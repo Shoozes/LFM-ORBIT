@@ -122,22 +122,22 @@ INFO:downlink_tx: Compressing payload... Transmitting cell-index flag to Ground 
 **2. Mission Control & Satellite Sweep**
 The autonomous **Satellite Agent** continuously scans Amazonian H3 cells, scoring spectral deltas to find regions suffering from loss of biomass (like deforestation). Hundreds of empty chunks are discarded locally in orbit, drastically saving downlink bandwidth.
 
-> Screenshots below are captured by the E2E suite (`npx playwright test capture_screenshots.spec.ts`). Run it against a live instance to populate `source/frontend/e2e/screenshots/`.
+> Screenshots below are captured by the E2E suite (`npx playwright test capture_screenshots.spec.ts`).
 
-![Mission Control Sweep](source/frontend/e2e/screenshots/05-mission-control-scanning.png)
+![Mission Control Sweep](docs/05-mission-control-scanning.png)
 
 **3. The Agent Dialogue Bus & Heartbeat**
 A continuous connection between Orbit (SAT) and Earth (GND). Notice the minimal, periodic **heartbeats** confirming the edge model is responsive, and the full chat-logs where only severe anomalies are transmitted down.
-![Agent Multimodality Eval](source/frontend/e2e/screenshots/02-agent-dialogue-bus.png)
-![Satellite Heartbeat](source/frontend/e2e/screenshots/01-satellite-heartbeat.png)
+![Agent Multimodality Eval](docs/02-agent-dialogue-bus.png)
+![Satellite Heartbeat](docs/01-satellite-heartbeat.png)
 
 **4. Ground Validation & Temporal Analysis**
 Once an anomaly is flagged, Ground Control analyzes the temporal evidence (pre- and post-event pixel values, NDVI drops).
-![Alert Temporal Evidence](source/frontend/e2e/screenshots/03-alert-analysis-verdict.png)
+![Alert Temporal Evidence](docs/03-alert-analysis-verdict.png)
 
 **5. Provider Settings & Offline Readiness**
 The inference engine configuration defaults to the **Offline LFM model**, ensuring no external AI dependencies are required for production.
-![Provider Settings](source/frontend/e2e/screenshots/04-settings-provider-model.png)
+![Provider Settings](docs/04-settings-provider-model.png)
 
 ---
 
