@@ -1,0 +1,115 @@
+# Dependencies
+node_modules/
+SimSat-main/
+
+# Python environment and cache
+.venv/
+source/backend/.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.gemini
+
+# Build and test output
+dist/
+playwright-report/
+test-results/
+source/frontend/playwright/.cache/
+source/frontend/e2e/screenshots/
+build/
+coverage/
+htmlcov/
+.coverage
+.eslintcache
+source/frontend/.vite/
+source/frontend/dist/
+source/frontend/playwright-report/
+source/frontend/test-results/
+source/backend/dist/
+
+# Local secrets
+.secrets/
+.tools/.secrets/
+.github/.secrets/
+
+# Local backups
+_backup/
+
+# Test outputs and QA logs
+*_output.txt
+*_output_after_fix.txt
+qa_audit_report.md
+source/frontend/vite.log
+source/backend/pytest_log.txt
+source/frontend/tailwind_log.txt
+source/frontend/errors.txt
+source/frontend/failure*.txt
+source/frontend/failing-tests*.txt
+source/frontend/lint-output.txt
+source/frontend/pipeline-results.txt
+source/frontend/short-test.txt
+source/frontend/test-output*.txt
+source/frontend/test-results.txt
+source/frontend/training-results.txt
+source/frontend/tsc-output.txt
+source/frontend/full-test-report.json
+source/frontend/test-results.json
+source/frontend/visual-layout-report.json
+source/frontend/out*.txt
+test_results.txt
+out-e2e.log
+e2e_log.txt
+*.log
+grep.txt
+nohup.out
+test_out.txt
+source/frontend/page_dump.html
+source/frontend/out.txt
+source/frontend/test-output.txt
+
+# Generated context and tool output
+code_references/
+_struct_summary.txt
+_structure_with_content.txt
+.tools/
+.agents/
+docs/unnamed.jpg
+source/backend/sidecar_crash.txt
+
+# Runtime data
+runtime-data/
+runtime/
+source/backend/assets/observation_store/
+models/
+unsloth_compiled_cache/
+_unsloth_sentencepiece_temp/
+source/backend/llama-b*-bin-*/
+
+# Tauri artifacts
+source/src-tauri/target/
+source/src-tauri/gen/
+source/src-tauri/sidecar/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+
+# PyInstaller
+*.pkg
+
+# Backup files
+*.bak
+
+_gen_controller.pyw
+_generate_structure.py
+AGENTS.md

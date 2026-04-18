@@ -1,0 +1,111 @@
+{
+  "defaults": {
+    "groups": [],
+    "tree": true,
+    "max_kb": 200,
+    "skip_dirs": [
+      ".DS_Store",
+      ".agents",
+      ".coverage",
+      ".eslintcache",
+      ".gemini",
+      ".git",
+      ".github",
+      ".idea",
+      ".mypy_cache",
+      ".pytest_cache",
+      ".ruff_cache",
+      ".secrets",
+      ".tools",
+      ".venv",
+      ".vscode",
+      "SimSat-main",
+      "Thumbs.db",
+      "__pycache__",
+      "_backup",
+      "_struct_summary.txt",
+      "_structure_with_content.txt",
+      "_unsloth_sentencepiece_temp",
+      "build",
+      "code_references",
+      "coverage",
+      "dist",
+      "docs",
+      "e2e_log.txt",
+      "grep.txt",
+      "htmlcov",
+      "models",
+      "node_modules",
+      "nohup.out",
+      "out-e2e.log",
+      "playwright-report",
+      "public",
+      "qa_audit_report.md",
+      "release",
+      "runtime",
+      "runtime-data",
+      "target",
+      "test",
+      "test-results",
+      "test_out.txt",
+      "test_results.txt",
+      "tests",
+      "unsloth_compiled_cache",
+      "venv"
+    ]
+  },
+  "groups": {},
+  "exclusions": {
+    "source": {
+      "note": "[collapsed (+)]"
+    },
+    "source/backend": {
+      "note": "[collapsed (+)]"
+    },
+    "source/backend/api": {
+      "note": "[collapsed (+)]"
+    },
+    "source/backend/assets": {
+      "note": "[collapsed (+)]"
+    },
+    "source/backend/assets/observation_store": {
+      "note": "[collapsed (+)]"
+    },
+    "source/backend/assets/seeded_data": {
+      "note": "[collapsed (+)]"
+    },
+    "source/backend/canopy_sentinel_backend.egg-info": {
+      "note": "[collapsed (+)]"
+    },
+    "source/backend/core": {
+      "note": "[collapsed (+)]"
+    },
+    "source/backend/scratch": {
+      "note": "[collapsed (+)]"
+    },
+    "source/backend/scripts": {
+      "note": "[collapsed (+)]"
+    },
+    "source/frontend": {
+      "note": "[collapsed (+)]"
+    },
+    "source/frontend/components": {
+      "note": "[collapsed (+)]"
+    },
+    "source/frontend/e2e": {
+      "note": "[collapsed (+)]"
+    },
+    "source/frontend/e2e/screenshots": {
+      "note": "[collapsed (+)]"
+    },
+    "source/frontend/hooks": {
+      "note": "[collapsed (+)]"
+    },
+    "source/frontend/types": {
+      "note": "[collapsed (+)]"
+    },
+    "source/frontend/utils": {
+      "note": "[collapsed (+)]"
+    }
+  }
+}

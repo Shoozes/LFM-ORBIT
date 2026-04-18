@@ -1,0 +1,33 @@
+steps:
+  - name: Install backend dependencies
+    run: |
+      cd source/backend
+      pip install fastapi uvicorn h3 pydantic websockets httpx requests numpy openai
+  - name: Install frontend dependencies
+    run: |
+      cd source/frontend
+      npm ci
+  - name: Install Playwright browsers
+    run: |
+      cd source/frontend
+      npx playwright install chromium --with-deps
+  - name: Configure Sentinel Hub credentials
+    env:
+      SENTINEL_HUB: ${{ secrets.SENTINEL_HUB }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    run: |
+      # Parse SENTINEL_HUB secret - expected format: client_id:client_secret
+      # Note: assumes client_secret does not contain colons
+      if [ -n "$SENTINEL_HUB" ]; then
+        export SENTINEL_CLIENT_ID=$(echo "$SENTINEL_HUB" | cut -d: -f1)
+        export SENTINEL_CLIENT_SECRET=$(echo "$SENTINEL_HUB" | cut -d: -f2)
+        echo "SENTINEL_CLIENT_ID=$SENTINEL_CLIENT_ID" >> "$GITHUB_ENV"
+        echo "SENTINEL_CLIENT_SECRET=$SENTINEL_CLIENT_SECRET" >> "$GITHUB_ENV"
+        echo "Sentinel Hub credentials configured from repo secret"
+      else
+        echo "SENTINEL_HUB secret not set - will use semi-real fallback"
+      fi
+      if [ -n "$OPENAI_API_KEY" ]; then
+        echo "OPENAI_API_KEY=$OPENAI_API_KEY" >> "$GITHUB_ENV"
+        echo "OpenAI API key configured from repo secret"
+      fi
