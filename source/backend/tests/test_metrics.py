@@ -5,6 +5,7 @@ from core.metrics import (
     init_metrics,
     read_metrics_summary,
     record_cycle_complete,
+    record_observability_telemetry,
     record_cycle_start,
     record_scan_result,
 )
@@ -48,6 +49,8 @@ def test_metrics_summary_tracks_cycles_and_examples(tmp_path):
     summary = read_metrics_summary()
 
     assert summary["total_cycles_completed"] == 1
+    assert summary["demo_mode_enabled"] is False
+    assert isinstance(summary["demo_mode_loop_scan"], bool)
     assert summary["total_cells_scanned"] == 2
     assert summary["total_alerts_emitted"] == 1
     assert summary["total_payload_bytes"] == 123
@@ -99,3 +102,52 @@ def test_init_metrics_no_reset_preserves_existing_state(tmp_path):
     assert summary_after["total_cells_scanned"] == 1
     assert summary_after["total_alerts_emitted"] == 1
     assert summary_after["total_cycles_completed"] == 1
+
+
+def test_observability_tracks_rejection_reasons_and_low_coverage(tmp_path, monkeypatch):
+    metrics_path = tmp_path / "demo_metrics_summary.json"
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(metrics_path))
+
+    init_metrics(reset=True)
+    record_scan_result(
+        cycle_index=1,
+        is_anomaly=False,
+        payload_bytes=0,
+        bandwidth_saved_mb=5.0,
+        discard_ratio=1.0,
+        flagged_example=None,
+    )
+    record_observability_telemetry(
+        total_time_ms=20.0,
+        peak_memory_mb=3.5,
+        is_rejected=True,
+        failures={},
+        stage_times={"Seasonal Baseline Loader": 0.01},
+        rejection_reason="insufficient_valid_pixels",
+    )
+
+    summary = read_metrics_summary()
+
+    assert summary["pct_scenes_rejected"] == 1.0
+    assert summary["pct_low_valid_coverage"] == 1.0
+    assert summary["runtime_rejections_by_reason"] == {"insufficient_valid_pixels": 1}
+    assert summary["peak_memory_mb"] == 3.5
+
+
+def test_observability_tracks_runtime_failures_by_stage(tmp_path, monkeypatch):
+    metrics_path = tmp_path / "demo_metrics_summary.json"
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(metrics_path))
+
+    init_metrics(reset=True)
+    record_observability_telemetry(
+        total_time_ms=12.0,
+        peak_memory_mb=0.0,
+        is_rejected=False,
+        failures={"Provider Fetch": "TimeoutError"},
+        stage_times={},
+    )
+
+    summary = read_metrics_summary()
+
+    assert summary["runtime_failures_by_stage"] == {"Provider Fetch": 1}
+    assert summary["runtime_rejections_by_reason"] == {}

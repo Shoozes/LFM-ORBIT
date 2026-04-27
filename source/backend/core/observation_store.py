@@ -112,7 +112,7 @@ def save_observation(
 
     # Mark training-ready once we have at least one satellite + one ground observation
     roles = {o["agent_role"] for o in record["observations"]}
-    record["training_ready"] = ("satellite" in roles or "ground" in roles)
+    record["training_ready"] = ("satellite" in roles and "ground" in roles)
 
     try:
         with open(path, "w") as f:
@@ -135,6 +135,20 @@ def list_observations(training_ready_only: bool = False) -> list[dict]:
             if training_ready_only and not rec.get("training_ready"):
                 continue
             records.append(rec)
-        except Exception:
+        except Exception as exc:
+            logger.debug("[OBS] Skipping unreadable observation %s: %s", path.name, exc)
             continue
     return records
+
+
+def clear_observations() -> int:
+    """Remove persisted observation records and return the number of deleted files."""
+    store = _ensure_dir()
+    deleted = 0
+    for path in store.glob("*.json"):
+        try:
+            path.unlink()
+            deleted += 1
+        except OSError as exc:
+            logger.warning("[OBS] Failed to delete observation %s: %s", path.name, exc)
+    return deleted

@@ -3,9 +3,12 @@
 These tests verify that all REST endpoints return expected data
 and comply with the locked contract schemas.
 """
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 
 from api.main import app
+from core.depth_anything import clear_depth_anything_runtime_override
 
 client = TestClient(app)
 
@@ -13,13 +16,12 @@ client = TestClient(app)
 def test_health_endpoint_returns_ok_status():
     """Health endpoint must return ok status."""
     response = client.get("/api/health")
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     assert data["status"] == "ok"
     assert "region_id" in data
-    assert "display_name" in data
     assert "display_name" in data
 
 
@@ -34,6 +36,7 @@ def test_health_endpoint_includes_alert_counts():
     assert "total_payload_bytes" in data
     assert isinstance(data["total_alerts"], int)
     assert isinstance(data["total_payload_bytes"], int)
+    assert data["demo_mode_enabled"] is False
 
 
 def test_recent_alerts_endpoint_returns_list():
@@ -68,15 +71,16 @@ def test_metrics_summary_endpoint_returns_structure():
     
     # Required fields
     assert "region_id" in data
-    assert "region_id" in data
     assert "total_cycles_completed" in data
     assert "total_cells_scanned" in data
     assert "total_alerts_emitted" in data
     assert "total_payload_bytes" in data
     assert "total_bandwidth_saved_mb" in data
     assert "latest_discard_ratio" in data
+    assert "runtime_rejections_by_reason" in data
     assert "flagged_examples" in data
-    
+
+    assert isinstance(data["runtime_rejections_by_reason"], dict)
     assert isinstance(data["flagged_examples"], list)
 
 
@@ -125,6 +129,48 @@ def test_analysis_status_endpoint_returns_model_info():
     assert "offline_lfm_v1" in data["models"]
     assert data["models"]["offline_lfm_v1"]["available"] is True
     assert "note" in data
+
+
+def test_analysis_status_endpoint_surfaces_manifest_metadata():
+    """Analysis status should surface resolved manifest/repo details for the optional model."""
+    with patch(
+        "api.main.llm_model_status",
+        return_value={
+            "name": "LFM2.5-VL-450M-Q4_0.gguf",
+            "loaded": False,
+            "path": "C:/tmp/model.gguf",
+            "repo_id": "jc816/lfm-orbit-satellite",
+            "revision": "main",
+            "source": "huggingface",
+            "manifest_path": "C:/tmp/model_manifest.json",
+            "mmproj_path": "C:/tmp/mmproj.gguf",
+            "source_handoff_path": "C:/tmp/source_handoff.json",
+            "source_handoff_present": True,
+            "training_result_manifest": "training_result_manifest.json",
+            "training_result_manifest_path": "C:/tmp/training_result_manifest.json",
+            "training_result_manifest_present": True,
+            "readme_path": "C:/tmp/README.md",
+            "readme_present": True,
+        },
+    ):
+        response = client.get("/api/analysis/status")
+
+    assert response.status_code == 200
+    data = response.json()
+    model = data["models"]["LFM2.5-VL-450M-Q4_0.gguf"]
+
+    assert model["repo_id"] == "jc816/lfm-orbit-satellite"
+    assert model["revision"] == "main"
+    assert model["source"] == "huggingface"
+    assert model["manifest_path"] == "C:/tmp/model_manifest.json"
+    assert model["mmproj_path"] == "C:/tmp/mmproj.gguf"
+    assert model["source_handoff_path"] == "C:/tmp/source_handoff.json"
+    assert model["source_handoff_present"] is True
+    assert model["training_result_manifest"] == "training_result_manifest.json"
+    assert model["training_result_manifest_path"] == "C:/tmp/training_result_manifest.json"
+    assert model["training_result_manifest_present"] is True
+    assert model["readme_path"] == "C:/tmp/README.md"
+    assert model["readme_present"] is True
 
 
 def test_analysis_alert_endpoint_returns_offline_result():
@@ -214,12 +260,224 @@ def test_provider_status_endpoint_returns_structure():
     assert "active_provider" in data
     assert "providers" in data
     assert "sentinel_credential_source" in data
+    assert "fallback_order" in data
+    assert isinstance(data["fallback_order"], list)
+    assert "simsat_mapbox" in data["providers"]
+    assert "nasa_api_direct" in data["providers"]
+
+
+def test_simsat_status_endpoint_includes_mapbox_metadata():
+    """SimSat status should expose optional Mapbox readiness without leaking the token."""
+    response = client.get("/api/simsat/status")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "mapbox_token_configured" in data
+    assert "mapbox_current" in data["endpoints"]
+    assert "mapbox_historical" in data["endpoints"]
+
+
+def test_simsat_status_tolerates_invalid_timeout_env(monkeypatch):
+    """Operator typos in .env should not break the Settings panel."""
+    monkeypatch.setenv("SIMSAT_TIMEOUT", "bad-timeout")
+
+    response = client.get("/api/simsat/status")
+
+    assert response.status_code == 200
+    assert response.json()["timeout_seconds"] == 30.0
+
+
+def test_temporal_use_cases_endpoint_returns_examples():
+    """Temporal use-case endpoint should expose examples for scan setup and dataset prep."""
+    response = client.get("/api/temporal/use-cases")
+
+    assert response.status_code == 200
+    data = response.json()
+    by_id = {item["id"]: item for item in data["use_cases"]}
+    assert "wildfire" in by_id
+    assert "maritime_activity" in by_id
+    assert "civilian_lifeline_disruption" in by_id
+    assert "ice_cap_growth" in by_id
+    assert by_id["wildfire"]["examples"]
+
+
+def test_temporal_classify_endpoint_auto_decides_use_case():
+    """Temporal classifier endpoint should choose a use case from mission-style payloads."""
+    response = client.post(
+        "/api/temporal/classify",
+        json={
+            "task_text": "Review glacier ice cap growth across same-season frames.",
+            "reason_codes": ["ice_extent_growth", "albedo_change"],
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == "ice_cap_growth"
+    assert data["examples"]
+
+
+def test_lifeline_assets_endpoint_returns_seed_assets():
+    """Lifeline assets endpoint should expose seeded before/after monitor targets."""
+    response = client.get("/api/lifelines/assets")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["count"] >= 3
+    assert any(asset["asset_id"] == "orbit_bridge_corridor" for asset in data["assets"])
+
+
+def test_lifeline_monitor_endpoint_downlinks_high_confidence_disruption():
+    """Lifeline monitor should turn valid high-confidence before/after changes into downlinks."""
+    response = client.post(
+        "/api/lifelines/monitor",
+        json={
+            "asset_id": "orbit_bridge_corridor",
+            "baseline_frame": {
+                "label": "before",
+                "date": "2025-01-01",
+                "source": "seeded_fixture",
+                "asset_ref": "before.png",
+            },
+            "current_frame": {
+                "label": "after",
+                "date": "2025-01-15",
+                "source": "seeded_fixture",
+                "asset_ref": "after.png",
+            },
+            "candidate": {
+                "event_type": "probable_access_obstruction",
+                "severity": "high",
+                "confidence": 0.88,
+                "bbox": [0.2, 0.25, 0.65, 0.75],
+                "civilian_impact": "public_mobility_disruption",
+                "why": "The current frame shows a bridge approach obstruction.",
+                "action": "downlink_now",
+            },
+            "task_text": "Before/after lifeline bridge disruption review.",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["mode"] == "orbit_lifeline_monitoring_v1"
+    assert data["decision"]["action"] == "downlink_now"
+    assert data["frames"]["pair_state"]["distinct_contextual_frames"] is True
+    assert data["use_case"]["id"] == "civilian_lifeline_disruption"
+
+
+def test_lifeline_monitor_endpoint_holds_downlink_without_frame_evidence():
+    """High-confidence candidates still need distinct before/after frame context."""
+    response = client.post(
+        "/api/lifelines/monitor",
+        json={
+            "asset_id": "orbit_bridge_corridor",
+            "baseline_frame": {"label": "before"},
+            "current_frame": {"label": "after"},
+            "candidate": {
+                "event_type": "probable_access_obstruction",
+                "severity": "high",
+                "confidence": 0.88,
+                "bbox": [0.2, 0.25, 0.65, 0.75],
+                "civilian_impact": "public_mobility_disruption",
+                "why": "The current frame shows a bridge approach obstruction.",
+                "action": "downlink_now",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["frames"]["pair_state"]["distinct_contextual_frames"] is False
+    assert data["decision"]["action"] == "defer"
+    assert data["decision"]["priority"] == "needs_context"
+
+
+def test_lifeline_monitor_endpoint_rejects_unknown_asset_id():
+    """Unknown seeded asset IDs should fail without running monitor work."""
+    response = client.post(
+        "/api/lifelines/monitor",
+        json={"asset_id": "missing_asset", "candidate": {}},
+    )
+
+    assert response.status_code == 400
+    assert "unknown lifeline asset_id" in response.json()["detail"]
+
+
+def test_lifeline_evaluate_endpoint_returns_metrics():
+    """Lifeline eval endpoint should expose schema and downlink recall metrics."""
+    response = client.post(
+        "/api/lifelines/evaluate",
+        json={
+            "cases": [
+                {
+                    "candidate": {
+                        "event_type": "probable_large_scale_disruption",
+                        "severity": "high",
+                        "confidence": 0.93,
+                        "bbox": [0.1, 0.1, 0.5, 0.6],
+                        "civilian_impact": "shipping_or_aid_disruption",
+                        "why": "Current frame shows severe access loss at the logistics hub.",
+                        "action": "downlink_now",
+                    },
+                    "expected_action": "downlink_now",
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["schema_valid"] == 1
+    assert data["downlink_now_recall"] == 1.0
+
+
+def test_lifeline_evaluate_endpoint_requires_cases():
+    """Empty eval payloads should fail fast instead of producing misleading metrics."""
+    response = client.post("/api/lifelines/evaluate", json={"cases": []})
+
+    assert response.status_code == 422
+
+
+def test_maritime_monitor_endpoint_returns_offline_investigation_plan():
+    """Maritime endpoint should return Orbit-native investigation planning."""
+    response = client.post(
+        "/api/maritime/monitor",
+        json={
+            "lat": 29.92,
+            "lon": 32.54,
+            "timestamp": "2025-03-15",
+            "task_text": "Review canal blockage and vessel queueing near a shipping lane.",
+            "anomaly_description": "dense vessel queue near a narrow channel",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["mode"] == "orbit_maritime_monitoring_v1"
+    assert data["use_case"]["id"] == "maritime_activity"
+    assert data["stac"]["disabled"] is True
+    assert len(data["investigation"]["directions"]) == 4
+    assert data["orbit_integration"]["separate_streamlit_app_required"] is False
+
+
+def test_maritime_monitor_endpoint_validates_coordinates():
+    """Invalid target coordinates should fail before any provider work starts."""
+    response = client.post(
+        "/api/maritime/monitor",
+        json={
+            "lat": 120,
+            "lon": 32.54,
+            "timestamp": "2025-03-15",
+        },
+    )
+
+    assert response.status_code == 422
 
 # ---------------------------------------------------------------------------
 # Timelapse endpoint tests
 # ---------------------------------------------------------------------------
-
-from unittest.mock import patch
 
 def test_timelapse_generate_endpoint_returns_webm():
     """Timelapse generation endpoint must return base64 WEBM structure."""
@@ -246,6 +504,7 @@ def test_timelapse_generate_endpoint_returns_webm():
         assert "video_b64" in data
         assert "frames_count" in data
         assert data["format"] == "webm"
+        assert data["provenance"]["kind"] == "live_fetch"
         assert data["video_b64"].startswith("data:video/webm;base64,")
 
 
@@ -273,7 +532,249 @@ def test_analysis_timelapse_endpoint_validates_bbox():
             "bbox": [-60.50, -3.50]  # Missing coords
         }
     )
-    
+
+    assert response.status_code == 422
+
+
+def test_timelapse_generate_endpoint_validates_bbox_shape():
+    """Timelapse generation endpoint rejects malformed bbox payloads before provider work."""
+    response = client.post(
+        "/api/timelapse/generate",
+        json={
+            "bbox": [-60.50, -3.50],
+            "start_date": "2024-01-01",
+            "end_date": "2024-12-31",
+            "steps": 5,
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_timelapse_generate_endpoint_validates_date_order():
+    """Timelapse generation endpoint rejects reversed date windows."""
+    response = client.post(
+        "/api/timelapse/generate",
+        json={
+            "bbox": [-60.50, -3.50, -60.40, -3.40],
+            "start_date": "2025-01-01",
+            "end_date": "2024-12-31",
+            "steps": 5,
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_mission_start_endpoint_validates_bbox_order():
+    """Mission start rejects bbox bounds that would break grid generation."""
+    response = client.post(
+        "/api/mission/start",
+        json={
+            "task_text": "Scan invalid area",
+            "bbox": [-60.40, -3.50, -60.50, -3.40],
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_mission_start_endpoint_validates_date_order():
+    """Mission start rejects reversed temporal windows."""
+    response = client.post(
+        "/api/mission/start",
+        json={
+            "task_text": "Scan reversed window",
+            "bbox": [-60.50, -3.50, -60.40, -3.40],
+            "start_date": "2025-01-01",
+            "end_date": "2024-01-01",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_vlm_endpoint_validates_bbox_shape():
+    """VLM helper endpoints share the strict bbox validator."""
+    response = client.post(
+        "/api/vlm/caption",
+        json={
+            "bbox": [-60.50, -3.50],
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_cell_imagery_rejects_unsupported_cell_ids():
+    """Imagery endpoint should not silently resolve unknown cell IDs to 0,0."""
+    response = client.get("/api/imagery/cell/not-a-cell")
+
+    assert response.status_code == 400
+    assert response.json()["error"] == "Unsupported or invalid cell_id"
+
+
+def test_depth_status_defaults_to_disabled(monkeypatch):
+    clear_depth_anything_runtime_override()
+    monkeypatch.delenv("DEPTH_ANYTHING_V3_ENABLED", raising=False)
+    monkeypatch.delenv("DEPTH_ANYTHING_V3_MODEL", raising=False)
+    monkeypatch.delenv("DEPTH_ANYTHING_V3_DEVICE", raising=False)
+
+    response = client.get("/api/depth/status")
+
     assert response.status_code == 200
-    data = response.json()
-    assert "error" in data
+    payload = response.json()
+    assert payload["feature"] == "depth_anything_v3"
+    assert payload["enabled"] is False
+    assert payload["available"] is False
+    assert payload["model_id"]
+    assert payload["package"] == "depth_anything_3"
+    assert payload["requested_device"] == "auto"
+    assert payload["device"] in {"cpu", "cuda"}
+
+
+def test_depth_toggle_is_runtime_scoped_and_nonfatal():
+    clear_depth_anything_runtime_override()
+
+    response = client.post("/api/depth/settings", json={"enabled": True})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["enabled"] is True
+    assert payload["source"] == "runtime"
+    assert "install_hint" in payload
+
+    response = client.post("/api/depth/settings", json={"enabled": False})
+    assert response.status_code == 200
+    assert response.json()["enabled"] is False
+
+    clear_depth_anything_runtime_override()
+
+
+def test_depth_estimate_returns_clear_error_when_disabled():
+    clear_depth_anything_runtime_override()
+
+    response = client.post("/api/depth/estimate", json={"image_b64": "not-image"})
+
+    assert response.status_code == 409
+    payload = response.json()
+    assert "Depth Anything V3 is disabled" in payload["error"]
+    assert payload["status"]["enabled"] is False
+
+
+def test_depth_estimate_rejects_malformed_image_before_model_load(monkeypatch):
+    clear_depth_anything_runtime_override()
+    monkeypatch.setenv("DEPTH_ANYTHING_V3_ENABLED", "true")
+
+    from core import depth_anything
+
+    monkeypatch.setattr(depth_anything, "_package_available", lambda: True)
+
+    def fail_model_load(config):
+        raise AssertionError("model should not load before image payload validation")
+
+    monkeypatch.setattr(depth_anything, "_get_model", fail_model_load)
+
+    response = client.post("/api/depth/estimate", json={"image_b64": "not-image"})
+
+    assert response.status_code == 400
+    assert "valid base64 image data" in response.json()["error"]
+
+    clear_depth_anything_runtime_override()
+
+
+def test_runtime_reset_endpoint_clears_mutable_runtime_state(tmp_path, monkeypatch):
+    """Runtime reset endpoint should clear alerts, missions, bus state, gallery, and metrics."""
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+
+    from core.agent_bus import init_bus, post_message, upsert_pin
+    from core.gallery import add_gallery_item
+    from core.metrics import seed_metrics_summary
+    from core.mission import start_mission
+    from core.queue import init_db, push_alert
+
+    init_db(reset=True)
+    init_bus(reset=True)
+
+    start_mission("Seeded runtime state")
+    post_message(
+        sender="satellite",
+        recipient="ground",
+        msg_type="flag",
+        cell_id="sq_-10.0_-63.0",
+        payload={"note": "Runtime reset test."},
+    )
+    upsert_pin(
+        pin_type="satellite",
+        cell_id="sq_-10.0_-63.0",
+        lat=-10.0,
+        lng=-63.0,
+        label="SAT ◆ sq_-10.0",
+        note="Reset me.",
+    )
+    push_alert(
+        event_id="evt_reset",
+        region_id="seeded_replay",
+        cell_id="sq_-10.0_-63.0",
+        change_score=0.82,
+        confidence=0.94,
+        priority="critical",
+        reason_codes=["ndvi_drop", "soil_exposure_spike"],
+        payload_bytes=123,
+        observation_source="seeded_replay",
+    )
+    add_gallery_item(
+        cell_id="sq_-10.0_-63.0",
+        lat=-10.0,
+        lng=-63.0,
+        severity="critical",
+        change_score=0.82,
+        mission_id=1,
+        fetch_thumb=False,
+        context_thumb="data:image/png;base64,stub",
+    )
+    seed_metrics_summary(
+        {
+            "total_cells_scanned": 4,
+            "total_alerts_emitted": 1,
+            "total_cycles_completed": 1,
+        }
+    )
+
+    response = client.post("/api/runtime/reset")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "reset"
+    assert payload["before"]["alerts"] == 1
+    assert payload["before"]["agent_messages"] == 1
+    assert payload["before"]["map_pins"] == 1
+    assert payload["before"]["gallery_items"] == 1
+    assert payload["before"]["missions"] == 1
+    assert payload["before"]["metrics_total_cells_scanned"] == 4
+    assert payload["before"]["metrics_total_alerts_emitted"] == 1
+    assert payload["after"]["alerts"] == 0
+    assert payload["after"]["agent_messages"] == 0
+    assert payload["after"]["map_pins"] == 0
+    assert payload["after"]["gallery_items"] == 0
+    assert payload["after"]["missions"] == 0
+    assert payload["after"]["metrics_total_cells_scanned"] == 0
+    assert payload["after"]["metrics_total_alerts_emitted"] == 0
+
+
+def test_map_pin_endpoint_rejects_out_of_range_coordinates():
+    response = client.post(
+        "/api/map/pins",
+        json={"lat": 91.0, "lng": -60.0, "note": "invalid latitude"},
+    )
+
+    assert response.status_code == 422
+
+    response = client.post(
+        "/api/map/pins",
+        json={"lat": -3.0, "lng": -181.0, "note": "invalid longitude"},
+    )
+
+    assert response.status_code == 422

@@ -1,10 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import maplibregl, { GeoJSONSource, LngLatBoundsLike, Map as MaplibreMap, Marker } from "maplibre-gl";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import maplibregl, { GeoJSONSource, LngLatBoundsLike, Map as MaplibreMap, Marker, type PointLike } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { OrbitalScanEventDetail } from "../types/telemetry";
 import { useMapPins } from "../hooks/useMapPins";
 import type { MapPin } from "../hooks/useMapPins";
 import type { VlmBox } from "./VlmPanel";
+
+type SpatialMenuState = {
+  x: number;
+  y: number;
+  lng: number;
+  lat: number;
+  cellId: string | null;
+};
 
 type MapVisualizerProps = {
   geoJsonGrid: GeoJSON.FeatureCollection | null;
@@ -24,7 +32,7 @@ type MapVisualizerProps = {
 
 const LOCAL_MAP_STYLE = {
   version: 8,
-  name: "Canopy Sentinel Satellite Style",
+  name: "LFM Orbit Satellite Style",
   glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
   sources: {
     "esri-satellite": {
@@ -72,6 +80,10 @@ const LOCAL_MAP_STYLE = {
   ],
 };
 
+const SPATIAL_MENU_WIDTH = 256;
+const SPATIAL_MENU_HEIGHT = 230;
+const SPATIAL_MENU_MARGIN = 12;
+
 function getGridBounds(geoJsonGrid: GeoJSON.FeatureCollection): LngLatBoundsLike | null {
   const coordinates: number[][] = [];
   for (const feature of geoJsonGrid.features) {
@@ -87,6 +99,38 @@ function getGridBounds(geoJsonGrid: GeoJSON.FeatureCollection): LngLatBoundsLike
     [Math.min(...lngs), Math.min(...lats)],
     [Math.max(...lngs), Math.max(...lats)],
   ];
+}
+
+function getGeoJsonSource(map: MaplibreMap | null, sourceId: string): GeoJSONSource | null {
+  if (!map || !map.isStyleLoaded()) return null;
+  const source = map.getSource(sourceId);
+  if (!source || !("setData" in source)) return null;
+  return source as GeoJSONSource;
+}
+
+function setFeatureStateIfReady(
+  map: MaplibreMap | null,
+  sourceId: string,
+  id: string | number | null | undefined,
+  state: Record<string, unknown>,
+): boolean {
+  if (!map || id == null || !map.isStyleLoaded() || !map.getSource(sourceId)) return false;
+  try {
+    map.setFeatureState({ source: sourceId, id }, state);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function getTargetCellIdAtPoint(map: MaplibreMap, point: PointLike): string | null {
+  if (!map.getLayer("scan-grid-fill")) return null;
+  try {
+    const features = map.queryRenderedFeatures(point, { layers: ["scan-grid-fill"] });
+    return typeof features[0]?.properties?.cell_id === "string" ? features[0].properties.cell_id : null;
+  } catch {
+    return null;
+  }
 }
 
 // ── Marker builders ──────────────────────────────────────────────────────────
@@ -128,35 +172,38 @@ function buildMarkerEl(pin: MapPin, onRemove: (id: number) => void, onClick: (ce
   if (pin.severity === "critical") severityRing = "box-shadow: 0 0 0 2px #ef4444, " + shadow + ";";
   else if (pin.severity === "high") severityRing = "box-shadow: 0 0 0 2px #f97316, " + shadow + ";";
 
-  const labelHtml = pin.label ? `
-    <span style="letter-spacing:0.02em; opacity:0.9; max-width:60px; overflow:hidden; text-overflow:ellipsis;">
-      ${pin.label.length > 10 ? pin.label.slice(0, 10) + "…" : pin.label}
-    </span>
-  ` : "";
-
-  el.innerHTML = `
-    <div class="map-pin-bubble" style="
-      display: flex; align-items: center; gap: ${pin.label ? '4px' : '0'};
-      background: ${bg};
-      border: 1.5px solid ${border};
-      border-radius: 100px;
-      padding: ${pin.label ? '2px 5px 2px 4px' : '2px 4px'};
-      font-family: ui-monospace, monospace;
-      font-size: 9px;
-      font-weight: 600;
-      color: ${textColor};
-      box-shadow: ${severityRing || shadow};
-      white-space: nowrap;
-      transition: transform 0.15s ease;
-      transform-origin: center center;
-    ">
-      <span style="font-size:10px; line-height:1;">${symbol}</span>
-      ${labelHtml}
-    </div>
+  const bubble = document.createElement("div");
+  bubble.className = "map-pin-bubble";
+  bubble.style.cssText = `
+    display: flex; align-items: center; gap: ${pin.label ? "4px" : "0"};
+    background: ${bg};
+    border: 1.5px solid ${border};
+    border-radius: 100px;
+    padding: ${pin.label ? "2px 5px 2px 4px" : "2px 4px"};
+    font-family: ui-monospace, monospace;
+    font-size: 9px;
+    font-weight: 600;
+    color: ${textColor};
+    box-shadow: ${severityRing || shadow};
+    white-space: nowrap;
+    transition: transform 0.15s ease;
+    transform-origin: center center;
   `;
 
+  const symbolEl = document.createElement("span");
+  symbolEl.style.cssText = "font-size:10px; line-height:1;";
+  symbolEl.textContent = symbol;
+  bubble.appendChild(symbolEl);
+
+  if (pin.label) {
+    const labelEl = document.createElement("span");
+    labelEl.style.cssText = "letter-spacing:0.02em; opacity:0.9; max-width:60px; overflow:hidden; text-overflow:ellipsis;";
+    labelEl.textContent = pin.label.length > 10 ? `${pin.label.slice(0, 10)}…` : pin.label;
+    bubble.appendChild(labelEl);
+  }
+  el.appendChild(bubble);
+
   // Tooltip on hover
-  const bubble = el.querySelector(".map-pin-bubble") as HTMLElement;
   const tooltipText = pin.note
     ? `${pin.label}\n${pin.note}`
     : pin.label;
@@ -207,10 +254,12 @@ export default function MapVisualizer({
 }: MapVisualizerProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MaplibreMap | null>(null);
+  const firstMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const previousSelectedCellId = useRef<string | null>(null);
   const didFitBounds = useRef(false);
   // Use a plain object as a map from pin id → Marker to avoid clash with MapLibre Map type
   const markerRefs = useRef<Record<number, Marker>>({});
+  const pinTooltipTimeoutRef = useRef<number | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [shiftHeld, setShiftHeld] = useState(false);
   const [pinTooltip, setPinTooltip] = useState<string | null>(null);
@@ -218,17 +267,39 @@ export default function MapVisualizer({
   // Satellite sweeping effect
   const cellCentroidsRef = useRef<Record<string, [number, number]>>({});
   const sweepTimeoutRef = useRef<number | null>(null);
+  const scanStateTimeoutsRef = useRef<Set<number>>(new Set());
 
   // Bbox draw state
   const bboxStartRef = useRef<[number, number] | null>(null);
   const [bboxPreview, setBboxPreview] = useState<number[] | null>(null);
 
-
-
   // Context Menu state
-  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, lng: number, lat: number, cellId: string | null } | null>(null);
+  const [contextMenu, setContextMenu] = useState<SpatialMenuState | null>(null);
 
-  const { pins, dropPin, removePin } = useMapPins();
+  const { pins, dropPin, removePin, error: pinError } = useMapPins();
+
+  const showPinTooltip = useCallback((message: string) => {
+    if (pinTooltipTimeoutRef.current) {
+      window.clearTimeout(pinTooltipTimeoutRef.current);
+    }
+    setPinTooltip(message);
+    pinTooltipTimeoutRef.current = window.setTimeout(() => {
+      setPinTooltip(null);
+      pinTooltipTimeoutRef.current = null;
+    }, 3000);
+  }, []);
+
+  const clearPinTooltip = useCallback(() => {
+    if (pinTooltipTimeoutRef.current) {
+      window.clearTimeout(pinTooltipTimeoutRef.current);
+      pinTooltipTimeoutRef.current = null;
+    }
+    setPinTooltip(null);
+  }, []);
+
+  useEffect(() => {
+    if (pinError) clearPinTooltip();
+  }, [pinError, clearPinTooltip]);
 
   // Mutable refs to resolve stale closures during single-mount map hooks
   const onCellClickRef = useRef(onCellClick);
@@ -248,6 +319,41 @@ export default function MapVisualizer({
     return getGridBounds(geoJsonGrid);
   }, [geoJsonGrid]);
 
+  const clampMenuPosition = (x: number, y: number) => {
+    const container = mapRef.current?.getContainer() ?? mapContainer.current;
+    const width = container?.clientWidth ?? SPATIAL_MENU_WIDTH;
+    const height = container?.clientHeight ?? SPATIAL_MENU_HEIGHT;
+    return {
+      x: Math.min(Math.max(SPATIAL_MENU_MARGIN, x), Math.max(SPATIAL_MENU_MARGIN, width - SPATIAL_MENU_WIDTH - SPATIAL_MENU_MARGIN)),
+      y: Math.min(Math.max(SPATIAL_MENU_MARGIN, y), Math.max(SPATIAL_MENU_MARGIN, height - SPATIAL_MENU_HEIGHT - SPATIAL_MENU_MARGIN)),
+    };
+  };
+
+  const openSpatialMenu = (
+    x: number,
+    y: number,
+    lng: number,
+    lat: number,
+    targetCellId: string | null,
+  ) => {
+    const position = clampMenuPosition(x, y);
+    setContextMenu({
+      ...position,
+      lng,
+      lat,
+      cellId: targetCellId,
+    });
+  };
+
+  const openSpatialMenuAtMapCenter = () => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    const center = map.getCenter();
+    const point = map.project(center);
+    const cellId = getTargetCellIdAtPoint(map, point);
+    openSpatialMenu(point.x, point.y, center.lng, center.lat, cellId);
+  };
+
   // Track shift key
   useEffect(() => {
     const down = (e: KeyboardEvent) => { if (e.key === "Shift") setShiftHeld(true); };
@@ -256,6 +362,11 @@ export default function MapVisualizer({
     window.addEventListener("keyup", up);
     return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
   }, []);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    window.setTimeout(() => firstMenuButtonRef.current?.focus(), 0);
+  }, [contextMenu]);
 
   // Map init
   useEffect(() => {
@@ -399,9 +510,11 @@ export default function MapVisualizer({
       map.on("click", (event) => {
         if (!event.originalEvent.shiftKey || drawBboxActiveRef.current) return;
         const { lng, lat } = event.lngLat;
-        void dropPinRef.current(lat, lng);
-        setPinTooltip(`★ Operator pin dropped at ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-        window.setTimeout(() => setPinTooltip(null), 3000);
+        void dropPinRef.current(lat, lng).then((saved) => {
+          if (saved) {
+            showPinTooltip(`★ Operator pin dropped at ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+          }
+        });
       });
 
       // Mouse drag for bbox
@@ -459,18 +572,9 @@ export default function MapVisualizer({
         event.originalEvent.preventDefault();
         
         let targetCellId: string | null = null;
-        const features = map.queryRenderedFeatures(event.point, { layers: ["scan-grid-fill"] });
-        if (features.length > 0 && typeof features[0].properties?.cell_id === "string") {
-          targetCellId = features[0].properties.cell_id;
-        }
+        targetCellId = getTargetCellIdAtPoint(map, event.point);
 
-        setContextMenu({
-          x: event.point.x,
-          y: event.point.y,
-          lng: event.lngLat.lng,
-          lat: event.lngLat.lat,
-          cellId: targetCellId
-        });
+        openSpatialMenu(event.point.x, event.point.y, event.lngLat.lng, event.lngLat.lat, targetCellId);
       });
 
       map.on("dragstart", () => {
@@ -487,6 +591,18 @@ export default function MapVisualizer({
     });
 
     return () => {
+      if (sweepTimeoutRef.current) {
+        window.clearTimeout(sweepTimeoutRef.current);
+        sweepTimeoutRef.current = null;
+      }
+      if (pinTooltipTimeoutRef.current) {
+        window.clearTimeout(pinTooltipTimeoutRef.current);
+        pinTooltipTimeoutRef.current = null;
+      }
+      for (const timeoutId of scanStateTimeoutsRef.current) {
+        window.clearTimeout(timeoutId);
+      }
+      scanStateTimeoutsRef.current.clear();
       map.remove();
       mapRef.current = null;
     };
@@ -513,8 +629,8 @@ export default function MapVisualizer({
     }
     cellCentroidsRef.current = centroids;
 
-    const source = map.getSource("scan-grid") as GeoJSONSource | undefined;
-    if (source?.setData) source.setData(geoJsonGrid);
+    const source = getGeoJsonSource(map, "scan-grid");
+    source?.setData(geoJsonGrid);
     if (!didFitBounds.current && gridBounds) {
       map.fitBounds(gridBounds, { padding: 40, duration: 0 });
       didFitBounds.current = true;
@@ -526,13 +642,10 @@ export default function MapVisualizer({
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
     if (previousSelectedCellId.current && previousSelectedCellId.current !== selectedCellId) {
-      map.setFeatureState(
-        { source: "scan-grid", id: previousSelectedCellId.current },
-        { isSelected: false },
-      );
+      setFeatureStateIfReady(map, "scan-grid", previousSelectedCellId.current, { isSelected: false });
     }
     if (selectedCellId) {
-      map.setFeatureState({ source: "scan-grid", id: selectedCellId }, { isSelected: true });
+      setFeatureStateIfReady(map, "scan-grid", selectedCellId, { isSelected: true });
       previousSelectedCellId.current = selectedCellId;
     }
   }, [selectedCellId]);
@@ -546,45 +659,49 @@ export default function MapVisualizer({
       const { cell_id: cellId, is_anomaly: isAnomaly } = scanEvent.detail;
       
       // Update cell visual
-      map.setFeatureState({ source: "scan-grid", id: cellId }, { isScanned: true });
+      setFeatureStateIfReady(map, "scan-grid", cellId, { isScanned: true });
       
       // Move realtime footprint array
       const centroid = cellCentroidsRef.current[cellId];
       if (centroid) {
-         const footprintSource = map.getSource("satellite-footprint") as GeoJSONSource | undefined;
-         if (footprintSource?.setData) {
-            footprintSource.setData({
-               type: "FeatureCollection",
-               features: [{
-                 type: "Feature",
-                 geometry: { type: "Point", coordinates: centroid },
-                 properties: {}
-               }]
-            });
-         }
+         const footprintSource = getGeoJsonSource(map, "satellite-footprint");
+         footprintSource?.setData({
+            type: "FeatureCollection",
+            features: [{
+              type: "Feature",
+              geometry: { type: "Point", coordinates: centroid },
+              properties: {}
+            }]
+         });
          
          if (sweepTimeoutRef.current) window.clearTimeout(sweepTimeoutRef.current);
          sweepTimeoutRef.current = window.setTimeout(() => {
             const m = mapRef.current;
-            if (m?.isStyleLoaded()) {
-               const s = m.getSource("satellite-footprint") as GeoJSONSource | undefined;
-               s?.setData({ type: "FeatureCollection", features: [] });
-            }
-         }, 350);
+            const s = getGeoJsonSource(m, "satellite-footprint");
+            s?.setData({ type: "FeatureCollection", features: [] });
+          }, 350);
       }
       
       
-      window.setTimeout(() => {
+      const timeoutId = window.setTimeout(() => {
+        scanStateTimeoutsRef.current.delete(timeoutId);
         const currentMap = mapRef.current;
-        if (!currentMap) return;
-        currentMap.setFeatureState(
-          { source: "scan-grid", id: cellId },
-          { isScanned: true, isAnomaly, isDiscarded: !isAnomaly },
-        );
+        setFeatureStateIfReady(currentMap, "scan-grid", cellId, {
+          isScanned: true,
+          isAnomaly,
+          isDiscarded: !isAnomaly,
+        });
       }, 120);
+      scanStateTimeoutsRef.current.add(timeoutId);
     };
     window.addEventListener("orbital-scan", handleScan);
-    return () => window.removeEventListener("orbital-scan", handleScan);
+    return () => {
+      window.removeEventListener("orbital-scan", handleScan);
+      for (const timeoutId of scanStateTimeoutsRef.current) {
+        window.clearTimeout(timeoutId);
+      }
+      scanStateTimeoutsRef.current.clear();
+    };
   }, []);
 
 
@@ -594,7 +711,7 @@ export default function MapVisualizer({
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
-    const source = map.getSource("bbox-preview");
+    const source = getGeoJsonSource(map, "bbox-preview");
     if (!source) return;
     
     const activeBbox = bboxPreview ?? drawnBbox;
@@ -612,9 +729,9 @@ export default function MapVisualizer({
           properties: {}
         }]
       };
-      (source as maplibregl.GeoJSONSource).setData(data);
+      source.setData(data);
     } else {
-      (source as maplibregl.GeoJSONSource).setData({ type: "FeatureCollection", features: [] });
+      source.setData({ type: "FeatureCollection", features: [] });
     }
   }, [bboxPreview, drawnBbox, mapReady]);
 
@@ -648,7 +765,7 @@ export default function MapVisualizer({
       
       // Upgrade grid color to Alert! if it's confirmed by ground agent
       if (pin.pin_type === "ground" && pin.cell_id) {
-         map.setFeatureState({ source: "scan-grid", id: pin.cell_id }, { isAlert: true, isAnomaly: false });
+         setFeatureStateIfReady(map, "scan-grid", pin.cell_id, { isAlert: true, isAnomaly: false });
       }
     }
   }, [pins, mapReady, removePin]);
@@ -784,12 +901,35 @@ export default function MapVisualizer({
         </div>
       </div>
 
+      <button
+        type="button"
+        data-testid="map-actions-button"
+        aria-label="Open spatial options at map center"
+        title="Open spatial options at map center"
+        className="absolute bottom-5 right-5 z-20 rounded border border-white/15 bg-zinc-950/70 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100 shadow-lg backdrop-blur-md transition hover:border-cyan-300/60 hover:bg-cyan-950/70 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={!mapReady}
+        onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          openSpatialMenuAtMapCenter();
+        }}
+      >
+        Map Actions
+      </button>
+
       {/* Operator Right Click Context Menu */}
       {contextMenu && (
         <div 
-          className="absolute z-50 rounded-xl border border-white/10 bg-zinc-900/60 backdrop-blur-md shadow-[0_4px_30px_rgba(0,0,0,0.5)] py-2 outline-none flex flex-col w-64"
+          role="menu"
+          aria-label="Spatial options"
+          className="absolute z-50 rounded-xl border border-white/10 bg-zinc-900/75 backdrop-blur-md shadow-[0_4px_30px_rgba(0,0,0,0.5)] py-2 outline-none flex flex-col w-64"
           style={{ top: contextMenu.y, left: contextMenu.x }}
           onMouseLeave={() => setContextMenu(null)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setContextMenu(null);
+            }
+          }}
         >
           <div className="px-3 pb-2 mb-2 border-b border-gray-800 flex items-center justify-between">
             <span className="text-[9px] uppercase tracking-[0.2em] font-mono text-cyan-500">Spatial Options</span>
@@ -797,7 +937,9 @@ export default function MapVisualizer({
           </div>
           
           <button 
+            ref={firstMenuButtonRef}
             type="button"
+            role="menuitem"
             className="text-left px-4 py-2 text-xs font-mono text-gray-300 hover:bg-cyan-900/40 hover:text-cyan-300 transition-colors"
             onClick={() => {
               const buffer = 0.05;
@@ -811,6 +953,7 @@ export default function MapVisualizer({
           
           <button 
              type="button"
+             role="menuitem"
              className="text-left px-4 py-2 text-xs font-mono text-gray-300 hover:bg-cyan-900/40 hover:text-cyan-300 transition-colors"
              onClick={() => {
               const buffer = 0.05;
@@ -824,6 +967,7 @@ export default function MapVisualizer({
           
           <button 
              type="button"
+             role="menuitem"
              className="text-left px-4 py-2 text-xs font-mono text-cyan-300 hover:bg-cyan-800 hover:text-white transition-colors border-y border-gray-800 my-1 font-semibold"
              onClick={() => {
               const buffer = 0.05;
@@ -837,9 +981,14 @@ export default function MapVisualizer({
           
           <button 
              type="button"
+             role="menuitem"
              className="text-left px-4 py-2 text-xs font-mono text-emerald-400 hover:bg-emerald-900/40 hover:text-emerald-300 transition-colors"
              onClick={() => {
-              void dropPin(contextMenu.lat, contextMenu.lng);
+              void dropPin(contextMenu.lat, contextMenu.lng).then((saved) => {
+                if (saved) {
+                  showPinTooltip(`★ Operator pin dropped at ${contextMenu.lat.toFixed(4)}, ${contextMenu.lng.toFixed(4)}`);
+                }
+              });
               setContextMenu(null);
              }}
           >
@@ -862,6 +1011,12 @@ export default function MapVisualizer({
       {pinTooltip && (
         <div className="absolute bottom-16 left-1/2 -translate-x-1/2 rounded-xl border border-amber-800/60 bg-black/80 px-4 py-2 text-xs text-amber-300 backdrop-blur-sm transition-all">
           {pinTooltip}
+        </div>
+      )}
+
+      {pinError && (
+        <div className="absolute bottom-16 left-1/2 max-w-[min(90%,32rem)] -translate-x-1/2 rounded-xl border border-red-900/60 bg-red-950/80 px-4 py-2 text-xs text-red-100 shadow-lg backdrop-blur-sm">
+          {pinError}
         </div>
       )}
 

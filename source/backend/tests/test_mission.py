@@ -33,11 +33,37 @@ def test_start_mission_with_bbox():
     assert m["bbox"] == bbox
 
 
+def test_start_mission_rejects_empty_task_text():
+    from core.mission import start_mission
+    with pytest.raises(ValueError, match="task_text"):
+        start_mission("   ")
+
+
+def test_start_mission_rejects_invalid_bbox():
+    from core.mission import start_mission
+    with pytest.raises(ValueError, match="west < east"):
+        start_mission("Bad bounds", bbox=[-60.0, -4.0, -62.0, -2.0])
+
+
+def test_start_mission_rejects_invalid_mode():
+    from core.mission import start_mission
+    with pytest.raises(ValueError, match="mission_mode"):
+        start_mission("Bad mode", mission_mode="demo")
+
+
 def test_start_mission_with_dates():
     from core.mission import start_mission
     m = start_mission("Temporal scan", start_date="2024-01-01", end_date="2024-06-30")
     assert m["start_date"] == "2024-01-01"
     assert m["end_date"] == "2024-06-30"
+
+
+def test_start_mission_auto_classifies_temporal_use_case():
+    from core.mission import start_mission
+    m = start_mission("Scan maritime vessel wakes near the harbor for AIS mismatch")
+    assert m["use_case_id"] == "maritime_activity"
+    assert m["use_case_confidence"] > 0
+    assert m["use_case_decision"]["target_task"] == "maritime_temporal_monitoring"
 
 
 def test_start_mission_deactivates_previous():

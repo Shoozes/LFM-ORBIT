@@ -20,6 +20,7 @@ import asyncio
 import logging
 from core.agent_bus import post_message, pull_messages, upsert_pin
 from core.grid import cell_to_boundary, cell_to_latlng
+from core.mission import get_active_mission
 from core.analyzer import analyze_alert, analyze_timelapse
 from core.gallery import add_gallery_item
 from core.link_state import is_link_connected
@@ -87,10 +88,19 @@ def _build_confirmation(cell_id: str, analysis: dict, flag_payload: dict, timela
     }
 
 
-def _build_reject(cell_id: str, reason: str) -> dict:
+def _build_reject(cell_id: str, reason: str, flag_payload: dict | None = None) -> dict:
+    flag_payload = flag_payload or {}
     return {
         "severity": "rejected",
         "action": "REJECT — below confirmation threshold.",
+        "reason": reason,
+        "change_score": float(flag_payload.get("change_score", 0.0)),
+        "confidence": float(flag_payload.get("confidence", 0.0)),
+        "reason_codes": list(flag_payload.get("reason_codes", [])),
+        "observation_source": str(flag_payload.get("observation_source", "unknown")),
+        "before_window": dict(flag_payload.get("before_window", {})) if flag_payload.get("before_window") else None,
+        "after_window": dict(flag_payload.get("after_window", {})) if flag_payload.get("after_window") else None,
+        "demo_forced_anomaly": bool(flag_payload.get("demo_forced_anomaly", False)),
         "note": (
             f"Ground review of {cell_id} complete. "
             f"Signal does not meet confirmation threshold. Reason: {reason}. "
@@ -99,11 +109,11 @@ def _build_reject(cell_id: str, reason: str) -> dict:
     }
 
 
-def _generate_cell_timelapse(cell_id: str) -> tuple[str | None, str | None]:
+def _generate_cell_timelapse(cell_id: str) -> tuple[str | None, str | None, str | None]:
     """
-    Generate a timelapse MP4 for the cell's bounding box and run temporal analysis.
+    Generate a timelapse WebM for the cell's bounding box and run temporal analysis.
 
-    Returns (video_b64, analysis_text). Both can be None on failure.
+    Returns (video_b64, analysis_text, source). Values can be None on failure.
     This is run in a thread pool since timelapse generation is I/O-heavy.
     """
     from core.config import REGION
@@ -118,15 +128,20 @@ def _generate_cell_timelapse(cell_id: str) -> tuple[str | None, str | None]:
             steps=12,
         )
         video_b64 = result.get("video_b64")
+        timelapse_source = (
+            (result.get("provenance") or {}).get("kind")
+            if isinstance(result.get("provenance"), dict)
+            else None
+        ) or result.get("source") or result.get("provider")
 
         # Now run the temporal signal analysis over the same bbox
         analysis_text = analyze_timelapse(bbox)
         logger.info("[GND] Timelapse generated for %s: %d frames. Analysis: %s",
                     cell_id, result.get("frames_count", 0), analysis_text[:80])
-        return video_b64, analysis_text
+        return video_b64, analysis_text, str(timelapse_source) if timelapse_source else None
     except Exception as exc:
         logger.warning("[GND] Timelapse generation failed for %s: %s", cell_id, exc)
-        return None, None
+        return None, None, None
 
 
 async def run_ground_agent(stop_event: asyncio.Event | None = None) -> None:
@@ -149,12 +164,17 @@ async def run_ground_agent(stop_event: asyncio.Event | None = None) -> None:
         },
     )
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     while True:
         if stop_event and stop_event.is_set():
             logger.info("[GND] Stop event received. Shutting down.")
             break
+
+        mission = get_active_mission()
+        if mission and mission.get("mission_mode") == "replay":
+            await asyncio.sleep(_POLL_INTERVAL)
+            continue
 
         # --- Link state check ---
         if not is_link_connected():
@@ -208,10 +228,11 @@ async def run_ground_agent(stop_event: asyncio.Event | None = None) -> None:
                 # Only generate for confirmed-worthy alerts (moderate / high / critical)
                 video_b64: str | None = None
                 timelapse_analysis: str | None = None
+                timelapse_source: str | None = None
 
                 if severity in ("critical", "high", "moderate"):
                     # Run blocking timelapse generation in threadpool so we don't stall the event loop
-                    video_b64, timelapse_analysis = await loop.run_in_executor(
+                    video_b64, timelapse_analysis, timelapse_source = await loop.run_in_executor(
                         None, _generate_cell_timelapse, cell_id
                     )
 
@@ -229,6 +250,7 @@ async def run_ground_agent(stop_event: asyncio.Event | None = None) -> None:
                             ),
                             "timelapse_analysis": tl_note,
                             "has_timelapse": video_b64 is not None,
+                            "timelapse_source": timelapse_source,
                         },
                     )
 
@@ -266,13 +288,14 @@ async def run_ground_agent(stop_event: asyncio.Event | None = None) -> None:
                             fetch_thumb=True,
                             timelapse_b64=video_b64,
                             timelapse_analysis=timelapse_analysis,
+                            timelapse_source=timelapse_source,
                         )
                     except Exception as gallery_exc:
                         logger.warning("[GND] Gallery/pin update failed for %s: %s", cell_id, gallery_exc)
                     logger.info("[GND] → SAT CONFIRM %s | %s | timelapse=%s",
                                 cell_id, severity.upper(), "yes" if video_b64 else "no")
                 else:
-                    reject = _build_reject(cell_id, "composite score too low for escalation")
+                    reject = _build_reject(cell_id, "composite score too low for escalation", flag_payload)
                     post_message(
                         sender=_GROUND_SENDER,
                         recipient=_SATELLITE_RECIPIENT,

@@ -75,7 +75,7 @@ class _CallbackHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def log_message(self, format, *args):
-        pass  # Suppress request logging
+        return None
 
 
 def _save_token(token_response: dict) -> None:

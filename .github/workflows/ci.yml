@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync backend dependencies
+        working-directory: source/backend
+        run: uv sync --extra dev --locked
+
+      - name: Run backend tests
+        working-directory: source/backend
+        run: uv run --no-sync pytest
+
+  frontend:
+    name: Frontend Typecheck and Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: source/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: source/frontend
+        run: npm ci
+
+      - name: Typecheck frontend
+        working-directory: source/frontend
+        run: npm run lint
+
+      - name: Build frontend
+        working-directory: source/frontend
+        run: npm run build
+
+  e2e:
+    name: Frontend E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - backend
+      - frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: source/frontend/package-lock.json
+
+      - name: Sync backend dependencies
+        working-directory: source/backend
+        run: uv sync --extra dev --locked
+
+      - name: Install frontend dependencies
+        working-directory: source/frontend
+        run: npm ci
+
+      - name: Install Playwright browser
+        working-directory: source/frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright suite
+        working-directory: source/frontend
+        env:
+          CI: "true"
+        run: npm run test:e2e
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            source/frontend/playwright-report
+            source/frontend/test-results
+          if-no-files-found: ignore

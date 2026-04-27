@@ -19,6 +19,8 @@ def get_metrics_path() -> str:
 def _default_metrics_state() -> MetricsSummary:
     return {
         "region_id": REGION.region_id,
+        "demo_mode_enabled": False,
+        "demo_mode_loop_scan": bool(getattr(REGION, "demo_mode_loop_scan", True)),
         "total_cycles_completed": 0,
         "total_cells_scanned": 0,
         "total_alerts_emitted": 0,
@@ -28,6 +30,12 @@ def _default_metrics_state() -> MetricsSummary:
         "latest_cycle_index": 0,
         "latest_cycle_started_at": "",
         "latest_cycle_completed_at": "",
+        "pct_scenes_rejected": 0.0,
+        "pct_low_valid_coverage": 0.0,
+        "average_inference_latency_ms": 0.0,
+        "peak_memory_mb": 0.0,
+        "runtime_failures_by_stage": {},
+        "runtime_rejections_by_reason": {},
         "flagged_examples": [],
     }
 
@@ -41,6 +49,8 @@ def _coerce_state(raw: dict[str, Any]) -> MetricsSummary:
     state.update(
         {
             "region_id": str(raw.get("region_id", state["region_id"])),
+            "demo_mode_enabled": bool(raw.get("demo_mode_enabled", state["demo_mode_enabled"])),
+            "demo_mode_loop_scan": bool(raw.get("demo_mode_loop_scan", state["demo_mode_loop_scan"])),
             "total_cycles_completed": int(raw.get("total_cycles_completed", state["total_cycles_completed"])),
             "total_cells_scanned": int(raw.get("total_cells_scanned", state["total_cells_scanned"])),
             "total_alerts_emitted": int(raw.get("total_alerts_emitted", state["total_alerts_emitted"])),
@@ -56,6 +66,12 @@ def _coerce_state(raw: dict[str, Any]) -> MetricsSummary:
             "latest_cycle_index": int(raw.get("latest_cycle_index", state["latest_cycle_index"])),
             "latest_cycle_started_at": str(raw.get("latest_cycle_started_at", state["latest_cycle_started_at"])),
             "latest_cycle_completed_at": str(raw.get("latest_cycle_completed_at", state["latest_cycle_completed_at"])),
+            "pct_scenes_rejected": round(float(raw.get("pct_scenes_rejected", state["pct_scenes_rejected"])), 4),
+            "pct_low_valid_coverage": round(float(raw.get("pct_low_valid_coverage", state["pct_low_valid_coverage"])), 4),
+            "average_inference_latency_ms": round(float(raw.get("average_inference_latency_ms", state["average_inference_latency_ms"])), 4),
+            "peak_memory_mb": round(float(raw.get("peak_memory_mb", state["peak_memory_mb"])), 4),
+            "runtime_failures_by_stage": dict(raw.get("runtime_failures_by_stage", state["runtime_failures_by_stage"])),
+            "runtime_rejections_by_reason": dict(raw.get("runtime_rejections_by_reason", state["runtime_rejections_by_reason"])),
             "flagged_examples": list(raw.get("flagged_examples", state["flagged_examples"])),
         }
     )
@@ -95,6 +111,12 @@ def init_metrics(reset: bool = False):
 
 def read_metrics_summary() -> MetricsSummary:
     return _read_state()
+
+
+def seed_metrics_summary(state: dict[str, Any]) -> MetricsSummary:
+    coerced = _coerce_state(state)
+    _write_state(coerced)
+    return coerced
 
 
 def record_cycle_start(cycle_index: int):
@@ -138,4 +160,54 @@ def record_cycle_complete(cycle_index: int, discard_ratio: float):
     state["latest_cycle_index"] = cycle_index
     state["latest_discard_ratio"] = round(discard_ratio, 4)
     state["latest_cycle_completed_at"] = utc_timestamp()
+    _write_state(state)
+
+def _increment_counter(target: dict[str, int], key: str) -> None:
+    target[key] = int(target.get(key, 0)) + 1
+
+
+def record_observability_telemetry(
+    total_time_ms: float,
+    peak_memory_mb: float,
+    is_rejected: bool,
+    failures: dict[str, str],
+    stage_times: dict[str, float],
+    rejection_reason: str = "",
+):
+    state = _read_state()
+
+    # Update running averages
+    current_count = state["total_cells_scanned"]
+    if current_count == 0:
+         current_count = 1
+
+    old_avg = state["average_inference_latency_ms"]
+    state["average_inference_latency_ms"] = round(((old_avg * (current_count - 1)) + total_time_ms) / current_count, 2)
+
+    # Update peak memory ceiling
+    if peak_memory_mb > state["peak_memory_mb"]:
+        state["peak_memory_mb"] = round(peak_memory_mb, 2)
+
+    # Update rejection tracking
+    if is_rejected:
+        # Pct scenes rejected roughly = rejections / scanned
+        rejs = round(state["pct_scenes_rejected"] * (current_count - 1)) + 1
+        state["pct_scenes_rejected"] = round(rejs / current_count, 4)
+        reason = rejection_reason.strip() or "unspecified"
+        _increment_counter(state["runtime_rejections_by_reason"], reason)
+
+        low_valid_count = round(state["pct_low_valid_coverage"] * (current_count - 1))
+        if "insufficient_valid_pixels" in reason or "low_valid_coverage" in reason:
+            low_valid_count += 1
+        state["pct_low_valid_coverage"] = round(low_valid_count / current_count, 4)
+    else:
+        rejs = round(state["pct_scenes_rejected"] * (current_count - 1))
+        state["pct_scenes_rejected"] = round(rejs / current_count, 4)
+        low_valid_count = round(state["pct_low_valid_coverage"] * (current_count - 1))
+        state["pct_low_valid_coverage"] = round(low_valid_count / current_count, 4)
+
+    # Update failures
+    for stage, err in failures.items():
+        _increment_counter(state["runtime_failures_by_stage"], stage)
+
     _write_state(state)

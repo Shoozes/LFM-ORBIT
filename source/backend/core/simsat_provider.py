@@ -1,5 +1,5 @@
 """
-SimSat API Provider for Canopy Sentinel.
+SimSat API provider for LFM Orbit.
 
 Fetches proxy imagery from the locally running SimSat instance.
 Validates the availability of telemetry bytes from the simulation dashboard
@@ -11,7 +11,7 @@ import hashlib
 import logging
 from typing import Optional
 
-from core.config import REGION
+from core.config import PROVIDER_SIMSAT_MAPBOX, REGION
 from core.contracts import ObservationPair
 from core.grid import cell_to_latlng
 from core.simsat_client import get_simsat_client
@@ -19,18 +19,30 @@ from core.simsat_client import get_simsat_client
 logger = logging.getLogger(__name__)
 
 SOURCE_SIMSAT_SENTINEL = "simsat_sentinel_imagery"
+SOURCE_SIMSAT_MAPBOX = "simsat_mapbox_imagery"
 
 
-def fetch_simsat_observations(cell_id: str) -> Optional[ObservationPair]:
+def fetch_simsat_observations(cell_id: str, provider: str | None = None) -> Optional[ObservationPair]:
     """Fetch simulated observations directly through the local SimSat client API."""
     centroid_lat, centroid_lng = cell_to_latlng(cell_id)
+    observation_mode = provider or REGION.observation_mode
 
     client = get_simsat_client()
     
-    # We query the current satellite footprint rather than a historical scrape 
+    # We query the current satellite footprint rather than a historical scrape
     # to maintain live telemetry integrity.
     try:
-        response = client.fetch_sentinel_current(lat=centroid_lat, lng=centroid_lng)
+        if observation_mode == PROVIDER_SIMSAT_MAPBOX:
+            response = client.fetch_mapbox_current(
+                lat=centroid_lat,
+                lng=centroid_lng,
+                width=512,
+                height=512,
+            )
+            source = SOURCE_SIMSAT_MAPBOX
+        else:
+            response = client.fetch_sentinel_current(lat=centroid_lat, lng=centroid_lng)
+            source = SOURCE_SIMSAT_SENTINEL
         if not response.success:
             logger.debug(f"SimSat client could not retrieve imagery for {cell_id}: {response.error}")
             return None
@@ -59,12 +71,12 @@ def fetch_simsat_observations(cell_id: str) -> Optional[ObservationPair]:
         after_flags.append("disturbance_pattern")
         
     return {
-        "source": SOURCE_SIMSAT_SENTINEL,
+        "source": source,
         "cell_id": cell_id,
         "centroid_lat": round(centroid_lat, 6),
         "centroid_lng": round(centroid_lng, 6),
         "before": {
-            "label": REGION.before_label,
+            "label": f"Baseline {REGION.after_label} (-2Y)",
             "quality": 0.95,
             "bands": before_bands,
             "flags": before_flags,

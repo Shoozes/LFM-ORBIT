@@ -1,175 +1,391 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$REPO_ROOT"
+BACKEND_DIR="$REPO_ROOT/source/backend"
+FRONTEND_DIR="$REPO_ROOT/source/frontend"
+RUNTIME_DIR="$REPO_ROOT/runtime-data"
+LEGACY_BACKEND_RUNTIME_DIR="$BACKEND_DIR/runtime-data"
+MODEL_DIR="$RUNTIME_DIR/models/lfm2.5-vlm-450m"
+MODEL_FILE="$MODEL_DIR/LFM2.5-VL-450M-Q4_0.gguf"
+SIMSAT_DIR="$BACKEND_DIR/SimSat-main"
 
-install_deps() {
-    echo -e "\033[0;36m[*] Installing backend dependencies...\033[0m"
-    cd "$REPO_ROOT/source/backend"
-    if command -v uv &> /dev/null; then
-        echo -e "\033[0;37m    Using uv...\033[0m"
-        uv sync
-    else
-        echo -e "\033[0;37m    uv not found, using pip...\033[0m"
-        pip install -e ".[dev]"
+INSTALL=false
+INSTALL_ONLY=false
+RUN_APP_ONLY=false
+CLEAN=false
+VERIFY=false
+FETCH_MODEL=false
+
+show_usage() {
+    cat <<'EOF'
+LFM Orbit launcher
+
+Usage:
+  ./run.sh                 Open the interactive menu
+  ./run.sh --install       Install locked deps, then start backend + frontend
+  ./run.sh --install-only  Install locked deps without starting the app
+  ./run.sh --run           Start backend + frontend from existing deps
+  ./run.sh --clean         Clear mutable runtime stores for a cold start
+  ./run.sh --verify        Install deps and run backend, frontend, and E2E checks
+  ./run.sh --install --fetch-model
+                           Also fetch the optional GGUF model before startup
+EOF
+}
+
+load_dotenv() {
+    local env_path="$REPO_ROOT/.env"
+    if [[ ! -f "$env_path" ]]; then
+        return
     fi
 
-    echo -e "\033[0;36m[*] Vendoring SimSat...\033[0m"
-    SIMSAT_DIR="$REPO_ROOT/source/backend/SimSat-main"
-    if [ ! -d "$SIMSAT_DIR" ]; then
-        echo -e "\033[0;37m    Downloading SimSat from GitHub...\033[0m"
-        ZIP_PATH="$REPO_ROOT/source/backend/simsat.zip"
-        curl -L "https://github.com/DPhi-Space/SimSat/archive/refs/heads/main.zip" -o "$ZIP_PATH"
-        echo -e "\033[0;37m    Extracting SimSat...\033[0m"
-        unzip -q -o "$ZIP_PATH" -d "$REPO_ROOT/source/backend"
-        rm -f "$ZIP_PATH"
-        echo -e "\033[0;37m    SimSat vendored successfully.\033[0m"
+    while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
+        local line="${raw_line#"${raw_line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        [[ -z "$line" || "${line:0:1}" == "#" || "$line" != *=* ]] && continue
+
+        local key="${line%%=*}"
+        local value="${line#*=}"
+        key="${key%"${key##*[![:space:]]}"}"
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
+
+        [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+        if [[ ${#value} -ge 2 ]]; then
+            local first="${value:0:1}"
+            local last="${value: -1}"
+            if [[ "$first" == "$last" && ( "$first" == "'" || "$first" == '"' ) ]]; then
+                value="${value:1:${#value}-2}"
+            fi
+        fi
+        export "$key=$value"
+    done < "$env_path"
+
+    echo "[i] Loaded environment overrides from .env"
+}
+
+load_dotenv
+
+require_command() {
+    local name="$1"
+    local hint="$2"
+    if ! command -v "$name" >/dev/null 2>&1; then
+        echo "[!] $name not found. $hint" >&2
+        exit 1
+    fi
+}
+
+write_simsat_status() {
+    if [[ -d "$SIMSAT_DIR" ]]; then
+        echo "[i] SimSat vendored source is present."
     else
-        echo -e "\033[0;37m    SimSat already present.\033[0m"
+        echo "[i] SimSat vendored source is missing. Orbit will still start with Sentinel/NASA/local fallback paths."
+    fi
+}
+
+install_backend_deps() {
+    require_command uv "Install uv from https://docs.astral.sh/uv/ to honor source/backend/uv.lock."
+    echo "[*] Syncing backend dependencies from uv.lock..."
+    (
+        cd "$BACKEND_DIR"
+        uv sync --extra dev --locked
+    )
+}
+
+install_frontend_deps() {
+    require_command npm "Install Node.js using the version pinned in .nvmrc."
+    echo "[*] Installing frontend dependencies from package-lock.json..."
+    (
+        cd "$FRONTEND_DIR"
+        npm ci
+    )
+}
+
+ensure_optional_model() {
+    if [[ "$FETCH_MODEL" != true ]]; then
+        echo "[i] Skipping optional GGUF model download. Orbit still boots with the local fallback analysis path."
+        return
     fi
 
-    echo -e "\033[0;36m[*] Installing frontend dependencies (npm)...\033[0m"
-    cd "$REPO_ROOT/source/frontend"
-    npm install
-
-    echo -e "\033[0;36m[*] Fetching LFM2.5 VLM 450m model...\033[0m"
-    MODEL_DIR="$REPO_ROOT/runtime-data/models/lfm2.5-vlm-450m"
-    MODEL_FILE="$MODEL_DIR/LFM2.5-VL-450M-Q4_0.gguf"
-    MODEL_URL="${LFM_MODEL_URL:-https://huggingface.co/LiquidAI/LFM2.5-VL-450M-GGUF/resolve/main/LFM2.5-VL-450M-Q4_0.gguf?download=true}"
-    MIN_SIZE_BYTES=1048576  # 1 MB sanity check
-
+    require_command python "Install Python 3.12 to fetch the optional GGUF model."
     mkdir -p "$MODEL_DIR"
 
-    NEEDS_DOWNLOAD=false
-    if [ -f "$MODEL_FILE" ]; then
-        FILE_SIZE=$(stat -c%s "$MODEL_FILE" 2>/dev/null || stat -f%z "$MODEL_FILE" 2>/dev/null || echo 0)
-        if [ "$FILE_SIZE" -ge "$MIN_SIZE_BYTES" ]; then
-            SIZE_MB=$(echo "scale=1; $FILE_SIZE / 1048576" | bc 2>/dev/null || echo "$FILE_SIZE bytes")
-            echo -e "\033[0;37m    Model already present and valid (${SIZE_MB} MB). Skipping download.\033[0m"
-        else
-            echo -e "\033[0;33m    Model file found but appears incomplete ($FILE_SIZE bytes). Re-downloading...\033[0m"
-            NEEDS_DOWNLOAD=true
+    local model_url="${LFM_MODEL_URL:-https://huggingface.co/LiquidAI/LFM2.5-VL-450M-GGUF/resolve/main/LFM2.5-VL-450M-Q4_0.gguf?download=true}"
+    local min_size_bytes=1048576
+    local needs_download=false
+
+    if [[ -f "$MODEL_FILE" ]]; then
+        local file_size
+        file_size=$(stat -c%s "$MODEL_FILE" 2>/dev/null || stat -f%z "$MODEL_FILE")
+        if [[ "$file_size" -ge "$min_size_bytes" ]]; then
+            echo "[i] Optional GGUF model already present."
+            return
         fi
+        echo "[i] Existing GGUF file is incomplete ($file_size bytes). Re-downloading..."
+        needs_download=true
     else
-        NEEDS_DOWNLOAD=true
+        needs_download=true
     fi
 
-    if [ "$NEEDS_DOWNLOAD" = true ]; then
-        echo -e "\033[0;37m    Downloading from: $MODEL_URL\033[0m"
-        echo -e "\033[0;37m    Destination: $MODEL_FILE\033[0m"
-        if python -c "import urllib.request, sys; print('Downloading model...', flush=True); urllib.request.urlretrieve(sys.argv[1], sys.argv[2])" "$MODEL_URL" "$MODEL_FILE"; then
-            FILE_SIZE=$(stat -c%s "$MODEL_FILE" 2>/dev/null || stat -f%z "$MODEL_FILE" 2>/dev/null || echo 0)
-            if [ "$FILE_SIZE" -lt "$MIN_SIZE_BYTES" ]; then
-                echo -e "\033[0;31m[!] Downloaded file is too small ($FILE_SIZE bytes). Download may be incomplete.\033[0m"
-                echo -e "\033[0;31m[!] Recovery steps:\033[0m"
-                echo "      1. Check your internet connection."
-                echo "      2. Set LFM_MODEL_URL to a valid URL and re-run install."
-                echo "      3. Or manually place LFM2.5-VL-450M-Q4_0.gguf in: $MODEL_DIR"
-                exit 1
-            fi
-            SIZE_MB=$(echo "scale=1; $FILE_SIZE / 1048576" | bc 2>/dev/null || echo "$FILE_SIZE bytes")
-            echo -e "\033[0;32m    Model downloaded successfully (${SIZE_MB} MB).\033[0m"
-        else
-            echo -e "\033[0;31m[!] Model download failed.\033[0m"
-            echo -e "\033[0;31m[!] Recovery steps:\033[0m"
-            echo "      1. Check your internet connection (required only at install time)."
-            echo "      2. Override the URL: export LFM_MODEL_URL='<url>' && bash run.sh"
-            echo "      3. Or manually place LFM2.5-VL-450M-Q4_0.gguf in: $MODEL_DIR"
+    if [[ "$needs_download" == true ]]; then
+        echo "[*] Fetching optional GGUF model..."
+        echo "    Source: $model_url"
+        echo "    Target: $MODEL_FILE"
+        python -c "import urllib.request, sys; print('Downloading optional model...', flush=True); urllib.request.urlretrieve(sys.argv[1], sys.argv[2])" "$model_url" "$MODEL_FILE"
+        local file_size
+        file_size=$(stat -c%s "$MODEL_FILE" 2>/dev/null || stat -f%z "$MODEL_FILE")
+        if [[ "$file_size" -lt "$min_size_bytes" ]]; then
+            echo "[!] Downloaded GGUF file is too small ($file_size bytes)." >&2
             exit 1
         fi
+        echo "[+] Optional GGUF model ready."
     fi
+}
 
-    echo -e "\033[0;32m[+] Install complete. Transitioning to Run Phase...\033[0m"
-    run_app
+install_deps() {
+    install_backend_deps
+    write_simsat_status
+    install_frontend_deps
+    ensure_optional_model
+    echo "[+] Install/repair complete."
+}
+
+install_playwright_browser() {
+    require_command npm "Install Node.js using the version pinned in .nvmrc."
+    echo "[*] Ensuring Playwright Chromium is installed..."
+    (
+        cd "$FRONTEND_DIR"
+        npx playwright install chromium
+    )
+}
+
+run_verify() {
+    echo "[*] Running full repo verification..."
+    install_backend_deps
+    install_frontend_deps
+    install_playwright_browser
+
+    (
+        cd "$BACKEND_DIR"
+        echo "[*] Backend tests..."
+        uv run --no-sync pytest -q
+    )
+
+    (
+        cd "$FRONTEND_DIR"
+        echo "[*] Frontend typecheck..."
+        npm run lint
+        echo "[*] Frontend production build..."
+        npm run build
+        echo "[*] Playwright E2E..."
+        npm run test:e2e
+    )
+
+    echo "[+] Verification complete."
 }
 
 run_app() {
-    echo -e "\033[0;36m[*] Starting LFM Orbit...\033[0m"
+    require_command npm "Install Node.js using the version pinned in .nvmrc."
+    echo "[*] Starting LFM Orbit..."
+    write_simsat_status
 
-    SIMSAT_DIR="$REPO_ROOT/source/backend/SimSat-main"
-    if [ -d "$SIMSAT_DIR" ] && command -v docker &> /dev/null; then
-        echo -e "\033[0;36m[*] Launching SimSat (docker compose up)...\033[0m"
-        cd "$SIMSAT_DIR"
-        docker compose up -d || echo -e "\033[0;33m[!] Failed to start SimSat. Docker may not be running. (Backend will fallback automatically)\033[0m"
-    elif [ -d "$SIMSAT_DIR" ]; then
-        echo -e "\033[0;37m[i] Skipping SimSat integration -> Docker not found. Backend will seamlessly use NASA/Mock fallback.\033[0m"
+    if [[ ! -f "$MODEL_FILE" ]]; then
+        echo "[i] Optional GGUF model not found. Satellite-side reasoning will stay on safe fallback behavior."
     fi
 
-    cd "$REPO_ROOT/source/backend"
-    
-    if command -v uv &> /dev/null; then
-        echo -e "\033[0;36m[*] Launching FastAPI Backend (uv)...\033[0m"
-        uv run uvicorn api.main:app --port 8000 &
+    echo "[*] Launching backend..."
+    local backend_pid
+    if command -v uv >/dev/null 2>&1; then
+        (
+            cd "$BACKEND_DIR"
+            uv run --no-sync uvicorn api.main:app --host 127.0.0.1 --port 8000
+        ) &
+        backend_pid=$!
+    elif [[ -x "$BACKEND_DIR/.venv/bin/python" ]]; then
+        (
+            cd "$BACKEND_DIR"
+            "$BACKEND_DIR/.venv/bin/python" -m uvicorn api.main:app --host 127.0.0.1 --port 8000
+        ) &
+        backend_pid=$!
     else
-        echo -e "\033[0;36m[*] Launching FastAPI Backend (uvicorn)...\033[0m"
-        uvicorn api.main:app --port 8000 &
-    fi
-    BACKEND_PID=$!
-
-    echo -e "\033[0;36m[*] Waiting for backend to be ready...\033[0m"
-    MAX_WAIT=30
-    READY=false
-    for ((i=1; i<=MAX_WAIT; i++)); do
-        if curl -s http://127.0.0.1:8000/api/health > /dev/null; then
-            READY=true
-            break
-        fi
-        echo -e "\033[0;37m    Waiting... (${i}s)\033[0m"
-        sleep 1
-    done
-
-    if [ "$READY" = false ]; then
-        echo -e "\033[0;31m[!] Backend did not start within ${MAX_WAIT}s.\033[0m"
-        kill $BACKEND_PID 2>/dev/null || true
+        echo "[!] Backend runtime is not installed. Run ./run.sh --install first." >&2
         exit 1
     fi
 
-    echo -e "\033[0;32m[+] Backend ready. Launching React Frontend...\033[0m"
-    cd "$REPO_ROOT/source/frontend"
-    npm run dev || true
+    trap 'kill "$backend_pid" 2>/dev/null || true' EXIT
 
-    # Cleanup background process on exit
-    kill $BACKEND_PID 2>/dev/null || true
+    echo "[*] Waiting for backend health check..."
+    local ready=false
+    for i in $(seq 1 30); do
+        if curl -fsS http://127.0.0.1:8000/api/health >/dev/null 2>&1; then
+            ready=true
+            break
+        fi
+        echo "    Waiting... (${i}s)"
+        sleep 1
+    done
+
+    if [[ "$ready" != true ]]; then
+        echo "[!] Backend did not become healthy within 30 seconds." >&2
+        exit 1
+    fi
+
+    echo "[+] Backend ready on http://127.0.0.1:8000"
+    echo "[*] Launching frontend on http://127.0.0.1:5173 ..."
+    (
+        cd "$FRONTEND_DIR"
+        npm run dev -- --host 127.0.0.1
+    )
 }
 
 clean_data() {
-    echo -e "\033[0;33m[*] Cleaning runtime data for a cold start...\033[0m"
-    BUS_PATH="$REPO_ROOT/runtime-data/agent_bus.sqlite"
-    if [ -f "$BUS_PATH" ]; then
-        rm -f "$BUS_PATH"
-        echo -e "\033[0;37m    Deleted agent_bus.sqlite\033[0m"
+    echo "[*] Cleaning runtime data for a cold start..."
+    local paths_to_remove=(
+        "$RUNTIME_DIR/agent_bus.sqlite"
+        "$RUNTIME_DIR/dtn_queue.sqlite"
+        "$RUNTIME_DIR/demo_metrics_summary.json"
+        "$RUNTIME_DIR/api_cache.sqlite"
+        "$LEGACY_BACKEND_RUNTIME_DIR/api_cache.sqlite"
+    )
+
+    for path in "${paths_to_remove[@]}"; do
+        if [[ -f "$path" ]]; then
+            rm -f "$path"
+            echo "    Removed $path"
+        fi
+    done
+
+    local observation_store_dir="$BACKEND_DIR/assets/observation_store"
+    if [[ -d "$observation_store_dir" ]]; then
+        find "$observation_store_dir" -maxdepth 1 -type f -name '*.json' -print -delete
     fi
-    echo -e "\033[0;32m[+] Clean complete.\033[0m"
-    sleep 2
+
+    echo "[+] Clean complete."
 }
 
 show_banner() {
-    if [ -f "$REPO_ROOT/docs/banner.txt" ]; then
-        echo -e "\033[0;36m$(cat "$REPO_ROOT/docs/banner.txt")\033[0m"
+    if [[ -f "$REPO_ROOT/docs/banner.txt" ]]; then
+        cat "$REPO_ROOT/docs/banner.txt"
     else
-        echo -e "\033[0;36mLFM Orbit\033[0m"
+        echo "LFM Orbit"
     fi
 }
 
-while true; do
-    clear
-    show_banner
-    echo -e "\033[0;33m======================================\033[0m"
-    echo -e "\033[0;32m              LFM ORBIT               \033[0m"
-    echo -e "\033[0;33m======================================\033[0m"
-    echo "1. Install/Repair (fetches models) -> Run"
-    echo "2. Run (if already installed)"
-    echo "3. Clean (deletes runtime data for cold start)"
-    echo "4. Exit"
-    echo -e "\033[0;33m======================================\033[0m"
-    
-    read -p "Select an option: " choice
-    case $choice in
-        1) install_deps; exit 0 ;;
-        2) run_app; exit 0 ;;
-        3) clean_data ;;
-        4) exit 0 ;;
-        *) echo -e "\033[0;31mInvalid choice\033[0m"; sleep 1 ;;
+run_menu() {
+    while true; do
+        clear
+        show_banner
+        echo "======================================"
+        echo "              LFM ORBIT               "
+        echo "======================================"
+        echo "1. Install/Repair -> Run"
+        echo "2. Install/Repair + Fetch optional GGUF model -> Run"
+        echo "3. Install/Repair only"
+        echo "4. Run"
+        echo "5. Verify (backend + frontend + E2E)"
+        echo "6. Clean (cold-start runtime reset)"
+        echo "7. Exit"
+        echo "======================================"
+
+        read -r -p "Select an option: " choice
+        case "$choice" in
+            1)
+                install_deps
+                run_app
+                exit 0
+                ;;
+            2)
+                FETCH_MODEL=true
+                install_deps
+                run_app
+                exit 0
+                ;;
+            3)
+                install_deps
+                exit 0
+                ;;
+            4)
+                run_app
+                exit 0
+                ;;
+            5)
+                run_verify
+                exit 0
+                ;;
+            6)
+                clean_data
+                sleep 2
+                ;;
+            7)
+                exit 0
+                ;;
+            *)
+                echo "Invalid choice"
+                sleep 1
+                ;;
+        esac
+    done
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --install)
+            INSTALL=true
+            ;;
+        --install-only)
+            INSTALL_ONLY=true
+            ;;
+        --run)
+            RUN_APP_ONLY=true
+            ;;
+        --clean)
+            CLEAN=true
+            ;;
+        --verify)
+            VERIFY=true
+            ;;
+        --fetch-model)
+            FETCH_MODEL=true
+            ;;
+        -h|--help)
+            show_usage
+            exit 0
+            ;;
+        *)
+            echo "[!] Unknown argument: $1" >&2
+            exit 1
+            ;;
     esac
+    shift
 done
+
+if [[ "$CLEAN" == true ]]; then
+    clean_data
+fi
+
+if [[ "$INSTALL_ONLY" == true ]]; then
+    install_deps
+    exit 0
+fi
+
+if [[ "$VERIFY" == true ]]; then
+    run_verify
+    exit 0
+fi
+
+if [[ "$INSTALL" == true ]]; then
+    install_deps
+    run_app
+    exit 0
+fi
+
+if [[ "$RUN_APP_ONLY" == true ]]; then
+    run_app
+    exit 0
+fi
+
+if [[ "$CLEAN" == true ]]; then
+    exit 0
+fi
+
+run_menu

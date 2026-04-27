@@ -3,6 +3,21 @@ import { getApiBaseUrl } from "../utils/telemetry";
 
 type Message = { role: "user" | "assistant"; content: string };
 
+async function readAgentError(response: Response, fallback: string): Promise<string> {
+  try {
+    const payload = await response.json() as { error?: unknown; detail?: unknown };
+    if (typeof payload.error === "string" && payload.error.trim()) {
+      return payload.error;
+    }
+    if (typeof payload.detail === "string" && payload.detail.trim()) {
+      return payload.detail;
+    }
+  } catch {
+    return fallback;
+  }
+  return fallback;
+}
+
 export default function GroundAgent() {
   const [messages, setMessages] = useState<Message[]>([
     { role: "assistant", content: "Ground Agent initialized. Reading telemetry. How can I assist you with operations?" }
@@ -12,24 +27,39 @@ export default function GroundAgent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
-    
-    const newMessages: Message[] = [...messages, { role: "user", content: input }];
+    const outbound = input.trim();
+    if (!outbound || isLoading) return;
+
+    const newMessages: Message[] = [...messages, { role: "user", content: outbound }];
     setMessages(newMessages);
     setInput("");
     setIsLoading(true);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
       const response = await fetch(`${getApiBaseUrl()}/api/agent/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: newMessages }),
+        signal: controller.signal,
       });
-      const data = await response.json();
-      setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
+      if (!response.ok) {
+        throw new Error(await readAgentError(response, `Ground Agent failed with HTTP ${response.status}.`));
+      }
+      const data = await response.json() as { reply?: unknown };
+      const reply = typeof data.reply === "string" && data.reply.trim() ? data.reply : "[Error: Empty reply]";
+      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
     } catch (e) {
-      setMessages((prev) => [...prev, { role: "assistant", content: "[Link Error: Ground Agent unreachable]" }]);
+      const message = e instanceof DOMException && e.name === "AbortError"
+        ? "Ground Agent timed out."
+        : e instanceof Error
+          ? e.message
+          : "Ground Agent unreachable.";
+      setMessages((prev) => [...prev, { role: "assistant", content: `[Link Error: ${message}]` }]);
     } finally {
+      clearTimeout(timeoutId);
       setIsLoading(false);
     }
   };
@@ -61,9 +91,14 @@ export default function GroundAgent() {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && sendMessage()}
           placeholder="Command agent..."
-          className="flex-1 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 outline-none"
+          disabled={isLoading}
+          className="flex-1 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2 text-sm text-zinc-900 placeholder-zinc-400 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 disabled:opacity-60"
         />
-        <button onClick={sendMessage} className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 transition">
+        <button
+          onClick={sendMessage}
+          disabled={isLoading || !input.trim()}
+          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
           Send
         </button>
       </div>

@@ -34,6 +34,31 @@ class TestSimSatConfig:
         assert config.mapbox_token == "test_token"
         assert config.timeout_seconds == 60.0
 
+    def test_from_env_accepts_mapbox_access_token(self, monkeypatch):
+        """MAPBOX_ACCESS_TOKEN is the documented Mapbox variable."""
+        monkeypatch.setenv("MAPBOX_ACCESS_TOKEN", "access_token")
+        monkeypatch.delenv("MAPBOX_API_TOKEN", raising=False)
+
+        config = SimSatConfig.from_env()
+
+        assert config.mapbox_token == "access_token"
+
+    def test_from_env_ignores_invalid_timeout(self, monkeypatch):
+        """Bad timeout values should not break settings/status endpoints."""
+        monkeypatch.setenv("SIMSAT_TIMEOUT", "not-a-number")
+
+        config = SimSatConfig.from_env()
+
+        assert config.timeout_seconds == 30.0
+
+    def test_from_env_ignores_non_positive_timeout(self, monkeypatch):
+        """Zero or negative timeout values fall back to the default."""
+        monkeypatch.setenv("SIMSAT_TIMEOUT", "0")
+
+        config = SimSatConfig.from_env()
+
+        assert config.timeout_seconds == 30.0
+
 
 class TestImageryRequest:
     """Tests for ImageryRequest."""

@@ -104,3 +104,37 @@ def test_payload_estimation_is_positive():
     }
 
     assert estimate_payload_bytes(payload) > 0
+
+
+def test_boundary_context_round_trips(tmp_path):
+    db_path = tmp_path / "alerts_boundary.sqlite"
+    os.environ["CANOPY_SENTINEL_DB_PATH"] = str(db_path)
+
+    init_db(reset=True)
+
+    boundary_context = [
+        {
+            "layer_type": "protected_area",
+            "source_name": "demo_boundary_pack",
+            "feature_name": "Reserva Teste",
+            "overlap_area_m2": 3210.5,
+            "overlap_ratio": 0.42,
+            "distance_to_boundary_m": 0.0,
+        }
+    ]
+
+    push_alert(
+        event_id="evt_boundary",
+        region_id="amazonas_region_alpha",
+        cell_id="85283473fffffff",
+        change_score=0.67,
+        confidence=0.91,
+        priority="critical",
+        reason_codes=["suspected_canopy_loss"],
+        payload_bytes=180,
+        boundary_context=boundary_context,
+    )
+
+    recent = get_recent_alerts(limit=5)
+
+    assert recent["alerts"][0]["boundary_context"] == boundary_context

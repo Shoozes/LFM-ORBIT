@@ -14,7 +14,10 @@ logger = logging.getLogger(__name__)
 # one of these exact strings.
 
 PROVIDER_SIMSAT_SENTINEL = "simsat_sentinel"
-"""Primary provider – routes through the official SimSat API (hackathon submission path)."""
+"""Primary provider that routes through the official SimSat API."""
+
+PROVIDER_SIMSAT_MAPBOX = "simsat_mapbox"
+"""Optional provider - routes through SimSat's Mapbox imagery endpoint."""
 
 PROVIDER_SENTINELHUB_DIRECT = "sentinelhub_direct"
 """Secondary provider – direct Sentinel Hub access for local dev/testing."""
@@ -28,6 +31,7 @@ PROVIDER_GEE = "gee"
 
 VALID_PROVIDERS = (
     PROVIDER_SIMSAT_SENTINEL,
+    PROVIDER_SIMSAT_MAPBOX,
     PROVIDER_SENTINELHUB_DIRECT,
     PROVIDER_NASA_DIRECT,
     PROVIDER_GEE,
@@ -36,6 +40,7 @@ VALID_PROVIDERS = (
 # Scoring provider fallback order
 PROVIDER_FALLBACK_ORDER = (
     PROVIDER_SIMSAT_SENTINEL,
+    PROVIDER_SIMSAT_MAPBOX,
     PROVIDER_SENTINELHUB_DIRECT,
     PROVIDER_NASA_DIRECT,
 )
@@ -89,7 +94,7 @@ def _parse_secrets_file(path: Path) -> dict[str, str]:
             # Strip whitespace then remove surrounding quotes (single or double)
             result[key.strip()] = value.strip().strip("\"'")
     except OSError:
-        pass
+        logger.debug("Unable to read secrets file %s", path, exc_info=True)
     return result
 
 
@@ -148,7 +153,7 @@ def resolve_nasa_credentials(secrets_path: Path | None = None) -> NasaCredential
             if key:
                 return NasaCredentials(api_key=key, source="file")
         except OSError:
-            pass
+            logger.debug("Unable to read NASA secrets file %s", file_path, exc_info=True)
 
     return NasaCredentials(api_key="", source="unavailable")
 
@@ -181,7 +186,7 @@ def resolve_gee_credentials(secrets_path: Path | None = None) -> GeeCredentials:
                 client_id = lines[1] if len(lines) > 1 else ""
                 return GeeCredentials(api_key=api_key, client_id=client_id, source="file")
         except OSError:
-            pass
+            logger.debug("Unable to read GEE secrets file %s", file_path, exc_info=True)
 
     return GeeCredentials(api_key="", client_id="", source="unavailable")
 
@@ -191,15 +196,19 @@ def resolve_active_provider() -> str:
 
     Resolution rules:
       - If OBSERVATION_PROVIDER env var is set to a valid provider, use it directly.
-      - If SimSat is enabled (SIMSAT_ENABLED=true), use simsat_sentinel.
+      - If SimSat is enabled (SIMSAT_ENABLED=true), use the requested SimSat data source.
       - If Sentinel credentials are available, use sentinelhub_direct.
-      - Otherwise, fall back to semi_real_loader_v1.
+      - If NASA credentials are available, use nasa_api_direct.
+      - Otherwise, stay on the safe SimSat/local fallback path.
     """
     explicit = os.environ.get("OBSERVATION_PROVIDER", "").strip()
     if explicit in VALID_PROVIDERS:
         return explicit
 
     if os.environ.get("SIMSAT_ENABLED", "").lower() in ("1", "true", "yes"):
+        source = os.environ.get("SIMSAT_DATA_SOURCE", "").strip().lower()
+        if source in ("mapbox", "simsat_mapbox"):
+            return PROVIDER_SIMSAT_MAPBOX
         return PROVIDER_SIMSAT_SENTINEL
 
     # Check OAuth creds — no cross-module imports to keep config.py dependency-free
@@ -261,6 +270,48 @@ REGION = RegionConfig(
 )
 
 
+@dataclass(frozen=True)
+class DetectionConfig:
+    min_quality_threshold: float
+    ndvi_drop_threshold: float
+    evi2_drop_threshold: float
+    nir_drop_ratio_threshold: float
+    nbr_drop_threshold: float
+    ndmi_drop_threshold: float
+    soil_ratio_spike_threshold: float
+    high_confidence_target: float
+    moderate_confidence_target: float
+    critical_severity_threshold: float
+    high_severity_threshold: float
+    low_change_threshold: float
+    confidence_base: float
+    confidence_quality_multiplier: float
+    confidence_penalty_low_change: float
+    confidence_penalty_low_quality: float
+    confidence_penalty_single_index: float
+    confidence_bonus_pattern_match: float
+
+DETECTION = DetectionConfig(
+    min_quality_threshold=0.65,
+    ndvi_drop_threshold=0.18,
+    evi2_drop_threshold=0.15,
+    nir_drop_ratio_threshold=0.25,
+    nbr_drop_threshold=0.20,
+    ndmi_drop_threshold=0.18,
+    soil_ratio_spike_threshold=0.30,
+    high_confidence_target=0.80,
+    moderate_confidence_target=0.65,
+    critical_severity_threshold=0.60,
+    high_severity_threshold=0.45,
+    low_change_threshold=0.12,
+    confidence_base=0.58,
+    confidence_quality_multiplier=0.32,
+    confidence_penalty_low_change=0.08,
+    confidence_penalty_low_quality=0.12,
+    confidence_penalty_single_index=0.20,
+    confidence_bonus_pattern_match=0.06,
+)
+
 # ---------------------------------------------------------------------------
 # Runtime mode summary helpers (for startup logging and UI truth)
 # ---------------------------------------------------------------------------
@@ -273,7 +324,7 @@ def get_runtime_mode_summary() -> dict:
     provider = REGION.observation_mode
     return {
         "active_provider": provider,
-        "imagery_backed_scoring_enabled": provider != PROVIDER_SIMSAT_SENTINEL,
+        "imagery_backed_scoring_enabled": is_imagery_backed_scoring_enabled(),
     }
 
 

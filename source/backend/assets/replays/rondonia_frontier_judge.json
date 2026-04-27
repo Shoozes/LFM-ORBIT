@@ -1,0 +1,224 @@
+{
+  "replay_id": "rondonia_frontier_judge",
+  "title": "Rondonia Frontier Judge Replay",
+  "description": "Completed mission replay seeded with local Sentinel Hub timelapses, alert evidence, and agent decisions for a compact judge-friendly walkthrough.",
+  "task_text": "Replay a completed orbit-to-ground mission across the Rondonia western frontier. Review why the system escalated a subset of cells and how the evidence supports a durable canopy-loss conclusion.",
+  "summary": "A seeded replay of corridor-style canopy loss across a frontier clearing zone. Four cells are promoted into Inspect with cached timelapses, grounded notes, and agent dialogue so judges can follow the decision chain without waiting on a live scan.",
+  "bbox": [
+    -63.15,
+    -10.15,
+    -62.85,
+    -9.85
+  ],
+  "start_date": "2023-01-15",
+  "end_date": "2025-01-15",
+  "cells_scanned": 9,
+  "flags_found": 4,
+  "primary_cell_id": "sq_-10.0_-63.0",
+  "alerts": [
+    {
+      "cell_id": "sq_-10.0_-63.0",
+      "lat": -10.0,
+      "lng": -63.0,
+      "seeded_video": "sh_07da3a0b",
+      "event_id": "replay_rondonia_center",
+      "change_score": 0.84,
+      "confidence": 0.95,
+      "priority": "critical",
+      "reason_codes": [
+        "ndvi_drop",
+        "nbr_drop",
+        "soil_exposure_spike",
+        "multi_index_consensus",
+        "suspected_canopy_loss"
+      ],
+      "observation_source": "seeded_sentinelhub_replay",
+      "before_window": {
+        "label": "2023-01-15",
+        "quality": 0.97,
+        "nir": 0.71,
+        "red": 0.09,
+        "swir": 0.17,
+        "ndvi": 0.78,
+        "nbr": 0.61,
+        "evi2": 0.67,
+        "ndmi": 0.52,
+        "soil_ratio": 0.18,
+        "flags": []
+      },
+      "after_window": {
+        "label": "2025-01-15",
+        "quality": 0.96,
+        "nir": 0.29,
+        "red": 0.27,
+        "swir": 0.39,
+        "ndvi": 0.10,
+        "nbr": -0.15,
+        "evi2": 0.09,
+        "ndmi": -0.11,
+        "soil_ratio": 0.82,
+        "flags": []
+      },
+      "timelapse_analysis": "The seeded Sentinel-2 sequence shows intact canopy in early 2023, road-edge opening through mid 2024, and consolidated bare-soil exposure by early 2025 with no seasonal recovery.",
+      "analysis_summary": "The central frontier tile transitioned from closed canopy to an established clearing footprint. The persistence and shape of the scar support structural land conversion rather than a transient atmospheric or seasonal effect.",
+      "satellite_note": "Orbital triage detected a severe multi-index collapse at the center of the frontier block and requested ground validation.",
+      "ground_note": "Ground review confirms persistent canopy removal across the central frontier tile. This cell is the clearest explanation anchor for the replay.",
+      "findings": [
+        "Persistent canopy-loss signature from 2023 to 2025",
+        "Bare-soil exposure expanded along a road-access edge"
+      ]
+    },
+    {
+      "cell_id": "sq_-10.1_-63.0",
+      "lat": -10.1,
+      "lng": -63.0,
+      "seeded_video": "sh_0d54891e",
+      "event_id": "replay_rondonia_south",
+      "change_score": 0.71,
+      "confidence": 0.91,
+      "priority": "high",
+      "reason_codes": [
+        "ndvi_drop",
+        "ndmi_drop",
+        "multi_index_consensus",
+        "suspected_canopy_loss"
+      ],
+      "observation_source": "seeded_sentinelhub_replay",
+      "before_window": {
+        "label": "2023-01-15",
+        "quality": 0.96,
+        "nir": 0.69,
+        "red": 0.10,
+        "swir": 0.18,
+        "ndvi": 0.75,
+        "nbr": 0.58,
+        "evi2": 0.64,
+        "ndmi": 0.48,
+        "soil_ratio": 0.21,
+        "flags": []
+      },
+      "after_window": {
+        "label": "2025-01-15",
+        "quality": 0.95,
+        "nir": 0.34,
+        "red": 0.24,
+        "swir": 0.34,
+        "ndvi": 0.17,
+        "nbr": -0.02,
+        "evi2": 0.15,
+        "ndmi": -0.05,
+        "soil_ratio": 0.73,
+        "flags": []
+      },
+      "timelapse_analysis": "The southern adjacent tile shows the same frontier edge progressing from a narrow opening into a wider disturbed strip over the replay window.",
+      "analysis_summary": "This southern neighbor carries the same directional clearing trend as the anchor cell, indicating expansion of the disturbed corridor rather than an isolated artifact.",
+      "satellite_note": "Satellite reasoning linked the southern tile to the same corridor-scale disturbance pattern and kept it in the escalation set.",
+      "ground_note": "Ground review confirms expansion along the southern edge of the same clearing corridor.",
+      "findings": [
+        "Adjacent clearing expands south of the anchor cell",
+        "Moisture loss and soil exposure remain elevated into 2025"
+      ]
+    },
+    {
+      "cell_id": "sq_-10.0_-62.9",
+      "lat": -10.0,
+      "lng": -62.9,
+      "seeded_video": "sh_a765e743",
+      "event_id": "replay_rondonia_east",
+      "change_score": 0.64,
+      "confidence": 0.88,
+      "priority": "high",
+      "reason_codes": [
+        "ndvi_drop",
+        "evi2_drop",
+        "soil_exposure_spike",
+        "suspected_canopy_loss"
+      ],
+      "observation_source": "seeded_sentinelhub_replay",
+      "before_window": {
+        "label": "2023-01-15",
+        "quality": 0.97,
+        "nir": 0.68,
+        "red": 0.09,
+        "swir": 0.19,
+        "ndvi": 0.76,
+        "nbr": 0.56,
+        "evi2": 0.63,
+        "ndmi": 0.45,
+        "soil_ratio": 0.24,
+        "flags": []
+      },
+      "after_window": {
+        "label": "2025-01-15",
+        "quality": 0.94,
+        "nir": 0.37,
+        "red": 0.22,
+        "swir": 0.32,
+        "ndvi": 0.25,
+        "nbr": 0.05,
+        "evi2": 0.21,
+        "ndmi": 0.01,
+        "soil_ratio": 0.69,
+        "flags": []
+      },
+      "timelapse_analysis": "The eastern tile preserves the same directional disturbance but with a smaller final footprint, consistent with edge spread from the core clearing.",
+      "analysis_summary": "The east-side evidence is weaker than the anchor cell but still consistent with durable land-cover conversion propagating along the frontier line.",
+      "satellite_note": "Satellite triage retained the eastern neighbor as a supporting tile because the vegetation collapse persisted across multiple seeded frames.",
+      "ground_note": "Ground review confirms this tile as a supporting extension of the same frontier-clearing story.",
+      "findings": [
+        "Supporting edge-spread signature east of the anchor cell",
+        "Recovered less canopy than a seasonal disturbance would suggest"
+      ]
+    },
+    {
+      "cell_id": "sq_-9.9_-63.0",
+      "lat": -9.9,
+      "lng": -63.0,
+      "seeded_video": "sh_fad8ab09",
+      "event_id": "replay_rondonia_north",
+      "change_score": 0.58,
+      "confidence": 0.84,
+      "priority": "medium",
+      "reason_codes": [
+        "ndvi_drop",
+        "nbr_drop",
+        "suspected_canopy_loss"
+      ],
+      "observation_source": "seeded_sentinelhub_replay",
+      "before_window": {
+        "label": "2023-01-15",
+        "quality": 0.95,
+        "nir": 0.67,
+        "red": 0.11,
+        "swir": 0.20,
+        "ndvi": 0.72,
+        "nbr": 0.51,
+        "evi2": 0.58,
+        "ndmi": 0.41,
+        "soil_ratio": 0.27,
+        "flags": []
+      },
+      "after_window": {
+        "label": "2025-01-15",
+        "quality": 0.93,
+        "nir": 0.41,
+        "red": 0.21,
+        "swir": 0.29,
+        "ndvi": 0.32,
+        "nbr": 0.10,
+        "evi2": 0.28,
+        "ndmi": 0.07,
+        "soil_ratio": 0.61,
+        "flags": []
+      },
+      "timelapse_analysis": "The northern tile shows a lighter but still persistent canopy-loss edge, useful as a medium-priority example within the same mission footprint.",
+      "analysis_summary": "The north-side change is smaller, but it still behaves like a durable frontier extension rather than a short-lived seasonal fluctuation.",
+      "satellite_note": "Satellite triage kept the northern edge as a medium-priority flag because the disturbance persisted through the seeded sequence.",
+      "ground_note": "Ground review confirms a smaller but still durable canopy-loss extension north of the core clearing.",
+      "findings": [
+        "Medium-priority supporting disturbance north of the anchor cell",
+        "Useful comparison tile for confidence calibration"
+      ]
+    }
+  ]
+}

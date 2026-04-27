@@ -497,7 +497,8 @@ def _build_html(stats: dict, model_badge: str, link_severed: bool) -> str:
 
   function renderMessage(msg) {{
     const cls = senderClass(msg.sender);
-    const ts = (msg.time||'').slice(11,19);
+    const msgId = Number.isFinite(Number(msg.id)) ? Number(msg.id) : 0;
+    const ts = escHtml((msg.time||'').slice(11,19));
     const meta = '<div class="msg-meta"><span class="sender">' + escHtml(msg.sender) + '</span>' +
                  '<span class="ts">' + ts + '</span>' +
                  '<span class="type-tag">' + escHtml(msg.msg_type) + '</span></div>';
@@ -507,7 +508,7 @@ def _build_html(stats: dict, model_badge: str, link_severed: bool) -> str:
     if (msg.msg_type === 'llm_thinking') {{
       extra = '<div class="llm-streaming"><div class="llm-dots"><span></span><span></span><span></span></div>LFM reasoning in progress&hellip;</div>';
     }}
-    return '<div class="msg ' + cls + ' new-msg" id="m' + msg.id + '">' +
+    return '<div class="msg ' + cls + ' new-msg" id="m' + msgId + '">' +
            meta + '<div class="bubble">' + body + extra + '</div></div>';
   }}
 
@@ -566,9 +567,12 @@ def _render_feed(feed: list) -> str:
             "operator": "from-operator operator",
         }.get(sender, "from-broadcast")
 
-        ts = item["time"][11:19] if len(item["time"]) > 18 else item["time"]
-        mtype = html_mod.escape(item.get("msg_type", ""))
-        sender_esc = html_mod.escape(sender)
+        item_id = html_mod.escape(str(item.get("id", "")))
+        timestamp = str(item.get("time", ""))
+        ts = html_mod.escape(timestamp[11:19] if len(timestamp) > 18 else timestamp)
+        msg_type = str(item.get("msg_type", ""))
+        mtype = html_mod.escape(msg_type)
+        sender_esc = html_mod.escape(str(sender))
 
         meta = (
             f'<div class="msg-meta">'
@@ -577,9 +581,9 @@ def _render_feed(feed: list) -> str:
             f'<span class="type-tag">{mtype}</span>'
             f'</div>'
         )
-        body = _render_payload_server(item["payload"], item["msg_type"])
+        body = _render_payload_server(item.get("payload"), msg_type)
         extra = ""
-        if item["msg_type"] == "llm_thinking":
+        if msg_type == "llm_thinking":
             extra = (
                 '<div class="llm-streaming">'
                 '<div class="llm-dots"><span></span><span></span><span></span></div>'
@@ -588,7 +592,7 @@ def _render_feed(feed: list) -> str:
 
         cell_attr = f' data-cell="{html_mod.escape(str(item.get("cell_id","") or ""))}"' if item.get("cell_id") else ""
         parts.append(
-            f'<div class="msg {sender_class}" id="m{item["id"]}" data-mtype="{mtype}"{cell_attr}>'
+            f'<div class="msg {sender_class}" id="m{item_id}" data-mtype="{mtype}"{cell_attr}>'
             f'{meta}<div class="bubble">{body}{extra}</div></div>'
         )
     return "\n".join(parts)

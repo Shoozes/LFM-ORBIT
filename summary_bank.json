@@ -19,10 +19,13 @@
       ".tools",
       ".venv",
       ".vscode",
+      "AGENTS.md",
       "SimSat-main",
       "Thumbs.db",
       "__pycache__",
       "_backup",
+      "_gen_controller.pyw",
+      "_generate_structure.py",
       "_struct_summary.txt",
       "_structure_with_content.txt",
       "_unsloth_sentencepiece_temp",
@@ -54,7 +57,410 @@
       "venv"
     ]
   },
-  "groups": {},
+  "groups": {
+    "docs_state_and_tracking": {
+      "note": "Canonical current-state docs and active repo tracking surfaces, with detailed progress history consolidated into TODO and the README kept to the current high-signal baseline.",
+      "files": [
+        "README.md",
+        "docs/ARCHITECTURE.md",
+        "docs/TODO.md",
+        "summary_bank.json"
+      ]
+    },
+    "docs_model_runtime_and_handoff": {
+      "note": "Supplemental model handoff docs. README, ARCHITECTURE, and TODO remain the canonical progress surfaces.",
+      "files": [
+        "docs/MODEL_HANDOFF.md"
+      ]
+    },
+    "issue_group_import_contracts_and_env_resilience": {
+      "note": "Repo integrity guardrails for broken backend imports/exports, seed/GEE/debug entrypoints, satellite-debug render sanitization, safe manual Sentinel probe imports, malformed local environment overrides, and offline-safe cold-start .env defaults.",
+      "files": [
+        ".env.example",
+        "run.ps1",
+        "run.sh",
+        "source/backend/satellite_debug.py",
+        "source/backend/start_edge.py",
+        "source/backend/test_evalscript.py",
+        "source/backend/test_wms.py",
+        "source/backend/core/simsat_client.py",
+        "source/backend/scripts/gee_auth.py",
+        "source/backend/scripts/seed_nasa_cache.py",
+        "source/backend/scripts/seed_sentinel_cache.py",
+        "source/backend/tests/test_api.py",
+        "source/backend/tests/test_import_contracts.py",
+        "source/backend/tests/test_satellite_debug.py",
+        "source/backend/tests/test_simsat_client.py"
+      ]
+    },
+    "issue_group_error_handling_and_parser_integrity": {
+      "note": "Malformed Depth Anything image payloads fail before optional model loading, nested fenced LFM tool-call JSON parses correctly, and non-fatal fallback paths now leave debug diagnostics.",
+      "files": [
+        "source/backend/api/main.py",
+        "source/backend/core/config.py",
+        "source/backend/core/depth_anything.py",
+        "source/backend/core/inference.py",
+        "source/backend/core/observability.py",
+        "source/backend/core/observation_store.py",
+        "source/backend/core/timelapse.py",
+        "source/backend/tests/test_api.py",
+        "source/backend/tests/test_depth_anything.py",
+        "source/backend/tests/test_inference.py",
+        "source/backend/tests/test_observation_store.py"
+      ]
+    },
+    "issue_group_e2e_state_isolation_and_run_conditions": {
+      "note": "Playwright state reset, replay determinism, shared retryable app navigation, settings API and basemap readiness waits, seeded-WebM visual proof, agent-dialogue REST polling, canvas-relative context-menu retries with Map Actions fallback, opt-in debug HTML dumps/logging, and explicit opt-in server reuse to avoid stale local runtime leakage.",
+      "files": [
+        "source/frontend/playwright.config.ts",
+        "source/frontend/e2e/app.spec.ts",
+        "source/frontend/e2e/runtime.ts",
+        "source/frontend/e2e/test_page_html.spec.ts",
+        "source/backend/core/runtime_state.py",
+        "source/backend/api/main.py"
+      ]
+    },
+    "issue_group_context_menu_vlm_and_visual_polish": {
+      "note": "Map context-menu stability, keyboard/touch map actions with click propagation guarded, marker-interception-resistant visual tests with button fallback, visible map-pin sync failures, non-overlapping map-pin feedback toasts, safe marker-label rendering, compact Mission composition, timelapse-before-VLM proof ordering, VLM inline errors, map-driven agent-evaluation non-OK response handling, and opt-in debug HTML output hygiene.",
+      "files": [
+        "source/frontend/App.tsx",
+        "source/frontend/components/MapVisualizer.tsx",
+        "source/frontend/components/VlmPanel.tsx",
+        "source/frontend/hooks/useMapPins.ts",
+        "source/frontend/e2e/app.spec.ts",
+        "source/frontend/e2e/bbox.spec.ts",
+        "source/frontend/e2e/runtime.ts",
+        "source/frontend/e2e/test_page_html.spec.ts",
+        "source/frontend/e2e/vlm.spec.ts"
+      ]
+    },
+    "issue_group_alert_contracts_and_persistence": {
+      "note": "Typed alert payloads, boundary-context persistence, and confirmation gating.",
+      "files": [
+        "source/backend/api/main.py",
+        "source/backend/core/contracts.py",
+        "source/backend/core/loader.py",
+        "source/backend/core/paths.py",
+        "source/backend/core/queue.py",
+        "source/backend/core/scanner.py",
+        "source/backend/core/telemetry.py",
+        "source/backend/tests/test_api.py",
+        "source/backend/tests/test_loader.py",
+        "source/backend/tests/test_paths.py",
+        "source/backend/tests/test_queue.py",
+        "source/backend/tests/test_telemetry.py"
+      ]
+    },
+    "issue_group_operator_input_validation_and_timing": {
+      "note": "Shared bbox/date validation, unsupported cell-id rejection, bounded timelapse frame fetches, and UI-visible mission validation errors for safer operator-facing APIs.",
+      "files": [
+        "source/backend/api/main.py",
+        "source/backend/core/grid.py",
+        "source/backend/core/mission.py",
+        "source/backend/core/timelapse.py",
+        "source/backend/tests/test_api.py",
+        "source/backend/tests/test_grid.py",
+        "source/backend/tests/test_mission.py",
+        "source/backend/tests/test_timelapse.py",
+        "source/frontend/components/MissionControl.tsx",
+        "source/frontend/e2e/bbox.spec.ts"
+      ]
+    },
+    "issue_group_lifeline_frame_gate_and_eval_validation": {
+      "note": "Before/after lifeline edge-case handling: downlink escalation now requires distinct frame evidence, and empty eval payloads fail API validation.",
+      "files": [
+        "source/backend/core/lifeline_monitoring.py",
+        "source/backend/api/main.py",
+        "source/backend/tests/test_lifeline_monitoring.py",
+        "source/backend/tests/test_api.py",
+        "docs/TODO.md"
+      ]
+    },
+    "issue_group_frontend_state_and_routing": {
+      "note": "Mission/sidebar synchronization, replay-aware routing, alert normalization, retried settings status resilience, compact auxiliary-panel composition, agent-bus-visible map action failures, operator-visible Agent Dialogue bus errors, and Ground Agent assistant error payload surfacing.",
+      "files": [
+        "source/frontend/App.tsx",
+        "source/frontend/components/AlertsLogs.tsx",
+        "source/frontend/components/GroundAgent.tsx",
+        "source/frontend/components/MissionControl.tsx",
+        "source/frontend/components/SettingsPanel.tsx",
+        "source/frontend/hooks/useTelemetry.ts",
+        "source/frontend/types/telemetry.ts",
+        "source/frontend/utils/telemetry.ts",
+        "source/frontend/e2e/app.spec.ts",
+        "source/frontend/e2e/capture_screenshots.spec.ts",
+        "source/frontend/e2e/qa_verification.spec.ts"
+      ]
+    },
+    "feature_group_monitor_preview_ui_and_visual_proof": {
+      "note": "Mission-tab maritime/lifeline monitor preview cards, Playwright API contract coverage, and visual proof screenshots.",
+      "files": [
+        "README.md",
+        "docs/ARCHITECTURE.md",
+        "docs/TODO.md",
+        "source/frontend/components/MissionControl.tsx",
+        "source/frontend/e2e/monitor_features.spec.ts",
+        "source/backend/api/main.py",
+        "source/backend/core/lifeline_monitoring.py",
+        "source/backend/core/maritime_monitoring.py"
+      ]
+    },
+    "feature_group_scene_qc_and_observability": {
+      "note": "Scene acceptance, runtime timings, rejection accounting, stable rejection-reason metrics, Logs-tab visibility, decision-gate output, and scoring integrity.",
+      "files": [
+        "source/backend/core/analyzer.py",
+        "source/backend/core/contracts.py",
+        "source/backend/core/indices.py",
+        "source/backend/core/metrics.py",
+        "source/backend/core/observability.py",
+        "source/backend/core/scene_qc.py",
+        "source/backend/core/scanner.py",
+        "source/backend/core/scorer.py",
+        "source/backend/core/telemetry.py",
+        "source/backend/scripts/decision_gate.py",
+        "source/backend/tests/test_api.py",
+        "source/backend/tests/test_decision_gate.py",
+        "source/backend/tests/test_metrics.py",
+        "source/backend/tests/test_observability.py",
+        "source/backend/tests/test_scanner.py",
+        "source/backend/tests/test_scene_qc.py",
+        "source/backend/tests/test_scorer.py",
+        "source/frontend/components/AlertsLogs.tsx",
+        "source/frontend/e2e/app.spec.ts",
+        "source/frontend/types/telemetry.ts"
+      ]
+    },
+    "feature_group_boundary_overlays_and_validation": {
+      "note": "Governance overlays, inspect panel attribution, and overlay regression coverage.",
+      "files": [
+        "source/backend/core/contracts.py",
+        "source/backend/core/overlays/attribution.py",
+        "source/backend/scripts/import_boundaries.py",
+        "source/backend/tests/test_overlays.py",
+        "source/frontend/components/ValidationPanel.tsx"
+      ]
+    },
+    "issue_group_gallery_cache_and_offline_fallbacks": {
+      "note": "Gallery thumbnail fallbacks, seeded timelapse cache reuse, provenance labels, and offline evidence regression coverage.",
+      "files": [
+        "source/backend/core/gallery.py",
+        "source/backend/core/timelapse.py",
+        "source/backend/tests/test_gallery.py",
+        "source/backend/tests/test_timelapse.py",
+        "source/frontend/components/ValidationPanel.tsx"
+      ]
+    },
+    "feature_group_agents_and_mission_runtime": {
+      "note": "Mission lifecycle, SAT/GND message flow, operator-visible Agent Dialogue bus errors, Ground Agent assistant error payloads, and agent runtime behaviors.",
+      "files": [
+        "source/backend/core/agent_bus.py",
+        "source/backend/core/ground_agent.py",
+        "source/backend/core/ground_agent_knowledge.py",
+        "source/backend/core/link_state.py",
+        "source/backend/core/mission.py",
+        "source/backend/core/runtime_state.py",
+        "source/backend/core/satellite_agent.py",
+        "source/backend/tests/test_agent_bus.py",
+        "source/backend/tests/test_link_ground_agent.py",
+        "source/backend/tests/test_mission.py",
+        "source/backend/tests/test_satellite_agent.py",
+        "source/frontend/components/AgentDialogue.tsx",
+        "source/frontend/components/GroundAgent.tsx"
+      ]
+    },
+    "feature_group_model_runtime_and_handoff": {
+      "note": "Manifest-based satellite artifact resolution, runtime status exposure, nested fenced JSON tool-call parsing, and model fetch handoff tooling.",
+      "files": [
+        "source/backend/api/main.py",
+        "source/backend/core/inference.py",
+        "source/backend/core/model_manifest.py",
+        "source/backend/scripts/fetch_satellite_model.py",
+        "source/backend/tests/test_api.py",
+        "source/backend/tests/test_inference.py",
+        "source/backend/tests/test_model_manifest.py"
+      ]
+    },
+    "feature_group_dataset_export_and_eval_lane": {
+      "note": "Orbit dataset export, asset retagging, optional Tkinter retag UI with README screenshot, and eval tooling, including recent alerts, weak rejects, cached API observations, persisted monitor-report JSON imports, deduplicated image/frame training assets, temporal sequence JSONL, and training JSONL generation.",
+      "files": [
+        "docs/MODEL_HANDOFF.md",
+        "docs/retag-training-assets-ui.png",
+        "source/backend/data/README.md",
+        "source/backend/scripts/export_orbit_dataset.py",
+        "source/backend/scripts/retag_training_assets.py",
+        "source/backend/scripts/retag_training_assets_ui.py",
+        "source/backend/scripts/evaluate_model.py",
+        "source/backend/tests/test_export_orbit_dataset.py",
+        "source/backend/tests/test_retag_training_assets.py",
+        "source/backend/tests/test_retag_training_assets_ui.py",
+        "source/backend/tests/test_evaluate_model.py"
+      ]
+    },
+    "issue_group_monitor_report_dataset_bridge": {
+      "note": "Optional import path for persisted maritime/lifeline monitor reports so STAC metadata and before/after candidates can flow into dataset exports.",
+      "files": [
+        "README.md",
+        "docs/TODO.md",
+        "docs/MODEL_HANDOFF.md",
+        "source/backend/scripts/export_orbit_dataset.py",
+        "source/backend/tests/test_export_orbit_dataset.py"
+      ]
+    },
+    "feature_group_runtime_reset_and_replay_determinism": {
+      "note": "Deterministic runtime reset, seeded replay hydration, stricter observation readiness, and replay-backed demo/test helpers including visible replay-driven tutorial recordings.",
+      "files": [
+        "source/backend/api/main.py",
+        "source/backend/core/observation_store.py",
+        "source/backend/core/replay.py",
+        "source/backend/core/runtime_state.py",
+        "source/backend/tests/test_api.py",
+        "source/backend/tests/test_observation_store.py",
+        "source/backend/tests/test_replay.py",
+        "source/frontend/e2e/capture_screenshots.spec.ts",
+        "source/frontend/e2e/dual_agent_demo.spec.ts",
+        "source/frontend/e2e/runtime.ts",
+        "source/frontend/e2e/tutorialHelpers.ts",
+        "source/frontend/e2e/tutorial_video.spec.ts"
+      ]
+    },
+    "feature_group_timelapse_gallery_and_vlm": {
+      "note": "Timelapse generation, provenance labels, seeded-WebM visual proof, retryable API-error rendering, gallery evidence with clearer pending/unavailable copy, explicit VLM Find/Ask/Generate controls, deterministic image-fetch fallback behavior, and demo flows.",
+      "files": [
+        "source/backend/core/gallery.py",
+        "source/backend/core/timelapse.py",
+        "source/backend/core/vlm.py",
+        "source/backend/tests/test_gallery.py",
+        "source/backend/tests/test_timelapse.py",
+        "source/backend/tests/test_vlm.py",
+        "source/frontend/e2e/app.spec.ts",
+        "source/frontend/App.tsx",
+        "source/frontend/components/TimelapseViewer.tsx",
+        "source/frontend/components/VlmPanel.tsx",
+        "source/frontend/e2e/tutorial_video.spec.ts",
+        "source/frontend/e2e/vlm.spec.ts"
+      ]
+    },
+    "feature_group_provider_pipeline_and_seed_scripts": {
+      "note": "Provider resolution, offline-safe cold-start defaults, SimSat Sentinel/Mapbox routing, fallback order, seeded caches, observation-record integrity, and debug diagnostics for safe fallback paths.",
+      "files": [
+        ".env.example",
+        "source/backend/test_evalscript.py",
+        "source/backend/test_wms.py",
+        "source/backend/core/config.py",
+        "source/backend/core/gee_provider.py",
+        "source/backend/core/loader.py",
+        "source/backend/core/nasa_provider.py",
+        "source/backend/core/observation_store.py",
+        "source/backend/core/sentinel_provider.py",
+        "source/backend/core/simsat_client.py",
+        "source/backend/core/simsat_provider.py",
+        "source/backend/scripts/decision_gate.py",
+        "source/backend/scripts/drift_simulator.py",
+        "source/backend/scripts/gee_auth.py",
+        "source/backend/scripts/seed_nasa_cache.py",
+        "source/backend/scripts/seed_sentinel_cache.py",
+        "source/backend/tests/test_api.py",
+        "source/backend/tests/test_config.py",
+        "source/backend/tests/test_loader.py",
+        "source/backend/tests/test_simsat_client.py"
+      ]
+    },
+    "feature_group_maritime_stac_and_investigation": {
+      "note": "Orbit-native maritime monitoring, optional Element84 STAC scene metadata, date deduplication, and cardinal investigation planning.",
+      "files": [
+        "source/backend/core/maritime_monitoring.py",
+        "source/backend/core/temporal_use_cases.py",
+        "source/backend/api/main.py",
+        "source/backend/tests/test_maritime_monitoring.py",
+        "source/backend/tests/test_api.py",
+        "source/backend/tests/test_temporal_use_cases.py"
+      ]
+    },
+    "feature_group_lifeline_before_after_monitoring": {
+      "note": "Civilian lifeline before/after monitoring, strict candidate validation, distinct frame-pair downlink gating, seeded assets, eval metrics, and acceptance checks.",
+      "files": [
+        "source/backend/core/lifeline_monitoring.py",
+        "source/backend/core/temporal_use_cases.py",
+        "source/backend/api/main.py",
+        "source/backend/tests/test_lifeline_monitoring.py",
+        "source/backend/tests/test_api.py",
+        "source/backend/tests/test_temporal_use_cases.py"
+      ]
+    },
+    "feature_group_depth_map_and_shader_helpers": {
+      "note": "Optional Depth Anything V3 support, backend depth-status/toggle/summary endpoints, pre-model image-payload validation, da3-large default, auto device resolution, Settings UI toggle, and frontend GPU texture-reduction helper for depth-map verification.",
+      "files": [
+        ".env.example",
+        "docs/TODO.md",
+        "source/backend/api/main.py",
+        "source/backend/core/depth_anything.py",
+        "source/backend/tests/test_api.py",
+        "source/backend/tests/test_config.py",
+        "source/backend/tests/test_depth_anything.py",
+        "source/frontend/components/SettingsPanel.tsx",
+        "source/frontend/e2e/app.spec.ts",
+        "source/frontend/utils/depthMapStats.ts",
+        "source/frontend/package.json",
+        "source/frontend/vite.config.ts"
+      ]
+    },
+    "feature_group_frontend_shell": {
+      "note": "Primary operator UI shells, map interactions including right-click and propagation-safe button-driven spatial options, Agent Dialogue inline bus errors, Ground Agent guarded sends/errors, logs integrity metrics, and settings/runtime surfaces.",
+      "files": [
+        "source/frontend/App.tsx",
+        "source/frontend/components/AgentDialogue.tsx",
+        "source/frontend/components/AlertsLogs.tsx",
+        "source/frontend/components/MapVisualizer.tsx",
+        "source/frontend/components/MissionControl.tsx",
+        "source/frontend/components/SettingsPanel.tsx",
+        "source/frontend/components/TimelapseViewer.tsx",
+        "source/frontend/components/ValidationPanel.tsx",
+        "source/frontend/components/VlmPanel.tsx",
+        "source/frontend/utils/depthMapStats.ts"
+      ]
+    },
+    "qa_suite_and_demo_flows": {
+      "note": "Playwright coverage for main flows, mission/timelapse validation errors, shared retryable app navigation, settings readiness, agent-bus visual/error assertions, Ground Agent backend-error rendering, replay-backed demos/screenshots, shared tutorial and basemap/context-menu helpers with Map Actions fallback, keyboard/touch map action coverage, debug dashboard, opt-in HTML dump logging, CI-safe web test wiring, and configurable loopback test ports.",
+      "files": [
+        ".github/workflows/ci.yml",
+        "source/frontend/playwright.config.ts",
+        "source/frontend/e2e/app.spec.ts",
+        "source/frontend/e2e/bbox.spec.ts",
+        "source/frontend/e2e/capture_screenshots.spec.ts",
+        "source/frontend/e2e/debug_dashboard.spec.ts",
+        "source/frontend/e2e/dual_agent_demo.spec.ts",
+        "source/frontend/e2e/monitor_features.spec.ts",
+        "source/frontend/e2e/qa-audit.spec.ts",
+        "source/frontend/e2e/qa_verification.spec.ts",
+        "source/frontend/e2e/runtime.ts",
+        "source/frontend/e2e/test_page_html.spec.ts",
+        "source/frontend/e2e/testUrls.ts",
+        "source/frontend/e2e/tutorialHelpers.ts",
+        "source/frontend/e2e/tutorial_video.spec.ts",
+        "source/frontend/e2e/vlm.spec.ts"
+      ]
+    },
+    "runtime_entrypoints_and_tools": {
+      "note": "Operator entrypoints, pinned local runtimes, reproducible install/run/verify tooling with repo-root smoke coverage, safe manual provider probes, and retired legacy entrypoint guardrails.",
+      "files": [
+        ".github/copilot-setup-steps.yml",
+        ".nvmrc",
+        ".env.example",
+        ".tools/_gen_bank.py",
+        ".tools/get-context.ps1",
+        "run.bat",
+        "run.ps1",
+        "run.sh",
+        "source/backend/test_evalscript.py",
+        "source/backend/test_wms.py",
+        "source/frontend/.npmrc",
+        "source/backend/autonomous_agent.py",
+        "source/backend/satellite_debug.py",
+        "source/backend/start_edge.py",
+        "source/backend/tests/test_autonomous_agent.py"
+      ]
+    }
+  },
   "exclusions": {
     "source": {
       "note": "[collapsed (+)]"
@@ -72,9 +478,6 @@
       "note": "[collapsed (+)]"
     },
     "source/backend/assets/seeded_data": {
-      "note": "[collapsed (+)]"
-    },
-    "source/backend/canopy_sentinel_backend.egg-info": {
       "note": "[collapsed (+)]"
     },
     "source/backend/core": {
@@ -105,6 +508,18 @@
       "note": "[collapsed (+)]"
     },
     "source/frontend/utils": {
+      "note": "[collapsed (+)]"
+    },
+    "source/backend/canopy_sentinel_backend.egg-info": {
+      "note": "[collapsed (+)]"
+    },
+    "source/backend/core/overlays": {
+      "note": "[collapsed (+)]"
+    },
+    "source/backend/data": {
+      "note": "[collapsed (+)]"
+    },
+    "source/backend/data/boundaries": {
       "note": "[collapsed (+)]"
     }
   }

@@ -1,63 +1,136 @@
+import asyncio
 import base64
+import json
 import logging
 import os
 import warnings
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import date
+from typing import Any
 
 try:
     from sentinelhub import SHRateLimitWarning
     warnings.filterwarnings('ignore', category=SHRateLimitWarning)
 except ImportError:
-    pass
+    SHRateLimitWarning = None  # type: ignore[assignment]
 
-from core.grid import cell_to_boundary, cell_to_latlng
+from core.grid import cell_to_boundary, cell_to_latlng, is_supported_cell_id, normalize_bbox
 import httpx
-from fastapi import FastAPI, Path, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Path, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from core.analyzer import analyze_alert
-from core.agent_bus import get_bus_stats, get_recent_dialogue, init_bus, list_pins, delete_pin, upsert_pin, post_message as bus_post
+from core.agent_bus import get_bus_stats, get_recent_dialogue, list_pins, delete_pin, upsert_pin, post_message as bus_post
 from core.config import (
+    PROVIDER_FALLBACK_ORDER,
+    PROVIDER_NASA_DIRECT,
     PROVIDER_SENTINELHUB_DIRECT,
+    PROVIDER_SIMSAT_MAPBOX,
     PROVIDER_SIMSAT_SENTINEL,
     REGION,
     get_runtime_mode_summary,
+    resolve_nasa_credentials,
     resolve_sentinel_credentials,
+)
+from core.depth_anything import (
+    DepthAnythingUnavailable,
+    estimate_depth_summary,
+    get_depth_anything_status,
+    set_depth_anything_enabled,
 )
 from core.gallery import list_gallery, get_gallery_item
 from core.ground_agent import run_ground_agent
 from core.inference import model_status as llm_model_status
-from core.link_state import is_link_connected, set_link_state
-from core.metrics import init_metrics, read_metrics_summary
-from core.mission import get_active_mission, list_missions, start_mission, stop_mission, reset_missions
-from core.queue import get_alert_counts, get_recent_alerts, init_db
+from core.lifeline_monitoring import (
+    build_lifeline_monitor_report,
+    evaluate_lifeline_predictions,
+    list_lifeline_assets,
+)
+from core.maritime_monitoring import (
+    build_maritime_monitor_report,
+    normalize_maritime_timestamp,
+)
+from core.metrics import read_metrics_summary
+from core.mission import get_active_mission, list_missions, start_mission, stop_mission
+from core.queue import get_alert_counts, get_recent_alerts
+from core.replay import list_seeded_replays, load_seeded_replay
+from core.runtime_state import ensure_runtime_state, reset_runtime_state
 from core.satellite_agent import run_satellite_agent
 from core.scanner import stream_region_scan
-from core.sentinel_provider import is_sentinelhub_available
 from core.simsat_client import get_simsat_client, SimSatConfig
 from core.telemetry import build_health_payload
+from core.temporal_use_cases import (
+    classify_temporal_use_case as classify_temporal_use_case_record,
+    list_temporal_use_cases,
+)
 from core.timelapse import generate_timelapse_frames
 from core.vlm import run_vlm_grounding, run_vlm_vqa, run_vlm_caption
 
 logger = logging.getLogger(__name__)
 
 
+def _normalize_bbox_for_request(value: list[float] | None) -> list[float] | None:
+    if value is None:
+        return None
+    try:
+        return normalize_bbox(value)
+    except ValueError as exc:
+        raise ValueError(str(exc)) from exc
+
+
+def _date_key(value: str | None) -> date | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    parts = text.split("-")
+    if len(parts) > 3:
+        raise ValueError("date must use YYYY, YYYY-MM, or YYYY-MM-DD")
+    try:
+        year = int(parts[0])
+        month = int(parts[1]) if len(parts) >= 2 else 1
+        day = int(parts[2]) if len(parts) >= 3 else 1
+        return date(year, month, day)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("date must use YYYY, YYYY-MM, or YYYY-MM-DD") from exc
+
+
+def _validate_date_order(start_date: str | None, end_date: str | None) -> None:
+    start_key = _date_key(start_date)
+    end_key = _date_key(end_date)
+    if start_key and end_key and start_key > end_key:
+        raise ValueError("start_date must be on or before end_date")
+
+
 def _should_reset_on_boot() -> bool:
     return os.getenv("RESET_RUNTIME_STATE_ON_BOOT", "false").lower() in ("true", "1", "yes")
 
 
+def _decode_bus_payload(raw_payload: str):
+    try:
+        return json.loads(raw_payload)
+    except Exception:
+        return {"note": str(raw_payload)}
+
+
+async def _safe_send_text(websocket: WebSocket, payload: dict) -> bool:
+    try:
+        await websocket.send_text(json.dumps(payload))
+        return True
+    except RuntimeError as exc:
+        if "close message has been sent" in str(exc):
+            return False
+        raise
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    import asyncio
     reset = _should_reset_on_boot()
-    init_db(reset=reset)
-    init_metrics(reset=reset)
-    init_bus(reset=reset)
     if reset:
-        reset_missions()
+        reset_runtime_state()
+    else:
+        ensure_runtime_state()
 
     mode = get_runtime_mode_summary()
     logger.info(
@@ -77,14 +150,14 @@ async def lifespan(_: FastAPI):
     gnd_task.cancel()
     try:
         await asyncio.gather(sat_task, gnd_task, return_exceptions=True)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Agent pair shutdown gather raised: %s", exc)
     logger.info("Agent pair stopped.")
 
 
 app = FastAPI(
-    title="Canopy Sentinel API",
-    description="Satellite-first deforestation triage system",
+    title="LFM Orbit API",
+    description="Satellite-first forest and infrastructure intelligence system",
     version="0.4.0",
     lifespan=lifespan,
 )
@@ -126,10 +199,13 @@ def simsat_status():
     return {
         "simsat_base_url": config.base_url,
         "simsat_available": client.is_available(),
+        "mapbox_token_configured": bool(config.mapbox_token),
         "timeout_seconds": config.timeout_seconds,
         "endpoints": {
             "sentinel_historical": "/data/image/sentinel",
             "sentinel_current": "/data/current/image/sentinel",
+            "mapbox_historical": "/data/image/mapbox",
+            "mapbox_current": "/data/current/image/mapbox",
         },
     }
 
@@ -143,13 +219,14 @@ def provider_status():
     credential detection status, the fallback policy, and the current
     demo/semi-real truth flags so callers can self-describe the scoring mode.
     """
-    config = SimSatConfig.from_env()
     client = get_simsat_client()
     sentinel_creds = resolve_sentinel_credentials()
-    mode = get_runtime_mode_summary()
+    nasa_creds = resolve_nasa_credentials()
+    simsat_config = SimSatConfig.from_env()
 
     simsat_available = client.is_available()
     sentinelhub_available = sentinel_creds.available
+    nasa_available = nasa_creds.available
 
     return {
         "active_provider": REGION.observation_mode,
@@ -158,17 +235,121 @@ def provider_status():
         "providers": {
             PROVIDER_SIMSAT_SENTINEL: {
                 "available": simsat_available,
-                "description": "Official SimSat API (hackathon submission path)",
+                "description": "Official SimSat API endpoint",
+            },
+            PROVIDER_SIMSAT_MAPBOX: {
+                "available": simsat_available and bool(simsat_config.mapbox_token),
+                "credential_source": "env" if simsat_config.mapbox_token else "unavailable",
+                "description": "Optional SimSat Mapbox imagery endpoint",
             },
             PROVIDER_SENTINELHUB_DIRECT: {
                 "available": sentinelhub_available,
                 "credential_source": sentinel_creds.source,
                 "description": "Direct Sentinel Hub access",
             },
+            PROVIDER_NASA_DIRECT: {
+                "available": nasa_available,
+                "credential_source": nasa_creds.source,
+                "description": "Direct NASA API fallback",
+            },
         },
-
+        "sentinel_secret_detected": sentinelhub_available,
         "sentinel_credential_source": sentinel_creds.source,
+        "fallback_order": list(PROVIDER_FALLBACK_ORDER),
     }
+
+
+@app.get("/api/temporal/use-cases")
+def temporal_use_cases():
+    """Return temporal scan use cases, methods, and starter examples."""
+    cases = list_temporal_use_cases()
+    return {"use_cases": cases, "count": len(cases)}
+
+
+@app.post("/api/temporal/classify")
+def temporal_classify(body: dict):
+    """Auto-select the temporal use case for mission, alert, or API-prep metadata."""
+    requested = body.get("use_case_id") if isinstance(body, dict) else None
+    return classify_temporal_use_case_record(body if isinstance(body, dict) else {}, requested)
+
+
+class LifelineMonitorBody(BaseModel):
+    asset_id: str | None = Field(default=None, max_length=120)
+    asset: dict[str, Any] | None = None
+    candidate: dict[str, Any] = Field(default_factory=dict)
+    baseline_frame: dict[str, Any] = Field(default_factory=dict)
+    current_frame: dict[str, Any] = Field(default_factory=dict)
+    task_text: str = Field(default="", max_length=1000)
+
+
+class LifelineEvalBody(BaseModel):
+    cases: list[dict[str, Any]] = Field(min_length=1, max_length=200)
+
+
+@app.get("/api/lifelines/assets")
+def lifeline_assets(category: str | None = None, region: str | None = None):
+    """Return seeded civilian lifeline assets for before/after monitoring."""
+    assets = list_lifeline_assets(category=category, region=region)
+    return {"assets": assets, "count": len(assets)}
+
+
+@app.post("/api/lifelines/monitor")
+def lifeline_monitor(body: LifelineMonitorBody):
+    """Build a before/after civilian lifeline report and downlink decision."""
+    try:
+        return build_lifeline_monitor_report(
+            asset_id=body.asset_id,
+            asset=body.asset,
+            candidate=body.candidate,
+            baseline_frame=body.baseline_frame,
+            current_frame=body.current_frame,
+            task_text=body.task_text,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/lifelines/evaluate")
+def lifeline_evaluate(body: LifelineEvalBody):
+    """Evaluate lifeline candidate decisions against expected actions."""
+    return evaluate_lifeline_predictions(body.cases)
+
+
+class MaritimeMonitorBody(BaseModel):
+    lat: float = Field(ge=-90.0, le=90.0)
+    lon: float = Field(ge=-180.0, le=180.0)
+    timestamp: str | None = None
+    task_text: str = Field(default="", max_length=1000)
+    anomaly_description: str = Field(default="", max_length=1000)
+    include_stac: bool = False
+    radius_km: float = Field(default=10.0, gt=0.0, le=100.0)
+    distance_km: float = Field(default=10.0, gt=0.0, le=100.0)
+    max_items: int = Field(default=4, ge=1, le=12)
+    max_cloud_cover: int = Field(default=30, ge=0, le=100)
+
+    @field_validator("timestamp")
+    @classmethod
+    def _valid_timestamp(cls, value: str | None) -> str | None:
+        if value is None or not str(value).strip():
+            return None
+        return normalize_maritime_timestamp(value)
+
+
+@app.post("/api/maritime/monitor")
+def maritime_monitor(body: MaritimeMonitorBody):
+    """Build an Orbit-native maritime monitor and cardinal investigation plan."""
+    return build_maritime_monitor_report(
+        lat=body.lat,
+        lon=body.lon,
+        timestamp=body.timestamp,
+        task_text=body.task_text,
+        anomaly_description=body.anomaly_description,
+        include_stac=body.include_stac,
+        radius_km=body.radius_km,
+        distance_km=body.distance_km,
+        max_items=body.max_items,
+        max_cloud_cover=body.max_cloud_cover,
+    )
 
 
 @app.websocket("/ws/telemetry")
@@ -191,8 +372,7 @@ async def agent_dialogue_websocket(websocket: WebSocket):
     Sends all agent_bus messages as they arrive (polling every 0.8s).
     Frontend receives the full conversation between satellite and ground agents.
     """
-    import asyncio
-    import json as _json
+    from core.agent_bus import _connect as _bus_connect
 
     await websocket.accept()
     last_id = 0
@@ -202,15 +382,15 @@ async def agent_dialogue_websocket(websocket: WebSocket):
         history = get_recent_dialogue(limit=40)
         if history:
             last_id = max(m["id"] for m in history)
-            await websocket.send_text(_json.dumps({"type": "history", "messages": history}))
-    except Exception:
-        pass
+            if not await _safe_send_text(websocket, {"type": "history", "messages": history}):
+                return
+    except Exception as exc:
+        logger.debug("Agent dialogue history bootstrap failed: %s", exc)
 
     try:
         while True:
             await asyncio.sleep(0.8)
 
-            from core.agent_bus import _connect as _bus_connect
             with _bus_connect() as conn:
                 rows = conn.execute(
                     """
@@ -224,7 +404,6 @@ async def agent_dialogue_websocket(websocket: WebSocket):
                 ).fetchall()
 
             if rows:
-                import json
                 messages = [
                     {
                         "id": r["id"],
@@ -232,13 +411,14 @@ async def agent_dialogue_websocket(websocket: WebSocket):
                         "recipient": r["recipient"],
                         "msg_type": r["msg_type"],
                         "cell_id": r["cell_id"],
-                        "payload": json.loads(r["payload"]),
+                        "payload": _decode_bus_payload(r["payload"]),
                         "timestamp": r["timestamp"],
                     }
                     for r in rows
                 ]
                 last_id = messages[-1]["id"]
-                await websocket.send_text(_json.dumps({"type": "messages", "messages": messages}))
+                if not await _safe_send_text(websocket, {"type": "messages", "messages": messages}):
+                    return
 
     except WebSocketDisconnect:
         return
@@ -290,8 +470,8 @@ def inject_operator_message(body: dict):
 # ---------------------------------------------------------------------------
 
 class PinBody(BaseModel):
-    lat: float
-    lng: float
+    lat: float = Field(ge=-90.0, le=90.0)
+    lng: float = Field(ge=-180.0, le=180.0)
     label: str = ""
     note: str = ""
     cell_id: str | None = None
@@ -328,6 +508,18 @@ def remove_pin(pin_id: int):
 
 
 
+class BboxRequest(BaseModel):
+    bbox: list[float]
+
+    @field_validator("bbox")
+    @classmethod
+    def _valid_bbox(cls, value: list[float]) -> list[float]:
+        normalized = _normalize_bbox_for_request(value)
+        if normalized is None:
+            raise ValueError("bbox is required")
+        return normalized
+
+
 class AlertAnalysisBody(BaseModel):
     change_score: float = Field(ge=0.0, le=1.0)
     confidence: float = Field(ge=0.0, le=1.0)
@@ -338,14 +530,10 @@ class AlertAnalysisBody(BaseModel):
     demo_forced_anomaly: bool = Field(default=False)
 
 @app.post("/api/analysis/timelapse")
-def analysis_timelapse(body: dict):
+def analysis_timelapse(body: BboxRequest):
     from core.analyzer import analyze_timelapse
-    
-    bbox = body.get("bbox")
-    if not bbox or len(bbox) != 4:
-        return {"error": "Invalid bounding box array"}
-        
-    analysis_text = analyze_timelapse(bbox)
+
+    analysis_text = analyze_timelapse(body.bbox)
     return {"analysis": analysis_text}
 
 @app.post("/api/analysis/alert")
@@ -372,22 +560,44 @@ def analyze_alert_endpoint(body: AlertAnalysisBody):
 # ---------------------------------------------------------------------------
 
 class MissionStartBody(BaseModel):
-    task_text: str
+    task_text: str = Field(min_length=1, max_length=1000)
     bbox: list[float] | None = None   # [west, south, east, north]
     start_date: str | None = None
     end_date: str | None = None
+    use_case_id: str | None = None
+
+    @field_validator("task_text")
+    @classmethod
+    def _strip_task_text(cls, value: str) -> str:
+        text = value.strip()
+        if not text:
+            raise ValueError("task_text is required")
+        return text
+
+    @field_validator("bbox")
+    @classmethod
+    def _valid_optional_bbox(cls, value: list[float] | None) -> list[float] | None:
+        return _normalize_bbox_for_request(value)
+
+    @model_validator(mode="after")
+    def _valid_date_order(self) -> "MissionStartBody":
+        _validate_date_order(self.start_date, self.end_date)
+        return self
+
+
+class RuntimeResetBody(BaseModel):
+    clear_observation_store_files: bool = False
 
 
 @app.post("/api/mission/start")
 def mission_start(body: MissionStartBody):
     """Start a new autonomous scan mission. Agents will restrict scanning to bbox if provided."""
-    if not body.task_text.strip():
-        return JSONResponse(status_code=400, content={"error": "task_text is required"})
     mission = start_mission(
-        task_text=body.task_text.strip(),
+        task_text=body.task_text,
         bbox=body.bbox,
         start_date=body.start_date,
         end_date=body.end_date,
+        use_case_id=body.use_case_id,
     )
     # Announce the mission on the agent bus
     bus_post(
@@ -398,6 +608,7 @@ def mission_start(body: MissionStartBody):
             "mission_id": mission["id"],
             "task": mission["task_text"],
             "bbox": mission["bbox"],
+            "temporal_use_case": mission.get("use_case_decision"),
             "note": f"[MISSION #{mission['id']}] Operator tasked: {mission['task_text']}",
         },
     )
@@ -414,12 +625,20 @@ def mission_current():
 @app.post("/api/mission/stop")
 def mission_stop():
     """Stop the active mission."""
+    active = get_active_mission()
     stop_mission()
     bus_post(
         sender="operator",
         recipient="broadcast",
         msg_type="mission",
-        payload={"task": "IDLE", "note": "[MISSION] Operator stopped mission. Resuming full-grid sweep."},
+        payload={
+            "task": "IDLE",
+            "note": (
+                "[REPLAY] Operator exited seeded replay. Resuming live sweep."
+                if active and active.get("mission_mode") == "replay"
+                else "[MISSION] Operator stopped mission. Resuming full-grid sweep."
+            ),
+        },
     )
     return {"status": "stopped"}
 
@@ -430,6 +649,36 @@ def mission_history(limit: int = Query(default=20, ge=1, le=100)):
     return {"missions": list_missions(limit=limit)}
 
 
+@app.get("/api/replay/catalog")
+def replay_catalog():
+    """Return bundled replay missions available in this workspace."""
+    return {"replays": list_seeded_replays()}
+
+
+@app.post("/api/replay/load/{replay_id}")
+def replay_load(replay_id: str = Path(...)):
+    """Reset runtime state and load a bundled replay mission into the standard app surfaces."""
+    try:
+        return load_seeded_replay(replay_id)
+    except FileNotFoundError as exc:
+        return JSONResponse(status_code=404, content={"error": str(exc)})
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
+
+
+@app.post("/api/runtime/reset")
+def runtime_reset(body: RuntimeResetBody | None = None):
+    """Reset mutable runtime state for deterministic local runs, demos, and tests."""
+    payload = body or RuntimeResetBody()
+    summary = reset_runtime_state(
+        clear_observation_store_files=payload.clear_observation_store_files,
+    )
+    return {
+        "status": "reset",
+        **summary,
+    }
+
+
 
 class CredentialsBody(BaseModel):
     client_id: str
@@ -438,17 +687,16 @@ class CredentialsBody(BaseModel):
 @app.post("/api/settings/credentials")
 def update_credentials(body: CredentialsBody):
     """Save Sentinel Hub credentials to the secrets file."""
-    import os
     from pathlib import Path
-    
+
     secrets_dir = Path(__file__).resolve().parents[3] / ".tools" / ".secrets"
     secrets_dir.mkdir(parents=True, exist_ok=True)
     secrets_file = secrets_dir / "sentinel.txt"
-    
+
     with open(secrets_file, "w", encoding="utf-8") as f:
         f.write(f"SENTINEL_CLIENT_ID={body.client_id}\n")
         f.write(f"SENTINEL_CLIENT_SECRET={body.client_secret}\n")
-    
+
     return {"status": "ok"}
 
 # ---------------------------------------------------------------------------
@@ -479,16 +727,20 @@ def get_gallery_cell(cell_id: str = Path(...)):
 # Timelapse endpoints
 # ---------------------------------------------------------------------------
 
-class TimelapseBody(BaseModel):
-    bbox: list[float]  # [w, s, e, n]
+class TimelapseBody(BboxRequest):
     start_date: str
     end_date: str
-    steps: int = 12
+    steps: int = Field(default=12, ge=2, le=24)
+
+    @model_validator(mode="after")
+    def _valid_date_order(self) -> "TimelapseBody":
+        _validate_date_order(self.start_date, self.end_date)
+        return self
 
 
 @app.post("/api/timelapse/generate")
 def generate_timelapse(body: TimelapseBody):
-    """Generate a timelapse MP4 video for a bounding box over a time range."""
+    """Generate a timelapse WebM video for a bounding box over a time range."""
     result = generate_timelapse_frames(
         bbox=body.bbox,
         start_date=body.start_date,
@@ -509,12 +761,12 @@ def analysis_status():
     """
     AI analysis model availability status.
 
-    The satellite uses the embedded LFM GGUF model (llama-cpp-python) for
-    live triage reasoning.  Ground analysis uses the offline LFM signal
+    The satellite can optionally use a locally resolved GGUF artifact for
+    live triage reasoning. Ground analysis uses the offline LFM signal
     analyzer which is always available.
     """
     ms = llm_model_status()
-    gguf_name = ms.get("name", "LFM2.5-1.2B-Thinking-Q4_K_M.gguf")
+    gguf_name = ms.get("name", "LFM2.5-VL-450M-Q4_0.gguf")
     return {
         "default_model": "offline_lfm_v1",
         "optional_model": gguf_name,
@@ -527,32 +779,50 @@ def analysis_status():
             },
             gguf_name: {
                 "available": ms.get("loaded", False),
-                "description": "LFM 2.5 1.2B Thinking GGUF -- satellite triage reasoning",
+                "description": "Optional GGUF artifact for satellite triage reasoning",
                 "path": ms.get("path", ""),
+                "repo_id": ms.get("repo_id", ""),
+                "revision": ms.get("revision", ""),
+                "source": ms.get("source", ""),
+                "manifest_path": ms.get("manifest_path", ""),
+                "mmproj_path": ms.get("mmproj_path", ""),
+                "source_handoff_path": ms.get("source_handoff_path", ""),
+                "source_handoff_present": ms.get("source_handoff_present", False),
+                "training_result_manifest": ms.get("training_result_manifest", ""),
+                "training_result_manifest_path": ms.get("training_result_manifest_path", ""),
+                "training_result_manifest_present": ms.get("training_result_manifest_present", False),
+                "readme_path": ms.get("readme_path", ""),
+                "readme_present": ms.get("readme_present", False),
                 "requires": "llama-cpp-python",
             },
         },
         "note": (
-            "Satellite triage uses the GGUF model for live reasoning. "
+            "Satellite triage can use a resolved GGUF artifact for live reasoning. "
             "Ground validation always uses offline_lfm_v1."
         ),
     }
 
 
 # ---------------------------------------------------------------------------
-# Vision-Language Model (VLM) mock endpoints
+# Vision-Language Model (VLM) endpoints
 # ---------------------------------------------------------------------------
 
-class VlmGroundingBody(BaseModel):
-    bbox: list[float]
+class VlmGroundingBody(BboxRequest):
     prompt: str
 
-class VlmVqaBody(BaseModel):
-    bbox: list[float]
+class VlmVqaBody(BboxRequest):
     question: str
 
-class VlmCaptionBody(BaseModel):
-    bbox: list[float]
+class VlmCaptionBody(BboxRequest):
+    """Caption request for a validated bbox."""
+
+
+class DepthAnythingSettingsBody(BaseModel):
+    enabled: bool
+
+
+class DepthEstimateBody(BaseModel):
+    image_b64: str = Field(..., min_length=1)
 
 @app.post("/api/vlm/grounding")
 def vlm_grounding(body: VlmGroundingBody):
@@ -569,6 +839,29 @@ def vlm_caption(body: VlmCaptionBody):
     caption = run_vlm_caption(body.bbox)
     return {"caption": caption}
 
+
+@app.get("/api/depth/status")
+def depth_status():
+    """Optional Depth Anything V3 runtime status."""
+    return get_depth_anything_status()
+
+
+@app.post("/api/depth/settings")
+def depth_settings(body: DepthAnythingSettingsBody):
+    """Toggle Depth Anything V3 for the current backend process."""
+    return set_depth_anything_enabled(body.enabled)
+
+
+@app.post("/api/depth/estimate")
+def depth_estimate(body: DepthEstimateBody):
+    """Run optional Depth Anything V3 and return compact depth statistics."""
+    try:
+        return estimate_depth_summary(body.image_b64)
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
+    except DepthAnythingUnavailable as exc:
+        return JSONResponse(status_code=409, content={"error": str(exc), "status": get_depth_anything_status()})
+
 # ---------------------------------------------------------------------------
 # Ground Agent Chat endpoint  (LFM-native — no external API key required)
 # ---------------------------------------------------------------------------
@@ -577,12 +870,9 @@ class ChatMessage(BaseModel):
     role: str
     content: str
 
+
 class ChatRequest(BaseModel):
     messages: list[ChatMessage]
-
-
-
-
 
 
 @app.post("/api/agent/chat")
@@ -665,7 +955,18 @@ def _fetch_simsat_image(
         if not client.is_available():
             return None
 
-        if date:
+        if REGION.observation_mode == PROVIDER_SIMSAT_MAPBOX:
+            if date:
+                response = client.fetch_mapbox_historical(
+                    lat=lat,
+                    lng=lng,
+                    date=date,
+                    width=512,
+                    height=512,
+                )
+            else:
+                response = client.fetch_mapbox_current(lat=lat, lng=lng, width=512, height=512)
+        elif date:
             response = client.fetch_sentinel_historical(lat=lat, lng=lng, date=date)
         else:
             response = client.fetch_sentinel_current(lat=lat, lng=lng)
@@ -694,6 +995,9 @@ def cell_imagery(
     SimSat before/after imagery when the SimSat API is reachable.
     Images are returned as base64-encoded data URLs.
     """
+    if not is_supported_cell_id(cell_id):
+        return JSONResponse(status_code=400, content={"error": "Unsupported or invalid cell_id"})
+
     try:
         centroid_lat, centroid_lng = cell_to_latlng(cell_id)
     except Exception:
@@ -714,7 +1018,11 @@ def cell_imagery(
         before_image = _fetch_simsat_image(centroid_lat, centroid_lng, date=REGION.before_label)
         after_image = _fetch_simsat_image(centroid_lat, centroid_lng, date=None)
         if before_image or after_image:
-            imagery_source = "simsat_sentinel"
+            imagery_source = (
+                "simsat_mapbox"
+                if REGION.observation_mode == PROVIDER_SIMSAT_MAPBOX
+                else "simsat_sentinel"
+            )
 
     return {
         "cell_id": cell_id,

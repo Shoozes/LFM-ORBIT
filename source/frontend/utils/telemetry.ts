@@ -1,5 +1,6 @@
 import type {
   AlertItem,
+  BoundaryContext,
   GridInitMessage,
   OrbitalScanEventDetail,
   ScanResultMessage,
@@ -10,11 +11,64 @@ import type {
 export function formatSourceLabel(source: string | undefined): string {
   if (!source) return "Unknown Source";
   switch (source) {
-    case "simsat_sentinel": return "SimSat Sentinel";
-    case "sentinelhub_direct": return "Sentinel Hub (Live)";
-    case "semi_real_loader_v1": return "Semi-Real (Offline Demo)";
+    case "simsat_sentinel":
+    case "simsat_sentinel_imagery":
+      return "SimSat Sentinel";
+    case "simsat_mapbox":
+    case "simsat_mapbox_imagery":
+      return "SimSat Mapbox";
+    case "sentinelhub_direct":
+    case "sentinelhub_direct_imagery":
+      return "Sentinel Hub (Live)";
+    case "nasa_api_direct":
+    case "nasa_api_direct_imagery":
+      return "NASA Direct";
+    case "nasa_gibs":
+      return "NASA GIBS";
+    case "semi_real_loader_v1":
+      return "Semi-Real (Offline Demo)";
+    case "seeded_sentinelhub_replay":
+      return "Seeded Replay (Sentinel Hub Cache)";
+    case "seeded_replay":
+      return "Seeded Replay";
+    case "seeded_cache":
+      return "Seeded Local Cache";
+    case "esri_arcgis":
+      return "Esri World Imagery";
+    case "offline_svg":
+      return "Offline SVG Fallback";
+    case "provided_asset":
+      return "Provided Asset";
+    case "generated_webm":
+      return "Generated WebM";
+    case "live_fetch":
+      return "Live Provider Fetch";
+    case "gee":
+      return "GEE Sentinel-2";
+    case "Seeded Orbital Video Cache":
+      return "Seeded Orbital Cache";
+    case "error_fallback":
+      return "Fallback Observation";
     default: return source;
   }
+}
+
+export function formatReasonCode(code: string): string {
+  const map: Record<string, string> = {
+    ndvi_drop: "NDVI Drop",
+    evi2_drop: "EVI2 Drop",
+    nir_drop: "NIR Drop",
+    nbr_drop: "NBR Drop",
+    ndmi_drop: "Moisture Loss",
+    soil_exposure_spike: "Soil Exposure Spike",
+    multi_index_consensus: "Multi-Index Consensus",
+    observation_pattern_match: "Disturbance Match",
+    low_quality_window: "Low Quality Data",
+    suspected_canopy_loss: "Canopy Loss",
+    stable_vegetation: "Stable",
+    regional_phenology_shift: "Regional Drought Signature",
+  };
+  return map[code] || code.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -33,6 +87,39 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
+function normalizeBoundaryContext(value: unknown): BoundaryContext[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const normalized = value
+    .map((entry) => {
+      if (
+        !isRecord(entry) ||
+        !isString(entry.layer_type) ||
+        !isString(entry.source_name) ||
+        !(entry.feature_name === null || isString(entry.feature_name)) ||
+        !isNumber(entry.overlap_area_m2) ||
+        !isNumber(entry.overlap_ratio) ||
+        !isNumber(entry.distance_to_boundary_m)
+      ) {
+        return null;
+      }
+
+      return {
+        layer_type: entry.layer_type,
+        source_name: entry.source_name,
+        feature_name: entry.feature_name,
+        overlap_area_m2: entry.overlap_area_m2,
+        overlap_ratio: entry.overlap_ratio,
+        distance_to_boundary_m: entry.distance_to_boundary_m,
+      };
+    })
+    .filter((entry): entry is BoundaryContext => entry !== null);
+
+  return normalized.length > 0 ? normalized : undefined;
+}
+
 function normalizeWindow(value: unknown): ScanWindow | null {
   if (!isRecord(value)) {
     return null;
@@ -46,6 +133,9 @@ function normalizeWindow(value: unknown): ScanWindow | null {
     !isNumber(value.swir) ||
     !isNumber(value.ndvi) ||
     !isNumber(value.nbr) ||
+    !isNumber(value.evi2) ||
+    !isNumber(value.ndmi) ||
+    !isNumber(value.soil_ratio) ||
     !isStringArray(value.flags)
   ) {
     return null;
@@ -59,6 +149,9 @@ function normalizeWindow(value: unknown): ScanWindow | null {
     swir: value.swir,
     ndvi: value.ndvi,
     nbr: value.nbr,
+    evi2: value.evi2,
+    ndmi: value.ndmi,
+    soil_ratio: value.soil_ratio,
     flags: value.flags,
   };
 }
@@ -98,6 +191,7 @@ export function parseTelemetryMessage(raw: string): TelemetryMessage | null {
     const cellId = normalizeCellId(parsed);
     const beforeWindow = normalizeWindow(parsed.before_window);
     const afterWindow = normalizeWindow(parsed.after_window);
+    const boundaryContext = normalizeBoundaryContext(parsed.boundary_context);
 
     if (
       !cellId ||
@@ -149,6 +243,8 @@ export function parseTelemetryMessage(raw: string): TelemetryMessage | null {
         cycle_index: parsed.heartbeat.cycle_index,
       },
       cycle_index: parsed.cycle_index,
+      demo_forced_anomaly: parsed.demo_forced_anomaly === true,
+      boundary_context: boundaryContext,
     };
   } catch {
     return null;
@@ -170,6 +266,8 @@ export function toAlertItem(message: ScanResultMessage): AlertItem {
     after_window: message.after_window,
     timestamp: new Date().toISOString(),
     downlinked: true,
+    demo_forced_anomaly: message.demo_forced_anomaly,
+    boundary_context: message.boundary_context,
   };
 }
 
@@ -225,7 +323,8 @@ export function getApiBaseUrl(): string {
   
   // Fallback to current hostname but locked to port 8000
   if (typeof window !== "undefined") {
-    return `${window.location.protocol}//${window.location.hostname}:8000`;
+    const host = window.location.hostname === "localhost" ? "127.0.0.1" : window.location.hostname;
+    return `${window.location.protocol}//${host}:8000`;
   }
   return "http://127.0.0.1:8000";
 }

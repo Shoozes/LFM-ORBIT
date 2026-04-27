@@ -117,11 +117,25 @@ def test_build_confirmation_uses_action_for_severity():
 
 def test_build_reject_structure():
     from core.ground_agent import _build_reject
-    reject = _build_reject("cell_xyz", "composite score too low")
+    reject = _build_reject(
+        "cell_xyz",
+        "composite score too low",
+        {
+            "change_score": 0.22,
+            "confidence": 0.41,
+            "reason_codes": ["low_signal"],
+            "observation_source": "seeded_cache",
+        },
+    )
     assert reject["severity"] == "rejected"
     assert "REJECT" in reject["action"]
     assert "cell_xyz" in reject["note"]
     assert "composite score too low" in reject["note"]
+    assert reject["reason"] == "composite score too low"
+    assert reject["change_score"] == pytest.approx(0.22)
+    assert reject["confidence"] == pytest.approx(0.41)
+    assert reject["reason_codes"] == ["low_signal"]
+    assert reject["observation_source"] == "seeded_cache"
 
 
 def test_build_confirmation_missing_payload_fields_defaults():
