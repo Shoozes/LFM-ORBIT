@@ -7,6 +7,7 @@ Updated **April 27, 2026**.
 - [x] Fixed GitHub Actions frontend install failure by refreshing `source/frontend/package-lock.json` with the CI Node/npm lane; `source/frontend` now passes `npm ci` under Node `20.19.0` and npm `10.8.2`.
 - [x] Reworked the root README opening into a visual proof, purpose, capabilities, and quick-start story with direct operator-facing details.
 - [x] Replaced stale README-facing screenshots in `docs/` and added lifeline, maritime, timelapse, and VLM proof images from the Playwright capture set.
+- [x] Corrected the maritime proof path so the screenshot uses the Suez/channel target map context and maritime task text instead of appearing over the default forest replay map.
 - [x] Re-ran `.\run.ps1 -Verify`: backend tests, frontend typecheck/build, and Playwright E2E all pass.
 - [x] Split the frontend bundle, lazy-loaded major panels, and cleared the old Vite large-chunk warning.
 - [x] Added manifest-based satellite model resolution plus `fetch_satellite_model.py` so Orbit can consume local bundle or Hugging Face artifacts without a hardcoded GGUF path.

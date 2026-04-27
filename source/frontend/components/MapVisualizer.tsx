@@ -735,6 +735,13 @@ export default function MapVisualizer({
     }
   }, [bboxPreview, drawnBbox, mapReady]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || !drawnBbox) return;
+    const [west, south, east, north] = drawnBbox;
+    map.fitBounds([[west, south], [east, north]], { padding: 96, duration: 0 });
+  }, [drawnBbox, mapReady]);
+
   // Sync pins → MapLibre markers
   useEffect(() => {
     const map = mapRef.current;

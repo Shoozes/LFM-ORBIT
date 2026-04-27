@@ -53,6 +53,14 @@ type ApiErrorPayload = {
   error?: string;
 };
 
+const MARITIME_PREVIEW_TARGET = {
+  lat: 29.92,
+  lon: 32.54,
+  timestamp: "2025-03-15",
+  bbox: [32.38, 29.78, 32.7, 30.06],
+  taskText: "Review maritime vessel queueing near the Suez channel.",
+};
+
 const cleanApiError = (message: string) => message.replace(/^Value error,\s*/i, "");
 
 async function readApiError(response: Response, fallback: string) {
@@ -104,6 +112,7 @@ type MissionControlProps = {
   onRefresh: () => void;
   isScanComplete?: boolean;
   onReplayLoaded?: (primaryCellId: string | null) => void | Promise<void>;
+  onPreviewBbox?: (bbox: number[]) => void;
 };
 
 export default function MissionControl({
@@ -117,6 +126,7 @@ export default function MissionControl({
   onRefresh,
   isScanComplete,
   onReplayLoaded,
+  onPreviewBbox,
 }: MissionControlProps) {
   const apiBase = getApiBaseUrl();
   const [task, setTask] = useState("");
@@ -217,15 +227,19 @@ export default function MissionControl({
   const handleMaritimePreview = async () => {
     setMonitorBusy("maritime");
     setErrorMsg("");
+    setTask(MARITIME_PREVIEW_TARGET.taskText);
+    setStartDate("2025-03-01");
+    setEndDate(MARITIME_PREVIEW_TARGET.timestamp);
+    onPreviewBbox?.(MARITIME_PREVIEW_TARGET.bbox);
     try {
       const response = await fetch(`${apiBase}/api/maritime/monitor`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          lat: 29.92,
-          lon: 32.54,
-          timestamp: "2025-03-15",
-          task_text: "Review maritime vessel queueing near a narrow channel.",
+          lat: MARITIME_PREVIEW_TARGET.lat,
+          lon: MARITIME_PREVIEW_TARGET.lon,
+          timestamp: MARITIME_PREVIEW_TARGET.timestamp,
+          task_text: MARITIME_PREVIEW_TARGET.taskText,
           anomaly_description: "dense vessel queue near a narrow channel",
           include_stac: false,
         }),
@@ -533,7 +547,10 @@ export default function MissionControl({
               Focus Area
             </label>
             {drawnBbox ? (
-              <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+              <div data-testid="bbox-badge" className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+                <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-500">
+                  Active Area
+                </span>
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-zinc-900 flex-1">
                     [{drawnBbox.map((v) => v.toFixed(2)).join(", ")}]

@@ -116,6 +116,8 @@ test.describe("Monitor Feature Visual Proof", () => {
     await expect(proofCard).toContainText("Maritime Monitor");
     await expect(proofCard).toContainText("directions");
     await expect(proofCard).toContainText("STAC optional");
+    await expect(page.locator("[data-testid='bbox-badge']")).toContainText("Active Area", { timeout: 10_000 });
+    await page.waitForTimeout(1_500);
 
     await page.screenshot({
       path: `${SHOT_DIR}/07-maritime-monitor-preview.png`,

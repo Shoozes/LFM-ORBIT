@@ -67,6 +67,7 @@ export default function App() {
   const [drawnBbox, setDrawnBbox] = useState<number[] | null>(null);
   const [vlmBoxes, setVlmBoxes] = useState<VlmBox[]>([]);
   const [showMissionTimelapse, setShowMissionTimelapse] = useState(false);
+  const [showBboxTools, setShowBboxTools] = useState(false);
   const [mission, setMission] = useState<Mission | null>(null);
   const apiBaseUrl = getApiBaseUrl();
 
@@ -116,6 +117,7 @@ export default function App() {
     setDrawnBbox(null);
     setVlmBoxes([]);
     setShowMissionTimelapse(false);
+    setShowBboxTools(false);
     if (primaryCellId) {
       setSelectedCellId(primaryCellId);
       setActiveTab("inspect");
@@ -133,6 +135,7 @@ export default function App() {
     const lats = coords.map(c => c[1]);
     const bbox = [Math.min(...lngs), Math.min(...lats), Math.max(...lngs), Math.max(...lats)];
     setDrawnBbox(bbox);
+    setShowBboxTools(false);
   };
 
   const displayGrid = useMemo(() => {
@@ -155,13 +158,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (drawnBbox) {
+    if (drawnBbox && showBboxTools) {
       void loadVlmPanel();
     }
     if (drawnBbox && showMissionTimelapse) {
       void loadTimelapseViewer();
     }
-  }, [drawnBbox, showMissionTimelapse]);
+  }, [drawnBbox, showBboxTools, showMissionTimelapse]);
 
   useEffect(() => {
     if (!selectedCellId) {
@@ -205,19 +208,23 @@ export default function App() {
             drawnBbox={drawnBbox}
             onBboxDrawn={(bbox) => {
               setDrawnBbox(bbox);
+              setShowBboxTools(true);
               setDrawBboxActive(false);
             }}
             onMenuAssignBBox={(bbox) => {
               setDrawnBbox(bbox);
+              setShowBboxTools(true);
               setActiveTab("mission");
             }}
             onMenuGenerateTimelapse={(bbox) => {
               setDrawnBbox(bbox);
+              setShowBboxTools(true);
               setShowMissionTimelapse(true);
               setActiveTab("mission");
             }}
             onMenuAgentVideoEval={async (bbox) => {
               setDrawnBbox(bbox);
+              setShowBboxTools(true);
               setActiveTab("agents");
               try {
                 await postAgentBusMessage(apiBaseUrl, {
@@ -314,19 +321,25 @@ export default function App() {
           {activeTab === "mission" && (
             <div className="flex flex-col h-full">
               <div className="flex-1">
-                <div className={drawnBbox ? "h-[360px] border-b border-zinc-200" : "h-full"}>
+                <div className={drawnBbox && (showBboxTools || showMissionTimelapse) ? "h-[360px] border-b border-zinc-200" : "h-full"}>
                   <Suspense fallback={<LoadingPanel label="Mission" />}>
                     <MissionControl
                       isOpen={true}
                       onClose={() => {}}
                       onDrawBbox={() => setDrawBboxActive(true)}
                       drawnBbox={drawnBbox}
-                      onClearBbox={() => { setDrawnBbox(null); setVlmBoxes([]); setShowMissionTimelapse(false); }}
-                      onOpenTimelapse={() => setShowMissionTimelapse((prev) => !prev)}
+                      onClearBbox={() => { setDrawnBbox(null); setVlmBoxes([]); setShowMissionTimelapse(false); setShowBboxTools(false); }}
+                      onOpenTimelapse={() => { setShowBboxTools(true); setShowMissionTimelapse((prev) => !prev); }}
                       mission={mission}
                       onRefresh={fetchMission}
                       isScanComplete={isScanComplete}
                       onReplayLoaded={handleReplayLoaded}
+                      onPreviewBbox={(bbox) => {
+                        setDrawnBbox(bbox);
+                        setVlmBoxes([]);
+                        setShowMissionTimelapse(false);
+                        setShowBboxTools(false);
+                      }}
                     />
                   </Suspense>
                 </div>
@@ -343,12 +356,12 @@ export default function App() {
                     </Suspense>
                   </div>
                 )}
-                {drawnBbox && (
+                {drawnBbox && showBboxTools && (
                   <div>
                     <Suspense fallback={<LoadingPanel label="VLM" />}>
                       <VlmPanel
                         isOpen={true}
-                        onClose={() => { setDrawnBbox(null); setVlmBoxes([]); }}
+                        onClose={() => { setDrawnBbox(null); setVlmBoxes([]); setShowBboxTools(false); }}
                         activeBbox={drawnBbox}
                         onBoxesUpdate={setVlmBoxes}
                       />
