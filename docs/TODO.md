@@ -8,8 +8,8 @@ Updated **April 27, 2026**.
 - [x] Reworked the root README opening into a visual proof, purpose, capabilities, and quick-start story with direct operator-facing details.
 - [x] Replaced stale README-facing screenshots in `docs/` and added lifeline, maritime, timelapse, and VLM proof images from the Playwright capture set.
 - [x] Corrected the maritime proof path so the screenshot uses the Suez/channel target map context and maritime task text instead of appearing over the default forest replay map.
-- [x] Added one-click Mission location presets for Amazon deforestation, Florida I-4 traffic, Suez maritime, Greenland ice, Florida dry wildfire, Bangladesh flood, Kansas crop, Delhi urban, and Atacama mining scenarios.
-- [x] Refreshed README proof screenshots with Florida I-4 traffic, Florida dry wildfire, and Greenland ice-cap mission presets, using April 2026 public wildfire/drought context for the Florida dry-fire target.
+- [x] Added one-click Mission location presets for Amazon deforestation, close Florida I-4 transportation mix, Suez maritime, Greenland ice, Florida dry wildfire, Bangladesh flood, Kansas crop, Delhi urban, and Atacama mining scenarios.
+- [x] Refreshed README proof screenshots with close Florida I-4 transportation mix, Florida dry wildfire, and Greenland ice-cap mission presets, using April 2026 public wildfire/drought context for the Florida dry-fire target.
 - [x] Replaced the VLM visual proof's airplane prompt with a Florida I-4 road-corridor target and hardened offline fallback behavior so unsupported airplane prompts do not fabricate detections over clouds or terrain.
 - [x] Re-ran current backend/frontend validation after the preset and screenshot updates: `242` backend tests, frontend lint/build, and `72` Playwright specs passed with `1` debug-only skip.
 - [x] Split the frontend bundle, lazy-loaded major panels, and cleared the old Vite large-chunk warning.

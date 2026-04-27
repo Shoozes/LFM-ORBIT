@@ -37,7 +37,7 @@ def test_temporal_use_case_classifier_handles_mission_text():
     )
     traffic = classify_temporal_use_case(
         {
-            "task_text": "Review car traffic and public mobility along Florida I-4 near Walt Disney World.",
+            "task_text": "Run a close transportation mix scan over the Florida I-4 and SR-536 interchange near Walt Disney World for road access and public mobility.",
         }
     )
     florida_wildfire = classify_temporal_use_case(

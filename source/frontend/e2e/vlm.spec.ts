@@ -8,7 +8,7 @@ test.describe("VLM Grounds E2E visual test", () => {
     await waitForBasemapReady(page);
     await page.getByTestId("tab-mission").click();
     await page.getByTestId("mission-preset-traffic_i4_disney").click();
-    await expect(page.getByTestId("selected-mission-preset")).toContainText("I-4 at Disney");
+    await expect(page.getByTestId("selected-mission-preset")).toContainText("I-4 interchange");
     await openMapContextMenu(page);
     await page.getByText("◫ Set Mission BBox Here").click();
 

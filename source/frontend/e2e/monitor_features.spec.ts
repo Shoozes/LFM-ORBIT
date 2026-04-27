@@ -125,7 +125,7 @@ test.describe("Monitor Feature Visual Proof", () => {
     });
   });
 
-  test("visual proof: Florida I-4 traffic mission preset", async ({ page, request }) => {
+  test("visual proof: Florida I-4 transportation mix mission preset", async ({ page, request }) => {
     test.setTimeout(45_000);
     await resetRuntimeState(request);
     await gotoApp(page);
@@ -134,9 +134,9 @@ test.describe("Monitor Feature Visual Proof", () => {
     await page.locator("[data-testid='tab-mission']").click();
 
     await page.locator("[data-testid='mission-preset-traffic_i4_disney']").click();
-    await expect(page.locator("[data-testid='selected-mission-preset']")).toContainText("I-4 at Disney");
-    await expect(page.locator("textarea")).toHaveValue(/Florida I-4/);
-    await expect(page.locator("[data-testid='bbox-badge']")).toContainText("-81.62", { timeout: 10_000 });
+    await expect(page.locator("[data-testid='selected-mission-preset']")).toContainText("I-4 interchange");
+    await expect(page.locator("textarea")).toHaveValue(/transportation mix scan/);
+    await expect(page.locator("[data-testid='bbox-badge']")).toContainText("-81.53", { timeout: 10_000 });
     await page.locator("[data-testid='selected-mission-preset']").scrollIntoViewIfNeeded();
     await page.waitForTimeout(1_500);
 

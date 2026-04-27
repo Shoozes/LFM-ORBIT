@@ -8,7 +8,7 @@ LFM Orbit proves a low-bandwidth dual-agent workflow: a satellite agent sweeps H
 
 ## Visual Proof
 
-Mission presets jump straight to recognizable geography: Amazon deforestation, Florida I-4 traffic, Suez maritime activity, Greenland ice, Florida dry-fire risk, Bangladesh flooding, Kansas agriculture, Delhi urban growth, and Atacama mining. The Florida dry-fire target follows April 2026 public context from [Drought.gov](https://www.drought.gov/drought-status-updates/drought-status-update-southeast-2026-04-16), [NIFC](https://www.nifc.gov/fire-information/nfn), and [NASA Earth Observatory](https://science.nasa.gov/earth/earth-observatory/smoke-rises-over-big-cypress-national-preserve/).
+Mission presets jump straight to recognizable geography: Amazon deforestation, Florida I-4 transportation mix, Suez maritime activity, Greenland ice, Florida dry-fire risk, Bangladesh flooding, Kansas agriculture, Delhi urban growth, and Atacama mining. The Florida dry-fire target follows April 2026 public context from [Drought.gov](https://www.drought.gov/drought-status-updates/drought-status-update-southeast-2026-04-16), [NIFC](https://www.nifc.gov/fire-information/nfn), and [NASA Earth Observatory](https://science.nasa.gov/earth/earth-observatory/smoke-rises-over-big-cypress-national-preserve/).
 
 <table>
   <tr>
@@ -36,11 +36,11 @@ Mission presets jump straight to recognizable geography: Amazon deforestation, F
     <td><strong>Maritime monitoring</strong><br />Cardinal investigation planning with optional Sentinel-2 STAC metadata.</td>
   </tr>
   <tr>
-    <td><img src="docs/08-traffic-i4-preview.png" alt="Florida I-4 traffic mission preset" /></td>
+    <td><img src="docs/08-traffic-i4-preview.png" alt="Florida I-4 transportation mix mission preset" /></td>
     <td><img src="docs/09-florida-wildfire-preview.png" alt="Florida dry wildfire mission preset" /></td>
   </tr>
   <tr>
-    <td><strong>Traffic corridor</strong><br />Florida I-4 near Walt Disney World as a public-mobility mission target.</td>
+    <td><strong>Transportation mix</strong><br />Up-close I-4 and SR-536 area scan over ramps, roads, parking, water edges, and managed vegetation.</td>
     <td><strong>Florida wildfire watch</strong><br />Big Cypress and Alligator Alley dry-fuel context for smoke and burn-scar review.</td>
   </tr>
   <tr>
@@ -73,7 +73,7 @@ Mission presets jump straight to recognizable geography: Amazon deforestation, F
 
 - FastAPI backend with satellite agent, ground validator, telemetry bus, replay state, gallery, and validation APIs.
 - React/MapLibre mission UI with scan controls, alerts, map pins, timelapse viewer, VLM helpers, and settings.
-- One-click mission location presets for recognizable deforestation, traffic, maritime, ice, wildfire, flood, crop, urban, and mining scenarios.
+- One-click mission location presets for recognizable deforestation, transportation, maritime, ice, wildfire, flood, crop, urban, and mining scenarios.
 - Provider routing for seeded/offline fallback, SimSat Sentinel, SimSat Mapbox, Sentinel Hub, NASA, and GEE.
 - Maritime and lifeline monitoring primitives with deterministic contracts and tests.
 - Dataset export, model evaluation, and retagging tools for API imagery and timelapse frames.
