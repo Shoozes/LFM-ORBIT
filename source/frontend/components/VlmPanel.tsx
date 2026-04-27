@@ -122,7 +122,7 @@ export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }:
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Find: large airplane (lower-left)"
+                  placeholder="Find: clearing, road, river"
                   value={groundingPrompt}
                   onChange={e => setGroundingPrompt(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleGrounding()}
@@ -169,7 +169,7 @@ export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }:
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="How many large planes are visible?"
+                  placeholder="What land cover is visible?"
                   value={vqaQuestion}
                   onChange={e => setVqaQuestion(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleVqa()}

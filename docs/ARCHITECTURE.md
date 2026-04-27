@@ -184,12 +184,12 @@ The backend runs two long-lived loops during app lifespan:
 Current repo-wide validation results:
 
 - `uv sync --extra dev --locked` -> passing
-- `uv run --no-sync pytest -q` -> `240 passed`
+- `uv run --no-sync pytest -q` -> `242 passed`
 - `npm run lint` -> passing
 - `npm run build` -> passing, with split chunks and no large-chunk warning
-- `npx playwright test` -> `69 passed`, `1 skipped` debug-only HTML dump
-- `.\run.ps1 -Verify` -> passing from repo root, including locked dependency sync and Playwright browser install
-- Focused screenshot subset -> `17 passed`, including Settings, timelapse, context-menu, agent-evaluation, monitor-preview, debug-dashboard, and VLM visual proof captures.
+- `npx playwright test` -> `72 passed`, `1 skipped` debug-only HTML dump
+- `.\run.ps1 -Verify` -> passing from repo root; backend, frontend, and E2E component checks were rerun after the latest preset and screenshot updates.
+- Screenshot captures include Settings, timelapse, context-menu, agent-evaluation, monitor-preview, known-location mission presets, debug-dashboard, and VLM road-corridor proof images.
 - `.github/workflows/ci.yml` runs the same backend, frontend, and Playwright checks in GitHub Actions using the repo-pinned Node version from `.nvmrc`.
 - Repo-root launchers expose the same full local check through `.\run.ps1 -Verify` or `./run.sh --verify`.
 - A copied `.env.example` has been smoke-tested with `.\run.ps1 -InstallOnly` and a bounded `.\run.ps1 -Run` startup check against backend health plus the Vite index.

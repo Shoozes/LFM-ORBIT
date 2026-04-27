@@ -8,6 +8,8 @@ LFM Orbit proves a low-bandwidth dual-agent workflow: a satellite agent sweeps H
 
 ## Visual Proof
 
+Mission presets jump straight to recognizable geography: Amazon deforestation, Florida I-4 traffic, Suez maritime activity, Greenland ice, Florida dry-fire risk, Bangladesh flooding, Kansas agriculture, Delhi urban growth, and Atacama mining. The Florida dry-fire target follows April 2026 public context from [Drought.gov](https://www.drought.gov/drought-status-updates/drought-status-update-southeast-2026-04-16), [NIFC](https://www.nifc.gov/fire-information/nfn), and [NASA Earth Observatory](https://science.nasa.gov/earth/earth-observatory/smoke-rises-over-big-cypress-national-preserve/).
+
 <table>
   <tr>
     <td><img src="docs/01-satellite-heartbeat.png" alt="Satellite heartbeat and scan HUD" /></td>
@@ -34,12 +36,28 @@ LFM Orbit proves a low-bandwidth dual-agent workflow: a satellite agent sweeps H
     <td><strong>Maritime monitoring</strong><br />Cardinal investigation planning with optional Sentinel-2 STAC metadata.</td>
   </tr>
   <tr>
-    <td><img src="docs/04-settings-provider-model.png" alt="Provider and model settings" /></td>
-    <td><img src="docs/vlm-panel-results.png" alt="VLM grounding and question answering panel" /></td>
+    <td><img src="docs/08-traffic-i4-preview.png" alt="Florida I-4 traffic mission preset" /></td>
+    <td><img src="docs/09-florida-wildfire-preview.png" alt="Florida dry wildfire mission preset" /></td>
   </tr>
   <tr>
+    <td><strong>Traffic corridor</strong><br />Florida I-4 near Walt Disney World as a public-mobility mission target.</td>
+    <td><strong>Florida wildfire watch</strong><br />Big Cypress and Alligator Alley dry-fuel context for smoke and burn-scar review.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/10-greenland-ice-preview.png" alt="Greenland ice cap mission preset" /></td>
+    <td><img src="docs/04-settings-provider-model.png" alt="Provider and model settings" /></td>
+  </tr>
+  <tr>
+    <td><strong>Ice cap monitoring</strong><br />Greenland coastal ice and glacier edge review with a high-contrast snow/water palette.</td>
     <td><strong>Provider control</strong><br />Live provider, local model, and optional depth status in one operator panel.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/vlm-panel-results.png" alt="VLM grounding and question answering panel" /></td>
+    <td><img src="docs/05-mission-control-scanning.png" alt="Mission control seeded replay" /></td>
+  </tr>
+  <tr>
     <td><strong>VLM helpers</strong><br />Grounding, VQA, captioning, and fallback behavior surfaced to the operator.</td>
+    <td><strong>Seeded replay</strong><br />Deterministic completed walkthrough with persisted evidence and agent notes.</td>
   </tr>
 </table>
 
@@ -55,6 +73,7 @@ LFM Orbit proves a low-bandwidth dual-agent workflow: a satellite agent sweeps H
 
 - FastAPI backend with satellite agent, ground validator, telemetry bus, replay state, gallery, and validation APIs.
 - React/MapLibre mission UI with scan controls, alerts, map pins, timelapse viewer, VLM helpers, and settings.
+- One-click mission location presets for recognizable deforestation, traffic, maritime, ice, wildfire, flood, crop, urban, and mining scenarios.
 - Provider routing for seeded/offline fallback, SimSat Sentinel, SimSat Mapbox, Sentinel Hub, NASA, and GEE.
 - Maritime and lifeline monitoring primitives with deterministic contracts and tests.
 - Dataset export, model evaluation, and retagging tools for API imagery and timelapse frames.
@@ -270,11 +289,11 @@ When `DEPTH_ANYTHING_V3_DEVICE=auto`, the backend resolves to CUDA when availabl
 Current local validation state on April 27, 2026:
 
 - `source/frontend`: `npx -y -p node@20.19.0 -p npm@10.8.2 npm ci` -> passing with the CI Node/npm lane
-- `uv run --no-sync pytest -q` -> `240 passed`
+- `uv run --no-sync pytest -q` -> `242 passed`
 - `npm run lint` -> passing
 - `npm run build` -> passing
-- `npm run test:e2e` -> `69 passed`, `1 skipped` debug-only HTML dump
-- `.\run.ps1 -Verify` -> passing from repo root, including locked dependency sync, Playwright Chromium install, backend tests, frontend checks, and E2E
+- `npm run test:e2e` -> `72 passed`, `1 skipped` debug-only HTML dump
+- `.\run.ps1 -Verify` -> passing from repo root; the backend, frontend, and E2E component checks above were rerun after the latest preset and screenshot updates.
 - README/docs screenshots regenerated at `1440x900` with artifact dimension checks passing.
 
 Current integrity baseline:
@@ -312,7 +331,7 @@ cd source/frontend
 npx playwright test e2e/capture_screenshots.spec.ts e2e/monitor_features.spec.ts e2e/debug_dashboard.spec.ts e2e/vlm.spec.ts e2e/app.spec.ts --grep "Visual evidence capture|Context Module|screenshot:|visual proof|Satellite 8080|VLM Grounds"
 ```
 
-Primary artifacts are written under `source/frontend/e2e/screenshots/`. README-facing copies live under `docs/`: `01-satellite-heartbeat.png`, `02-agent-dialogue-bus.png`, `03-alert-analysis-verdict.png`, `04-settings-provider-model.png`, `05-mission-control-scanning.png`, `06-lifeline-monitor-preview.png`, `07-maritime-monitor-preview.png`, `ffmpeg-timelapse-viewer.png`, and `vlm-panel-results.png`.
+Primary artifacts are written under `source/frontend/e2e/screenshots/`. README-facing copies live under `docs/`: `01-satellite-heartbeat.png`, `02-agent-dialogue-bus.png`, `03-alert-analysis-verdict.png`, `04-settings-provider-model.png`, `05-mission-control-scanning.png`, `06-lifeline-monitor-preview.png`, `07-maritime-monitor-preview.png`, `08-traffic-i4-preview.png`, `09-florida-wildfire-preview.png`, `10-greenland-ice-preview.png`, `ffmpeg-timelapse-viewer.png`, and `vlm-panel-results.png`.
 
 ## Project Map
 

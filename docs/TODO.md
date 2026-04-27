@@ -8,7 +8,10 @@ Updated **April 27, 2026**.
 - [x] Reworked the root README opening into a visual proof, purpose, capabilities, and quick-start story with direct operator-facing details.
 - [x] Replaced stale README-facing screenshots in `docs/` and added lifeline, maritime, timelapse, and VLM proof images from the Playwright capture set.
 - [x] Corrected the maritime proof path so the screenshot uses the Suez/channel target map context and maritime task text instead of appearing over the default forest replay map.
-- [x] Re-ran `.\run.ps1 -Verify`: backend tests, frontend typecheck/build, and Playwright E2E all pass.
+- [x] Added one-click Mission location presets for Amazon deforestation, Florida I-4 traffic, Suez maritime, Greenland ice, Florida dry wildfire, Bangladesh flood, Kansas crop, Delhi urban, and Atacama mining scenarios.
+- [x] Refreshed README proof screenshots with Florida I-4 traffic, Florida dry wildfire, and Greenland ice-cap mission presets, using April 2026 public wildfire/drought context for the Florida dry-fire target.
+- [x] Replaced the VLM visual proof's airplane prompt with a Florida I-4 road-corridor target and hardened offline fallback behavior so unsupported airplane prompts do not fabricate detections over clouds or terrain.
+- [x] Re-ran current backend/frontend validation after the preset and screenshot updates: `242` backend tests, frontend lint/build, and `72` Playwright specs passed with `1` debug-only skip.
 - [x] Split the frontend bundle, lazy-loaded major panels, and cleared the old Vite large-chunk warning.
 - [x] Added manifest-based satellite model resolution plus `fetch_satellite_model.py` so Orbit can consume local bundle or Hugging Face artifacts without a hardcoded GGUF path.
 - [x] Surfaced manifest and repo metadata through `/api/inference/status` and `/api/analysis/status`.
@@ -118,7 +121,7 @@ Updated **April 27, 2026**.
 - [ ] Add mocked Element84 STAC fixture coverage with visual asset URLs and a seeded maritime replay pack.
 - [ ] Expand the dataset export from weak negatives into a full training contract with operator-reviewed controls and stronger localization labels.
 - [ ] Persist API-generated maritime/lifeline monitor reports into a runtime report directory so `--monitor-reports-dir` can be populated directly from UI/API usage.
-- [ ] Add UI controls for selecting and previewing temporal use cases before mission launch.
+- [ ] Add a full custom temporal-use-case editor so operators can save their own preset library beyond the bundled known-location examples.
 - [ ] Add responsive/mobile layout coverage for the fixed right mission rail so smaller operator displays can still inspect evidence without overlap.
 - [ ] Add a lightweight frontend unit/component harness for hooks such as `useMapPins` so timeout/error behavior can be tested without starting the full Playwright stack.
 - [ ] Expand the first-pass eval harness into a true base-vs-tuned benchmark lane with independent labels and promotion thresholds.
@@ -140,7 +143,7 @@ The remaining work is now mostly the modeling lane, not general app integrity.
 - No broken frontend imports/exports were found after lint, build, and the full Playwright suite.
 - No broken backend imports surfaced under the full backend test run, and import contracts now have dedicated pytest coverage.
 - No actionable repo-local `TODO`/`FIXME`/stub markers were found outside intentional test fixtures, input placeholders, documented fallback paths, and this canonical backlog.
-- Full validation on April 27, 2026 is green: `240` backend tests, `npm run lint`, `npm run build`, and `69` Playwright specs with `1` debug-only HTML dump skipped by default.
+- Full validation on April 27, 2026 is green: `242` backend tests, `npm run lint`, `npm run build`, and `72` Playwright specs with `1` debug-only HTML dump skipped by default.
 - Repo-root validation on April 27, 2026 is green: `.\run.ps1 -Verify` completes the locked install and full test path from repo root.
 - Judge screenshot artifacts under `source/frontend/e2e/screenshots/` regenerated at `1440x900`; nonblank luminance checks passed, with the darker satellite-debug dashboard expected.
 - Screenshot contact-sheet review passed for the current visual set: settings shows live provider/model status, timelapse shows a real video frame plus extracted-frame count, and agent-evaluation shows the operator query on the dialogue bus.

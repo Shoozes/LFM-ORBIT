@@ -124,4 +124,67 @@ test.describe("Monitor Feature Visual Proof", () => {
       fullPage: false,
     });
   });
+
+  test("visual proof: Florida I-4 traffic mission preset", async ({ page, request }) => {
+    test.setTimeout(45_000);
+    await resetRuntimeState(request);
+    await gotoApp(page);
+    await waitForLinkOpen(page);
+    await waitForBasemapReady(page);
+    await page.locator("[data-testid='tab-mission']").click();
+
+    await page.locator("[data-testid='mission-preset-traffic_i4_disney']").click();
+    await expect(page.locator("[data-testid='selected-mission-preset']")).toContainText("I-4 at Disney");
+    await expect(page.locator("textarea")).toHaveValue(/Florida I-4/);
+    await expect(page.locator("[data-testid='bbox-badge']")).toContainText("-81.62", { timeout: 10_000 });
+    await page.locator("[data-testid='selected-mission-preset']").scrollIntoViewIfNeeded();
+    await page.waitForTimeout(1_500);
+
+    await page.screenshot({
+      path: `${SHOT_DIR}/08-traffic-i4-preview.png`,
+      fullPage: false,
+    });
+  });
+
+  test("visual proof: Florida dry wildfire mission preset", async ({ page, request }) => {
+    test.setTimeout(45_000);
+    await resetRuntimeState(request);
+    await gotoApp(page);
+    await waitForLinkOpen(page);
+    await waitForBasemapReady(page);
+    await page.locator("[data-testid='tab-mission']").click();
+
+    await page.locator("[data-testid='mission-preset-wildfire_florida_dry']").click();
+    await expect(page.locator("[data-testid='selected-mission-preset']")).toContainText("Big Cypress");
+    await expect(page.locator("textarea")).toHaveValue(/dry Florida wildfire/);
+    await expect(page.locator("[data-testid='bbox-badge']")).toContainText("-81.55", { timeout: 10_000 });
+    await page.locator("[data-testid='selected-mission-preset']").scrollIntoViewIfNeeded();
+    await page.waitForTimeout(1_500);
+
+    await page.screenshot({
+      path: `${SHOT_DIR}/09-florida-wildfire-preview.png`,
+      fullPage: false,
+    });
+  });
+
+  test("visual proof: Greenland ice cap mission preset", async ({ page, request }) => {
+    test.setTimeout(45_000);
+    await resetRuntimeState(request);
+    await gotoApp(page);
+    await waitForLinkOpen(page);
+    await waitForBasemapReady(page);
+    await page.locator("[data-testid='tab-mission']").click();
+
+    await page.locator("[data-testid='mission-preset-ice_greenland']").click();
+    await expect(page.locator("[data-testid='selected-mission-preset']")).toContainText("Greenland coast");
+    await expect(page.locator("textarea")).toHaveValue(/Greenland ice cap/);
+    await expect(page.locator("[data-testid='bbox-badge']")).toContainText("-50.60", { timeout: 10_000 });
+    await page.locator("[data-testid='selected-mission-preset']").scrollIntoViewIfNeeded();
+    await page.waitForTimeout(1_500);
+
+    await page.screenshot({
+      path: `${SHOT_DIR}/10-greenland-ice-preview.png`,
+      fullPage: false,
+    });
+  });
 });

@@ -35,8 +35,20 @@ def test_temporal_use_case_classifier_handles_mission_text():
             "reason_codes": ["probable_access_obstruction", "public_mobility_disruption"],
         }
     )
+    traffic = classify_temporal_use_case(
+        {
+            "task_text": "Review car traffic and public mobility along Florida I-4 near Walt Disney World.",
+        }
+    )
+    florida_wildfire = classify_temporal_use_case(
+        {
+            "task_text": "Review dry Florida wildfire conditions around Big Cypress and Alligator Alley for smoke, burn scar, and vegetation stress.",
+        }
+    )
 
     assert wildfire["id"] == "wildfire"
     assert maritime["id"] == "maritime_activity"
     assert ice["id"] == "ice_cap_growth"
     assert lifeline["id"] == "civilian_lifeline_disruption"
+    assert traffic["id"] == "civilian_lifeline_disruption"
+    assert florida_wildfire["id"] == "wildfire"

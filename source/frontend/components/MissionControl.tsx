@@ -30,6 +30,29 @@ type MonitorPreview = {
   status: string;
 };
 
+type MissionPresetTone =
+  | "forest"
+  | "traffic"
+  | "water"
+  | "ice"
+  | "fire"
+  | "flood"
+  | "crop"
+  | "urban"
+  | "mining";
+
+type MissionPreset = {
+  id: string;
+  label: string;
+  place: string;
+  useCaseId: string;
+  taskText: string;
+  bbox: number[];
+  startDate: string;
+  endDate: string;
+  tone: MissionPresetTone;
+};
+
 type MaritimeMonitorResponse = {
   mode?: string;
   use_case?: { id?: string; display_name?: string };
@@ -59,6 +82,120 @@ const MARITIME_PREVIEW_TARGET = {
   timestamp: "2025-03-15",
   bbox: [32.38, 29.78, 32.7, 30.06],
   taskText: "Review maritime vessel queueing near the Suez channel.",
+};
+
+const MISSION_LOCATION_PRESETS: MissionPreset[] = [
+  {
+    id: "deforestation_amazon",
+    label: "Deforestation",
+    place: "Amazon frontier",
+    useCaseId: "deforestation",
+    taskText: "Scan the Amazon frontier near Rondonia for new canopy loss against the same-season baseline.",
+    bbox: [-62.1, -9.8, -61.4, -9.1],
+    startDate: "2024-06-01",
+    endDate: "2025-06-01",
+    tone: "forest",
+  },
+  {
+    id: "traffic_i4_disney",
+    label: "Traffic",
+    place: "I-4 at Disney",
+    useCaseId: "civilian_lifeline_disruption",
+    taskText: "Review car traffic and public mobility along Florida I-4 near Walt Disney World.",
+    bbox: [-81.62, 28.33, -81.48, 28.44],
+    startDate: "2025-03-01",
+    endDate: "2025-03-15",
+    tone: "traffic",
+  },
+  {
+    id: "maritime_suez",
+    label: "Maritime",
+    place: "Suez channel",
+    useCaseId: "maritime_activity",
+    taskText: MARITIME_PREVIEW_TARGET.taskText,
+    bbox: MARITIME_PREVIEW_TARGET.bbox,
+    startDate: "2025-03-01",
+    endDate: MARITIME_PREVIEW_TARGET.timestamp,
+    tone: "water",
+  },
+  {
+    id: "ice_greenland",
+    label: "Ice Cap",
+    place: "Greenland coast",
+    useCaseId: "ice_cap_growth",
+    taskText: "Compare same-season Greenland ice cap and glacier edge frames for true growth or retreat.",
+    bbox: [-50.6, 69.0, -49.5, 69.8],
+    startDate: "2021-07-01",
+    endDate: "2025-07-01",
+    tone: "ice",
+  },
+  {
+    id: "wildfire_florida_dry",
+    label: "Wildfire",
+    place: "Big Cypress / I-75",
+    useCaseId: "wildfire",
+    taskText: "Review dry Florida wildfire conditions around Big Cypress and Alligator Alley for smoke, burn scar, and vegetation stress.",
+    bbox: [-81.55, 25.65, -80.75, 26.25],
+    startDate: "2026-02-01",
+    endDate: "2026-04-24",
+    tone: "fire",
+  },
+  {
+    id: "flood_bangladesh",
+    label: "Flood",
+    place: "Bangladesh floodplain",
+    useCaseId: "flood_extent",
+    taskText: "Find new surface water outside the normal Bangladesh river channel after a storm sequence.",
+    bbox: [90.1, 23.2, 91.0, 24.0],
+    startDate: "2025-05-01",
+    endDate: "2025-08-01",
+    tone: "flood",
+  },
+  {
+    id: "crop_kansas",
+    label: "Crop",
+    place: "Kansas fields",
+    useCaseId: "crop_phenology",
+    taskText: "Separate normal Kansas harvest cycles from structural land-cover loss using seasonal field history.",
+    bbox: [-96.8, 39.0, -96.0, 39.8],
+    startDate: "2024-04-01",
+    endDate: "2025-11-01",
+    tone: "crop",
+  },
+  {
+    id: "urban_delhi",
+    label: "Urban",
+    place: "Delhi NCR",
+    useCaseId: "urban_expansion",
+    taskText: "Track Delhi NCR construction footprints becoming persistent built surface and road grid.",
+    bbox: [77.3, 28.3, 77.9, 28.9],
+    startDate: "2023-01-01",
+    endDate: "2026-01-01",
+    tone: "urban",
+  },
+  {
+    id: "mining_atacama",
+    label: "Mining",
+    place: "Atacama open pit",
+    useCaseId: "mining_expansion",
+    taskText: "Detect Atacama open-pit mining expansion and separate persistent bare earth from seasonal vegetation loss.",
+    bbox: [-70.6, -23.8, -69.8, -23.1],
+    startDate: "2023-01-01",
+    endDate: "2026-01-01",
+    tone: "mining",
+  },
+];
+
+const PRESET_TONE_CLASSES: Record<MissionPresetTone, string> = {
+  forest: "border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
+  traffic: "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100",
+  water: "border-blue-200 bg-blue-50 text-blue-900 hover:bg-blue-100",
+  ice: "border-cyan-200 bg-cyan-50 text-cyan-900 hover:bg-cyan-100",
+  fire: "border-red-200 bg-red-50 text-red-900 hover:bg-red-100",
+  flood: "border-sky-200 bg-sky-50 text-sky-900 hover:bg-sky-100",
+  crop: "border-lime-200 bg-lime-50 text-lime-900 hover:bg-lime-100",
+  urban: "border-violet-200 bg-violet-50 text-violet-900 hover:bg-violet-100",
+  mining: "border-stone-300 bg-stone-100 text-stone-900 hover:bg-stone-200",
 };
 
 const cleanApiError = (message: string) => message.replace(/^Value error,\s*/i, "");
@@ -137,6 +274,8 @@ export default function MissionControl({
   const [replayNotice, setReplayNotice] = useState("");
   const [monitorBusy, setMonitorBusy] = useState<MonitorPreview["kind"] | null>(null);
   const [monitorPreview, setMonitorPreview] = useState<MonitorPreview | null>(null);
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const [selectedUseCaseId, setSelectedUseCaseId] = useState<string | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -162,6 +301,17 @@ export default function MissionControl({
 
   const [errorMsg, setErrorMsg] = useState("");
 
+  const applyMissionPreset = (preset: MissionPreset) => {
+    setSelectedPresetId(preset.id);
+    setSelectedUseCaseId(preset.useCaseId);
+    setMonitorPreview(null);
+    setErrorMsg("");
+    setTask(preset.taskText);
+    setStartDate(preset.startDate);
+    setEndDate(preset.endDate);
+    onPreviewBbox?.([...preset.bbox]);
+  };
+
   const handleSubmit = async () => {
     if (!task.trim()) return;
     if (startDate && endDate && startDate > endDate) {
@@ -179,6 +329,7 @@ export default function MissionControl({
           bbox: drawnBbox ?? null,
           start_date: startDate || null,
           end_date: endDate || null,
+          use_case_id: selectedUseCaseId,
         }),
       });
       if (!response.ok) {
@@ -186,6 +337,8 @@ export default function MissionControl({
       }
       await onRefresh();
       setTask("");
+      setSelectedPresetId(null);
+      setSelectedUseCaseId(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Backend unreachable";
       setErrorMsg(`Mission failed to deploy: ${message}`);
@@ -227,6 +380,8 @@ export default function MissionControl({
   const handleMaritimePreview = async () => {
     setMonitorBusy("maritime");
     setErrorMsg("");
+    setSelectedPresetId("maritime_suez");
+    setSelectedUseCaseId("maritime_activity");
     setTask(MARITIME_PREVIEW_TARGET.taskText);
     setStartDate("2025-03-01");
     setEndDate(MARITIME_PREVIEW_TARGET.timestamp);
@@ -270,6 +425,8 @@ export default function MissionControl({
   const handleLifelinePreview = async () => {
     setMonitorBusy("lifeline");
     setErrorMsg("");
+    setSelectedPresetId(null);
+    setSelectedUseCaseId("civilian_lifeline_disruption");
     try {
       const response = await fetch(`${apiBase}/api/lifelines/monitor`, {
         method: "POST",
@@ -434,6 +591,41 @@ export default function MissionControl({
             </div>
           )}
 
+          <div data-testid="mission-preset-panel" className="space-y-3 rounded-lg border border-zinc-200 bg-white px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <label className="block text-[10px] uppercase tracking-wider font-semibold text-zinc-500">
+                Mission Location Presets
+              </label>
+              <span className="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold">
+                Known Places
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {MISSION_LOCATION_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  data-testid={`mission-preset-${preset.id}`}
+                  onClick={() => applyMissionPreset(preset)}
+                  className={`rounded border px-2 py-2 text-left transition ${PRESET_TONE_CLASSES[preset.tone]} ${
+                    selectedPresetId === preset.id ? "ring-2 ring-zinc-900/20" : ""
+                  }`}
+                  title={`${preset.label}: ${preset.place}`}
+                >
+                  <span className="block text-[11px] font-semibold leading-tight text-current">{preset.label}</span>
+                  <span className="mt-0.5 block text-[10px] leading-tight text-current opacity-70">{preset.place}</span>
+                </button>
+              ))}
+            </div>
+            {selectedPresetId && (
+              <div data-testid="selected-mission-preset" className="rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] font-medium text-zinc-700">
+                {MISSION_LOCATION_PRESETS.find((preset) => preset.id === selectedPresetId)?.place}
+                <span className="text-zinc-400"> · </span>
+                {selectedUseCaseId?.replace(/_/g, " ")}
+              </div>
+            )}
+          </div>
+
           <div data-testid="monitor-template-panel" className="space-y-3 rounded-lg border border-zinc-200 bg-white px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <label className="block text-[10px] uppercase tracking-wider font-semibold text-zinc-500">
@@ -503,7 +695,11 @@ export default function MissionControl({
                 Instruction
               </label>
               <button
-                onClick={() => setTask("Conduct a high-resolution sweep for active logging in the northern sector. Flag any significant NDVI drop.")}
+                onClick={() => {
+                  setSelectedPresetId(null);
+                  setSelectedUseCaseId("deforestation");
+                  setTask("Conduct a high-resolution sweep for active logging in the northern sector. Flag any significant NDVI drop.");
+                }}
                 className="text-[10px] font-bold text-zinc-400 hover:text-zinc-600 transition"
               >
                 Use Suggested Template
@@ -512,7 +708,11 @@ export default function MissionControl({
             <textarea
               ref={textareaRef}
               value={task}
-              onChange={(e) => setTask(e.target.value)}
+              onChange={(e) => {
+                setTask(e.target.value);
+                setSelectedPresetId(null);
+                setSelectedUseCaseId(null);
+              }}
               rows={3}
               placeholder="Search for areas where deforestation seems to have occurred…"
               className="w-full resize-none rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 outline-none"

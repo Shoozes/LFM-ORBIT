@@ -6,16 +6,33 @@ from core import vlm
 def test_vlm_grounding_uses_fallback_when_transformers_unavailable():
     with patch("core.vlm._load_pipeline", return_value=None):
         vlm._grounding_pipeline = None
-        assert vlm.run_vlm_grounding([-60.5, -3.5, -60.4, -3.4], "Find airplanes") == [
-            {"label": "airplane", "bbox": [0.18, 0.22, 0.46, 0.52]},
-            {"label": "airplane", "bbox": [0.52, 0.36, 0.78, 0.7]},
+        assert vlm.run_vlm_grounding([-60.5, -3.5, -60.4, -3.4], "Find clearings") == [
+            {"label": "clearing", "bbox": [0.24, 0.18, 0.74, 0.76]},
         ]
+
+
+def test_vlm_fallback_does_not_fabricate_aircraft_boxes():
+    with patch("core.vlm._load_pipeline", return_value=None):
+        vlm._grounding_pipeline = None
+        assert vlm.run_vlm_grounding([-60.5, -3.5, -60.4, -3.4], "Find airplanes") == []
 
 
 def test_vlm_vqa_uses_fallback_when_transformers_unavailable():
     with patch("core.vlm._load_pipeline", return_value=None):
         vlm._vqa_pipeline = None
-        assert vlm.run_vlm_vqa([-60.5, -3.5, -60.4, -3.4], "How many airplanes are visible?") == "3."
+        assert (
+            vlm.run_vlm_vqa([-60.5, -3.5, -60.4, -3.4], "What land cover is visible?")
+            == "Mixed vegetation, exposed clearing, and road context."
+        )
+
+
+def test_vlm_vqa_fallback_uses_bbox_context():
+    with patch("core.vlm._load_pipeline", return_value=None):
+        vlm._vqa_pipeline = None
+        assert (
+            vlm.run_vlm_vqa([-81.62, 28.33, -81.48, 28.44], "What land cover is visible?")
+            == "Urban road corridor, water bodies, and managed vegetation."
+        )
 
 
 def test_vlm_caption_uses_fallback_when_transformers_unavailable():
