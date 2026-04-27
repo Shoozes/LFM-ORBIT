@@ -25,6 +25,7 @@ import httpx
 import imageio.v3 as iio
 import numpy as np
 from PIL import Image, ImageDraw
+from core.grid import normalize_bbox
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,27 @@ def _chunk_sig(bbox: list[float]) -> str:
     return hashlib.md5(str(rounded).encode()).hexdigest()[:8]
 
 
-def _month_range(start_date: str, end_date: str) -> list[tuple[int, int]]:
+def _limit_months(months: list[tuple[int, int]], steps: int | None) -> list[tuple[int, int]]:
+    if steps is None or len(months) <= steps:
+        return months
+
+    target = max(2, min(int(steps), 24))
+    if len(months) <= target:
+        return months
+
+    span = len(months) - 1
+    indices = [round(index * span / (target - 1)) for index in range(target)]
+    limited: list[tuple[int, int]] = []
+    seen: set[int] = set()
+    for index in indices:
+        if index in seen:
+            continue
+        seen.add(index)
+        limited.append(months[index])
+    return limited
+
+
+def _month_range(start_date: str, end_date: str, steps: int | None = None) -> list[tuple[int, int]]:
     """
     Build a list of (year, month) tuples from start_date to end_date.
     Inputs accepted as 'YYYY-MM-DD', 'YYYY-MM', or 'YYYY'.
@@ -63,17 +84,24 @@ def _month_range(start_date: str, end_date: str) -> list[tuple[int, int]]:
     """
     def _parse(s: str) -> tuple[int, int]:
         parts = s.split("-")
-        return int(parts[0]), int(parts[1]) if len(parts) > 1 else 1
+        year = int(parts[0])
+        month = int(parts[1]) if len(parts) > 1 else 1
+        date(year, month, 1)
+        return year, month
 
     try:
         sy, sm = _parse(start_date)
         ey, em = _parse(end_date)
-    except Exception:
+    except Exception as exc:
+        logger.debug("[TIMELAPSE] Invalid date range %s -> %s: %s", start_date, end_date, exc)
         sy, sm, ey, em = 2024, 4, 2026, 4
 
     today = date.today()
     if ey > today.year or (ey == today.year and em > today.month):
         ey, em = today.year, today.month
+
+    if (sy, sm) > (ey, em):
+        return []
 
     months = []
     y, m = sy, sm
@@ -83,11 +111,7 @@ def _month_range(start_date: str, end_date: str) -> list[tuple[int, int]]:
         if m > 12:
             m, y = 1, y + 1
 
-    if len(months) > 24:
-        step = len(months) / 24
-        months = [months[int(i * step)] for i in range(24)]
-
-    return months
+    return _limit_months(months, steps if steps is not None else 24)
 
 
 def _burn_hud(img: Image.Image, iso_label: str, source: str) -> Image.Image:
@@ -174,8 +198,8 @@ def _fetch_gibs_month(
                     if arr.mean() > 8.0 and arr.std() > 4.0:
                         logger.info("[TIMELAPSE] GIBS HLS-%s %s  mean=%.0f", short, iso, arr.mean())
                         return resp.content, f"HLS {short}  {iso}"
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("[TIMELAPSE] GIBS HLS-%s request failed for %s: %s", short, iso, exc)
 
     # MODIS fallback: 250m, daily global coverage
     for day in [15, 10, 20, 1]:
@@ -197,8 +221,8 @@ def _fetch_gibs_month(
                 if arr.mean() > 5.0:
                     logger.info("[TIMELAPSE] GIBS MODIS %s  mean=%.0f", iso, arr.mean())
                     return resp.content, f"MODIS  {iso}"
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("[TIMELAPSE] GIBS MODIS request failed for %s: %s", iso, exc)
 
     return None, ""
 
@@ -253,23 +277,35 @@ def _read_cache(sig: str) -> dict | None:
     if sh_webm_path.exists():
         webm_path = sh_webm_path
         meta_path = sh_meta_path
+        cache_family = "sentinelhub"
     elif nasa_webm_path.exists():
         webm_path = nasa_webm_path
         meta_path = nasa_meta_path
+        cache_family = "nasa_gibs"
     else:
         return None
 
     frames_count = 4
+    meta: dict = {}
     try:
-        frames_count = json.loads(meta_path.read_text()).get("frames_count", 4)
-    except Exception:
-        pass
+        meta = json.loads(meta_path.read_text())
+        frames_count = meta.get("frames_count", 4)
+    except Exception as exc:
+        logger.debug("[TIMELAPSE] Invalid cache metadata for %s: %s", sig, exc)
     data_b64 = base64.b64encode(webm_path.read_bytes()).decode("ascii")
     return {
         "video_b64": f"data:video/webm;base64,{data_b64}",
         "frames_count": frames_count,
         "format": "webm",
         "source": "seeded_cache",
+        "provider": meta.get("provider", cache_family),
+        "provenance": {
+            "kind": "seeded_cache",
+            "label": "Seeded local WebM cache",
+            "provider": meta.get("provider", cache_family),
+            "cache_family": cache_family,
+            "cache_key": sig,
+        },
     }
 
 
@@ -282,7 +318,8 @@ def get_provider_status() -> dict:
     try:
         from core.gee_provider import get_gee_status
         gee = get_gee_status()
-    except Exception:
+    except Exception as exc:
+        logger.debug("[TIMELAPSE] GEE status unavailable: %s", exc)
         gee = {"available": False, "reason": "gee_provider not loaded"}
     return {
         "gee": gee,
@@ -309,14 +346,22 @@ def generate_timelapse_frames(
         bbox: [west, south, east, north] in EPSG:4326
         start_date: 'YYYY-MM-DD' or 'YYYY-MM'
         end_date: 'YYYY-MM-DD' or 'YYYY-MM'
-        steps: unused (kept for API compat)
+        steps: target frame count; wider date windows are sampled down
         prefer_provider: 'gee' | 'nasa_gibs' | None (auto)
 
     Returns dict with video_b64, frames_count, format, source.
     """
+    try:
+        bbox = normalize_bbox(bbox)
+    except ValueError as exc:
+        return {"video_b64": "", "frames_count": 0, "format": "none",
+                "error": f"Invalid bbox: {exc}",
+                "provenance": {"kind": "unavailable", "label": "Invalid request"}}
+
     if os.environ.get("DISABLE_EXTERNAL_APIS", "false").lower() == "true":
         return {"video_b64": "", "frames_count": 0, "format": "none",
-                "error": "External APIs disabled."}
+                "error": "External APIs disabled.",
+                "provenance": {"kind": "unavailable", "label": "External APIs disabled"}}
 
     sig = _chunk_sig(bbox)
 
@@ -326,10 +371,11 @@ def generate_timelapse_frames(
         logger.info("[TIMELAPSE] Serving cache %s", sig)
         return cached
 
-    months = _month_range(start_date, end_date)
+    months = _month_range(start_date, end_date, steps=steps)
     if not months:
         return {"video_b64": "", "frames_count": 0, "format": "none",
-                "error": "No months in date range."}
+                "error": "No months in date range.",
+                "provenance": {"kind": "unavailable", "label": "No monthly frame window"}}
 
     logger.info("[TIMELAPSE] Fetching %d months | %s → %s | bbox=%s",
                 len(months), start_date, end_date, [round(b, 2) for b in bbox])
@@ -356,14 +402,16 @@ def generate_timelapse_frames(
 
     if len(frame_data) < 2:
         return {"video_b64": "", "frames_count": 0, "format": "none",
-                "error": f"Insufficient imagery ({len(frame_data)} frames) for this area and date range."}
+                "error": f"Insufficient imagery ({len(frame_data)} frames) for this area and date range.",
+                "provenance": {"kind": "unavailable", "label": "Insufficient imagery"}}
 
     try:
         webm = _encode_webm([arr for arr, _ in frame_data])
     except Exception as exc:
         logger.error("[TIMELAPSE] Encode error: %s", exc)
         return {"video_b64": "", "frames_count": 0, "format": "none",
-                "error": f"Video encoding failed: {exc}"}
+                "error": f"Video encoding failed: {exc}",
+                "provenance": {"kind": "unavailable", "label": "Video encoding failed"}}
 
     meta = {
         "chunk_signature": sig,
@@ -386,4 +434,10 @@ def generate_timelapse_frames(
         "frame_dates": [iso for _, iso in frame_data],
         "provider": provider_used,
         "source": meta["source"],
+        "provenance": {
+            "kind": "live_fetch",
+            "label": meta["source"],
+            "provider": provider_used,
+            "cache_key": sig,
+        },
     }

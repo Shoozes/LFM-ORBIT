@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getApiBaseUrl } from "../utils/telemetry";
 import { useAgentBus } from "../hooks/useAgentBus";
+import type { Mission } from "../types/mission";
 
 function getSenderLabel(sender: string): string {
   if (sender === "satellite") return "SAT";
@@ -38,17 +39,37 @@ function formatTimestamp(ts: string): string {
   }
 }
 
+async function readBusError(response: Response, fallback: string): Promise<string> {
+  try {
+    const payload = await response.json() as { error?: unknown; detail?: unknown };
+    if (typeof payload.error === "string" && payload.error.trim()) {
+      return payload.error;
+    }
+    if (typeof payload.detail === "string" && payload.detail.trim()) {
+      return payload.detail;
+    }
+  } catch {
+    return fallback;
+  }
+  return fallback;
+}
+
 type AgentDialogueProps = {
   isOpen: boolean;
   onClose: () => void;
+  mission?: Mission | null;
 };
 
-export default function AgentDialogue({ isOpen }: AgentDialogueProps) {
+export default function AgentDialogue({ isOpen, mission }: AgentDialogueProps) {
   const [operatorInput, setOperatorInput] = useState("");
+  const [isInjecting, setIsInjecting] = useState(false);
   const [stats, setStats] = useState<Record<string, number> | null>(null);
+  const [statsError, setStatsError] = useState<string | null>(null);
+  const [injectError, setInjectError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const apiBase = getApiBaseUrl();
   const { messages, wsStatus } = useAgentBus();
+  const isReplayMission = mission?.mission_mode === "replay";
 
   useEffect(() => {
     if (isOpen && endRef.current) {
@@ -62,8 +83,14 @@ export default function AgentDialogue({ isOpen }: AgentDialogueProps) {
     const fetchStats = async () => {
       try {
         const r = await fetch(`${apiBase}/api/agent/bus/stats`);
-        if (r.ok) setStats(await r.json() as Record<string, number>);
-      } catch { /* ignore */ }
+        if (!r.ok) {
+          throw new Error(`HTTP ${r.status}`);
+        }
+        setStats(await r.json() as Record<string, number>);
+        setStatsError(null);
+      } catch {
+        setStatsError("Bus stats unavailable");
+      }
     };
     fetchStats();
     const id = window.setInterval(fetchStats, 5000);
@@ -72,15 +99,24 @@ export default function AgentDialogue({ isOpen }: AgentDialogueProps) {
 
   const sendOperatorMessage = async () => {
     const msg = operatorInput.trim();
-    if (!msg) return;
-    setOperatorInput("");
+    if (!msg || isInjecting) return;
+    setIsInjecting(true);
+    setInjectError(null);
     try {
-      await fetch(`${apiBase}/api/agent/bus/inject`, {
+      const response = await fetch(`${apiBase}/api/agent/bus/inject`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: msg }),
       });
-    } catch { /* ignore */ }
+      if (!response.ok) {
+        throw new Error(await readBusError(response, `Bus injection failed with HTTP ${response.status}.`));
+      }
+      setOperatorInput("");
+    } catch (error) {
+      setInjectError(error instanceof Error ? error.message : "Bus injection failed.");
+    } finally {
+      setIsInjecting(false);
+    }
   };
 
   // Filter: hide dense heartbeats by default for readability
@@ -93,10 +129,10 @@ export default function AgentDialogue({ isOpen }: AgentDialogueProps) {
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-white">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-2">
             <div className={`h-2 w-2 rounded-full ${wsStatus === "open" ? "bg-emerald-500 animate-pulse" : "bg-zinc-300"}`} />
-            <span className="text-xs uppercase tracking-widest text-zinc-500 font-semibold">Agent Dialogue Bus</span>
+            <span className="truncate text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Agent Bus</span>
             <span className={`rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider font-semibold ${
               wsStatus === "open"
                 ? "border-emerald-200 bg-emerald-50 text-emerald-700"
@@ -106,15 +142,20 @@ export default function AgentDialogue({ isOpen }: AgentDialogueProps) {
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex shrink-0 items-center gap-3">
             {stats && (
-              <div className="flex gap-3 text-xs text-zinc-500 font-medium">
-                <span>{stats.from_satellite} sat</span>
-                <span>{stats.from_ground} gnd</span>
-                <span>{stats.total_messages} total</span>
+              <div className="grid grid-cols-3 gap-2 text-center text-[10px] text-zinc-500 font-medium">
+                <span><span className="block text-xs text-zinc-700">{stats.from_satellite}</span>sat</span>
+                <span><span className="block text-xs text-zinc-700">{stats.from_ground}</span>gnd</span>
+                <span><span className="block text-xs text-zinc-700">{stats.total_messages}</span>total</span>
               </div>
             )}
-            <div className="flex items-center gap-2 text-xs text-zinc-400 uppercase font-semibold hidden sm:flex">
+            {!stats && statsError && (
+              <span className="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+                {statsError}
+              </span>
+            )}
+            <div className="hidden items-center gap-2 text-xs text-zinc-400 uppercase font-semibold sm:flex">
               <span>SAT</span>
               <span>⇌</span>
               <span>GND</span>
@@ -140,6 +181,17 @@ export default function AgentDialogue({ isOpen }: AgentDialogueProps) {
 
         {/* Message feed */}
         <div className="flex-1 overflow-y-auto px-4 py-3 font-mono text-sm space-y-2">
+          {isReplayMission && (
+            <div className="rounded border border-cyan-200 bg-cyan-50 px-4 py-3 text-xs leading-relaxed text-cyan-800">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-700">
+                Historical replay trace loaded
+              </p>
+              <p className="mt-1">
+                This dialogue bus is showing restored SAT/GND reasoning from replay
+                {mission?.replay_id ? ` ${mission.replay_id}` : ""}. Operator inject is disabled until replay mode is exited.
+              </p>
+            </div>
+          )}
           {displayMessages.length === 0 && (
             <div className="flex items-center justify-center h-full text-zinc-400 text-sm">
               Waiting for agent messages…
@@ -227,22 +279,34 @@ export default function AgentDialogue({ isOpen }: AgentDialogueProps) {
         </div>
 
         {/* Operator inject */}
-        <div className="border-t border-zinc-200 px-4 py-3 flex gap-2 items-center bg-zinc-50">
-          <span className="text-[10px] uppercase tracking-wider font-semibold text-purple-600 shrink-0">User</span>
-          <input
-            type="text"
-            value={operatorInput}
-            onChange={(e) => setOperatorInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && sendOperatorMessage()}
-            placeholder="Inject manual command into agent bus…"
-            className="flex-1 rounded border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 outline-none"
-          />
-          <button
-            onClick={sendOperatorMessage}
-            className="rounded border border-purple-200 bg-purple-50 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-purple-700 hover:bg-purple-100 transition"
-          >
-            Inject
-          </button>
+        <div className="border-t border-zinc-200 bg-zinc-50 px-4 py-3">
+          {injectError && (
+            <p className="mb-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700" role="status">
+              {injectError}
+            </p>
+          )}
+          <div className="flex gap-2 items-center">
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-purple-600 shrink-0">User</span>
+            <input
+              type="text"
+              value={operatorInput}
+              onChange={(e) => {
+                setOperatorInput(e.target.value);
+                if (injectError) setInjectError(null);
+              }}
+              onKeyDown={(e) => e.key === "Enter" && sendOperatorMessage()}
+              placeholder="Inject manual command into agent bus…"
+              disabled={isInjecting || isReplayMission}
+              className="flex-1 rounded border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 outline-none disabled:opacity-50"
+            />
+            <button
+              onClick={sendOperatorMessage}
+              disabled={isInjecting || !operatorInput.trim() || isReplayMission}
+              className="rounded border border-purple-200 bg-purple-50 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-purple-700 hover:bg-purple-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isInjecting ? "Injecting..." : "Inject"}
+            </button>
+          </div>
       </div>
     </div>
   );

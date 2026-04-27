@@ -1,5 +1,5 @@
 """
-Shared utility functions for Canopy Sentinel backend.
+Shared utility functions for the LFM Orbit backend.
 """
 
 from datetime import datetime, timezone

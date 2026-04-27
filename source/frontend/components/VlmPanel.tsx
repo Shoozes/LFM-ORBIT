@@ -10,6 +10,10 @@ type VlmPanelProps = {
   onBoxesUpdate: (boxes: VlmBox[]) => void;
 };
 
+function getErrorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error ? err.message : fallback;
+}
+
 export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }: VlmPanelProps) {
   const [groundingPrompt, setGroundingPrompt] = useState("");
   const [vqaQuestion, setVqaQuestion] = useState("");
@@ -17,6 +21,9 @@ export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }:
   const [groundingResults, setGroundingResults] = useState<VlmBox[] | null>(null);
   const [vqaAnswer, setVqaAnswer] = useState<string | null>(null);
   const [caption, setCaption] = useState<string | null>(null);
+  const [groundingError, setGroundingError] = useState<string | null>(null);
+  const [vqaError, setVqaError] = useState<string | null>(null);
+  const [captionError, setCaptionError] = useState<string | null>(null);
   
   const [loadingGrounding, setLoadingGrounding] = useState(false);
   const [loadingVqa, setLoadingVqa] = useState(false);
@@ -29,16 +36,18 @@ export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }:
   async function handleGrounding() {
     if (!activeBbox || !groundingPrompt) return;
     setLoadingGrounding(true);
+    setGroundingError(null);
     try {
       const res = await fetch(`${apiBaseUrl}/api/vlm/grounding`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bbox: activeBbox, prompt: groundingPrompt })
       });
+      if (!res.ok) throw new Error(`Grounding failed with HTTP ${res.status}.`);
       const data = await res.json();
       setGroundingResults(data.results);
       onBoxesUpdate(data.results);
     } catch (err) {
-      console.error(err);
+      setGroundingError(getErrorMessage(err, "Grounding failed."));
     } finally {
       setLoadingGrounding(false);
     }
@@ -47,15 +56,17 @@ export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }:
   async function handleVqa() {
     if (!activeBbox || !vqaQuestion) return;
     setLoadingVqa(true);
+    setVqaError(null);
     try {
       const res = await fetch(`${apiBaseUrl}/api/vlm/vqa`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bbox: activeBbox, question: vqaQuestion })
       });
+      if (!res.ok) throw new Error(`Visual Q&A failed with HTTP ${res.status}.`);
       const data = await res.json();
       setVqaAnswer(data.answer);
     } catch (err) {
-      console.error(err);
+      setVqaError(getErrorMessage(err, "Visual Q&A failed."));
     } finally {
       setLoadingVqa(false);
     }
@@ -64,15 +75,17 @@ export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }:
   async function handleCaption() {
     if (!activeBbox) return;
     setLoadingCaption(true);
+    setCaptionError(null);
     try {
       const res = await fetch(`${apiBaseUrl}/api/vlm/caption`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bbox: activeBbox })
       });
+      if (!res.ok) throw new Error(`Captioning failed with HTTP ${res.status}.`);
       const data = await res.json();
       setCaption(data.caption);
     } catch (err) {
-      console.error(err);
+      setCaptionError(getErrorMessage(err, "Captioning failed."));
     } finally {
       setLoadingCaption(false);
     }
@@ -106,16 +119,28 @@ export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }:
               Grounding
             </div>
             <div className="flex flex-col gap-2">
-              <input 
-                type="text" 
-                placeholder="Find: large airplane (lower-left)"
-                value={groundingPrompt}
-                onChange={e => setGroundingPrompt(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleGrounding()}
-                className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 placeholder-zinc-400 transition"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Find: large airplane (lower-left)"
+                  value={groundingPrompt}
+                  onChange={e => setGroundingPrompt(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleGrounding()}
+                  className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 placeholder-zinc-400 transition"
+                />
+                <button
+                  type="button"
+                  onClick={handleGrounding}
+                  disabled={!groundingPrompt.trim() || loadingGrounding}
+                  className="rounded border border-zinc-300 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-700 hover:bg-zinc-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  Find
+                </button>
+              </div>
               {loadingGrounding ? (
                  <p className="text-[10px] animate-pulse text-zinc-400 mt-1 uppercase font-semibold">Searching region...</p>
+              ) : groundingError ? (
+                 <p className="text-xs font-medium text-red-600">{groundingError}</p>
               ) : groundingResults && (
                  <div className="mt-3 space-y-2">
                     {groundingResults.length === 0 ? (
@@ -141,16 +166,28 @@ export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }:
               Visual Q&A
             </div>
             <div className="flex flex-col gap-2">
-              <input 
-                type="text" 
-                placeholder="How many large planes are visible?"
-                value={vqaQuestion}
-                onChange={e => setVqaQuestion(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleVqa()}
-                className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 placeholder-zinc-400 transition"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="How many large planes are visible?"
+                  value={vqaQuestion}
+                  onChange={e => setVqaQuestion(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleVqa()}
+                  className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 placeholder-zinc-400 transition"
+                />
+                <button
+                  type="button"
+                  onClick={handleVqa}
+                  disabled={!vqaQuestion.trim() || loadingVqa}
+                  className="rounded border border-zinc-300 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-700 hover:bg-zinc-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  Ask
+                </button>
+              </div>
               {loadingVqa ? (
                  <p className="text-[10px] animate-pulse text-zinc-400 mt-1 uppercase font-semibold">Processing question...</p>
+              ) : vqaError ? (
+                 <p className="text-xs font-medium text-red-600">{vqaError}</p>
               ) : vqaAnswer && (
                  <p className="mt-2 text-xs text-zinc-800 font-medium">{vqaAnswer}</p>
               )}
@@ -174,6 +211,8 @@ export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }:
             <div className="flex flex-col gap-2">
               {loadingCaption ? (
                  <p className="text-[10px] animate-pulse text-zinc-400 uppercase font-semibold">Describing scene...</p>
+              ) : captionError ? (
+                 <p className="text-xs font-medium text-red-600">{captionError}</p>
               ) : caption ? (
                  <p className="mt-1 text-xs text-zinc-800 font-medium leading-relaxed">{caption}</p>
               ) : (

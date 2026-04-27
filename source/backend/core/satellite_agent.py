@@ -10,12 +10,16 @@ In demo mode it runs as an async task inside FastAPI.
 """
 
 import asyncio
+import hashlib
+import json
 import logging
+from pathlib import Path
 from uuid import uuid4
 from core.agent_bus import post_message, pull_messages, upsert_pin
 from core.config import REGION
 from core.grid import cell_to_latlng, generate_scan_grid
 from core.mission import get_active_mission, update_mission_progress
+from core.observability import log_throttled
 from core.scorer import score_cell_change
 from core.inference import build_satellite_prompt, generate, stream_tokens, parse_output
 
@@ -216,16 +220,37 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
             logger.info("[SAT] Stop event received. Shutting down.")
             break
 
+        mission = get_active_mission()
+        if mission and mission.get("mission_mode") == "replay":
+            mission_id = mission["id"]
+            if mission_id != getattr(run_satellite_agent, "_last_replay_mission_id", None):
+                run_satellite_agent._last_replay_mission_id = mission_id  # type: ignore[attr-defined]
+                post_message(
+                    sender=_SATELLITE_SENDER,
+                    recipient="broadcast",
+                    msg_type="status",
+                    payload={
+                        "mission_id": mission_id,
+                        "replay_id": mission.get("replay_id"),
+                        "note": (
+                            f"[REPLAY #{mission_id}] Satellite loop idled. "
+                            "Serving the seeded mission state until the operator exits replay mode."
+                        ),
+                    },
+                )
+            await asyncio.sleep(_CYCLE_PAUSE)
+            continue
+
+        run_satellite_agent._last_replay_mission_id = None  # type: ignore[attr-defined]
         cycle += 1
         cells_scanned = 0
         flags_sent = 0
 
         # Read active mission
-        mission = get_active_mission()
         mission_id = mission["id"] if mission else None
         mission_bbox = mission["bbox"] if mission else None  # [W, S, E, N] or None
 
-        if mission and cycle == 1 or (mission and mission_id != getattr(run_satellite_agent, "_last_mission_id", None)):
+        if mission and (cycle == 1 or mission_id != getattr(run_satellite_agent, "_last_mission_id", None)):
             run_satellite_agent._last_mission_id = mission_id  # type: ignore[attr-defined]
             post_message(
                 sender=_SATELLITE_SENDER,
@@ -239,10 +264,16 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                 },
             )
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
+        replay_interrupted = False
 
         for feature in features:
             if stop_event and stop_event.is_set():
+                break
+
+            live_mission = get_active_mission()
+            if live_mission and live_mission.get("mission_mode") == "replay":
+                replay_interrupted = True
                 break
 
             cell_id = str(feature["id"])
@@ -254,15 +285,23 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                     w, s, e, n = mission_bbox
                     if not (w <= clng <= e and s <= clat <= n):
                         continue  # outside mission area
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("[SAT] Failed mission bbox check for %s: %s", cell_id, exc)
+                    continue
 
             await asyncio.sleep(_SCAN_INTERVAL)
 
             try:
                 score = score_cell_change(cell_id)
             except Exception as exc:
-                logger.warning("[SAT] Scorer error on %s: %s", cell_id, exc)
+                log_throttled(
+                    logger,
+                    logging.WARNING,
+                    f"satellite_agent:scorer_error:{type(exc).__name__}:{str(exc)}",
+                    "[SAT] Scorer error on %s: %s",
+                    cell_id,
+                    exc,
+                )
                 continue
 
             # Automatically flag any area with a seeded video cache so we don't redownload
@@ -300,7 +339,14 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                         )
                     score["timelapse_analysis"] = vlm_text
             except Exception as cache_exc:
-                logger.warning("[SAT] Cache link error for %s: %s", cell_id, cache_exc)
+                log_throttled(
+                    logger,
+                    logging.WARNING,
+                    f"satellite_agent:cache_link_error:{type(cache_exc).__name__}:{str(cache_exc)}",
+                    "[SAT] Cache link error for %s: %s",
+                    cell_id,
+                    cache_exc,
+                )
 
             cells_scanned += 1
             is_anomaly = score["change_score"] >= REGION.anomaly_threshold
@@ -311,7 +357,14 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                 try:
                     llm_result = await _run_llm_triage(cell_id, score, loop)
                 except Exception as exc:
-                    logger.warning("[SAT] LFM triage error on %s: %s", cell_id, exc)
+                    log_throttled(
+                        logger,
+                        logging.WARNING,
+                        f"satellite_agent:llm_triage_error:{type(exc).__name__}:{str(exc)}",
+                        "[SAT] LFM triage error on %s: %s",
+                        cell_id,
+                        exc,
+                    )
 
                 response_str = (llm_result.get("response", "") if llm_result else "").lower()
                 tool_calls = llm_result.get("tool_calls", []) if llm_result else []
@@ -345,8 +398,8 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                         note=f"Orbital flag. Change score {score['change_score']:.3f}. Requesting ground validation.",
                         severity=None,
                     )
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("[SAT] Failed to place satellite pin for %s: %s", cell_id, exc)
                 logger.info(
                     "[SAT] FLAG → %s | score=%.3f confidence=%.3f | llm=%s",
                     cell_id,
@@ -376,6 +429,9 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                         mission=mission,
                     ),
                 )
+
+        if replay_interrupted:
+            continue
 
         # Update mission progress
         if mission_id:
@@ -413,12 +469,9 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                         try:
                             lat, lng = cell_to_latlng(conf_cell_id)
                             dim = 0.05
-                            bbox = [lng - dim, lat - dim, lng + dim, lat + dim]
-                            import hashlib
-                            rounded = [round(b, 3) for b in bbox]
+                            cell_bbox = [lng - dim, lat - dim, lng + dim, lat + dim]
+                            rounded = [round(b, 3) for b in cell_bbox]
                             chunk_sig = hashlib.md5(str(rounded).encode()).hexdigest()[:8]
-                            from pathlib import Path
-                            import json
 
                             # Check seeded cache first
                             meta_path = Path(__file__).resolve().parent.parent / "assets" / "seeded_data" / f"nasa_{chunk_sig}_meta.json"
@@ -431,7 +484,7 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                             # Check observation store as second-level cache
                             if not vlm_explanation:
                                 from core.observation_store import load_observation
-                                obs = load_observation(bbox)
+                                obs = load_observation(cell_bbox)
                                 if obs and obs.get("observations"):
                                     latest = obs["observations"][-1]
                                     vlm_explanation = latest.get("vlm_text")

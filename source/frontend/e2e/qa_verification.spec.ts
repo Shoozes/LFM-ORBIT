@@ -1,70 +1,143 @@
 import { test, expect } from "@playwright/test";
+import { gotoApp, resetRuntimeState } from "./runtime";
 
 test.describe("QA Verification — Single Page Architecture", () => {
-  test.beforeEach(async ({ page }) => {
-    // Navigate to the main page
-    await page.goto("http://localhost:5173/");
+  test.beforeEach(async ({ page, request }) => {
+    await resetRuntimeState(request);
+    await gotoApp(page);
   });
 
   test("verify all major panels render correctly", async ({ page }) => {
-    // 1. Mission Control
-    await expect(page.locator("h2", { hasText: /Mission Control/i })).toBeVisible();
+    // 1. Mission tab
+    await page.getByTestId("tab-mission").click();
+    await expect(page.getByText("New Mission", { exact: true })).toBeVisible();
     await expect(page.getByPlaceholder("Search for areas")).toBeVisible();
-    
-    // 2. Working Conversation
-    await expect(page.locator("h2", { hasText: /Working Conversation/i })).toBeVisible();
-    await expect(page.getByPlaceholder("Inject operator message")).toBeVisible();
-    
-    // 3. Ground Agent Assistant
-    await expect(page.locator("h2", { hasText: /Ground Agent Assistant/i })).toBeVisible();
+
+    // 2. Agents tab
+    await page.getByTestId("tab-agents").click();
+    await expect(page.getByTestId("header-agent-bus")).toBeVisible();
+    await expect(page.getByPlaceholder("Inject manual command into agent bus…")).toBeVisible();
     await expect(page.getByPlaceholder("Command agent...")).toBeVisible();
-    
-    // 4. System Logs & Alerts
-    await expect(page.locator("h2", { hasText: /System Logs & Alerts/i })).toBeVisible();
-    
-    // 5. Provider Settings
-    await expect(page.locator("h2", { hasText: /Provider Settings/i })).toBeVisible();
+
+    // 3. Logs tab
+    await page.getByTestId("tab-logs").click();
+    await expect(page.getByText("Alerts & Logs")).toBeVisible();
+
+    // 4. Settings tab
+    await page.getByTestId("tab-settings").click();
+    await expect(page.getByText("Provider Status")).toBeVisible();
     await expect(page.getByPlaceholder("Sentinel Client ID")).toBeVisible();
   });
 
   test("verify empty and disabled states", async ({ page }) => {
-    // Mission Control Launch should be disabled when empty
-    const launchBtn = page.getByRole("button", { name: /Launch Mission/i });
+    const launchBtn = page.getByRole("button", { name: /Launch Mission|Mission Complete/i });
     await expect(launchBtn).toBeVisible();
     await expect(launchBtn).toBeDisabled();
 
     // Settings save should be disabled automatically
-    const saveSettingsBtn = page.getByRole("button", { name: /SAVE CREDENTIALS/i });
+    await page.getByTestId("tab-settings").click();
+    const saveSettingsBtn = page.getByRole("button", { name: /save credentials/i });
     await expect(saveSettingsBtn).toBeVisible();
     await expect(saveSettingsBtn).toBeDisabled();
-    
-    // Logs empty state
-    await expect(page.getByText("No alerts downlinked yet.")).toBeVisible();
+
+    // Logs state may be empty on boot or already contain early downlinks
+    await page.getByTestId("tab-logs").click();
+    await expect(async () => {
+      const emptyVisible = await page.getByText("No alerts downlinked yet.").isVisible().catch(() => false);
+      const alertButtons = await page.locator("[data-testid='alert-button']").count();
+      expect(emptyVisible || alertButtons > 0).toBeTruthy();
+    }).toPass();
   });
 
   test("verify Mission Control text entry and Launch behavior", async ({ page }) => {
+    await page.getByTestId("tab-mission").click();
+
     await page.fill('textarea[placeholder*="Search for areas"]', "Detect canopy loss");
-    
-    const launchBtn = page.getByRole("button", { name: /Launch Mission/i });
+
+    const launchBtn = page.getByRole("button", { name: /Launch Mission|Mission Complete/i });
     await expect(launchBtn).toBeEnabled();
-    
-    // If we click launch, it should say Deploying... or Mission in Progress (if API mock allows)
-    // However, without a real backend responding properly, we verify the button was enabled correctly.
   });
 
   test("verify Ground Agent message input", async ({ page }) => {
+    // Navigate to Agents tab
+    await page.getByTestId("tab-agents").click();
+
     const chatInput = page.getByPlaceholder("Command agent...");
     await chatInput.fill("Start scanning the northern sector");
-    
-    const sendBtn = page.locator('button:has-text("Send")').nth(1); // Second send button is in GroundAgent
+
+    const sendBtn = page.locator('button:has-text("Send")');
     await sendBtn.click();
-    
+
     // Expect the user message to be reflected instantly
     await expect(page.getByText("Start scanning the northern sector")).toBeVisible();
   });
 
-  test("verify map UI elements load", async ({ page }) => {
+  test("verify Ground Agent surfaces backend errors", async ({ page }) => {
+    await page.route("**/api/agent/chat", async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Synthetic assistant outage" }),
+      });
+    });
+
+    await page.getByTestId("tab-agents").click();
+
+    const chatInput = page.getByPlaceholder("Command agent...");
+    await chatInput.fill("Start fallback analysis");
+    await page.getByRole("button", { name: "Send" }).click();
+
+    await expect(page.getByText("Start fallback analysis")).toBeVisible();
+    await expect(page.getByText("[Link Error: Synthetic assistant outage]")).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("verify Agent Dialogue surfaces bus failures", async ({ page }) => {
+    await page.route("**/api/agent/bus/stats", async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Synthetic stats outage" }),
+      });
+    });
+    await page.route("**/api/agent/bus/inject", async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Synthetic bus outage" }),
+      });
+    });
+
+    await page.getByTestId("tab-agents").click();
+    await expect(page.getByText("Bus stats unavailable")).toBeVisible({ timeout: 10_000 });
+
+    const injectInput = page.getByPlaceholder("Inject manual command into agent bus…");
+    await injectInput.fill("Check sensor handoff");
+    await page.getByRole("button", { name: "Inject" }).click();
+
+    await expect(page.getByText("Synthetic bus outage")).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("verify map UI elements load and LINK OPEN has tooltip", async ({ page }) => {
     // Expect Map element to be mounted
     await expect(page.locator(".maplibregl-map")).toBeVisible({ timeout: 10_000 });
+
+    // Check that LINK OPEN or DISCONNECTED badge exists and has title
+    const linkBadge = page.locator('div[title="Telemetry Link Status (View Only)"]');
+    await expect(linkBadge).toBeVisible();
+  });
+
+  test("verify Draw Area on Map functionality and cancellation", async ({ page }) => {
+    await page.getByTestId("tab-mission").click();
+
+    const drawBtn = page.getByRole("button", { name: "Draw Area on Map" });
+    await drawBtn.click();
+
+    // Banner should appear
+    const banner = page.getByText("DRAWING MODE ACTIVE");
+    await expect(banner).toBeVisible();
+
+    // Press escape to cancel
+    await page.keyboard.press("Escape");
+    await expect(banner).toBeHidden();
   });
 });

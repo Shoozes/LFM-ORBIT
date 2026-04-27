@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AlertItem,
   ApiHealth,
@@ -31,6 +31,7 @@ export type UseTelemetryState = {
   apiHealth: ApiHealth | null;
   metricsSummary: ApiMetricsSummary | null;
   isScanComplete: boolean;
+  refreshTelemetry: (options?: { replaceAlerts?: boolean }) => Promise<void>;
 };
 
 async function fetchJson<T>(url: string): Promise<T | null> {
@@ -69,33 +70,36 @@ export function useTelemetry(): UseTelemetryState {
   const MAX_RECONNECT_ATTEMPTS = 10;
   const BASE_RECONNECT_DELAY_MS = 1000;
 
-  useEffect(() => {
-    void (async () => {
-      const [health, recent, metrics] = await Promise.all([
-        fetchJson<ApiHealth>(`${apiBaseUrl}/api/health`),
-        fetchJson<RecentAlertsResponse>(`${apiBaseUrl}/api/alerts/recent?limit=50`),
-        fetchJson<ApiMetricsSummary>(`${apiBaseUrl}/api/metrics/summary`),
-      ]);
+  const refreshTelemetry = useCallback(async (options?: { replaceAlerts?: boolean }) => {
+    const replaceAlerts = options?.replaceAlerts ?? false;
+    const [health, recent, metrics] = await Promise.all([
+      fetchJson<ApiHealth>(`${apiBaseUrl}/api/health`),
+      fetchJson<RecentAlertsResponse>(`${apiBaseUrl}/api/alerts/recent?limit=50`),
+      fetchJson<ApiMetricsSummary>(`${apiBaseUrl}/api/metrics/summary`),
+    ]);
 
-      if (health) {
-        setApiHealth(health);
-        setRegionId(health.region_id);
-        setDisplayName(health.display_name);
-      }
+    if (health) {
+      setApiHealth(health);
+      setRegionId(health.region_id);
+      setDisplayName(health.display_name);
+    }
 
-      if (recent) {
-        setAlerts((current) => mergeAlertLists(current, recent.alerts));
-        if (recent.region_id) {
-          setRegionId(recent.region_id);
-        }
+    if (recent) {
+      setAlerts((current) => (replaceAlerts ? recent.alerts : mergeAlertLists(current, recent.alerts)));
+      if (recent.region_id) {
+        setRegionId(recent.region_id);
       }
+    }
 
-      if (metrics) {
-        setMetricsSummary(metrics);
-        setBandwidthSaved(metrics.total_bandwidth_saved_mb);
-      }
-    })();
+    if (metrics) {
+      setMetricsSummary(metrics);
+      setBandwidthSaved(metrics.total_bandwidth_saved_mb);
+    }
   }, [apiBaseUrl]);
+
+  useEffect(() => {
+    void refreshTelemetry({ replaceAlerts: true });
+  }, [refreshTelemetry]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -106,7 +110,7 @@ export function useTelemetry(): UseTelemetryState {
           setBandwidthSaved(metrics.total_bandwidth_saved_mb);
         }
       })();
-    }, 500);
+    }, 5000);
 
     return () => window.clearInterval(intervalId);
   }, [apiBaseUrl]);
@@ -120,6 +124,7 @@ export function useTelemetry(): UseTelemetryState {
       const socket = new WebSocket(telemetryUrl);
       wsRef.current = socket;
       setConnectionState(reconnectAttempts.current > 0 ? "reconnecting" : "connecting");
+      setIsScanComplete(false);
 
       socket.onopen = () => {
         if (reconnectAttempts.current > 0) {
@@ -168,6 +173,7 @@ export function useTelemetry(): UseTelemetryState {
           setGeoJsonGrid(message.data);
           setRegionId(message.region.region_id);
           setDisplayName(message.region.display_name);
+          setIsScanComplete(false);
           return;
         }
 
@@ -199,7 +205,7 @@ export function useTelemetry(): UseTelemetryState {
         wsRef.current = null;
       }
     };
-  }, [telemetryUrl]);
+  }, [apiBaseUrl, telemetryUrl]);
 
   const selectedAlert = useMemo(() => {
     if (!selectedCellId) {
@@ -223,5 +229,6 @@ export function useTelemetry(): UseTelemetryState {
     apiHealth,
     metricsSummary,
     isScanComplete,
+    refreshTelemetry,
   };
 }

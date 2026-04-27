@@ -53,8 +53,8 @@ def _load_credentials() -> tuple[str, str] | None:
             return lines[0], lines[1]
         if len(lines) == 1:
             return lines[0], ""
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("[GEE] Failed to read credentials file: %s", exc)
     return None
 
 
@@ -74,8 +74,8 @@ def _load_cached_token() -> str | None:
         expires = datetime.fromisoformat(tok["expires_at"])
         if datetime.now(timezone.utc) < expires - timedelta(minutes=5):
             return tok["access_token"]
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("[GEE] Failed to load cached token: %s", exc)
     return None
 
 
@@ -83,8 +83,8 @@ def _save_token(token: str, expires_in: int) -> None:
     expires = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
     try:
         _TOKEN_CACHE.write_text(json.dumps({"access_token": token, "expires_at": expires}))
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("[GEE] Failed to persist token cache: %s", exc)
 
 
 def gee_available() -> bool:

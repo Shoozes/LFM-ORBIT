@@ -177,6 +177,96 @@ def get_recent_dialogue(limit: int = 60) -> list[dict[str, Any]]:
     ]
 
 
+def mark_messages_read(
+    *,
+    sender: str | None = None,
+    recipient: str | None = None,
+    msg_type: str | None = None,
+    cell_id: str | None = None,
+) -> int:
+    """Mark matching messages as read without removing them from dialogue history."""
+    init_bus()
+
+    clauses = ["read = 0"]
+    params: list[Any] = []
+    if sender:
+        clauses.append("sender = ?")
+        params.append(sender)
+    if recipient:
+        clauses.append("recipient = ?")
+        params.append(recipient)
+    if msg_type:
+        clauses.append("msg_type = ?")
+        params.append(msg_type)
+    if cell_id:
+        clauses.append("cell_id = ?")
+        params.append(cell_id)
+
+    with _connect() as conn:
+        cursor = conn.execute(
+            f"UPDATE agent_messages SET read = 1 WHERE {' AND '.join(clauses)}",
+            params,
+        )
+        conn.commit()
+        return int(cursor.rowcount or 0)
+
+
+def get_recent_messages(
+    *,
+    limit: int = 60,
+    sender: str | None = None,
+    recipient: str | None = None,
+    msg_type: str | None = None,
+    cell_id: str | None = None,
+) -> list[dict[str, Any]]:
+    """Return recent bus messages filtered by optional message fields."""
+    init_bus()
+    safe_limit = max(1, min(int(limit), 500))
+
+    clauses: list[str] = []
+    params: list[Any] = []
+    if sender:
+        clauses.append("sender = ?")
+        params.append(sender)
+    if recipient:
+        clauses.append("recipient = ?")
+        params.append(recipient)
+    if msg_type:
+        clauses.append("msg_type = ?")
+        params.append(msg_type)
+    if cell_id:
+        clauses.append("cell_id = ?")
+        params.append(cell_id)
+
+    where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+    with _connect() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT id, sender, recipient, msg_type, cell_id, payload, timestamp, read
+            FROM agent_messages
+            {where_clause}
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (*params, safe_limit),
+        ).fetchall()
+
+    return [
+        {
+            "id": r["id"],
+            "sender": r["sender"],
+            "recipient": r["recipient"],
+            "msg_type": r["msg_type"],
+            "cell_id": r["cell_id"],
+            "payload": json.loads(r["payload"]),
+            "timestamp": r["timestamp"],
+            "read": bool(r["read"]),
+        }
+        for r in reversed(rows)
+    ]
+
+
 def get_bus_stats() -> dict[str, int]:
     init_bus()  # ensure table exists
     with _connect() as conn:
@@ -271,6 +361,45 @@ def list_pins() -> list[dict[str, Any]]:
         }
         for r in rows
     ]
+
+
+def get_pin_for_cell(cell_id: str, preferred_types: tuple[str, ...] = ("ground", "satellite", "operator")) -> dict[str, Any] | None:
+    """Return the most relevant persisted pin for a cell when available."""
+    init_bus()
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, pin_type, cell_id, lat, lng, label, note, severity, timestamp
+            FROM map_pins
+            WHERE cell_id = ?
+            ORDER BY id DESC
+            """,
+            (cell_id,),
+        ).fetchall()
+
+    if not rows:
+        return None
+
+    pins = [
+        {
+            "id": r["id"],
+            "pin_type": r["pin_type"],
+            "cell_id": r["cell_id"],
+            "lat": r["lat"],
+            "lng": r["lng"],
+            "label": r["label"],
+            "note": r["note"] or "",
+            "severity": r["severity"],
+            "timestamp": r["timestamp"],
+        }
+        for r in rows
+    ]
+
+    for pin_type in preferred_types:
+        for pin in pins:
+            if pin["pin_type"] == pin_type:
+                return pin
+    return pins[0]
 
 
 def delete_pin(pin_id: int) -> bool:

@@ -1,9 +1,9 @@
 """
 inference.py -- Self-contained LFM inference engine for the satellite backend.
 
-Loads LFM2.5-1.2B-Thinking-Q4_K_M.gguf from runtime-data/models/ via
+Loads the configured GGUF artifact from runtime-data/models/ via
 llama-cpp-python. This is the satellite's own inference stack, independent
-of the frontend wllama instance.
+of the frontend runtime.
 
 Provides:
   - Lazy singleton model load (first call triggers load)
@@ -17,15 +17,11 @@ import logging
 import os
 import re
 import threading
-from pathlib import Path
 from typing import Iterator
 
-logger = logging.getLogger(__name__)
+from core.model_manifest import resolve_satellite_model_artifact
 
-# Model path resolved relative to the repo root
-_MODELS_DIR = Path(__file__).resolve().parents[3] / "runtime-data" / "models" / "lfm2.5-vlm-450m"
-_MODEL_FILENAME = "LFM2.5-VL-450M-Q4_0.gguf"
-_MODEL_PATH = _MODELS_DIR / _MODEL_FILENAME
+logger = logging.getLogger(__name__)
 
 # Generation defaults
 _CTX_SIZE = 4096
@@ -50,12 +46,16 @@ def _get_model():
         _load_attempted = True
         try:
             from llama_cpp import Llama
-            if not _MODEL_PATH.exists():
-                logger.warning("[INF] Model not found at %s -- satellite reasoning disabled", _MODEL_PATH)
+            artifact = resolve_satellite_model_artifact()
+            if not artifact.model_path.exists():
+                logger.warning(
+                    "[INF] Model not found at %s -- satellite reasoning disabled",
+                    artifact.model_path,
+                )
                 return None
-            logger.info("[INF] Loading LFM model: %s", _MODEL_PATH.name)
+            logger.info("[INF] Loading LFM model: %s", artifact.model_path.name)
             _model = Llama(
-                model_path=str(_MODEL_PATH),
+                model_path=str(artifact.model_path),
                 n_ctx=_CTX_SIZE,
                 n_threads=max(1, (os.cpu_count() or 4) - 1),
                 verbose=False,
@@ -70,13 +70,24 @@ def _get_model():
 def model_status() -> dict:
     """Return load status for the debug dashboard."""
     global _load_attempted
+    artifact = resolve_satellite_model_artifact()
+    payload = artifact.to_status_dict()
+    payload["name"] = artifact.model_filename
+    payload["path"] = str(artifact.model_path)
     if _model is not None:
-        return {"loaded": True, "path": str(_MODEL_PATH), "name": _MODEL_FILENAME}
-    if not _MODEL_PATH.exists():
-        return {"loaded": False, "reason": "model file not found", "path": str(_MODEL_PATH)}
+        payload["loaded"] = True
+        return payload
+    if not artifact.model_path.exists():
+        payload["loaded"] = False
+        payload["reason"] = "model file not found"
+        return payload
     if _load_attempted:
-        return {"loaded": False, "reason": "load failed", "path": str(_MODEL_PATH)}
-    return {"loaded": False, "reason": "not yet attempted", "path": str(_MODEL_PATH)}
+        payload["loaded"] = False
+        payload["reason"] = "load failed"
+        return payload
+    payload["loaded"] = False
+    payload["reason"] = "not yet attempted"
+    return payload
 
 
 # ---------------------------------------------------------------------------
@@ -85,11 +96,26 @@ def model_status() -> dict:
 
 _THINK_OPEN = re.compile(r"<think>", re.IGNORECASE)
 _THINK_CLOSE = re.compile(r"</think>", re.IGNORECASE)
-# Tool call: JSON block with a "tool" key
-_TOOL_CALL_PATTERN = re.compile(
-    r"```json\s*(\{.*?\})\s*```|(\{[^{}]*\"tool\"[^{}]*\})",
-    re.DOTALL,
-)
+# Tool calls can appear as fenced JSON blocks with nested arguments or as
+# simple inline JSON objects. Keep the fallback intentionally conservative.
+_FENCED_JSON_PATTERN = re.compile(r"```json\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
+_INLINE_TOOL_PATTERN = re.compile(r"(\{[^{}]*\"tool\"[^{}]*\})", re.DOTALL)
+
+
+def _iter_tool_json_blobs(response_text: str) -> Iterator[str]:
+    seen: set[str] = set()
+    for match in _FENCED_JSON_PATTERN.finditer(response_text):
+        blob = match.group(1).strip()
+        if blob and blob not in seen:
+            seen.add(blob)
+            yield blob
+
+    without_fenced_blocks = _FENCED_JSON_PATTERN.sub("", response_text)
+    for match in _INLINE_TOOL_PATTERN.finditer(without_fenced_blocks):
+        blob = match.group(1).strip()
+        if blob and blob not in seen:
+            seen.add(blob)
+            yield blob
 
 
 def parse_output(raw: str) -> dict:
@@ -122,8 +148,7 @@ def parse_output(raw: str) -> dict:
     response_text = " ".join(r.strip() for r in response_parts if r.strip())
 
     tool_calls = []
-    for m in _TOOL_CALL_PATTERN.finditer(response_text):
-        blob = m.group(1) or m.group(2)
+    for blob in _iter_tool_json_blobs(response_text):
         try:
             parsed = json.loads(blob)
             if isinstance(parsed, dict) and "tool" in parsed:
@@ -132,7 +157,7 @@ def parse_output(raw: str) -> dict:
                     "arguments": parsed.get("arguments", parsed),
                 })
         except json.JSONDecodeError:
-            pass
+            logger.debug("Ignoring malformed tool-call JSON: %s", blob[:120], exc_info=True)
 
     return {
         "thinking": thinking,
@@ -178,7 +203,7 @@ def stream_tokens(prompt: str, max_tokens: int = _MAX_TOKENS) -> Iterator[str]:
 def generate(prompt: str, max_tokens: int = _MAX_TOKENS) -> dict:
     """
     Blocking generation. Returns parsed output dict.
-    Falls back to a stub response when the model is unavailable.
+    Falls back to a deterministic status response when the model is unavailable.
     """
     model = _get_model()
     if model is None:

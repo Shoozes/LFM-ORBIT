@@ -1,19 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AlertAnalysis, AlertItem, CellImageryResponse, ScanWindow } from "../types/telemetry";
-import { getApiBaseUrl, formatSourceLabel } from "../utils/telemetry";
+import { getApiBaseUrl, formatSourceLabel, formatReasonCode } from "../utils/telemetry";
 import { useAgentBus } from "../hooks/useAgentBus";
+import type { Mission } from "../types/mission";
 type GalleryFull = {
   timelapse_b64: string | null;
+  timelapse_source: string | null;
   timelapse_analysis: string | null;
   context_thumb: string | null;
+  context_thumb_source: string | null;
   has_timelapse: number;
 };
 
 type ValidationPanelProps = {
   selectedCellId: string | null;
   alert: AlertItem | null;
-  onOpenGallery?: () => void;
   onOpenTimelapse?: () => void;
+  mission?: Mission | null;
 };
 
 function getDelta(beforeValue: number, afterValue: number): string {
@@ -22,33 +25,53 @@ function getDelta(beforeValue: number, afterValue: number): string {
   return `${sign}${delta.toFixed(3)}`;
 }
 
-function buildSummary(alert: AlertItem | null): string {
+function buildSummary(alert: AlertItem | null): string[] {
   if (!alert) {
-    return "No alert is selected. Choose a flagged cell to inspect the temporal evidence.";
+    return ["No alert is selected. Choose a flagged cell to inspect the temporal evidence."];
   }
 
   if (!alert.before_window || !alert.after_window) {
-    return "This alert has no attached temporal windows yet.";
+    return ["This alert has no attached temporal windows yet."];
   }
 
-  const ndviDrop = alert.before_window.ndvi - alert.after_window.ndvi;
-  const nbrDrop = alert.before_window.nbr - alert.after_window.nbr;
+  const notes: string[] = [];
 
+  if (alert.observation_source === "seeded_sentinelhub_replay" || alert.observation_source === "seeded_replay") {
+    notes.push("✓ Seeded replay evidence restored from bundled local imagery and historical agent outputs.");
+  }
 
+  // Spectral evidence
+  if (alert.reason_codes.includes("multi_index_consensus")) {
+    notes.push("✓ Strong multi-index consensus indicating structural canopy loss.");
+  } else if (alert.reason_codes.includes("ndvi_drop") && alert.reason_codes.includes("nbr_drop")) {
+    notes.push("✓ Combined vegetation (NDVI) and burn-ratio (NBR) signals decreased.");
+  }
+
+  if (alert.reason_codes.includes("soil_exposure_spike")) {
+    notes.push("✓ Significant emergence of exposed bare soil / structural dryness.");
+  }
 
   if (alert.reason_codes.includes("observation_pattern_match")) {
-    return "The after window matches the seeded disturbance signature in the cached orbital sweeps. This is useful triage evidence, but it is still awaiting full-resolution confirmation.";
+    notes.push("✓ Pattern matches the seeded disturbance signature.");
   }
 
-  if (ndviDrop >= 0.18 && nbrDrop >= 0.20) {
-    return "Both vegetation and burn-ratio style signals moved strongly in the loss direction. This is a strong triage candidate for follow-up review.";
-  }
-
+  // Quality checks
   if (alert.reason_codes.includes("low_quality_window")) {
-    return "The score crossed threshold, but at least one observation window is weak. Treat this as a review candidate, not as a decisive finding.";
+    notes.push("⚠ Warning: Detection limited by low-quality observation imagery.");
   }
 
-  return "The temporal signals shifted enough to trigger a triage alert, but this panel still shows temporal evidence only, indicating suspected activity.";
+  // Context checks
+  if (alert.reason_codes.includes("regional_phenology_shift")) {
+    notes.push("⚠ Downgrade: Drought context detected; local region similarly stressed.");
+  } else if (alert.reason_codes.includes("suspected_canopy_loss")) {
+    notes.push("✓ Targeted focal anomaly stands out from surrounding region.");
+  }
+
+  if (notes.length > 0) {
+    return notes;
+  }
+
+  return ["Temporal signals shifted enough to trigger a triage alert, but evidence remains ambiguous."];
 }
 
 function renderWindowCard(title: string, window: ScanWindow) {
@@ -78,12 +101,37 @@ function renderWindowCard(title: string, window: ScanWindow) {
           <span className="text-zinc-500 font-semibold">NBR:</span> <span className="text-zinc-900 font-medium">{window.nbr !== undefined ? window.nbr.toFixed(3) : "—"}</span>
         </div>
         <div>
+          <span className="text-zinc-500 font-semibold">EVI2:</span> <span className="text-zinc-900 font-medium">{window.evi2 !== undefined ? window.evi2.toFixed(3) : "—"}</span>
+        </div>
+        <div>
+          <span className="text-zinc-500 font-semibold">NDMI:</span> <span className="text-zinc-900 font-medium">{window.ndmi !== undefined ? window.ndmi.toFixed(3) : "—"}</span>
+        </div>
+        <div>
+          <span className="text-zinc-500 font-semibold">Soil Ratio:</span> <span className="text-zinc-900 font-medium">{window.soil_ratio !== undefined ? window.soil_ratio.toFixed(3) : "—"}</span>
+        </div>
+        <div>
           <span className="text-zinc-500 font-semibold">Flags:</span>{" "}
           <span className="text-zinc-900 font-medium">{window.flags.length > 0 ? window.flags.join(", ") : "none"}</span>
         </div>
       </div>
     </div>
   );
+}
+
+function getDataUrlExtension(dataUrl: string): string {
+  if (dataUrl.startsWith("data:image/jpeg")) return "jpg";
+  if (dataUrl.startsWith("data:image/png")) return "png";
+  if (dataUrl.startsWith("data:image/svg+xml")) return "svg";
+  if (dataUrl.startsWith("data:video/webm")) return "webm";
+  if (dataUrl.startsWith("data:video/mp4")) return "mp4";
+  return "bin";
+}
+
+function downloadDataUrl(dataUrl: string, filenameStem: string) {
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  a.download = `${filenameStem}.${getDataUrlExtension(dataUrl)}`;
+  a.click();
 }
 
 function ImageryChip({
@@ -108,20 +156,20 @@ function ImageryChip({
   }, [src]);
 
   return (
-    <div 
+    <div
       className={`overflow-hidden rounded border border-zinc-200 bg-zinc-50 ${onClick ? 'cursor-pointer hover:border-zinc-400 transition-colors' : ''}`}
       onClick={onClick}
     >
       <div className="relative w-full" style={{ paddingBottom: "100%" }}>
         {loading ? (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider animate-pulse">Loading</span>
+          <div className="absolute inset-0 bg-zinc-200/60 animate-pulse flex items-center justify-center">
+            <span className="text-zinc-400 text-[10px] font-semibold uppercase tracking-wider drop-shadow-sm">Fetching...</span>
           </div>
         ) : src && !error ? (
           <>
             {!loaded && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider animate-pulse">Loading</span>
+              <div className="absolute inset-0 bg-zinc-200/60 animate-pulse flex items-center justify-center">
+                <span className="text-zinc-400 text-[10px] font-semibold uppercase tracking-wider drop-shadow-sm">Decoding...</span>
               </div>
             )}
             <img
@@ -174,7 +222,7 @@ function AnalysisCard({ analysis, label }: { analysis: AlertAnalysis; label: str
   );
 }
 
-export default function ValidationPanel({ selectedCellId, alert, onOpenGallery, onOpenTimelapse }: ValidationPanelProps) {
+export default function ValidationPanel({ selectedCellId, alert, onOpenTimelapse, mission }: ValidationPanelProps) {
   const summary = useMemo(() => buildSummary(alert), [alert]);
   const { messages } = useAgentBus();
   const cellMessages = useMemo(() => {
@@ -206,11 +254,26 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenGallery, 
       return;
     }
     setGalleryLoading(true);
-    void fetch(`${apiBaseUrl}/api/gallery/${selectedCellId}`)
-      .then((r) => (r.ok ? r.json() : null))
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    void fetch(`${apiBaseUrl}/api/gallery/${selectedCellId}`, { signal: controller.signal })
+      .then((r) => {
+        clearTimeout(timeoutId);
+        return r.ok ? r.json() : null;
+      })
       .then((data) => setGalleryItem(data as GalleryFull | null))
-      .catch(() => setGalleryItem(null))
+      .catch(() => {
+        clearTimeout(timeoutId);
+        setGalleryItem(null);
+      })
       .finally(() => setGalleryLoading(false));
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, [selectedCellId, alert, apiBaseUrl]);
 
   // Fetch cell imagery whenever the selected cell changes
@@ -223,13 +286,27 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenGallery, 
     setImagery(null);
     setImageryLoading(true);
 
-    void fetch(`${apiBaseUrl}/api/imagery/cell/${selectedCellId}`)
-      .then((r) => (r.ok ? r.json() : null))
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    void fetch(`${apiBaseUrl}/api/imagery/cell/${selectedCellId}`, { signal: controller.signal })
+      .then((r) => {
+        clearTimeout(timeoutId);
+        return r.ok ? r.json() : null;
+      })
       .then((data) => {
         setImagery(data as CellImageryResponse | null);
       })
-      .catch(() => setImagery(null))
+      .catch(() => {
+        clearTimeout(timeoutId);
+        setImagery(null);
+      })
       .finally(() => setImageryLoading(false));
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, [selectedCellId, apiBaseUrl]);
 
   const canAnalyze = !!alert?.before_window && !!alert?.after_window;
@@ -305,6 +382,7 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenGallery, 
   }
 
   const hasResults = analysis !== null;
+  const isReplayMission = mission?.mission_mode === "replay";
 
   return (
     <div>
@@ -320,14 +398,6 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenGallery, 
             <p className="text-[10px] py-0.5 px-2 rounded bg-zinc-100 uppercase tracking-widest font-bold text-zinc-600">
               {alert.priority}
             </p>
-            {onOpenGallery && (
-              <button
-                onClick={onOpenGallery}
-                className="text-[10px] uppercase font-bold tracking-wider text-purple-600 hover:text-purple-700 transition"
-              >
-                View Gallery &rarr;
-              </button>
-            )}
           </div>
         </div>
 
@@ -346,12 +416,52 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenGallery, 
           </div>
         </div>
 
+        {isReplayMission && (
+          <div className="mb-3 rounded border border-cyan-200 bg-cyan-50 p-3 text-xs text-cyan-800 font-medium">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-700 mb-1">Seeded Replay Evidence</p>
+            <p>
+              Historical downlinks, timelapse evidence, and agent reasoning were restored from replay
+              {mission?.replay_id ? ` ${mission.replay_id}` : ""} so this cell can be inspected without waiting on a live pass.
+            </p>
+          </div>
+        )}
+
         <div className="mb-3 rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 font-medium">
           This panel shows temporal evidence only. It identifies suspected logging activity and does not claim final ground truth.
         </div>
 
-        <p className="text-sm text-zinc-700 leading-relaxed">{summary}</p>
+        <div className="text-sm text-zinc-700 leading-relaxed space-y-1">
+          {summary.map((note, idx) => (
+            <p key={idx} className={note.startsWith("⚠") ? "text-amber-700 font-medium" : note.startsWith("✓") ? "text-slate-800 font-medium" : ""}>
+              {note}
+            </p>
+          ))}
+        </div>
       </div>
+
+      {/* Governance & Concession Overlays */}
+      {alert?.boundary_context && alert.boundary_context.length > 0 && (
+        <div className="mb-4">
+          <p className="text-[10px] uppercase font-semibold tracking-wider text-teal-600 mb-2">Governance Overlays</p>
+          <div className="space-y-2">
+            {alert.boundary_context.map((bc, idx) => (
+              <div key={idx} className="rounded border border-teal-200 bg-teal-50 p-2 text-xs flex justify-between items-center shadow-sm">
+                <div>
+                  <p className="font-semibold text-teal-900">{bc.feature_name || bc.source_name}</p>
+                  <p className="text-teal-700 text-[9px] uppercase tracking-wider font-semibold">{bc.layer_type}</p>
+                </div>
+                <div className="text-right">
+                  {bc.overlap_ratio > 0 ? (
+                    <p className="font-bold text-teal-800">{(bc.overlap_ratio * 100).toFixed(1)}% OVERLAP</p>
+                  ) : (
+                    <p className="font-medium text-teal-600">{bc.distance_to_boundary_m.toFixed(0)}m AWAY</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Ground-agent timelapse (from gallery) */}
       {(galleryLoading || galleryItem) && (
@@ -359,7 +469,9 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenGallery, 
           <div className="flex items-center justify-between mb-2">
             <p className="text-[10px] uppercase tracking-wider font-semibold text-purple-600">Timelapse Evidence</p>
             {galleryItem?.timelapse_b64 && (
-              <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Ground Agent</p>
+              <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+                {galleryItem.timelapse_source ? formatSourceLabel(galleryItem.timelapse_source) : "Ground Agent"}
+              </p>
             )}
           </div>
           {galleryLoading && !galleryItem && (
@@ -385,10 +497,15 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenGallery, 
                   <p className="text-zinc-800 leading-relaxed">{galleryItem.timelapse_analysis}</p>
                 </div>
               )}
+              {galleryItem.context_thumb_source && (
+                <p className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">
+                  Context thumbnail: {formatSourceLabel(galleryItem.context_thumb_source)}
+                </p>
+              )}
             </div>
           ) : galleryItem && !galleryItem.timelapse_b64 ? (
             <div className="rounded border border-zinc-200 bg-zinc-50 p-3 text-center">
-              <span className="text-xs text-zinc-500 font-medium">Timelapse generating...</span>
+              <span className="text-xs text-zinc-500 font-medium">Timelapse pending or unavailable.</span>
             </div>
           ) : null}
         </div>
@@ -403,9 +520,11 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenGallery, 
               ? "fetching…"
               : imagery?.imagery_source === "simsat_sentinel"
                 ? "SimSat Sentinel"
-                : imagery?.context_image
-                  ? "Esri World Imagery"
-                  : "unavailable"}
+                : imagery?.imagery_source === "simsat_mapbox"
+                  ? "SimSat Mapbox"
+                  : imagery?.context_image
+                    ? "Esri World Imagery"
+                    : "unavailable"}
           </p>
         </div>
 
@@ -482,9 +601,25 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenGallery, 
                 <span className="text-zinc-500 font-semibold">NBR delta:</span>{" "}
                 <span className="text-zinc-900 font-medium">{alert.before_window.nbr !== undefined ? getDelta(alert.before_window.nbr, alert.after_window.nbr) : "—"}</span>
               </div>
+              <div>
+                <span className="text-zinc-500 font-semibold">EVI2 delta:</span>{" "}
+                <span className="text-zinc-900 font-medium">{alert.before_window.evi2 !== undefined ? getDelta(alert.before_window.evi2, alert.after_window.evi2) : "—"}</span>
+              </div>
+              <div>
+                <span className="text-zinc-500 font-semibold">NDMI delta:</span>{" "}
+                <span className="text-zinc-900 font-medium">{alert.before_window.ndmi !== undefined ? getDelta(alert.before_window.ndmi, alert.after_window.ndmi) : "—"}</span>
+              </div>
+              <div>
+                <span className="text-zinc-500 font-semibold">Soil Ratio delta:</span>{" "}
+                <span className="text-zinc-900 font-medium">{alert.before_window.soil_ratio !== undefined ? getDelta(alert.before_window.soil_ratio, alert.after_window.soil_ratio) : "—"}</span>
+              </div>
               <div className="col-span-2 mt-1">
                 <span className="text-zinc-500 font-semibold">Reason codes:</span>{" "}
-                <span className="text-zinc-900 font-medium">{alert.reason_codes.join(", ")}</span>
+                <div className="inline-flex flex-wrap gap-1 mt-1">
+                  {alert.reason_codes.map(c => (
+                    <span key={c} className="bg-zinc-100 border border-zinc-200 text-zinc-600 px-1.5 py-0.5 rounded text-[10px] tracking-wider uppercase">{formatReasonCode(c)}</span>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -525,7 +660,7 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenGallery, 
               )
             )}
           </div>
-          
+
           {/* Internal Agent Logs */}
           {cellMessages.length > 0 && (
             <div className="rounded border border-zinc-200 bg-white p-4 text-xs shadow-sm">
@@ -539,16 +674,16 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenGallery, 
                       </span>
                       <span className="text-zinc-400 font-bold text-[9px] uppercase tracking-widest">{msg.msg_type}</span>
                     </div>
-                    
+
                     <p className="text-zinc-800 leading-relaxed text-xs whitespace-pre-wrap font-sans">{msg.payload.note || "No textual note provided by agent."}</p>
-                    
+
                     {msg.payload.analysis_summary && (
                       <div className="mt-3 text-[10px] bg-white p-2 rounded text-zinc-700 border border-zinc-200 font-medium">
                         <span className="text-zinc-400 font-bold uppercase tracking-wider block mb-1">Rank Justification</span>
                         {msg.payload.analysis_summary}
                       </div>
                     )}
-                    
+
                     {msg.payload.action && (
                       <p className="mt-3 text-[11px] text-amber-700 font-bold italic border-l-2 border-amber-300 pl-2">{msg.payload.action as string}</p>
                     )}
@@ -564,7 +699,7 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenGallery, 
                  Export the metadata, temporal visual sequences, and VLM rankings as a standardized dataset tuple for downstream model fine-tuning.
                </p>
                <div className="flex gap-2">
-                 <button 
+                 <button
                    onClick={() => {
                      const data = JSON.stringify(alert, null, 2);
                      const blob = new Blob([data], { type: "application/json" });
@@ -575,30 +710,19 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenGallery, 
                      a.click();
                      URL.revokeObjectURL(url);
                    }}
-                   className="flex-1 bg-zinc-900 text-white font-bold text-[10px] uppercase tracking-wider py-2 rounded hover:bg-zinc-800 transition"
+                 className="flex-1 bg-zinc-900 text-white font-bold text-[10px] uppercase tracking-wider py-2 rounded hover:bg-zinc-800 transition"
                  >
-                   Download JSON
+                   {isReplayMission ? "Download Record" : "Download JSON"}
                  </button>
-                 <button 
-                   onClick={() => {
-                     const downloadImage = (dataUrl: string, suffix: string) => {
-                       const ext = dataUrl.startsWith("data:image/jpeg") ? "jpg" : "png";
-                       const a = document.createElement("a");
-                       a.href = dataUrl;
-                       a.download = `alert_${alert.cell_id}_${suffix}.${ext}`;
-                       a.click();
-                     };
-                     
-                     if (imagery?.context_image) downloadImage(imagery.context_image, "context");
-                     if (imagery?.before_image) downloadImage(imagery.before_image, "before");
-                     if (imagery?.after_image) downloadImage(imagery.after_image, "after");
-                     if (galleryItem?.timelapse_b64) {
-                       const a = document.createElement("a");
-                       a.href = galleryItem.timelapse_b64;
-                       a.download = `alert_${alert.cell_id}_timelapse.mp4`;
-                       a.click();
-                     }
-                   }}
+                <button
+                  onClick={() => {
+                    if (imagery?.context_image) downloadDataUrl(imagery.context_image, `alert_${alert.cell_id}_context`);
+                    if (imagery?.before_image) downloadDataUrl(imagery.before_image, `alert_${alert.cell_id}_before`);
+                    if (imagery?.after_image) downloadDataUrl(imagery.after_image, `alert_${alert.cell_id}_after`);
+                    if (galleryItem?.timelapse_b64) {
+                      downloadDataUrl(galleryItem.timelapse_b64, `alert_${alert.cell_id}_timelapse`);
+                    }
+                  }}
                    disabled={!imagery?.context_image && !imagery?.before_image && !galleryItem?.timelapse_b64}
                    title={(!imagery?.context_image && !imagery?.before_image && !galleryItem?.timelapse_b64) ? "No assets available to export." : "Download available imagery and video assets."}
                    className="flex-1 border border-zinc-300 text-zinc-700 bg-white hover:bg-zinc-50 disabled:opacity-50 font-bold text-[10px] uppercase tracking-wider py-2 rounded transition"

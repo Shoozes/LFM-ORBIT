@@ -32,6 +32,7 @@ source/frontend/test-results/
 source/backend/dist/
 
 # Local secrets
+.env
 .secrets/
 .tools/.secrets/
 .github/.secrets/
@@ -77,7 +78,11 @@ _struct_summary.txt
 _structure_with_content.txt
 .tools/
 .agents/
+docs/dev-notes/
 docs/unnamed.jpg
+docs/COMPETITION_REFERENCES.md
+docs/*_COMPARE.md
+docs/competition-study/
 source/backend/sidecar_crash.txt
 
 # Runtime data

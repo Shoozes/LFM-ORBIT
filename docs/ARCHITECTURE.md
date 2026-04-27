@@ -1,56 +1,208 @@
 # LFM Orbit Architecture
 
-## Overview
-LFM Orbit (Canopy Sentinel) is a dual-stack web application for satellite telemetry and spatial deforestation triage. It is designed to install once online and run fully offline thereafter. No external AI API is required at runtime.
+Current as of **April 27, 2026**.
 
-## Stack
-- **Frontend:** Vite + React + TypeScript + Vanilla CSS. Contains mapping visualization (`MapVisualizer.tsx`), timeline viewer (`TimelapseViewer.tsx`), and a telemetry-bound mission control UI (`MissionControl.tsx`).
-- **Backend:** Python + FastAPI + Uvicorn. Located in `source/backend/`. Handles spatial queries, caching, and local model inference.
-- **Testing:** Playwright for E2E user flows (`npm run test:e2e`). Pytest for backend logic (`python -m pytest`).
+## System Shape
 
-## Directory Structure
-- `source/frontend/`: React single-page app.
-- `source/backend/`: FastAPI Python backend.
-- `runtime-data/models/`: Local model weights fetched at install time. `runtime-data/models/lfm2.5-vlm-450m/LFM2.5-VL-450M-Q4_0.gguf` is the expected path.
-- `docs/`: Project documentation and TODO tracking logs.
-- `runtime-data/`: Local SQLite or cached states for development runs.
-- `.tools/`: Agent generation, LLM context tools, and PowerShell helpers.
+LFM Orbit is a single-page React frontend backed by a FastAPI service. The frontend is organized around five operator surfaces:
 
-## Install vs. Runtime Networking
+- `Mission`: define bbox, task text, and temporal window.
+- `Agents`: inspect the SAT/GND dialogue bus and interact with the ground assistant.
+- `Logs`: review flagged examples and persisted alerts.
+- `Inspect`: inspect a selected cell's temporal evidence, overlays, imagery, and analysis.
+- `Settings`: inspect provider status, credentials, local-model state, and optional depth support.
 
-| Phase | Internet Required |
-|---|---|
-| Install (first-time) | Yes — downloads model weights and vendors SimSat |
-| Runtime (all subsequent runs) | No — fully local/offline |
+The backend runs two long-lived loops during app lifespan:
 
-## Local Model & Inference
+- `core/satellite_agent.py`: orbital scan loop, provider fetch, QC gate, scoring, telemetry emission.
+- `core/ground_agent.py`: message-bus listener, confirmation, gallery/timelapse enrichment, operator-facing validation.
 
-The system uses two inference paths, both fully offline:
+## End-to-End Flow
 
-- **Satellite Inference Engine:** `llama-cpp-python` with `LFM2.5-VL-450M-Q4_0.gguf`. Loaded at startup from `runtime-data/models/lfm2.5-vlm-450m/`. Used by the satellite agent for live orbital triage reasoning. Reports load status at `/api/analysis/status` via `satellite_inference_loaded`.
-- **Ground Analysis Engine (`offline_lfm_v1`):** Deterministic signal analyzer using spectral band deltas (NDVI, NIR, NBR). Always available, CPU-only, requires no model file. Used by `core/analyzer.py` for all ground-side alert analysis.
+1. `MissionControl.tsx` posts mission state to `/api/mission/start` and exposes one-click maritime/lifeline monitor preview cards.
+2. `api/main.py` boots `run_satellite_agent()` and `run_ground_agent()` during lifespan and exposes REST/WebSocket endpoints.
+3. `core/runtime_state.py` centralizes deterministic store initialization/reset so replay loading, backend tests, and Playwright demos all reset the same runtime surfaces.
+4. `core/temporal_use_cases.py` auto-classifies the mission into a temporal use case such as deforestation, wildfire, civilian lifeline disruption, maritime activity, or ice-cap growth.
+5. `core/lifeline_monitoring.py` validates before/after candidate schemas, preserves baseline/current frame metadata, and decides `discard`, `defer`, or `downlink_now` only after frame-pair integrity gates pass.
+6. `core/maritime_monitoring.py` adds deterministic maritime monitor reports, optional Element84 STAC metadata search, and N/E/S/W investigation planning.
+7. `core/grid.py` validates operator bboxes/cell IDs and generates the active square-grid scan geometry.
+8. `core/depth_anything.py` exposes optional Depth Anything V3 status, runtime toggling, and compact depth-summary inference without making DA3 a required dependency.
+9. `core/loader.py` resolves observations from the configured provider chain, including optional SimSat Mapbox, and caches by provider plus date-window labels.
+10. `core/paths.py` centralizes repo-root runtime-data/model/boundary paths so cache and model resolution do not drift with working directory.
+11. `core/model_manifest.py` resolves the optional satellite artifact from a runtime manifest plus environment overrides.
+12. `core/scene_qc.py` rejects unusable scenes before scoring.
+13. `core/scorer.py` and `core/analyzer.py` compute deltas, confidence, and interpretation signals.
+14. `core/overlays/attribution.py` adds governance/boundary context when available.
+15. `core/telemetry.py` emits typed `scan_result` payloads defined in `core/contracts.py`.
+16. `core/queue.py` persists confirmed alerts for `Logs`, `Inspect`, and recent-alert APIs.
+17. `core/gallery.py` expands confirmed alerts into imagery/timelapse evidence and now reuses seeded local cache for thumbnail fallback before dropping to SVG-only offline chips.
+18. `core/replay.py` can reset runtime state and seed a completed mission directly into the same mission, queue, gallery, metrics, and dialogue stores used by live operations.
+19. `ValidationPanel.tsx`, `TimelapseViewer.tsx`, and `VlmPanel.tsx` expand a selected alert into imagery, analysis, exports, and timelapse context. Mission-tab timelapse output renders ahead of VLM actions so active temporal video evidence remains visible.
+20. `SettingsPanel.tsx` queries provider, SimSat, analysis, and depth status endpoints independently, with short retries so one transient miss does not force a false offline settings surface.
 
-Model readiness is checked at startup by `core/inference.py`. A missing or incomplete model file disables satellite reasoning but does not block ground analysis.
+## Module Map
 
-## Satellite Provider Pipeline
+### Backend Runtime
 
-Providers are **imagery/data sources**, not AI dependencies. The fallback chain is:
+- `source/backend/api/main.py`
+  FastAPI entrypoint, lifespan boot, REST endpoints, telemetry websocket, agent-dialogue websocket.
+- `source/backend/core/config.py`
+  Region selection, provider ordering, thresholds, runtime summaries.
+- `source/backend/core/contracts.py`
+  Typed wire contracts shared across telemetry, alert persistence, tests, and frontend normalization.
+- `source/backend/core/scanner.py`
+  Scan orchestration and anomaly-confirmation gating.
+- `source/backend/core/grid.py`
+  Current scan-cell compatibility layer, bbox validation, cell-id validation, and scan-grid generation.
+- `source/backend/core/loader.py`
+  Provider resolution, SimSat Sentinel/Mapbox loading, window loading, cache keys, and fallbacks.
+- `source/backend/core/scene_qc.py`
+  Valid-pixel and no-data rejection gate.
+- `source/backend/core/scorer.py`
+  Spectral-delta scoring and reason-code generation.
+- `source/backend/core/indices.py`
+  Derived spectral index helpers.
+- `source/backend/core/overlays/attribution.py`
+  Boundary/governance overlap context.
+- `source/backend/core/observability.py`
+  Runtime observer, structured production logging, throttled warning summaries, and latency/rejection metrics.
+- `source/backend/core/queue.py`
+  Alert persistence and recent-alert retrieval.
+- `source/backend/core/metrics.py`
+  Aggregated counters, flagged examples, observability rollups, rejection-reason counts, and low-valid-coverage rates surfaced in Logs and decision-gate output.
+- `source/backend/core/paths.py`
+  Repo-root runtime path helpers for cache DBs, boundaries, and optional local models.
+- `source/backend/core/model_manifest.py`
+  Runtime model-manifest resolution for optional satellite artifacts and local/Hugging Face handoff metadata.
+- `source/backend/core/depth_anything.py`
+  Optional Depth Anything V3 adapter, `/api/depth/*` status/toggle support, package detection, and compact depth-map statistics.
+- `source/backend/core/mission.py`
+  Mission lifecycle and operator-run state, including `live` vs `replay` mission modes and auto-selected temporal use-case metadata.
+- `source/backend/core/temporal_use_cases.py`
+  Temporal use-case catalog, examples, classifier, API-prep plan builder, and chat-style training JSONL row builder.
+- `source/backend/core/lifeline_monitoring.py`
+  Civilian lifeline before/after candidate validation, frame-pair preservation, distinct-frame downlink gating, eval metrics, and acceptance checks.
+- `source/backend/core/maritime_monitoring.py`
+  Orbit-native maritime monitor report, optional Element84 Sentinel-2 STAC metadata search, and cardinal investigation planning.
+- `source/backend/core/runtime_state.py`
+  Deterministic runtime initialization/reset helper used by app boot, replay loading, and automated validation.
+- `source/backend/core/agent_bus.py`
+  SAT/GND/operator message queue, pins, and replay-safe read-state helpers.
+- `source/backend/core/gallery.py`
+  Ground-confirmed imagery/timelapse evidence store.
+- `source/backend/core/replay.py`
+  Seeded mission replay catalog/loading path that hydrates the existing runtime tables for judge walkthroughs and fixture-driven demos.
+- `source/backend/core/timelapse.py`
+  Temporal frame generation and video assembly; `steps` caps provider frame fetches for long windows.
+- `source/backend/core/vlm.py`
+  Optional grounding/VQA/caption helper with deterministic offline fallbacks; imagery fetch failures fall back instead of sending blank tiles into optional pipelines.
+- `source/backend/scripts/decision_gate.py`
+  Local pipeline readiness report for scan counts, stage failures, QC rejection breakdowns, and optical/SAR readiness recommendations.
+- `source/backend/scripts/fetch_satellite_model.py`
+  Fetch utility that stages a published artifact into `runtime-data/models/` and writes the local runtime manifest.
+- `source/backend/scripts/export_orbit_dataset.py`
+  Dataset exporter for recent alerts, fetched/cached API imagery, local gallery evidence, weak reject controls, cached API observations, persisted maritime/lifeline monitor reports, enriched sample JSONL, and SFT-style training JSONL.
+- `source/backend/scripts/retag_training_assets.py`
+  Standalone second-pass retagger for exported data directories. It deduplicates images/frames by SHA-256, extracts sampled timelapse frames, writes ordered temporal sequence JSONL, and can use heuristic/manual queue, Ollama vision, or OpenAI-compatible vision providers.
+- `source/backend/scripts/retag_training_assets_ui.py`
+  Optional Tkinter wrapper around the retag CLI for operators who prefer directory pickers and a live subprocess log.
+- `source/backend/scripts/evaluate_model.py`
+  First-pass baseline eval harness that replays exported samples through the offline analyzer and writes eval artifacts.
+- `source/backend/satellite_debug.py`
+  Separate port-8080 debugging surface for the agent bus.
+- `source/backend/autonomous_agent.py`
+  Retired standalone prototype shim. The supported runtime is the FastAPI dual-agent app.
 
-1. **SimSat** (`simsat_sentinel`) — official hackathon satellite API provider.
-2. **Sentinel Hub** (`sentinelhub_direct`) — direct WMS access; requires credentials.
-3. **NASA GIBS** (`nasa_api_direct`) — HLS 30m / MODIS 250m; public API with rate limits.
+### Frontend Runtime
 
-When offline, all provider tiers degrade cleanly and the system falls back to edge-cached (semi-real) observations. Provider availability is reported separately from model availability at `/api/provider/status`.
+- `source/frontend/App.tsx`
+  Shell layout, tab routing, top-level polling, map/sidebar coordination, and map-driven agent-evaluation error routing.
+- `source/frontend/hooks/useTelemetry.ts`
+  Grid, alerts, selected cell, mission completion, websocket lifecycle.
+- `source/frontend/components/MapVisualizer.tsx`
+  MapLibre basemap, scan grid, pins, bbox preview, context menu, VLM boxes, safe marker-label rendering, and map-pin sync failure visibility.
+- `source/frontend/utils/depthMapStats.ts`
+  WebGL shader texture reducer for depth-map summaries with CPU fallback.
+- `source/frontend/components/MissionControl.tsx`
+  Mission entry form, seeded replay loader, maritime/lifeline monitor previews, temporal windows, bbox controls, stop/launch state.
+- `source/frontend/components/SettingsPanel.tsx`
+  Independent provider/SimSat/model/depth status fetches with retry, credential form, optional Depth Anything V3 toggle, and runtime health surface.
+- `source/frontend/e2e/testUrls.ts`
+  Shared CI/dev Playwright loopback URL helpers so test ports can be overridden without rewriting specs.
+- `source/frontend/e2e/runtime.ts`
+  Shared retryable app navigation, runtime-reset, replay-load, link-readiness, basemap-readiness, and canvas-relative map context-menu helpers for deterministic demos, visual captures, and fixtures.
+- `source/frontend/e2e/app.spec.ts`
+  Main app E2E coverage, including deterministic seeded-WebM timelapse proof, settings API readiness guards, and agent-dialogue REST polling before bus screenshots.
+- `source/frontend/e2e/tutorialHelpers.ts`
+  Shared Playwright subtitle, highlight, and map-drawing helpers used by tutorial-style recording specs.
+- `source/frontend/playwright.config.ts`
+  Local/CI web-server orchestration; server reuse is opt-in through `PLAYWRIGHT_REUSE_SERVER=1` so stale local runtime state does not leak into normal test runs.
+- `source/frontend/components/AlertsLogs.tsx`
+  Historical flagged examples, persisted alerts, and operator-facing pipeline integrity metrics.
+- `source/frontend/components/ValidationPanel.tsx`
+  Alert evidence, imagery chips, analysis, overlays, exports.
+- `source/frontend/components/AgentDialogue.tsx`
+  Live SAT/GND bus stream and operator injection, including inline bus stats and injection failure visibility.
+- `source/frontend/components/GroundAgent.tsx`
+  Ground assistant chat surface with inline backend-error payloads, timeout labeling, and guarded send state.
+- `source/frontend/components/VlmPanel.tsx`
+  Grounding, VQA, and caption actions for the selected bbox, with explicit action controls and inline API-error handling.
+- `source/frontend/components/TimelapseViewer.tsx`
+  Timelapse generation, playback UI, and retryable error display for provider/API failures.
 
-## Dual-Agent System
+## Persistence and Contracts
 
-- **Satellite Agent (Edge):** Runs autonomously simulating low-power orbital hardware (`core/satellite_agent.py`). Monitors spectral deltas, triggers local LFM inference, and downlinks compressed JSON flags (~15 bytes).
-- **Ground Agent (Surface):** Validates flags (`core/ground_agent.py`, `core/analyzer.py`). Runs fully offline using `offline_lfm_v1`. Capable of processing timelapse evidence.
+- Alerts are persisted in SQLite via `core/queue.py`.
+- Agent dialogue and gallery data also live in runtime SQLite tables.
+- Seeded replays do not introduce a second persistence model. They hydrate the same queue/bus/gallery/mission/metrics stores and then idle the background SAT/GND loops so the seeded state stays deterministic.
+- `boundary_context` now survives:
+  telemetry -> alert persistence -> recent alerts API -> frontend normalization -> inspect panel.
+- Candidate anomalies are not surfaced as confirmed alerts until persistence/confirmation criteria are met.
 
-## Dependencies
-- `llama-cpp-python` — local GGUF inference.
-- `sentinelhub` — Sentinel Hub SDK (imagery source, optional).
-- `httpx` — HTTP client for SimSat and ESRI imagery.
-- `imageio`, `av` — timelapse video generation.
-- `h3` — spatial hex grid.
-- `fastapi`, `uvicorn` — backend API server.
+## Providers and Models
+
+### Observation Providers
+
+- Primary: `simsat_sentinel`
+- Optional SimSat imagery provider: `simsat_mapbox` via `MAPBOX_ACCESS_TOKEN`
+- Secondary: `sentinelhub_direct`
+- Tertiary: `nasa_api_direct`
+- Final safety net: local/semi-real fallback data
+- Cold-start `.env.example` sets `DISABLE_EXTERNAL_APIS=true` so fresh installs do not depend on network credentials or live provider quota unless the operator opts in.
+
+### Analysis Models
+
+- Guaranteed available: `offline_lfm_v1`
+- Optional manifest-resolved local GGUF: `runtime-data/models/lfm2.5-vlm-450m/model_manifest.json`
+- Default GGUF target artifact: `runtime-data/models/lfm2.5-vlm-450m/LFM2.5-VL-450M-Q4_0.gguf`
+- Optional remote handoff path: `source/backend/scripts/fetch_satellite_model.py` can fetch a published Hugging Face artifact and write the local runtime manifest
+- Optional VLM actions: safe offline fallback responses when compatible transformers paths are unavailable
+- Optional Depth Anything V3: disabled by default through `DEPTH_ANYTHING_V3_ENABLED=false`; when enabled, `/api/depth/status` reports package/model/device readiness, and malformed image payloads are rejected before optional model loading.
+
+## Verification State
+
+Current repo-wide validation results:
+
+- `uv sync --extra dev --locked` -> passing
+- `uv run --no-sync pytest -q` -> `240 passed`
+- `npm run lint` -> passing
+- `npm run build` -> passing, with split chunks and no large-chunk warning
+- `npx playwright test` -> `69 passed`, `1 skipped` debug-only HTML dump
+- `.\run.ps1 -Verify` -> passing from repo root, including locked dependency sync and Playwright browser install
+- Focused screenshot subset -> `17 passed`, including Settings, timelapse, context-menu, agent-evaluation, monitor-preview, debug-dashboard, and VLM visual proof captures.
+- `.github/workflows/ci.yml` runs the same backend, frontend, and Playwright checks in GitHub Actions using the repo-pinned Node version from `.nvmrc`.
+- Repo-root launchers expose the same full local check through `.\run.ps1 -Verify` or `./run.sh --verify`.
+- A copied `.env.example` has been smoke-tested with `.\run.ps1 -InstallOnly` and a bounded `.\run.ps1 -Run` startup check against backend health plus the Vite index.
+- Current E2E stability work uses fresh local web servers by default, shared retryable app navigation, canvas-relative map context-menu retries, a keyboard/touch-accessible map-actions fallback path, replay fixtures for deterministic judge captures, and an opt-in HTML dump spec.
+
+## Known Constraints
+
+- The satellite path is still metadata-conditioned GGUF reasoning over scored signals. Production image-conditioned `mmproj` inference is not wired into runtime yet.
+- The optional VLM grounding path works with available dependencies, but VQA/caption currently rely on compatibility fallbacks unless a matching local transformer setup is added.
+- Depth Anything V3 is integrated as an optional adapter and Settings toggle, but depth statistics are not yet part of the live alert scoring or promotion gate.
+- Tool-call parsing supports nested fenced JSON arguments for local LFM output. Inline JSON extraction remains intentionally conservative to avoid over-parsing normal prose.
+- The primary UI is desktop-operator oriented with a fixed right mission rail. The map now has a non-right-click action path, but responsive/mobile layout coverage remains follow-up work.
+- The current eval lane is replay/baseline-only. It is not yet a multi-model benchmark or a tuned-model promotion gate.
+- The runtime now supports seeded replay loading, and the Playwright suite mixes live scan startup with replay-first fixtures. A second replay pack would broaden deterministic coverage.
+- Satellite GGUF reasoning is only active when a manifest-resolved model artifact is installed locally.
+- The current scan grid is still the repo-local square-cell compatibility layer. A true H3 parser/generator remains the right follow-up before production geospatial scale-out.

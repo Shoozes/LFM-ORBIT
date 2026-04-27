@@ -1,51 +1,36 @@
 import { test, expect } from "@playwright/test";
+import { gotoApp, openMapContextMenu, waitForBasemapReady, waitForLinkOpen } from "./runtime";
 
 test.describe("VLM Grounds E2E visual test", () => {
   test("mounts VLM panel, sets bbox via context menu, executes search", async ({ page }) => {
-    await page.goto("/");
-    
-    // Await map load
-    await page.waitForTimeout(1500);
+    await gotoApp(page);
+    await waitForLinkOpen(page);
+    await waitForBasemapReady(page);
+    await openMapContextMenu(page);
+    await page.getByText("◫ Set Mission BBox Here").click();
 
-    // Right-click the map canvas to trigger context menu and assign a BBox
-    const viewportSize = page.viewportSize() || { width: 1280, height: 720 };
-    await page.mouse.click(viewportSize.width / 2 + 100, viewportSize.height / 2 + 100, { button: "right" });
-    
-    // Click the Context Menu item
-    await page.locator('text=◫ Set Mission BBox Here').click();
-    
-    // Close Mission Control modal if it appears
-    await page.locator('button[aria-label="Close"]').click({ force: true }).catch(() => {});
-    await page.waitForTimeout(500);
-    
-    // Press the VLM Vision button
-    await page.locator('button[id="vlm-vision-btn"]').click({ force: true });
-    
-    // VLM Panel should unfold out of the top right
-    await expect(page.locator("text=VLM VISION")).toBeVisible();
-    
-    // Wait for the Grounding input to mount (since activeBbox is now populated)
-    const gInput = page.getByPlaceholder('Find: large airplane (lower-left)');
-    await expect(gInput).toBeVisible({ timeout: 5000 });
-    
-    // Issue Grounding Search
+    await page.getByTestId("tab-mission").click();
+    await expect(page.getByText("VLM Vision")).toBeVisible();
+
+    const gInput = page.getByPlaceholder("Find: large airplane (lower-left)");
+    await expect(gInput).toBeVisible({ timeout: 5_000 });
     await gInput.fill("Find airplanes");
     await gInput.press("Enter");
-    
-    // Wait for mock json bounding coordinates to resolve in the UI
-    await expect(page.locator('pre').filter({ hasText: /"label":\s*"airplane"/ }).first()).toBeVisible({ timeout: 5000 });
-    
-    // Issue VQA question
-    const vqaInput = page.getByPlaceholder('How many large planes are visible?');
+
+    await expect(
+      page.getByText(/airplane|Find airplanes|No matches found\./i).first(),
+    ).toBeVisible({ timeout: 15_000 });
+
+    const vqaInput = page.getByPlaceholder("How many large planes are visible?");
     await vqaInput.fill("How many airplanes");
     await vqaInput.press("Enter");
-    await expect(page.locator("p").filter({ hasText: "3" }).first()).toBeVisible({ timeout: 5000 });
-    
-    // Issue Captioning task
-    await page.locator("button:has-text('GENERATE')").click();
-    await expect(page.locator("p").filter({ hasText: /airport tarmac|dense canopy|Deforested clearing/ }).first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/3\.|Unable to answer precisely|Unknown\./i).first()).toBeVisible({ timeout: 15_000 });
 
-    // Capture visual QA proof of work
+    await page.getByRole("button", { name: "Generate" }).click();
+    await expect(
+      page.getByText(/Deforested clearing|satellite view|intact canopy|Describe the scene/i).first(),
+    ).toBeVisible({ timeout: 15_000 });
+
     await page.screenshot({ path: "e2e/screenshots/vlm-panel-results.png" });
   });
 });

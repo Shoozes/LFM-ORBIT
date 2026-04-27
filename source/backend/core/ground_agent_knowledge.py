@@ -198,7 +198,7 @@ def get_ground_agent_reply(user_msg: str) -> str:
     if any(k in msg for k in ("provider", "imagery", "simsat", "sentinel", "esri", "image")):
         return (
             f"Active observation mode: {REGION.observation_mode}. "
-            f"Provider fallback order: simsat_sentinel → sentinelhub_direct → semi_real_loader_v1. "
+            f"Provider fallback order: simsat_sentinel -> simsat_mapbox -> sentinelhub_direct -> nasa_api_direct -> semi_real_loader_v1. "
             f"Context imagery sourced from ESRI World Imagery (always available). "
             f"Before/after chips use SimSat Sentinel API when token is configured."
         )

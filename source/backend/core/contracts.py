@@ -27,6 +27,9 @@ class WindowObservation(TypedDict):
     swir: float
     ndvi: float
     nbr: float
+    evi2: float
+    ndmi: float
+    soil_ratio: float
     flags: list[str]
 
 
@@ -63,6 +66,15 @@ class ScanHeartbeat(TypedDict):
     cycle_index: int
 
 
+class BoundaryContext(TypedDict):
+    layer_type: str
+    source_name: str
+    feature_name: str | None
+    overlap_area_m2: float
+    overlap_ratio: float
+    distance_to_boundary_m: float
+
+
 class AlertRecord(TypedDict):
     event_id: str
     region_id: str
@@ -78,6 +90,7 @@ class AlertRecord(TypedDict):
     before_window: NotRequired[WindowObservation]
     after_window: NotRequired[WindowObservation]
     demo_forced_anomaly: NotRequired[bool]
+    boundary_context: NotRequired[list[BoundaryContext]]
 
 
 class MetricsFlaggedExample(TypedDict):
@@ -91,6 +104,7 @@ class MetricsFlaggedExample(TypedDict):
     payload_bytes: int
     timestamp: str
     demo_forced_anomaly: bool
+    boundary_context: NotRequired[list[BoundaryContext]]
 
 
 class MetricsSummary(TypedDict):
@@ -106,6 +120,12 @@ class MetricsSummary(TypedDict):
     latest_cycle_index: int
     latest_cycle_started_at: str
     latest_cycle_completed_at: str
+    pct_scenes_rejected: float
+    pct_low_valid_coverage: float
+    average_inference_latency_ms: float
+    peak_memory_mb: float
+    runtime_failures_by_stage: dict[str, int]
+    runtime_rejections_by_reason: dict[str, int]
     flagged_examples: list[MetricsFlaggedExample]
 
 
@@ -133,6 +153,7 @@ class ScanResultMessage(TypedDict):
     heartbeat: ScanHeartbeat
     cycle_index: int
     demo_forced_anomaly: bool
+    boundary_context: NotRequired[list[BoundaryContext]]
 
 
 class HealthResponse(TypedDict):

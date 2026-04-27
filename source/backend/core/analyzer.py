@@ -1,5 +1,5 @@
 """
-AI-powered alert analysis for Canopy Sentinel.
+AI-powered alert analysis for LFM Orbit.
 
 This path uses offline LFM deterministic signal-based analysis 
 suitable for CPU-only inference, producing structured natural-language summaries.
@@ -7,6 +7,8 @@ suitable for CPU-only inference, producing structured natural-language summaries
 
 import logging
 import os
+from core.config import DETECTION, REGION
+from core.contracts import AlertAnalysisResponse
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +19,11 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def _severity_label(change_score: float) -> str:
-    if change_score >= 0.60:
+    if change_score >= DETECTION.critical_severity_threshold:
         return "critical"
-    if change_score >= 0.45:
+    if change_score >= DETECTION.high_severity_threshold:
         return "high"
-    if change_score >= 0.32:
+    if change_score >= REGION.anomaly_threshold:
         return "moderate"
     return "low"
 
@@ -34,7 +36,7 @@ def _offline_analysis(
     after_window: dict,
     observation_source: str,
     demo_forced_anomaly: bool,
-) -> dict:
+) -> AlertAnalysisResponse:
     """
     Deterministic offline analysis using signal deltas.
 
@@ -55,21 +57,21 @@ def _offline_analysis(
 
     findings: list[str] = []
 
-    if ndvi_drop >= 0.18:
+    if ndvi_drop >= DETECTION.ndvi_drop_threshold:
         pct = round((ndvi_drop / ndvi_before) * 100) if ndvi_before > 0 else 0
         findings.append(
             f"NDVI declined by {ndvi_drop:.3f} ({pct}%), indicating reduced "
             f"photosynthetically active biomass between the two observation windows."
         )
 
-    if nir_drop_ratio >= 0.25:
+    if nir_drop_ratio >= DETECTION.nir_drop_ratio_threshold:
         pct = round(nir_drop_ratio * 100)
         findings.append(
             f"Near-infrared reflectance dropped by {pct}%, consistent with canopy "
             f"removal or significant vegetation stress."
         )
 
-    if nbr_drop >= 0.20:
+    if nbr_drop >= DETECTION.nbr_drop_threshold:
         findings.append(
             f"The normalized burn ratio shifted by {nbr_drop:.3f}, suggesting "
             f"disturbance consistent with clearing or biomass loss."
@@ -83,7 +85,7 @@ def _offline_analysis(
         )
 
     confidence_label = (
-        "high" if confidence >= 0.80 else "moderate" if confidence >= 0.65 else "low"
+        "high" if confidence >= DETECTION.high_confidence_target else "moderate" if confidence >= DETECTION.moderate_confidence_target else "low"
     )
     confidence_note = f"Detection confidence is {confidence_label} ({confidence:.2f}). "
     if "low_quality_window" in reason_codes:
@@ -137,7 +139,7 @@ def analyze_alert(
     after_window: dict,
     observation_source: str,
     demo_forced_anomaly: bool = False,
-) -> dict:
+) -> AlertAnalysisResponse:
     """
     Analyze a deforestation alert using available offline infrastructure.
     

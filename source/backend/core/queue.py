@@ -45,6 +45,16 @@ def _migrate_alerts_schema(connection: sqlite3.Connection):
         """
     )
 
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS candidates (
+            cell_id TEXT PRIMARY KEY,
+            first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+            consecutive_anomaly_count INTEGER DEFAULT 1
+        )
+        """
+    )
+
     columns = _column_names(connection, "alerts")
 
     if "cell_id" not in columns and "hex_id" in columns:
@@ -66,6 +76,9 @@ def _migrate_alerts_schema(connection: sqlite3.Connection):
     if "after_window" not in columns:
         connection.execute("ALTER TABLE alerts ADD COLUMN after_window TEXT")
 
+    if "boundary_context" not in columns:
+        connection.execute("ALTER TABLE alerts ADD COLUMN boundary_context TEXT")
+
     connection.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_alerts_event_id
@@ -79,6 +92,28 @@ def init_db(reset: bool = False):
         _migrate_alerts_schema(connection)
         if reset:
             connection.execute("DELETE FROM alerts")
+            connection.execute("DELETE FROM candidates")
+        connection.commit()
+
+def upsert_candidate(cell_id: str) -> int:
+    """Record or update a candidate, returning the new consecutive anomaly count."""
+    with _connect() as connection:
+        _migrate_alerts_schema(connection)
+        row = connection.execute("SELECT consecutive_anomaly_count FROM candidates WHERE cell_id = ?", (cell_id,)).fetchone()
+        if row:
+            new_count = row["consecutive_anomaly_count"] + 1
+            connection.execute("UPDATE candidates SET consecutive_anomaly_count = ? WHERE cell_id = ?", (new_count, cell_id))
+        else:
+            new_count = 1
+            connection.execute("INSERT INTO candidates (cell_id, consecutive_anomaly_count) VALUES (?, 1)", (cell_id,))
+        connection.commit()
+        return new_count
+
+def remove_candidate(cell_id: str):
+    """Remove a candidate if the anomaly fails to persist."""
+    with _connect() as connection:
+        _migrate_alerts_schema(connection)
+        connection.execute("DELETE FROM candidates WHERE cell_id = ?", (cell_id,))
         connection.commit()
 
 
@@ -95,6 +130,8 @@ def push_alert(
     observation_source: str = "unknown",
     before_window: dict | None = None,
     after_window: dict | None = None,
+    boundary_context: list[dict] | None = None,
+    downlinked: bool = False,
 ):
     with _connect() as connection:
         _migrate_alerts_schema(connection)
@@ -109,11 +146,13 @@ def push_alert(
                 priority,
                 reason_codes,
                 payload_bytes,
+                downlinked,
                 demo_forced_anomaly,
                 observation_source,
                 before_window,
-                after_window
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                after_window,
+                boundary_context
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event_id,
@@ -124,10 +163,12 @@ def push_alert(
                 priority,
                 json.dumps(reason_codes),
                 payload_bytes,
+                1 if downlinked else 0,
                 1 if demo_forced_anomaly else 0,
                 observation_source,
                 json.dumps(before_window) if before_window else None,
                 json.dumps(after_window) if after_window else None,
+                json.dumps(boundary_context) if boundary_context else None,
             ),
         )
         connection.commit()
@@ -184,7 +225,8 @@ def get_recent_alerts(limit: int = 50) -> RecentAlertsResponse:
                 demo_forced_anomaly,
                 observation_source,
                 before_window,
-                after_window
+                after_window,
+                boundary_context
             FROM alerts
             ORDER BY id DESC
             LIMIT ?
@@ -210,6 +252,7 @@ def get_recent_alerts(limit: int = 50) -> RecentAlertsResponse:
                 "observation_source": row["observation_source"] if "observation_source" in row.keys() else "unknown",
                 "before_window": json.loads(row["before_window"]) if "before_window" in row.keys() and row["before_window"] else None,
                 "after_window": json.loads(row["after_window"]) if "after_window" in row.keys() and row["after_window"] else None,
+                "boundary_context": json.loads(row["boundary_context"]) if "boundary_context" in row.keys() and row["boundary_context"] else None,
             }
         )
 

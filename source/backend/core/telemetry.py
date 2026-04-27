@@ -47,6 +47,7 @@ def build_health_payload(counts: dict[str, int]) -> HealthResponse:
         "after_label": REGION.after_label,
         "total_alerts": counts["total_alerts"],
         "total_payload_bytes": counts["total_payload_bytes"],
+        "demo_mode_enabled": False,
     }
 
 
@@ -56,8 +57,10 @@ def build_alert_payload(
     change_score: float,
     confidence: float,
     reason_codes: list[str],
+    boundary_context: list[dict] | None = None,
+    demo_forced_anomaly: bool = False,
 ) -> AlertRecord:
-    return {
+    result: AlertRecord = {
         "event_id": event_id,
         "region_id": REGION.region_id,
         "cell_id": cell_id,
@@ -67,6 +70,11 @@ def build_alert_payload(
         "reason_codes": reason_codes,
         "payload_bytes": 0,
     }
+    if boundary_context:
+        result["boundary_context"] = boundary_context
+    if demo_forced_anomaly:
+        result["demo_forced_anomaly"] = True
+    return result
 
 
 def build_scan_result_message(
@@ -82,7 +90,7 @@ def build_scan_result_message(
     total_cells: int,
     cycle_index: int,
 ) -> ScanResultMessage:
-    return {
+    result: ScanResultMessage = {
         "type": "scan_result",
         "event_id": alert_payload["event_id"],
         "region_id": alert_payload["region_id"],
@@ -107,3 +115,8 @@ def build_scan_result_message(
         },
         "cycle_index": cycle_index,
     }
+    if "boundary_context" in alert_payload:
+        result["boundary_context"] = alert_payload["boundary_context"]
+    if "demo_forced_anomaly" in alert_payload:
+        result["demo_forced_anomaly"] = alert_payload["demo_forced_anomaly"]
+    return result

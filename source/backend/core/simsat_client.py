@@ -12,9 +12,22 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Optional
-from urllib.parse import urljoin
 
 import httpx
+
+
+DEFAULT_SIMSAT_TIMEOUT_SECONDS = 30.0
+
+
+def _parse_timeout(value: str | None) -> float:
+    """Parse a positive timeout value while keeping bad env overrides non-fatal."""
+    try:
+        timeout = float(value or DEFAULT_SIMSAT_TIMEOUT_SECONDS)
+    except (TypeError, ValueError):
+        return DEFAULT_SIMSAT_TIMEOUT_SECONDS
+    if timeout <= 0:
+        return DEFAULT_SIMSAT_TIMEOUT_SECONDS
+    return timeout
 
 
 class DataSource(Enum):
@@ -41,8 +54,8 @@ class SimSatConfig:
         """Create configuration from environment variables."""
         return cls(
             base_url=os.environ.get("SIMSAT_BASE_URL", "http://localhost:8080"),
-            mapbox_token=os.environ.get("MAPBOX_API_TOKEN"),
-            timeout_seconds=float(os.environ.get("SIMSAT_TIMEOUT", "30.0")),
+            mapbox_token=os.environ.get("MAPBOX_ACCESS_TOKEN") or os.environ.get("MAPBOX_API_TOKEN"),
+            timeout_seconds=_parse_timeout(os.environ.get("SIMSAT_TIMEOUT")),
         )
 
 
@@ -289,7 +302,7 @@ class SimSatClient:
                 endpoint_type=EndpointType.CURRENT.value,
                 lat=lat,
                 lng=lng,
-                error="Mapbox API token not configured. Set MAPBOX_API_TOKEN environment variable.",
+                error="Mapbox API token not configured. Set MAPBOX_ACCESS_TOKEN or MAPBOX_API_TOKEN.",
             )
         
         return self.fetch_imagery(ImageryRequest(
@@ -324,7 +337,7 @@ class SimSatClient:
                 endpoint_type=EndpointType.HISTORICAL.value,
                 lat=lat,
                 lng=lng,
-                error="Mapbox API token not configured. Set MAPBOX_API_TOKEN environment variable.",
+                error="Mapbox API token not configured. Set MAPBOX_ACCESS_TOKEN or MAPBOX_API_TOKEN.",
             )
         
         return self.fetch_imagery(ImageryRequest(
@@ -347,7 +360,7 @@ class SimSatClient:
         try:
             response = self.client.get("/health", timeout=5.0)
             return response.status_code == 200
-        except (httpx.RequestError, httpx.TimeoutException):
+        except (httpx.RequestError, httpx.TimeoutException, ValueError):
             return False
 
 

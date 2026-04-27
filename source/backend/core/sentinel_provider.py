@@ -20,6 +20,7 @@ from core.config import (
     REGION,
     SentinelCredentials,
 )
+from core.scene_qc import evaluate_scene_quality
 import os
 
 def _get_sentinel_instance_id():
@@ -62,6 +63,42 @@ def _date_range_for_label(label: str) -> tuple[str, str]:
 
     return from_date, to_date
 
+def _fetch_seasonal_baseline(bbox_coords: tuple, target_label: str, instance_id: str, years_back: int = 2) -> Optional[dict]:
+    """
+    Constructs a historical baseline using the same season from prior years.
+    If target is '2024-08', fetches '2023-08' and '2022-08', merging them into a single stable baseline.
+    """
+    parts = target_label.split("-")
+    if len(parts) < 2:
+        return None
+
+    year = int(parts[0])
+    month = parts[1]
+
+    valid_nirs, valid_reds, valid_swirs, qualities = [], [], [], []
+
+    for past_year in range(year - years_back, year):
+        past_label = f"{past_year}-{month}"
+        start_date, end_date = _date_range_for_label(past_label)
+
+        bands = _fetch_window_bands(bbox_coords, start_date, end_date, instance_id)
+        if bands is not None and not bands.get("cloud_degraded"):
+            valid_nirs.append(bands["nir"])
+            valid_reds.append(bands["red"])
+            valid_swirs.append(bands["swir"])
+            qualities.append(bands["quality"])
+
+    if not valid_nirs:
+        return None
+
+    return {
+        "nir": round(sum(valid_nirs) / len(valid_nirs), 4),
+        "red": round(sum(valid_reds) / len(valid_reds), 4),
+        "swir": round(sum(valid_swirs) / len(valid_swirs), 4),
+        "quality": round(sum(qualities) / len(qualities), 4),
+        "cloud_degraded": False,
+    }
+
 EVALSCRIPT = """//VERSION=3
 function setup() {
   return {
@@ -81,9 +118,9 @@ def _fetch_window_bands(bbox_coords: tuple, start_date: str, end_date: str, inst
         config.instance_id = instance_id
         config.sh_client_id = ''
         config.sh_client_secret = ''
-        
+
         box = BBox(bbox=bbox_coords, crs=CRS.WGS84)
-        
+
         req = WmsRequest(
             data_collection=DataCollection.SENTINEL2_L2A,
             layer='1_TRUE-COLOR-L1C',  # Mock valid string, evalscript will overwrite band logic entirely
@@ -96,25 +133,31 @@ def _fetch_window_bands(bbox_coords: tuple, start_date: str, end_date: str, inst
             custom_url_params={CustomUrlParam.EVALSCRIPT: EVALSCRIPT},
             config=config
         )
-        
+
         data_list = req.get_data()
         if not data_list:
             return None
-            
+
         # Merge all available frames (often just 1 or 2 good ones)
         reds, nirs, swirs, scls = [], [], [], []
-        
+
         for arr in data_list:
-            red_band = arr[:, :, 0]
-            nir_band = arr[:, :, 1]
-            swir_band = arr[:, :, 2]
             scl_band = arr[:, :, 3]
-            
+            qc_result = evaluate_scene_quality(scl_band)
+
+            if not qc_result["accepted"] and len(data_list) > 1:
+                # If we have multiple scenes and this one is entirely garbage, skip it
+                logger.debug(f"Skipping scene frame due to QC flags: {qc_result['reasons']}")
+                continue
+
             valid_mask = ~np.isin(scl_band.astype(int), [0, 1, 3, 8, 9, 10])
             valid_count = valid_mask.sum()
             pixel_count = arr.shape[0] * arr.shape[1]
-            
+
             if valid_count > 0:
+                red_band = arr[:, :, 0]
+                nir_band = arr[:, :, 1]
+                swir_band = arr[:, :, 2]
                 reds.extend(red_band[valid_mask].tolist())
                 nirs.extend(nir_band[valid_mask].tolist())
                 swirs.extend(swir_band[valid_mask].tolist())
@@ -122,11 +165,13 @@ def _fetch_window_bands(bbox_coords: tuple, start_date: str, end_date: str, inst
 
         if not reds:
             return None
-            
+
         total_valid = sum(v for v, p in scls)
         total_pixels = sum(p for v, p in scls)
         quality = round(total_valid / max(1, total_pixels), 4)
-        cloud_flag = quality < 0.7
+
+        from core.config import DETECTION
+        cloud_flag = quality < DETECTION.min_quality_threshold
 
         return {
             "nir": round(float(np.mean(nirs)), 4),
@@ -151,13 +196,18 @@ def fetch_sentinelhub_observations(
     bbox = _cell_bbox(cell_id)
     centroid_lat, centroid_lng = cell_to_latlng(cell_id)
 
-    before_from, before_to = _date_range_for_label(REGION.before_label)
     after_from, after_to = _date_range_for_label(REGION.after_label)
 
     logger.info("sentinelhub_direct: fetching windows for cell %s", cell_id)
-    before_bands = _fetch_window_bands(bbox, before_from, before_to, instance_id)
+
+    # Switch to seasonal baseline rather than hardcoded pairwise month compare
+    before_bands = _fetch_seasonal_baseline(bbox, REGION.after_label, instance_id, years_back=2)
     if not before_bands:
-        return None
+        # Fall back to pairwise baseline if seasonal failed to reconstruct (e.g., cloudy past years)
+        before_from, before_to = _date_range_for_label(REGION.before_label)
+        before_bands = _fetch_window_bands(bbox, before_from, before_to, instance_id)
+        if not before_bands:
+            return None
 
     after_bands = _fetch_window_bands(bbox, after_from, after_to, instance_id)
     if not after_bands:
@@ -176,7 +226,7 @@ def fetch_sentinelhub_observations(
         "centroid_lat": round(centroid_lat, 6),
         "centroid_lng": round(centroid_lng, 6),
         "before": {
-            "label": REGION.before_label,
+            "label": f"Baseline {REGION.after_label} (-2Y)",
             "quality": before_bands["quality"],
             "bands": {
                 "nir": before_bands["nir"],

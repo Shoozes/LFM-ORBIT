@@ -18,11 +18,30 @@ type ProviderStatus = {
 type SimSatStatus = {
   simsat_base_url: string;
   simsat_available: boolean;
+  mapbox_token_configured: boolean;
   timeout_seconds: number;
   endpoints: {
     sentinel_historical: string;
     sentinel_current: string;
+    mapbox_historical: string;
+    mapbox_current: string;
   };
+};
+
+type DepthStatus = {
+  feature: string;
+  enabled: boolean;
+  available: boolean;
+  loaded: boolean;
+  reason: string;
+  model_id: string;
+  device: string;
+  requested_device: string;
+  max_pixels: number;
+  source: string;
+  package: string;
+  requires: string;
+  install_hint: string;
 };
 
 type SettingsPanelProps = {
@@ -33,14 +52,21 @@ type SettingsPanelProps = {
 
 function providerDisplayName(key: string): string {
   if (key === "simsat_sentinel") return "SimSat Sentinel";
+  if (key === "simsat_mapbox") return "SimSat Mapbox";
   if (key === "sentinelhub_direct") return "Sentinel Hub Direct";
+  if (key === "nasa_api_direct") return "NASA Direct";
   return key;
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsPanelProps) {
   const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
   const [simsatStatus, setSimsatStatus] = useState<SimSatStatus | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus | null>(null);
+  const [depthStatus, setDepthStatus] = useState<DepthStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +74,7 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [savingSettings, setSavingSettings] = useState(false);
+  const [savingDepth, setSavingDepth] = useState(false);
 
 
   useEffect(() => {
@@ -67,50 +94,84 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
 
   useEffect(() => {
     if (isOpen) {
-      fetchStatus();
+      void fetchStatus();
     }
   }, [isOpen, apiBaseUrl]);
+
+  async function fetchStatusJson<T>(path: string, attempts = 2): Promise<T | null> {
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 10000);
+
+      try {
+        const response = await fetch(`${apiBaseUrl}${path}`, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return (await response.json()) as T;
+      } catch {
+        if (attempt === attempts) {
+          return null;
+        }
+        await delay(250 * attempt);
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    }
+
+    return null;
+  }
 
   async function fetchStatus() {
     setLoading(true);
     setError(null);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
     try {
-      const [providerRes, simsatRes, analysisRes] = await Promise.all([
-        fetch(`${apiBaseUrl}/api/provider/status`, { signal: controller.signal }).catch(() => null),
-        fetch(`${apiBaseUrl}/api/simsat/status`, { signal: controller.signal }).catch(() => null),
-        fetch(`${apiBaseUrl}/api/analysis/status`, { signal: controller.signal }).catch(() => null),
+      const [providerData, simsatData, analysisData, depthData] = await Promise.all([
+        fetchStatusJson<ProviderStatus>("/api/provider/status"),
+        fetchStatusJson<SimSatStatus>("/api/simsat/status"),
+        fetchStatusJson<AnalysisStatus>("/api/analysis/status"),
+        fetchStatusJson<DepthStatus>("/api/depth/status"),
       ]);
-      clearTimeout(timeoutId);
 
-      if (!providerRes && !simsatRes && !analysisRes) {
-        throw new Error("Backend offline. Cannot connect to Canopy Sentinel API.");
+      if (providerData) {
+        setProviderStatus(providerData);
       }
 
-      if (providerRes?.ok) {
-        setProviderStatus(await providerRes.json());
+      if (simsatData) {
+        setSimsatStatus(simsatData);
       }
 
-      if (simsatRes?.ok) {
-        setSimsatStatus(await simsatRes.json());
+      if (analysisData) {
+        setAnalysisStatus(analysisData);
       }
 
-      if (analysisRes?.ok) {
-        setAnalysisStatus(await analysisRes.json());
+      if (depthData) {
+        setDepthStatus(depthData);
       }
 
-      if (providerRes && !providerRes.ok) {
-        throw new Error(`HTTP ${providerRes.status}`);
+      if (!providerData && !simsatData && !analysisData && !depthData) {
+        throw new Error("Backend offline. Cannot connect to LFM Orbit API.");
+      }
+
+      const partialFailures: string[] = [];
+      if (!providerData) {
+        partialFailures.push("provider status");
+      }
+      if (!simsatData) {
+        partialFailures.push("SimSat status");
+      }
+      if (!analysisData) {
+        partialFailures.push("analysis status");
+      }
+      if (!depthData) {
+        partialFailures.push("depth status");
+      }
+      if (partialFailures.length > 0) {
+        setError(`Some settings data could not be refreshed: ${partialFailures.join(", ")}.`);
       }
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        setError("Request timed out. Backend is too slow or unreachable.");
-      } else {
-        setError(err instanceof Error ? err.message : "Failed to fetch status");
-      }
+      setError(err instanceof Error ? err.message : "Failed to fetch status");
     } finally {
       setLoading(false);
     }
@@ -135,6 +196,26 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
       setError("Network error saving credentials.");
     } finally {
       setSavingSettings(false);
+    }
+  }
+
+  async function handleDepthToggle(enabled: boolean) {
+    setSavingDepth(true);
+    setError(null);
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/depth/settings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      if (!res.ok) {
+        throw new Error(`Depth settings failed with HTTP ${res.status}`);
+      }
+      setDepthStatus((await res.json()) as DepthStatus);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update depth settings.");
+    } finally {
+      setSavingDepth(false);
     }
   }
 
@@ -249,6 +330,12 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
                     <p className="text-zinc-500 font-semibold mb-1">Timeout</p>
                     <p className="text-zinc-700 font-medium">{simsatStatus.timeout_seconds}s</p>
                   </div>
+                  <div>
+                    <p className="text-zinc-500 font-semibold mb-1">Mapbox Token</p>
+                    <p className={`font-semibold ${simsatStatus.mapbox_token_configured ? "text-emerald-700" : "text-amber-600"}`}>
+                      {simsatStatus.mapbox_token_configured ? "Configured" : "Optional"}
+                    </p>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -318,6 +405,79 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
           </div>
 
           <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-wider font-semibold text-zinc-500">Depth Anything V3</p>
+                <p className="mt-1 text-[11px] text-zinc-500">
+                  Optional depth-geometry lane for image-conditioned validation.
+                </p>
+              </div>
+              <label className="flex cursor-pointer items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-zinc-600">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                  checked={depthStatus?.enabled ?? false}
+                  disabled={savingDepth || !depthStatus}
+                  onChange={(event) => void handleDepthToggle(event.target.checked)}
+                />
+                {savingDepth ? "Saving" : "Enable"}
+              </label>
+            </div>
+
+            {depthStatus ? (
+              <div className="space-y-3 text-xs">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-zinc-500 font-semibold mb-1">Runtime</p>
+                    <p className={`font-bold ${depthStatus.enabled ? "text-emerald-700" : "text-zinc-500"}`}>
+                      {depthStatus.enabled ? "Enabled" : "Disabled"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-500 font-semibold mb-1">Adapter</p>
+                    <p className={`font-bold ${depthStatus.available ? "text-emerald-700" : "text-amber-600"}`}>
+                      {depthStatus.available ? "Available" : "Optional"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-500 font-semibold mb-1">Device</p>
+                    <p className="text-zinc-700 font-medium">
+                      {depthStatus.device}
+                      {depthStatus.requested_device !== depthStatus.device && (
+                        <span className="text-zinc-400"> ({depthStatus.requested_device})</span>
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-500 font-semibold mb-1">Source</p>
+                    <p className="text-zinc-700 font-medium">{depthStatus.source}</p>
+                  </div>
+                </div>
+
+                <div className="rounded border border-zinc-200 bg-white p-2">
+                  <p className="text-zinc-500 font-semibold mb-1">Model</p>
+                  <p className="break-all font-mono text-[11px] text-zinc-800">{depthStatus.model_id}</p>
+                </div>
+
+                <div className={`rounded border p-2 ${
+                  depthStatus.available
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-amber-200 bg-amber-50 text-amber-700"
+                }`}>
+                  <p className="font-semibold">{depthStatus.reason}</p>
+                  {!depthStatus.available && (
+                    <p className="mt-1 text-[11px]">{depthStatus.install_hint}</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4 rounded border border-red-200 bg-red-50 mt-4">
+                <p className="text-xs text-red-600 font-bold uppercase tracking-widest">Backend Offline</p>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
             <p className="text-xs uppercase tracking-wider font-semibold text-zinc-500 mb-1">Configuration</p>
             <p className="text-xs text-zinc-500 mb-4">
               Update Sentinel Hub direct credentials for image processing.
@@ -350,7 +510,7 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
             <div className="space-y-3 text-xs text-zinc-500">
               <div>
                 <p className="text-zinc-600 font-semibold mb-1">Observation Provider</p>
-                <p>Explicit provider override: simsat_sentinel or sentinelhub_direct.</p>
+                <p>Explicit provider override: simsat_sentinel, simsat_mapbox, sentinelhub_direct, or nasa_api_direct.</p>
               </div>
             </div>
           </div>

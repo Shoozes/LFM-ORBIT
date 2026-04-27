@@ -34,7 +34,19 @@ export type ScanWindow = {
   swir: number;
   ndvi: number;
   nbr: number;
+  evi2: number;
+  ndmi: number;
+  soil_ratio: number;
   flags: string[];
+};
+
+export type BoundaryContext = {
+  layer_type: string;
+  source_name: string;
+  feature_name: string | null;
+  overlap_area_m2: number;
+  overlap_ratio: number;
+  distance_to_boundary_m: number;
 };
 
 export type ScanResultMessage = {
@@ -54,6 +66,8 @@ export type ScanResultMessage = {
   after_window: ScanWindow;
   heartbeat: ScanHeartbeat;
   cycle_index: number;
+  demo_forced_anomaly?: boolean;
+  boundary_context?: BoundaryContext[];
 };
 
 export type ScanCompleteMessage = {
@@ -76,6 +90,8 @@ export type AlertItem = {
   after_window?: ScanWindow;
   timestamp?: string;
   downlinked?: boolean;
+  demo_forced_anomaly?: boolean;
+  boundary_context?: BoundaryContext[];
 };
 
 export type ApiHealth = {
@@ -91,6 +107,7 @@ export type ApiHealth = {
   after_label: string;
   total_alerts: number;
   total_payload_bytes: number;
+  demo_mode_enabled: boolean;
 };
 
 export type MetricsFlaggedExample = {
@@ -103,10 +120,14 @@ export type MetricsFlaggedExample = {
   reason_codes: string[];
   payload_bytes: number;
   timestamp: string;
+  demo_forced_anomaly?: boolean;
+  boundary_context?: BoundaryContext[];
 };
 
 export type ApiMetricsSummary = {
   region_id: string;
+  demo_mode_enabled: boolean;
+  demo_mode_loop_scan: boolean;
   total_cycles_completed: number;
   total_cells_scanned: number;
   total_alerts_emitted: number;
@@ -116,6 +137,12 @@ export type ApiMetricsSummary = {
   latest_cycle_index: number;
   latest_cycle_started_at: string;
   latest_cycle_completed_at: string;
+  pct_scenes_rejected: number;
+  pct_low_valid_coverage: number;
+  average_inference_latency_ms: number;
+  peak_memory_mb: number;
+  runtime_failures_by_stage: Record<string, number>;
+  runtime_rejections_by_reason: Record<string, number>;
   flagged_examples: MetricsFlaggedExample[];
 };
 
@@ -154,7 +181,7 @@ export type CellImageryResponse = {
   centroid_lat: number;
   centroid_lng: number;
   cell_bbox: [number, number, number, number];
-  imagery_source: "esri_arcgis" | "simsat_sentinel" | string;
+  imagery_source: "esri_arcgis" | "simsat_sentinel" | "simsat_mapbox" | string;
   before_label: string;
   after_label: string;
   context_image: string | null;

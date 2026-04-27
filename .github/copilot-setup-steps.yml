@@ -1,8 +1,9 @@
 steps:
   - name: Install backend dependencies
     run: |
+      python -m pip install uv
       cd source/backend
-      pip install fastapi uvicorn h3 pydantic websockets httpx requests numpy openai
+      uv sync --extra dev --locked
   - name: Install frontend dependencies
     run: |
       cd source/frontend
@@ -14,7 +15,6 @@ steps:
   - name: Configure Sentinel Hub credentials
     env:
       SENTINEL_HUB: ${{ secrets.SENTINEL_HUB }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     run: |
       # Parse SENTINEL_HUB secret - expected format: client_id:client_secret
       # Note: assumes client_secret does not contain colons
@@ -26,8 +26,4 @@ steps:
         echo "Sentinel Hub credentials configured from repo secret"
       else
         echo "SENTINEL_HUB secret not set - will use semi-real fallback"
-      fi
-      if [ -n "$OPENAI_API_KEY" ]; then
-        echo "OPENAI_API_KEY=$OPENAI_API_KEY" >> "$GITHUB_ENV"
-        echo "OpenAI API key configured from repo secret"
       fi

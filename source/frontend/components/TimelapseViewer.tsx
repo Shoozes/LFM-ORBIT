@@ -6,12 +6,24 @@
  * time-series representation.
  */
 import { useEffect, useState } from "react";
-import { getApiBaseUrl } from "../utils/telemetry";
+import { formatSourceLabel, getApiBaseUrl } from "../utils/telemetry";
+
+type TimelapseProvenance = {
+  kind?: string;
+  label?: string;
+  provider?: string;
+  cache_family?: string;
+  cache_key?: string;
+};
 
 type TimelapsePayload = {
   video_b64: string;
   frames_count: number;
   format: string;
+  source?: string;
+  provider?: string;
+  provenance?: TimelapseProvenance;
+  error?: string;
 };
 
 type TimelapseViewerProps = {
@@ -32,16 +44,21 @@ export default function TimelapseViewer({
   const [timelapse, setTimelapse] = useState<TimelapsePayload | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [requestVersion, setRequestVersion] = useState(0);
   const apiBase = getApiBaseUrl();
+
+  const provenanceLabel = timelapse?.provenance?.label
+    ?? (timelapse?.source ? formatSourceLabel(timelapse.source) : null)
+    ?? (timelapse?.provider ? formatSourceLabel(timelapse.provider) : null);
 
   useEffect(() => {
     if (!isOpen) return;
 
     let mounted = true;
     const fetchFrames = async () => {
-      console.log("[TimelapseViewer] Starting fetch for bbox:", bbox);
       setIsLoading(true);
       setError(null);
+      setTimelapse(null);
       try {
         const res = await fetch(`${apiBase}/api/timelapse/generate`, {
           method: "POST",
@@ -54,13 +71,15 @@ export default function TimelapseViewer({
           }),
         });
         
+        const data = (await res.json()) as TimelapsePayload;
         if (!res.ok) {
-          throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+          throw new Error(data.error || `Server returned ${res.status}: ${res.statusText}`);
+        }
+        if (data.error || data.format === "none" || !data.video_b64 || data.frames_count < 2) {
+          throw new Error(data.error || "Timelapse requires at least two contextual imagery frames.");
         }
 
         if (mounted) {
-          const data = (await res.json()) as TimelapsePayload;
-          console.log("[TimelapseViewer] Received data, frames:", data.frames_count);
           setTimelapse(data);
           
           // Acknowledge in Agent Dialogue
@@ -74,9 +93,9 @@ export default function TimelapseViewer({
             })
           }).catch(() => {});
         }
-      } catch (err: any) {
-        console.error("[TimelapseViewer] Fetch failed:", err);
-        if (mounted) setError(err.message || "Failed to generate timelapse.");
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Failed to generate timelapse.";
+        if (mounted) setError(message);
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -87,7 +106,7 @@ export default function TimelapseViewer({
     return () => {
       mounted = false;
     };
-  }, [isOpen, bbox, startDate, endDate, apiBase]);
+  }, [isOpen, bbox, startDate, endDate, apiBase, requestVersion]);
 
   if (!isOpen) return null;
 
@@ -127,7 +146,7 @@ export default function TimelapseViewer({
             <div className="flex flex-col gap-2 items-center justify-center p-8 text-center text-red-500 text-xs font-semibold uppercase tracking-wider">
               <span>{error}</span>
               <button 
-                onClick={() => window.location.reload()} 
+                onClick={() => setRequestVersion((version) => version + 1)}
                 className="mt-2 px-3 py-1 rounded border border-red-200 bg-white hover:bg-red-50 transition"
               >
                 Retry Request
@@ -153,6 +172,12 @@ export default function TimelapseViewer({
                 <div className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">
                   Extracted {timelapse.frames_count} historical frames
                 </div>
+                {provenanceLabel && (
+                  <div className="min-w-0 text-right text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">
+                    <span className="text-zinc-400">Source</span>{" "}
+                    <span className="text-zinc-700">{provenanceLabel}</span>
+                  </div>
+                )}
               </div>
             </>
           )}

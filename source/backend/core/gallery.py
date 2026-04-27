@@ -3,7 +3,7 @@ Gallery — imagery chips for confirmed deforestation cells, linked to map pins.
 
 Populated autonomously by the ground agent when it confirms a cell.
 Stores ESRI context imagery as base64. Before/after chips stored when SimSat is available.
-Each gallery item now also stores the timelapse MP4 (base64) and its temporal analysis text
+Each gallery item now also stores the timelapse WebM (base64) and its temporal analysis text
 so the operator can review the full temporal evidence in one place.
 
 The gallery provides the visual evidence layer — each confirmed detection
@@ -14,10 +14,15 @@ playable timelapse video derived from the ground agent's temporal analysis pass.
 import base64
 import json
 import logging
+import hashlib
+from io import BytesIO
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import httpx
+import imageio.v3 as iio
+from PIL import Image
 
 from core.agent_bus import _connect, init_bus
 
@@ -28,10 +33,59 @@ _ESRI_EXPORT = (
 )
 _THUMBNAIL_SIZE = 192
 _IMAGERY_TIMEOUT = 10.0
+_THUMB_BUFFER_DEG = 0.05
+_SEEDED_DIR = Path(__file__).resolve().parent.parent / "assets" / "seeded_data"
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
+def _thumb_bbox(lat: float, lng: float, buf: float = _THUMB_BUFFER_DEG) -> list[float]:
+    return [lng - buf, lat - buf, lng + buf, lat + buf]
+
+
+def _chunk_sig(bbox: list[float]) -> str:
+    rounded = [round(value, 3) for value in bbox]
+    return hashlib.md5(str(rounded).encode()).hexdigest()[:8]
+
+
+def _encode_png_data_url(img: Image.Image) -> str:
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+def _load_cached_thumbnail(sig: str, size: int) -> str | None:
+    for prefix in ("sh", "nasa"):
+        webm_path = _SEEDED_DIR / f"{prefix}_{sig}.webm"
+        if not webm_path.exists():
+            continue
+        try:
+            first_frame = next(iio.imiter(webm_path, plugin="pyav"))
+            img = Image.fromarray(first_frame).convert("RGB").resize((size, size), Image.LANCZOS)
+            return _encode_png_data_url(img)
+        except Exception as exc:
+            logger.debug("[GALLERY] Failed to decode cached thumbnail %s: %s", webm_path.name, exc)
+    return None
+
+
+def resolve_seeded_thumbnail(signature: str, size: int = _THUMBNAIL_SIZE) -> str | None:
+    """Resolve a thumbnail from the bundled seeded WebM cache when available."""
+    return _load_cached_thumbnail(signature, size)
+
+
+def _offline_svg_thumbnail(lat: float, lng: float, size: int) -> str:
+    r_val = int((lat * 100) % 50 + 20)
+    g_val = int((lng * 100) % 50 + 60)
+    b_val = int(((lat + lng) * 100) % 50 + 20)
+    svg = (
+        f'<svg width="{size}" height="{size}" xmlns="http://www.w3.org/2000/svg">'
+        f'<rect width="100%" height="100%" fill="rgb({r_val},{g_val},{b_val})"/>'
+        '<text x="10" y="20" fill="white" font-family="monospace" font-size="10">OFFLINE CHIP</text>'
+        "</svg>"
+    )
+    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
 
 
 def _ensure_gallery_table() -> None:
@@ -49,7 +103,9 @@ def _ensure_gallery_table() -> None:
                 change_score    REAL,
                 mission_id      INTEGER,
                 context_thumb   TEXT,
+                context_thumb_source TEXT,
                 timelapse_b64   TEXT,
+                timelapse_source TEXT,
                 timelapse_analysis TEXT,
                 created_at      TEXT NOT NULL
             )
@@ -61,21 +117,42 @@ def _ensure_gallery_table() -> None:
         }
         if "timelapse_b64" not in existing_cols:
             conn.execute("ALTER TABLE gallery_items ADD COLUMN timelapse_b64 TEXT")
+        if "context_thumb_source" not in existing_cols:
+            conn.execute("ALTER TABLE gallery_items ADD COLUMN context_thumb_source TEXT")
+        if "timelapse_source" not in existing_cols:
+            conn.execute("ALTER TABLE gallery_items ADD COLUMN timelapse_source TEXT")
         if "timelapse_analysis" not in existing_cols:
             conn.execute("ALTER TABLE gallery_items ADD COLUMN timelapse_analysis TEXT")
         conn.commit()
 
 
-def _fetch_thumbnail(lat: float, lng: float, size: int = _THUMBNAIL_SIZE) -> str | None:
+def init_gallery(reset: bool = False) -> None:
+    _ensure_gallery_table()
+    if not reset:
+        return
+    with _connect() as conn:
+        conn.execute("DELETE FROM gallery_items")
+        conn.commit()
+
+
+def reset_gallery() -> None:
+    init_gallery(reset=True)
+
+
+def _fetch_thumbnail_with_provenance(
+    lat: float,
+    lng: float,
+    size: int = _THUMBNAIL_SIZE,
+) -> tuple[str | None, str | None]:
     """Fetch a small ESRI World Imagery chip as base64."""
-    buf = 0.05
-    bbox = f"{lng-buf},{lat-buf},{lng+buf},{lat+buf}"
+    bbox = _thumb_bbox(lat, lng)
+    bbox_text = ",".join(str(value) for value in bbox)
     try:
         with httpx.Client(timeout=_IMAGERY_TIMEOUT) as client:
             r = client.get(
                 _ESRI_EXPORT,
                 params={
-                    "bbox": bbox,
+                    "bbox": bbox_text,
                     "bboxSR": "4326",
                     "imageSR": "4326",
                     "size": f"{size},{size}",
@@ -84,17 +161,35 @@ def _fetch_thumbnail(lat: float, lng: float, size: int = _THUMBNAIL_SIZE) -> str
                 },
             )
         if r.status_code == 200 and r.headers.get("content-type", "").startswith("image/"):
-            return "data:image/png;base64," + base64.b64encode(r.content).decode()
+            img = Image.open(BytesIO(r.content)).convert("RGB")
+            return _encode_png_data_url(img), "esri_arcgis"
     except Exception as exc:
         logger.debug("[GALLERY] Thumbnail fetch failed: %s", exc)
-    
-    # Fallback: colored placeholder based on lat/lng to look like a "chip"
-    import random
-    r_val = int((lat * 100) % 50 + 20)
-    g_val = int((lng * 100) % 50 + 60)
-    b_val = int(((lat + lng) * 100) % 50 + 20)
-    svg = f'<svg width="{size}" height="{size}" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="rgb({r_val},{g_val},{b_val})"/><text x="10" y="20" fill="white" font-family="monospace" font-size="10">OFFLINE CHIP</text></svg>'
-    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+
+    cached_thumb = _load_cached_thumbnail(_chunk_sig(bbox), size)
+    if cached_thumb:
+        return cached_thumb, "seeded_cache"
+
+    return _offline_svg_thumbnail(lat, lng, size), "offline_svg"
+
+
+def _fetch_thumbnail(lat: float, lng: float, size: int = _THUMBNAIL_SIZE) -> str | None:
+    """Fetch a context thumbnail data URL, preserving the original helper API."""
+    thumb, _source = _fetch_thumbnail_with_provenance(lat, lng, size=size)
+    return thumb
+
+
+def _infer_context_thumb_source(context_thumb: str | None) -> str | None:
+    if not context_thumb:
+        return None
+    if context_thumb.startswith("data:image/svg+xml"):
+        return "offline_svg"
+    return "provided_asset"
+
+
+def resolve_context_thumb(lat: float, lng: float, size: int = _THUMBNAIL_SIZE) -> str | None:
+    """Return a context thumbnail data URL for an arbitrary cell centroid."""
+    return _fetch_thumbnail(lat, lng, size=size)
 
 
 def add_gallery_item(
@@ -107,16 +202,24 @@ def add_gallery_item(
     fetch_thumb: bool = True,
     timelapse_b64: str | None = None,
     timelapse_analysis: str | None = None,
+    context_thumb: str | None = None,
+    context_thumb_source: str | None = None,
+    timelapse_source: str | None = None,
 ) -> int | None:
     """Add or update a gallery item for a confirmed cell. Returns the item id."""
     _ensure_gallery_table()
 
-    thumb = None
-    if fetch_thumb:
+    thumb = context_thumb
+    thumb_source = context_thumb_source or _infer_context_thumb_source(context_thumb)
+    if thumb is None and fetch_thumb:
         try:
-            thumb = _fetch_thumbnail(lat, lng)
-        except Exception:
-            pass
+            thumb, thumb_source = _fetch_thumbnail_with_provenance(lat, lng)
+        except Exception as exc:
+            logger.debug("[GALLERY] Thumbnail resolution failed for %s: %s", cell_id, exc)
+
+    resolved_timelapse_source = timelapse_source
+    if timelapse_b64 and not resolved_timelapse_source:
+        resolved_timelapse_source = "generated_webm"
 
     label = f"Cell {cell_id[:8]} · {severity.upper()}"
 
@@ -126,13 +229,14 @@ def add_gallery_item(
             """
             INSERT OR REPLACE INTO gallery_items
               (cell_id, lat, lng, label, severity, change_score, mission_id,
-               context_thumb, timelapse_b64, timelapse_analysis, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               context_thumb, context_thumb_source, timelapse_b64, timelapse_source,
+               timelapse_analysis, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 cell_id, lat, lng, label, severity,
-                round(change_score, 4), mission_id, thumb,
-                timelapse_b64, timelapse_analysis, _now(),
+                round(change_score, 4), mission_id, thumb, thumb_source,
+                timelapse_b64, resolved_timelapse_source, timelapse_analysis, _now(),
             ),
         )
         conn.commit()
@@ -163,6 +267,8 @@ def list_gallery(
                    mission_id, created_at,
                    CASE WHEN context_thumb IS NOT NULL THEN 1 ELSE 0 END AS has_thumb,
                    CASE WHEN timelapse_b64 IS NOT NULL THEN 1 ELSE 0 END AS has_timelapse,
+                   context_thumb_source,
+                   timelapse_source,
                    timelapse_analysis
             FROM gallery_items
             {where}

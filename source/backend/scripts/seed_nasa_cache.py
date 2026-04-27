@@ -127,8 +127,8 @@ def _fetch_month_frame(
                     if arr.mean() > 8.0 and arr.std() > 4.0:
                         logger.info(f"  [HLS-{short}] {iso}  mean={arr.mean():.0f}")
                         return resp.content, f"HLS {short}  {iso}"
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("HLS %s fetch failed for %s: %s", short, iso, exc)
 
     # MODIS fallback
     logger.warning(f"  [MODIS fallback] {year}-{month:02d}")
@@ -157,8 +157,8 @@ def _fetch_month_frame(
                 if arr.mean() > 5.0:
                     logger.info(f"  [MODIS] {iso}  mean={arr.mean():.0f}")
                     return resp.content, f"MODIS  {iso}"
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("MODIS fetch failed for %s: %s", iso, exc)
 
     return None, ""
 
@@ -399,4 +399,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

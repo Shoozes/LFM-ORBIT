@@ -1,5 +1,5 @@
 """
-NASA Earth Imagery provider for Canopy Sentinel.
+NASA Earth Imagery provider for LFM Orbit.
 
 Fetches RGB imagery from api.nasa.gov. Because true multispectral bands
 (NIR, SWIR) are unavailable via this endpoint, it successfully tests
@@ -86,7 +86,7 @@ def fetch_nasa_observations(cell_id: str) -> Optional[ObservationPair]:
         "centroid_lat": round(centroid_lat, 6),
         "centroid_lng": round(centroid_lng, 6),
         "before": {
-            "label": REGION.before_label,
+            "label": f"Baseline {REGION.after_label} (-2Y)",
             "quality": 0.95,
             "bands": before_bands,
             "flags": before_flags,

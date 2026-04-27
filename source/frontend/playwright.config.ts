@@ -1,4 +1,7 @@
 import { defineConfig } from "@playwright/test";
+import { API_BASE, API_HEALTH_URL, APP_BASE, DEBUG_BASE } from "./e2e/testUrls";
+
+const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === "1";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -12,7 +15,7 @@ export default defineConfig({
     timeout: 15_000,
   },
   use: {
-    baseURL: "http://localhost:5173",
+    baseURL: APP_BASE,
     trace: "on-first-retry",
     screenshot: "on",
     video: "on-failure",
@@ -38,23 +41,26 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "cd ../backend && uvicorn api.main:app --host 0.0.0.0 --port 8000",
-      port: 8000,
+      command: `cd ../backend && uv run --no-sync uvicorn api.main:app --host 127.0.0.1 --port ${new URL(API_BASE).port}`,
+      url: API_HEALTH_URL,
       timeout: 60_000,
-      reuseExistingServer: true,
+      reuseExistingServer,
       env: { RESET_RUNTIME_STATE_ON_BOOT: "true", OBSERVATION_PROVIDER: "simsat_sentinel", DISABLE_EXTERNAL_APIS: "true" },
     },
     {
-      command: "cd ../backend && uvicorn satellite_debug:app --host 0.0.0.0 --port 8080",
-      port: 8080,
+      command: `cd ../backend && uv run --no-sync uvicorn satellite_debug:app --host 127.0.0.1 --port ${new URL(DEBUG_BASE).port}`,
+      url: DEBUG_BASE,
       timeout: 60_000,
-      reuseExistingServer: true,
+      reuseExistingServer,
     },
     {
-      command: "npm run dev",
-      port: 5173,
+      command: `npm run dev -- --host 127.0.0.1 --port ${new URL(APP_BASE).port}`,
+      url: APP_BASE,
       timeout: 60_000,
-      reuseExistingServer: true,
+      reuseExistingServer,
+      env: {
+        VITE_API_BASE_URL: API_BASE,
+      },
     },
   ],
 });
