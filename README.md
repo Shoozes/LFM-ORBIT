@@ -1,25 +1,71 @@
 # LFM Orbit
 
-LFM Orbit is a reproducible satellite-first mission-control app for temporal Earth-observation triage. A low-bandwidth satellite agent scans cells and downlinks compact anomaly telemetry; a ground validator expands only selected cells into imagery, timelapse evidence, operator review, and model-training records.
+Satellite-first mission control for temporal Earth-observation triage.
 
-## What It Does
+LFM Orbit proves a low-bandwidth dual-agent workflow: a satellite agent sweeps H3 cells and downlinks compact anomaly telemetry, then a ground validator spends bandwidth only where it matters by rebuilding imagery, timelapse evidence, model analysis, operator review, and training records.
 
-- Runs a FastAPI dual-agent backend plus a React/MapLibre mission UI.
-- Scans a bbox/date mission, scores temporal change, and downlinks compact JSON alerts.
-- Expands confirmed cells into imagery chips, timelapse evidence, analysis text, and gallery records.
-- Works from a cold start without external secrets by using seeded replay/offline fallbacks.
-- Supports optional SimSat Sentinel, SimSat Mapbox, Sentinel Hub, NASA, and GEE data paths.
-- Includes an Orbit-native maritime monitoring plan with optional Element84 Sentinel-2 STAC metadata search.
-- Includes civilian lifeline before/after monitoring with strict candidate schemas and downlink decisions.
-- Exports fetched API imagery and agent decisions into reproducible dataset bundles for custom training.
-- Exposes an optional Depth Anything V3 lane for depth/geometry checks when local DA3 dependencies are installed.
+![LFM Orbit mission control replay](docs/05-mission-control-scanning.png)
 
-## Cold Start
+## Visual Proof
+
+<table>
+  <tr>
+    <td><img src="docs/01-satellite-heartbeat.png" alt="Satellite heartbeat and scan HUD" /></td>
+    <td><img src="docs/02-agent-dialogue-bus.png" alt="Satellite and ground agent dialogue bus" /></td>
+  </tr>
+  <tr>
+    <td><strong>Satellite heartbeat</strong><br />Live link state, scan cadence, and compact telemetry flow.</td>
+    <td><strong>Agent dialogue</strong><br />Replayable SAT/GND reasoning trace with injected operator prompts.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/03-alert-analysis-verdict.png" alt="Alert evidence and offline LFM verdict" /></td>
+    <td><img src="docs/ffmpeg-timelapse-viewer.png" alt="Timelapse evidence viewer" /></td>
+  </tr>
+  <tr>
+    <td><strong>Alert verdict</strong><br />Before/after evidence, provenance labels, and deterministic offline analysis.</td>
+    <td><strong>Temporal proof</strong><br />Real frame sequence evidence, not a tinted single-image animation.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/06-lifeline-monitor-preview.png" alt="Lifeline monitor preview" /></td>
+    <td><img src="docs/07-maritime-monitor-preview.png" alt="Maritime monitor preview" /></td>
+  </tr>
+  <tr>
+    <td><strong>Lifeline monitoring</strong><br />Strict before/after schemas for civilian access disruption review.</td>
+    <td><strong>Maritime monitoring</strong><br />Cardinal investigation planning with optional Sentinel-2 STAC metadata.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/04-settings-provider-model.png" alt="Provider and model settings" /></td>
+    <td><img src="docs/vlm-panel-results.png" alt="VLM grounding and question answering panel" /></td>
+  </tr>
+  <tr>
+    <td><strong>Provider control</strong><br />Live provider, local model, and optional depth status in one operator panel.</td>
+    <td><strong>VLM helpers</strong><br />Grounding, VQA, captioning, and fallback behavior surfaced to the operator.</td>
+  </tr>
+</table>
+
+## Why It Exists
+
+- Reduce downlink noise: score broad scan areas on the satellite side and transmit tiny JSON alerts.
+- Preserve evidence quality: reconstruct selected cells into imagery, timelapses, provenance, and human-readable reasoning.
+- Stay reproducible: seeded replay and offline analysis let reviewers validate the full app with no external secrets.
+- Close the training loop: export inspected evidence into JSONL, image, frame, and temporal-sequence datasets.
+- Keep optional lanes optional: SimSat, Sentinel Hub, NASA, GEE, local GGUF, and Depth Anything V3 are feature-gated.
+
+## Capabilities
+
+- FastAPI backend with satellite agent, ground validator, telemetry bus, replay state, gallery, and validation APIs.
+- React/MapLibre mission UI with scan controls, alerts, map pins, timelapse viewer, VLM helpers, and settings.
+- Provider routing for seeded/offline fallback, SimSat Sentinel, SimSat Mapbox, Sentinel Hub, NASA, and GEE.
+- Maritime and lifeline monitoring primitives with deterministic contracts and tests.
+- Dataset export, model evaluation, and retagging tools for API imagery and timelapse frames.
+- CI coverage for backend tests, frontend typecheck/build, and Playwright E2E flows.
+
+## Quick Start
 
 Prerequisites:
 
 - Python 3.10+ with `uv`
-- Node compatible with `.nvmrc`
+- Node compatible with `.nvmrc` (`20.19.0`)
 - Optional: SimSat running at `SIMSAT_BASE_URL`
 - Optional: Sentinel Hub, NASA, GEE, or Mapbox credentials
 
@@ -28,7 +74,6 @@ git clone <repo-url>
 cd "LFM Orbit"
 Copy-Item .env.example .env
 
-# Installs locked backend/frontend deps, boots backend, then starts Vite.
 .\run.ps1 -Install
 ```
 
@@ -224,12 +269,13 @@ When `DEPTH_ANYTHING_V3_DEVICE=auto`, the backend resolves to CUDA when availabl
 
 Current local validation state on April 27, 2026:
 
+- `source/frontend`: `npx -y -p node@20.19.0 -p npm@10.8.2 npm ci` -> passing with the CI Node/npm lane
 - `uv run --no-sync pytest -q` -> `240 passed`
 - `npm run lint` -> passing
 - `npm run build` -> passing
-- `npx playwright test` -> `69 passed`, `1 skipped` debug-only HTML dump
+- `npm run test:e2e` -> `69 passed`, `1 skipped` debug-only HTML dump
 - `.\run.ps1 -Verify` -> passing from repo root, including locked dependency sync, Playwright Chromium install, backend tests, frontend checks, and E2E
-- Judge screenshots regenerated at `1440x900` with nonblank artifact checks passing.
+- README/docs screenshots regenerated at `1440x900` with artifact dimension checks passing.
 
 Current integrity baseline:
 
@@ -266,7 +312,7 @@ cd source/frontend
 npx playwright test e2e/capture_screenshots.spec.ts e2e/monitor_features.spec.ts e2e/debug_dashboard.spec.ts e2e/vlm.spec.ts e2e/app.spec.ts --grep "Visual evidence capture|Context Module|screenshot:|visual proof|Satellite 8080|VLM Grounds"
 ```
 
-Primary artifacts are written under `source/frontend/e2e/screenshots/`: `01-satellite-heartbeat.png`, `02-agent-dialogue-bus.png`, `03-alert-analysis-verdict.png`, `04-settings-provider-model.png`, `05-mission-control-scanning.png`, `06-lifeline-monitor-preview.png`, `07-maritime-monitor-preview.png`, `app-scan-in-progress.png`, `alert-temporal-evidence.png`, `settings-provider-status.png`, `context-menu-deployed.png`, `ffmpeg-timelapse-viewer.png`, `agent-multimodality-evaluation.png`, `satellite-debug-dashboard.png`, and `vlm-panel-results.png`.
+Primary artifacts are written under `source/frontend/e2e/screenshots/`. README-facing copies live under `docs/`: `01-satellite-heartbeat.png`, `02-agent-dialogue-bus.png`, `03-alert-analysis-verdict.png`, `04-settings-provider-model.png`, `05-mission-control-scanning.png`, `06-lifeline-monitor-preview.png`, `07-maritime-monitor-preview.png`, `ffmpeg-timelapse-viewer.png`, and `vlm-panel-results.png`.
 
 ## Project Map
 
