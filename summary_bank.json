@@ -61,7 +61,7 @@
   },
   "groups": {
     "docs_state_and_tracking": {
-      "note": "README is the Liquid AI x DPhi Space Hackathon-facing presentation surface; deeper current-state, architecture, demo, dataset-cycle, and backlog tracking lives in focused docs.",
+      "note": "README is the Liquid AI x DPhi Space Hackathon-facing presentation surface with current demo screenshots; deeper current-state, architecture, demo, dataset-cycle, and backlog tracking lives in focused docs.",
       "files": [
         "README.md",
         "docs/ARCHITECTURE.md",
@@ -549,7 +549,7 @@
       ]
     },
     "feature_group_judge_demo_mode": {
-      "note": "Judge-ready deterministic demo lane with visual overlay, tutorial-style UI flow, Judge Mode proof panel, Playwright video/trace/screenshots, proof JSON export, per-demo evidence-frame screenshot/luminance guards, preloaded mission/replay starts that avoid the legacy Amazonas sweep, Rondonia replay proof, Pakistan Manchar Lake payload reduction, Atacama provenance, Greenland abstain safety, Suez maritime link outage recovery, real Sentinel-2 L2A demo frames and seeded WebMs, active-replay Judge Mode proof binding, clearer replay proof-panel playback windows, and refreshed tutorial video output covering Singapore maritime plus Atacama mining.",
+      "note": "Judge-ready deterministic demo lane with visual overlay, tutorial-style UI flow, Judge Mode proof panel, Playwright video/trace/screenshots, proof JSON export, README presentation screenshots extracted from current demo WebMs, per-demo evidence-frame screenshot/luminance guards, preloaded mission/replay starts that avoid the legacy Amazonas sweep, Rondonia replay proof, Pakistan Manchar Lake payload reduction, Atacama provenance, Greenland abstain safety, Suez maritime link outage recovery, real Sentinel-2 L2A demo frames and seeded WebMs, active-replay Judge Mode proof binding, clearer replay proof-panel playback windows, and refreshed tutorial video output covering Singapore maritime plus Atacama mining.",
       "files": [
         "README.md",
         "docs/JUDGE_DEMO.md",
@@ -568,6 +568,11 @@
         "source/frontend/public/demo-assets/atacama-mining.png",
         "source/frontend/public/demo-assets/greenland-ice.png",
         "source/frontend/public/demo-assets/suez-maritime.png",
+        "docs/readme-judge-mode.png",
+        "docs/readme-payload-reduction.png",
+        "docs/readme-provenance.png",
+        "docs/readme-orbital-eclipse.png",
+        "docs/readme-visual-grid.png",
         "source/backend/assets/seeded_data/sh_24541539.webm",
         "source/backend/assets/seeded_data/sh_24541539_meta.json",
         "source/backend/assets/seeded_data/sh_fbe644a9.webm",

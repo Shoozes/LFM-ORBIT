@@ -6,6 +6,8 @@ It turns satellite imagery into compact, evidence-backed orbital alerts: the sat
 
 [Hackathon event](https://luma.com/n9cw58h0) | [Judging criteria](docs/Liquid_AI_x_DPhi_Space_Judging_Criteria.md) | [Judge demo guide](docs/JUDGE_DEMO.md)
 
+![LFM-ORBIT Judge Mode proof surface](docs/readme-judge-mode.png)
+
 ## Run The Proof
 
 ```bash
@@ -42,6 +44,27 @@ Recorded WebMs:
 | `docs/abstain-safety-demo.webm` | Greenland ice-edge review abstains instead of hallucinating when quality is insufficient |
 | `docs/orbital-eclipse-demo.webm` | Suez maritime mission keeps processing while link is offline, queues alerts, then flushes on restore |
 | `docs/tutorial_video.webm` | Operator-style replay walkthrough: Singapore maritime evidence, Atacama mining evidence, then active-replay Judge Mode |
+
+## Visual Proof
+
+<table>
+  <tr>
+    <td><img src="docs/readme-payload-reduction.png" alt="Payload reduction demo with satellite frame, bbox, raw bytes, alert JSON bytes, and downlink reduction" /></td>
+    <td><img src="docs/readme-provenance.png" alt="Atacama provenance demo with satellite evidence, bbox, model, source, capture time, prompt, and output JSON" /></td>
+  </tr>
+  <tr>
+    <td><strong>Payload reduction</strong><br />Raw satellite frame reduced to compact alert JSON.</td>
+    <td><strong>Provenance chain</strong><br />Provider, capture time, bbox, prompt, model, confidence, and JSON stay attached.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/readme-orbital-eclipse.png" alt="Orbital eclipse demo with maritime satellite frame, link offline state, local queue, and restore flow" /></td>
+    <td><img src="docs/readme-visual-grid.png" alt="Four-panel visual grid of Judge Mode, payload reduction, provenance, and orbital eclipse demos" /></td>
+  </tr>
+  <tr>
+    <td><strong>Delay-tolerant downlink</strong><br />Alerts queue locally while the link is offline, then flush after restore.</td>
+    <td><strong>Show pack</strong><br />Four recorded proof flows from the current app, not static mockups.</td>
+  </tr>
+</table>
 
 ## What Judges See
 
