@@ -66,7 +66,7 @@ Recorded WebMs:
   </tr>
 </table>
 
-## What Judges See
+## What Users See
 
 The demo is meant to be understandable muted.
 
