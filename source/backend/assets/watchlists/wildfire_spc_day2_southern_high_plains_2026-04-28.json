@@ -1,0 +1,39 @@
+{
+  "schema": "orbit_future_watch_v1",
+  "watch_id": "spc_day2_southern_high_plains_2026_04_28",
+  "created_at_utc": "2026-04-28T03:25:10Z",
+  "source_issued_at_utc": "2026-04-27T19:36:00Z",
+  "valid_from_utc": "2026-04-28T12:00:00Z",
+  "valid_to_utc": "2026-04-29T12:00:00Z",
+  "hazard": "critical_fire_weather",
+  "status": "watch_only_unverified",
+  "claim_boundary": "This is a timestamped risk watch for wildfire spread potential, not an ignition prediction or confirmed event.",
+  "risk_area_label": "Southern High Plains: eastern New Mexico into western Texas",
+  "mission_preset_id": "wildfire_future_spc_high_plains",
+  "bbox": [-104.9, 31.0, -101.1, 35.5],
+  "centroid": {
+    "lat": 33.2,
+    "lon": -103.0
+  },
+  "task_text": "Watch the SPC Day 2 critical fire-weather corridor across eastern New Mexico and western Texas for new smoke plume, active-fire, or burn-scar evidence after the valid window.",
+  "deduction": [
+    "Official SPC Day 2 Fire Weather Outlook marks a critical area for eastern New Mexico and western Texas.",
+    "Forecast ingredients include dry fuels, relative humidity near 10-20%, and wind corridors capable of supporting fire spread.",
+    "The watch becomes a future catch only if independent post-window evidence confirms a new fire, smoke plume, thermal anomaly, or burn scar inside the bbox."
+  ],
+  "verification_plan": {
+    "verify_after_utc": "2026-04-29T18:00:00Z",
+    "steps": [
+      "Query NASA FIRMS or NIFC incident feeds for new detections/incidents in the bbox after the valid window.",
+      "If a candidate exists, seed Sentinel-2 imagery using explicit pre-event and post-event windows.",
+      "Retag candidate frames with the local Ollama Qwen vision model and mark the row verified only if visual evidence supports it."
+    ]
+  },
+  "sources": [
+    {
+      "name": "NOAA SPC Day 2 Fire Weather Outlook",
+      "url": "https://www.spc.noaa.gov/products/fire_wx/fwdy2.html",
+      "accessed_at_utc": "2026-04-28T03:25:10Z"
+    }
+  ]
+}

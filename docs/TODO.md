@@ -1,166 +1,113 @@
 # TODO
 
-Updated **April 27, 2026**.
+Updated **April 28, 2026**.
 
-## Completed This Pass
+This is the canonical backlog and integrity note. Keep completed history out of this file unless it changes current operating guidance.
 
-- [x] Fixed GitHub Actions frontend install failure by refreshing `source/frontend/package-lock.json` with the CI Node/npm lane; `source/frontend` now passes `npm ci` under Node `20.19.0` and npm `10.8.2`.
-- [x] Reworked the root README opening into a visual proof, purpose, capabilities, and quick-start story with direct operator-facing details.
-- [x] Replaced stale README-facing screenshots in `docs/` and added lifeline, maritime, timelapse, and VLM proof images from the Playwright capture set.
-- [x] Corrected the maritime proof path so the screenshot uses the Suez/channel target map context and maritime task text instead of appearing over the default forest replay map.
-- [x] Added one-click Mission location presets for Amazon deforestation, close Florida I-4 transportation mix, Suez maritime, Greenland ice, Florida dry wildfire, Bangladesh flood, Kansas crop, Delhi urban, and Atacama mining scenarios.
-- [x] Refreshed README proof screenshots with close Florida I-4 transportation mix, Florida dry wildfire, and Greenland ice-cap mission presets, using April 2026 public wildfire/drought context for the Florida dry-fire target.
-- [x] Replaced the VLM visual proof's airplane prompt with a Florida I-4 road-corridor target and hardened offline fallback behavior so unsupported airplane prompts do not fabricate detections over clouds or terrain.
-- [x] Re-ran current backend/frontend validation after the preset and screenshot updates: `242` backend tests, frontend lint/build, and `72` Playwright specs passed with `1` debug-only skip.
-- [x] Split the frontend bundle, lazy-loaded major panels, and cleared the old Vite large-chunk warning.
-- [x] Added manifest-based satellite model resolution plus `fetch_satellite_model.py` so Orbit can consume local bundle or Hugging Face artifacts without a hardcoded GGUF path.
-- [x] Surfaced manifest and repo metadata through `/api/inference/status` and `/api/analysis/status`.
-- [x] Replaced the gallery's first offline thumbnail fallback with seeded local timelapse-frame extraction before dropping to the SVG placeholder.
-- [x] Added gallery regression coverage for cached-frame and SVG fallback behavior.
-- [x] Switched long-lived agent runtime code to `asyncio.get_running_loop()`.
-- [x] Replaced several silent cache/credential/websocket failure paths with debug logging while preserving non-fatal fallbacks.
-- [x] Tightened bbox/date validation across mission start, analysis timelapse, timelapse generation, VLM helper, and imagery-cell APIs so malformed inputs fail before scan/provider work starts.
-- [x] Added shared `core/grid.py` bbox and cell-id validation coverage.
-- [x] Made timelapse `steps` bound monthly provider fetches instead of being only an API compatibility field.
-- [x] Retired the stale standalone `source/backend/autonomous_agent.py` prototype behind a clear non-running shim.
-- [x] Added regression tests for invalid bboxes, reversed date windows, unsupported imagery cell IDs, bounded timelapse steps, mission-mode validation, and the retired agent shim.
-- [x] Fixed validation exports so downloaded timelapse assets keep the correct container extension instead of being mislabeled as `.mp4`.
-- [x] Added a first-pass Orbit dataset export script for recent alerts plus local gallery evidence at `source/backend/scripts/export_orbit_dataset.py`.
-- [x] Added a first-pass baseline eval harness at `source/backend/scripts/evaluate_model.py` for replaying exported samples through `offline_lfm_v1`.
-- [x] Expanded Orbit dataset export to materialize context thumbnails for image-backed alert rows and include recent ground-agent rejects as weak negative/control samples.
-- [x] Added a seeded replay mission path that hydrates Mission/Logs/Inspect/Agent Dialogue from bundled local evidence for judge walkthroughs and deterministic review.
-- [x] Added a central runtime reset helper plus `/api/runtime/reset` so app boot, replay loading, backend tests, and Playwright fixtures all reset the same mutable stores.
-- [x] Repointed selected screenshot/tutorial demo flows at the seeded replay path and added shared Playwright runtime helpers to reduce repeated setup logic.
-- [x] Tightened observation-store readiness so records are only marked `training_ready` after both satellite and ground observations exist.
-- [x] Corrected runtime-mode summary truth so imagery-backed scoring flags match the stricter provider rules used elsewhere in config.
-- [x] Stopped the debug HTML dump spec from writing artifacts into the frontend repo root.
-- [x] Refreshed `README.md`, `docs/ARCHITECTURE.md`, and `summary_bank.json` so current state, backlog, and grouping match the validated repo.
-- [x] Added `core/temporal_use_cases.py` so temporal missions and exports can auto-classify deforestation, wildfire, maritime, ice-cap growth, flood, crop, urban, mining, and generic temporal-review tasks.
-- [x] Extended Orbit dataset export to emit enriched sample JSONL plus chat-style `training.jsonl` files with temporal examples and API-prep metadata.
-- [x] Added an API observation-store export lane for cached provider data so raw API-derived observations can be auto-prepped into the modeling bundle.
-- [x] Promoted SimSat Mapbox from client-only support into provider config, loader routing, status APIs, imagery labels, settings UI, and tests.
-- [x] Added repo-root `.env.example` plus launcher `.env` loading for reproducible cold-start provider/model configuration.
-- [x] Trimmed the README into a GitHub-facing cold-start, provider, custom-training-data, and validation guide.
-- [x] Added a WebGL depth-map summary utility with CPU fallback for the future image-conditioned depth-verification lane.
-- [x] Added backend import-contract coverage for core modules, API entrypoints, and supported scripts so broken imports/exports fail fast in pytest.
-- [x] Hardened SimSat timeout parsing so malformed or non-positive `SIMSAT_TIMEOUT` values fall back safely instead of breaking status checks.
-- [x] Made Playwright dev-server reuse explicitly opt-in with `PLAYWRIGHT_REUSE_SERVER=1` and reset runtime state in replay/metrics specs to avoid stale local state leakage.
-- [x] Consolidated progress tracking around `README.md`, `docs/ARCHITECTURE.md`, `docs/TODO.md`, and `summary_bank.json`.
-- [x] Added install-only and verify modes to the cross-platform launchers so setup, startup, clean reset, and full validation are scriptable from repo root.
-- [x] Fixed the PowerShell launcher to stop its backend child process when the frontend dev server exits.
-- [x] Updated GitHub/Copilot setup metadata to use the locked `uv` backend environment instead of ad hoc package installs.
-- [x] Smoke-tested `.\run.ps1 -Run` by verifying backend health and Vite startup from a clean local port state.
-- [x] Added Orbit-native maritime monitoring primitives: optional Element84 Sentinel-2 STAC metadata search, date deduplication, N/E/S/W investigation planning, API endpoint, and tests.
-- [x] Added civilian lifeline before/after monitoring primitives: seeded assets, strict candidate validation, safe `discard` fallbacks, `downlink_now` policy, API endpoints, eval metrics, and tests.
-- [x] Tightened lifeline before/after integrity so `downlink_now` requires distinct baseline/current frame evidence, and empty eval payloads fail validation instead of returning misleading metrics.
-- [x] Added optional dataset-export ingestion for persisted maritime/lifeline monitor-report JSON files through `--monitor-reports-dir`, with sample JSONL and training JSONL coverage.
-- [x] Added Mission-tab monitor preview cards for maritime and lifeline workflows plus Playwright visual proof screenshots and API contract coverage.
-- [x] Tightened model-handoff and eval-harness wording so tracked runtime gaps live in this canonical backlog instead of scattered follow-up notes.
-- [x] Added rejection-reason observability so QC/runtime rejects now persist `runtime_rejections_by_reason` and low-valid-coverage rates instead of only aggregate reject percentages.
-- [x] Normalized scanner QC failures such as `Scene Quality Rejected: Insufficient Valid Pixels` into stable metrics reason codes.
-- [x] Added backend coverage for metrics rejection reasons, scanner rejection normalization, VLM image-fetch fallback behavior, and health/metrics contract alignment.
-- [x] Updated Mission Control to show client/API validation details instead of collapsing all launch failures into a generic backend-unreachable message.
-- [x] Added Playwright coverage for reversed mission date validation and kept bbox assignment coverage on the current context-menu workflow.
-- [x] Changed VLM image fetch failure behavior to return deterministic fallback answers instead of passing blank fabricated tiles into optional pipelines.
-- [x] Aligned backend health/metrics contracts with frontend telemetry types, including demo-mode and observability fields.
-- [x] Surfaced observability rejection breakdowns in the Logs tab so operators can see scene rejects, low-valid-coverage rate, and top rejection reasons without opening raw metrics JSON.
-- [x] Added decision-gate output for QC rejection breakdowns and separated low-valid-coverage optical blockage from other high-rejection states.
-- [x] Tightened timelapse viewer error handling so `format: none` API payloads render a retryable operator error instead of an empty video surface.
-- [x] Added focused backend and Playwright coverage for decision-gate QC output, Logs-tab pipeline integrity, and timelapse API error rendering.
-- [x] Consolidated tutorial/demo Playwright subtitle, highlight, and map-drawing helpers, and moved the dual-agent tutorial onto the visible seeded-replay path for deterministic recordings.
-- [x] Added shared basemap-readiness waits to judge screenshot, monitor-preview, and VLM visual specs so captures do not freeze partially loaded map tiles.
-- [x] Polished Mission-tab composition so VLM/timelapse auxiliary panels mount directly below a compact mission section instead of below empty sidebar space.
-- [x] Added explicit VLM `Find` and `Ask` controls plus inline error rendering for grounding, VQA, and caption failures.
-- [x] Replaced console-only map agent-evaluation failures with best-effort agent-bus error messages for operator visibility.
-- [x] Hardened Playwright map context-menu setup with a canvas-relative retry helper that avoids live scan marker interception.
-- [x] Added a keyboard/touch-friendly `Map Actions` button that opens the same spatial options at map center and covered it with Playwright.
-- [x] Added optional Depth Anything V3 support: env/runtime toggle, `/api/depth/status`, `/api/depth/settings`, `/api/depth/estimate`, Settings UI status, documented `da3-large` default, auto device resolution, and dependency-free fallback tests.
-- [x] Gated the debug HTML dump spec behind `PLAYWRIGHT_DUMP_HTML=1`, kept dumps under Playwright test output, and left browser-console echo opt-in with `PLAYWRIGHT_DUMP_HTML_LOGS=1`.
-- [x] Regenerated judge-facing screenshot artifacts and checked the PNG outputs for expected dimensions and nonblank luminance ranges.
-- [x] Re-reviewed actionable `TODO`/`FIXME`/stub-style markers; remaining hits are canonical docs references, input placeholders, test fixtures, or explicitly tracked safe fallback paths.
-- [x] Reordered Depth Anything V3 estimate validation so malformed image payloads fail before optional model loading, with API/unit regression coverage.
-- [x] Hardened LFM tool-call parsing for nested fenced JSON arguments and added parser regression coverage.
-- [x] Replaced additional silent fallback paths with debug diagnostics for secrets-file reads, observability persistence, GIBS timelapse candidate fetches, and corrupt observation-store records.
-- [x] Converted root-level Sentinel Hub WMS probe files into safe manual entrypoints with env-only credentials and import-contract coverage.
-- [x] Replaced remaining script-level silent suppressions in model fetch, NASA seed, and GEE auth helpers with explicit suppress/debug/return paths.
-- [x] Added the button-driven `Map Actions` path as the final fallback in the shared Playwright context-menu helper after a full-suite run exposed one marker/layer interception edge case.
-- [x] Moved active Mission timelapse evidence above the VLM panel so generated temporal video proof is immediately visible in the right rail.
-- [x] Made the timelapse visual proof deterministic by routing the E2E generation call to a seeded WebM and waiting for video readiness before screenshot capture.
-- [x] Hardened Settings status loading with per-endpoint retries and made the settings screenshot wait for provider, SimSat, analysis, depth, and basemap readiness before asserting live status.
-- [x] Reset agent-bus runtime state and verified the injected agent-evaluation query through `/api/agent/bus/dialogue` before scrolling it into the visual proof screenshot.
-- [x] Reused the shared Playwright link-readiness helper in `app.spec.ts` to reduce duplicate E2E timing code.
-- [x] Stopped Map Actions overlay clicks from bubbling into the map click handler, which could immediately close the spatial menu in the full E2E run.
-- [x] Promoted retryable app navigation into shared Playwright runtime helpers and moved all E2E specs onto `gotoApp`.
-- [x] Surfaced Agent Dialogue bus stats and operator-injection failures inline instead of silently swallowing non-OK or unreachable bus responses, with Playwright coverage for both failure paths.
-- [x] Sharpened Ground Agent assistant failures so backend error payloads render inline, timed-out requests are labeled distinctly, and empty/loading sends are disabled.
-- [x] Added Playwright coverage for Ground Agent backend-error rendering.
-- [x] Tightened map-driven Agent Video Evaluation so bus injection and timelapse-analysis non-OK responses become agent-bus error notes instead of silent no-ops.
-- [x] Changed Inspect timelapse fallback copy from an active generating state to a clearer pending/unavailable state when a gallery row has no video payload.
-- [x] Made `.env.example` default to `DISABLE_EXTERNAL_APIS=true` so copied cold-start configs avoid live API calls and provider quota unless explicitly enabled.
-- [x] Verified the repo-root `.\run.ps1 -Verify` path, including locked dependency sync, Playwright Chromium install, backend tests, frontend lint/build, and full E2E.
-- [x] Smoke-tested copied `.env.example` with `.\run.ps1 -InstallOnly` and a bounded `.\run.ps1 -Run` startup check against backend health plus the Vite index.
-- [x] Surfaced gallery and timelapse provenance through API payloads and operator UI labels so evidence is distinguishable as live fetch, seeded cache, replay, provided asset, or offline fallback.
-- [x] Added standalone dataset asset retagging via `scripts/retag_training_assets.py`, with SHA-256 dedupe, Ollama/OpenAI-compatible provider hooks, Hugging Face ImageFolder output, sampled timelapse frames, and ordered temporal sequence JSONL.
-- [x] Added optional Tkinter wrapper `scripts/retag_training_assets_ui.py` so operators can run retagging with directory pickers, provider/model controls, and a live log while preserving the CLI as source of truth.
-- [x] Added the Tkinter retagging screenshot to the root README and data README.
-- [x] Hardened map pins with backend coordinate validation, bounded frontend fetches, operator-visible sync errors, and Playwright coverage for API failure visibility.
-- [x] Replaced MapLibre marker-label `innerHTML` rendering with DOM text nodes so agent/operator pin labels cannot inject markup.
-- [x] Expanded import-contract coverage to include seed-data scripts, GEE auth, the edge starter, and the optional satellite debug dashboard.
-- [x] Added satellite-debug dashboard render sanitization coverage and escaped server-side message IDs/timestamps before HTML insertion.
-- [x] Prevented map-pin success and error toasts from stacking over each other after failed pin sync.
-- [x] Consolidated the root README integrity notes into a shorter current-state baseline, leaving detailed progress history in this TODO file.
+## Current App State
+
+- Mission Control can run live scans, deterministic seeded replay, monitor previews, VLM helper calls, timelapse generation, and dataset export paths.
+- Mission Control now has Fast Replay for curated replay packs and every valid seeded-cache WebM, plus a rescan action that reruns prior replay metadata through the current runtime/model stack.
+- Judge Mode now provides a deterministic Playwright demo lane with video, trace, screenshots, proof JSON, payload-reduction evidence, provenance, abstain behavior, and link-outage recovery.
+- Runtime reset, replay loading, provider fallback, queue/gallery/bus persistence, and Playwright navigation helpers are shared instead of duplicated per test.
+- Direct Sentinel Hub seeding supports `.tools/.secrets/sentinel.txt`, `.tools/.secrets/sh.txt`, or environment variables; the current labeled `API` / `CLIENTID` / `CLIENT` `sh.txt` shape validates against Sentinel Hub Process API OAuth.
+- NDVI now has an explicit spectral-band contract: RGB-only or invalid band data returns unavailable/abstain instead of fake NDVI.
+- Cloud and no-data coverage are hard quality gates: Sentinel SCL cloud/shadow/cirrus classes are tracked, cloudy seeded frames are skipped, and cloud-blocked scoring windows return no-transmit quality-gate results.
+- Dataset export and retagging can carry real seeded Sentinel-2 timelapses into local ImageFolder-style training data; the current bounded Qwen/Ollama pass retags representative images and falls back deterministically for the rest; Hugging Face upload is published to `Shoozes/LFM-Orbit-SatData`.
+
+## Completed Current Pass
+
+- [x] Added judge-ready Playwright demo config, demo scripts, demo specs, visual overlay hooks, proof JSON export, and Judge Mode UI.
+- [x] Added deterministic payload-reduction, provenance, abstain-safety, and orbital-eclipse demos.
+- [x] Added backend link-state endpoints for outage/recovery demos and included reset-state cleanup.
+- [x] Added spectral-band contract coverage for explicit NIR/Red NDVI requirements.
+- [x] Added `.tools/.secrets/sh.txt` compatibility for Sentinel Hub credentials without logging secret values.
+- [x] Added labeled Sentinel Hub trial-bundle parsing for `API`, `CLIENTID`, and `CLIENT` lines.
+- [x] Added `--skip-vlm-metadata` to Sentinel Hub cache seeding so replay imagery can be refreshed without forcing local metadata inference for every cell.
+- [x] Added Sentinel-2 L2A seeded mission timelapses for Pakistan Manchar Lake flood, Atacama mining, Greenland ice-edge abstain, and Suez maritime demos.
+- [x] Hardened recorded demo videos against static or too-short captures by using seeded WebM evidence, minimum-duration checks, sampled-frame uniqueness checks, and a backend seeded-timelapse integrity test.
+- [x] Kept replay proof-panel playback inside a clearer evidence window so the final Judge Mode screenshot does not land on cloud-obstructed frames while still rendering the seeded WebM.
+- [x] Added a Playwright proof-frame artifact and luminance guard for every recorded demo so blank or washed-out final evidence panels fail the demo run.
+- [x] Reworked recorded demos into tutorial-style UI flows with subtitles: Rondonia Judge replay, Pakistan flood payload proof, Atacama provenance proof, Greenland abstain safety, Suez maritime eclipse recovery, and a refreshed `docs/tutorial_video.webm`.
+- [x] Rebuilt the tutorial video as a user-like replay workflow that loads Singapore maritime evidence, analyzes it, replaces it with Atacama mining evidence, and opens Judge Mode on the active replay instead of defaulting to Rondonia.
+- [x] Added visible local satellite frames for Pakistan flood, Atacama, Greenland, and Suez demos so mission-preset demos do not fake timelapses.
+- [x] Preloaded recorded demo missions/replay before browser telemetry connects and disabled the boot-time live agent pair for demo runs, so videos do not open on the legacy Amazonas sweep.
+- [x] Added seeded-cache export, HF upload helper, and optional HF upload controls in the Tkinter retag UI.
+- [x] Added a timestamped future wildfire risk-watch manifest from the NOAA SPC Day 2 fire-weather outlook so later evidence can prove or disprove a post-window catch without retroactive claims.
+- [x] Consolidated progress docs so `README.md` stays judge-facing for the Liquid AI x DPhi Space Hackathon, while architecture, backlog, demo, and handoff details live in focused docs.
+- [x] Re-reviewed repo-local TODO/FIXME/stub markers; remaining hits are intentional UI placeholders, test fixtures, or tracked backlog items.
+- [x] Tightened Playwright map-action timing by replacing several fixed sleeps with shared basemap readiness checks.
+- [x] Moved opt-in HTML dump console capture into Playwright artifacts instead of stdout noise.
+- [x] Removed the empty SimSat client exception body left by the repo-wide stub scan.
+- [x] Hardened cloud handling so SCL QC records cloud/no-data ratios, Sentinel seeded frames are skipped when quality fails, low-quality score windows zero effective change score, and scanner cloud/QC exceptions cannot force demo anomalies.
+- [x] Added a narrow Windows asyncio disconnect-noise filter for benign Playwright WebSocket teardown resets without hiding unrelated backend exceptions.
+- [x] Published the retagged satellite dataset to `Shoozes/LFM-Orbit-SatData` and added a Hugging Face dataset card so the Dataset Viewer loads single-image SFT, temporal SFT, metadata, retag, temporal metadata, and review queue files as separate schemas.
+- [x] Added new mission replay packs for Manchar flood, Atacama mining, Singapore maritime activity, Georgia wildfire candidate, and Delhi urban expansion.
+- [x] Seeded additional Sentinel-2 mission data for Kansas crop phenology, Delhi urban expansion, and Singapore maritime anchorage with cloud/no-data quality gates.
+- [x] Verified `Shoozes/LFM-Orbit-SatData` with remote `datasets.load_dataset` streaming/regular loads.
+- [x] Re-scanned repo-local TODO/FIXME/stub/incomplete markers; no active code TODOs were found outside intentional UI placeholders, test fixtures, documented compatibility fallbacks, and this backlog.
+- [x] Replaced a silent Mission refresh catch with debug diagnostics so API refresh failures are traceable without adding operator UI noise.
+- [x] Added Sentinel-2 seeded data-cycle missions for Mauna Loa lava-flow review and Lake Urmia water persistence with cloud/no-data quality metadata.
+- [x] Added a `volcanic_surface_change` temporal use case so lava-flow evidence does not collapse into wildfire labeling.
+- [x] Added Fast Replay catalog support for dynamic seeded-cache WebMs and a rescan endpoint/UI action for rerunning saved mission metadata after model/runtime updates.
+- [x] Added Sentinel-2 temporal data for Black Rock City recurring settlement, Lahaina wildfire recovery, Kakhovka reservoir drawdown, Kilauea summit eruption review, and Lake Mead shoreline recovery; rejected the Mayon candidate instead of forcing cloudy evidence.
+- [x] Added retag reuse so already-tagged image hashes are not resent to Qwen/Ollama, while new assets and intentionally regenerated sequences still get current-cycle tags.
+- [x] Fixed extracted timelapse frame naming so different samples named `timelapse.webm` cannot overwrite each other during training export.
+- [x] Re-exported and retagged the current dataset cycle with Ollama `qwen3.6:27b`: `56` current-cycle samples, `24` seeded-cache rows, `179` assets, `26` temporal sequences, `40` image calls, `6` sequence calls, `74` reused image tags, `9` skipped SVG placeholders, and zero tagger failures.
+- [x] Refreshed `Shoozes/LFM-Orbit-SatData` at data commit `5a2798e7d16cd76df08eff3725dcf3ade9340b58` and card commit `60e8ae913f61315740a640c532eb1aa9ae7cfe75`; verified remote streaming loads for all six configs.
+- [x] Added `docs/DATASET_CYCLE_TUTORIAL.md` so the seed/export/Qwen/Hugging Face workflow is documented as a repeatable story outside the front README.
 
 ## Active Backlog
 
-- [ ] Add a production image-conditioned satellite inference adapter that consumes `GGUF + mmproj` artifacts instead of score-only prompt context.
-- [ ] Replace VLM VQA/caption compatibility fallbacks with explicitly supported on-device implementations for the current local runtime.
+- [ ] Add a production image-conditioned satellite inference adapter that consumes `GGUF + mmproj` artifacts, not only scored metadata.
+- [ ] Replace VLM VQA/caption compatibility fallbacks with explicitly supported on-device implementations for the selected local runtime.
 - [ ] Add a model-present smoke path that validates manifest-resolved GGUF loading separately from fallback-only default runs.
-- [ ] Add replay snapshot export/import so completed missions can be packaged outside the bundled seeded manifest set.
-- [ ] Add a second seeded replay pack so deterministic demo/test coverage spans more than one mission style.
-- [ ] Add mocked SimSat Mapbox fixture coverage for provider selection, credential status, imagery labels, and operator-facing provenance.
-- [ ] Add mocked Element84 STAC fixture coverage with visual asset URLs and a seeded maritime replay pack.
-- [ ] Expand the dataset export from weak negatives into a full training contract with operator-reviewed controls and stronger localization labels.
-- [ ] Persist API-generated maritime/lifeline monitor reports into a runtime report directory so `--monitor-reports-dir` can be populated directly from UI/API usage.
-- [ ] Add a full custom temporal-use-case editor so operators can save their own preset library beyond the bundled known-location examples.
-- [ ] Add responsive/mobile layout coverage for the fixed right mission rail so smaller operator displays can still inspect evidence without overlap.
-- [ ] Add a lightweight frontend unit/component harness for hooks such as `useMapPins` so timeout/error behavior can be tested without starting the full Playwright stack.
-- [ ] Expand the first-pass eval harness into a true base-vs-tuned benchmark lane with independent labels and promotion thresholds.
-- [ ] Feed Depth Anything V3 depth summaries into alert evidence/eval scoring and add a model-present smoke test on a runner with DA3 artifacts installed.
-- [ ] Replace the current square-grid compatibility layer with true H3 parsing/generation before production geospatial scale-out.
+- [ ] Expand `scripts/evaluate_model.py` into a base-vs-tuned benchmark lane with independent labels, thresholds, and promotion artifacts.
+- [ ] Expand dataset export from weak negatives into a full training contract with operator-reviewed controls and stronger localization labels.
+- [ ] Add a versioned update cadence for future `Shoozes/LFM-Orbit-SatData` refreshes.
+- [ ] Replace remaining SVG context placeholder outputs with raster thumbnails before dataset export so future Qwen cycles have zero unsupported assets.
+- [ ] Add optional Planet/Planet Insights imagery ingestion once a local API token is available; the current shared workspace URL is a browser account page, not an API credential.
+- [ ] Persist API-generated maritime/lifeline monitor reports into `runtime-data/monitor-reports/` directly from UI/API usage.
+- [ ] Add full replay snapshot export/import so completed live missions can be packaged outside the bundled replay packs and seeded-cache WebMs.
+- [ ] Add Sentinel Hub OGC/WMS instance-id seeding support only if a valid WMS-only instance appears; current Process API seeding uses validated OAuth credentials.
+- [ ] Add mocked SimSat Mapbox and Element84 STAC fixture coverage with visual asset URLs and operator-facing provenance checks.
+- [ ] Add a custom temporal-use-case editor so operators can save preset libraries beyond bundled examples.
+- [ ] Add responsive/mobile Playwright coverage for the map, fixed right rail, and Judge Mode panel.
+- [ ] Add lightweight frontend unit/component tests for hooks such as `useMapPins`, telemetry normalization, and settings retry behavior.
+- [ ] Feed Depth Anything V3 summaries into alert evidence/eval scoring and add a model-present smoke test where DA3 artifacts are installed.
+- [ ] Replace the square-grid compatibility layer with true H3 parsing/generation before production geospatial scale-out.
+- [ ] Add a reusable Sentinel Hub replay seeding manifest command that refreshes exact replay assets without relying on manual grid/cell-dim selection.
+- [ ] After `2026-04-29T18:00:00Z`, verify the SPC Southern High Plains future fire watch against FIRMS/NIFC and only promote it from `watch_only_unverified` if independent detections or incident reports exist inside the bbox.
 
-## Wrap-Up Order
+## Edge Cases To Keep Covered
 
-The remaining work is now mostly the modeling lane, not general app integrity.
+- Empty or malformed provider credentials must report unavailable status without switching to live calls unexpectedly.
+- Cloudy, stale, missing, RGB-only, or non-numeric spectral inputs must abstain rather than fabricate spectral indices.
+- Quality-gated cloud/no-data failures must not emit `suspected_canopy_loss`, even when raw band deltas look large.
+- Seeded Sentinel demo/training frames must carry frame-quality metadata and reject cloudy frames before WebM creation.
+- Timelapse evidence must contain multiple contextual imagery slices; single still-image color shifts are invalid temporal evidence.
+- Link-offline mode must queue compact JSON alerts locally and flush only after link recovery.
+- Demo and test runs should reset runtime state and avoid stale local server reuse unless explicitly requested.
+- Recorded demos must preload their intended mission or replay before opening the browser; a generic default scan at video start is a regression.
+- Map-action tests should use app readiness signals and shared helpers before touching the canvas; fixed sleeps are only acceptable for intentional visual/video pacing.
+- Opt-in debug tests should write extra diagnostics to artifacts rather than polluting normal test output.
+- Benign browser disconnect noise should stay out of demo logs; real websocket and backend exceptions should still be logged.
+- Future-watch manifests must stay timestamped, source-backed, and unverified until post-window evidence exists; do not turn risk outlooks into claimed detections.
+- Operator-visible errors should remain visible for mission validation, VLM actions, Ground Agent chat, agent-bus injection, timelapse generation, map-pin sync, and settings status.
+- Periodic mission refresh failures should leave debug diagnostics so stale mission state can be investigated during local demo runs.
 
-1. Expand the new dataset export path so confirmed/rejected alerts can be handed to external training workflows in a reproducible format.
-2. Expand the new baseline eval harness into a base-vs-tuned comparison lane and persist run artifacts before changing live runtime behavior.
-3. Add the real image-conditioned `GGUF + mmproj` or equivalent local adapter for tuned-model inference.
-4. Add model-present smoke tests and a promotion gate so trained artifacts are validated before live use.
-5. Surface tuned-model provenance and comparison output in the existing UI.
+## Verification Notes
 
-## Review Notes
-
-- No broken frontend imports/exports were found after lint, build, and the full Playwright suite.
-- No broken backend imports surfaced under the full backend test run, and import contracts now have dedicated pytest coverage.
-- No actionable repo-local `TODO`/`FIXME`/stub markers were found outside intentional test fixtures, input placeholders, documented fallback paths, and this canonical backlog.
-- Full validation on April 27, 2026 is green: `242` backend tests, `npm run lint`, `npm run build`, and `72` Playwright specs with `1` debug-only HTML dump skipped by default.
-- Repo-root validation on April 27, 2026 is green: `.\run.ps1 -Verify` completes the locked install and full test path from repo root.
-- Judge screenshot artifacts under `source/frontend/e2e/screenshots/` regenerated at `1440x900`; nonblank luminance checks passed, with the darker satellite-debug dashboard expected.
-- Screenshot contact-sheet review passed for the current visual set: settings shows live provider/model status, timelapse shows a real video frame plus extracted-frame count, and agent-evaluation shows the operator query on the dialogue bus.
-- Playwright now starts fresh local web servers by default; set `PLAYWRIGHT_REUSE_SERVER=1` only when intentionally reusing already-running servers.
-- Context-menu and VLM visual specs now share canvas-relative helpers so live map markers do not make tests depend on a fragile viewport-center click.
-- The map has both right-click and button-driven spatial action paths; the shared test helper now falls back to the button path, the button is disabled until MapLibre layers are ready, and Escape closes the menu.
-- Playwright app navigation retries are now shared across all E2E specs through `source/frontend/e2e/runtime.ts`.
-- Agent Dialogue now exposes bus stats/injection failures in the panel so operator commands do not fail silently.
-- Ground Agent assistant failures now preserve API error payloads in the chat transcript, and its send control disables during empty/loading states.
-- Map-driven Agent Video Evaluation now checks non-OK bus and timelapse-analysis responses and routes failures back through the agent bus.
-- Map pin sync now has bounded frontend fetches, visible API failure copy, coordinate validation, and safe marker-label DOM rendering.
-- Inspect timelapse fallback text no longer implies an active generation job when the gallery only has partial evidence.
-- Copied cold-start `.env` files now stay offline-safe by default; direct Sentinel/NASA/GEE provider use should set `DISABLE_EXTERNAL_APIS=false` alongside credentials.
-- Depth Anything V3 is optional and disabled by default; the Settings toggle changes the current backend process only and reports missing `depth_anything_3` dependencies without failing app startup.
-- Repo-root verification is available through `.\run.ps1 -Verify` or `./run.sh --verify`.
-- The repo-root launcher start path was smoke-tested after copying `.env.example`; no listeners were left on ports `8000`, `8080`, or `5173`.
-- Remaining placeholder/fallback behavior is intentional and currently limited to safe offline paths:
-  - `core/inference.py`: non-fatal response when the manifest-resolved GGUF model is not installed.
-  - `core/vlm.py`: deterministic offline assist responses when optional vision pipelines are unavailable.
-  - `core/gallery.py`: final SVG chip only after ESRI and seeded-cache thumbnail fallbacks both fail.
+- Backend import-contract coverage is the fast broken-import/export guard.
+- Frontend `npm run lint` is the fast TypeScript import/export guard.
+- `npm run demo:judge` is the acceptance path for the judge proof demo.
+- Full local validation remains `.\run.ps1 -Verify` from repo root.
+- Current pass validation: `283` backend tests passed; frontend lint/build passed; normal `npm run test:e2e` passed `73` specs with `1` debug-only skip; `npm run demo:record` passed `5` demo specs.
+- Current dataset-cycle validation: dataset export produced `56` current-cycle samples, `24` seeded-cache rows, and `25` timelapse rows; bounded Qwen retag produced `179` assets and `26` temporal sequences with `74` reused image tags, `9` SVG placeholder skips, and zero tagger failures.
+- Hugging Face remote config verification: `default=179`, `temporal_sft=26`, `asset_metadata=179`, `retagged_assets=179`, `temporal_metadata=26`, `review_queue=179`.
+- Focused integrity cleanup validation: SimSat/import-contract pytest passed `16` tests; frontend `npm run lint` passed; `e2e/bbox.spec.ts` passed `3` tests; app Phase 9 map/timelapse Playwright passed `4` tests; `summary_bank.json` parsed; `git diff --check` reported only CRLF normalization warnings.
+- Focused cloud-gate/error-noise validation: API, scene QC, scorer, scanner, Sentinel seeding, and dataset-export tests passed `66` tests.
+- Latest docs WebMs were sampled into contact sheets and visually checked for distinct Manchar, Atacama, Greenland, Suez, Rondonia, Singapore maritime, and refreshed tutorial scenes. The current `docs/tutorial_video.webm` is `27.60s` with `28` unique 1 FPS sampled frame hashes; the refreshed `docs/judge-mode-demo.webm` is `22.80s` with `23` unique 1 FPS sampled frame hashes.
+- Sentinel Hub OAuth with current `.tools/.secrets/sh.txt` returned HTTP `200`; HF auth with current `.tools/.secrets/hf.txt` succeeds as `Shoozes`; the refreshed retagged dataset landed at data commit `5a2798e7d16cd76df08eff3725dcf3ade9340b58` and card commit `60e8ae913f61315740a640c532eb1aa9ae7cfe75`.
+- Latest replay/retag/API validation: backend replay and retag tests passed `12` tests; backend import/API guard passed `43` tests; full backend pytest passed `283` tests; frontend `npm run lint` and `npm run build` passed; the focused seeded replay Playwright flow passed and covers Fast Replay plus rescan visibility.
+- Latest targeted integrity pass: backend import/replay/export/seeded timelapse tests passed `14` tests; frontend `npm run lint` passed; `npm run demo:judge` passed and regenerated proof JSON with `evidence_frame`; `summary_bank.json` parsed; `git diff --check` reported only CRLF normalization warnings.

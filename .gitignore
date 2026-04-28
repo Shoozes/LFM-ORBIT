@@ -20,6 +20,7 @@ playwright-report/
 test-results/
 source/frontend/playwright/.cache/
 source/frontend/e2e/screenshots/
+source/frontend/e2e/artifacts/
 build/
 coverage/
 htmlcov/
@@ -118,3 +119,4 @@ Thumbs.db
 _gen_controller.pyw
 _generate_structure.py
 AGENTS.md
+Liquid_AI_x_DPhi_Space_Judging_Criteria.md

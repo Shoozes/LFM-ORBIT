@@ -11,6 +11,7 @@ def test_scene_quality_perfect_scene():
 
     assert result["accepted"] is True
     assert result["valid_pixel_ratio"] == 1.0
+    assert result["cloud_pixel_ratio"] == 0.0
     assert "excessive_nodata_clipping" not in result["reasons"]
 
 def test_scene_quality_rejects_heavy_clouds():
@@ -23,6 +24,7 @@ def test_scene_quality_rejects_heavy_clouds():
 
     assert result["accepted"] is False
     assert result["valid_pixel_ratio"] < 0.10
+    assert result["cloud_pixel_ratio"] > 0.90
     assert "insufficient_valid_pixels" in result["reasons"]
 
 def test_scene_quality_rejects_heavy_cirrus():
@@ -34,6 +36,7 @@ def test_scene_quality_rejects_heavy_cirrus():
 
     assert result["accepted"] is False
     assert result["valid_pixel_ratio"] < 0.10
+    assert result["cloud_pixel_ratio"] > 0.90
     assert "insufficient_valid_pixels" in result["reasons"]
 
 def test_scene_quality_rejects_edge_clipping():
@@ -44,4 +47,5 @@ def test_scene_quality_rejects_edge_clipping():
     result = evaluate_scene_quality(scl_band)
 
     assert result["accepted"] is False
+    assert result["nodata_pixel_ratio"] > 0.15
     assert "excessive_nodata_clipping" in result["reasons"]

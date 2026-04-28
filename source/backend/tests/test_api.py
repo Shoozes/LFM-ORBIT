@@ -7,10 +7,28 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from api.main import app
+from api.main import _is_windows_transport_disconnect_noise, _should_run_agent_pair_on_boot, app
 from core.depth_anything import clear_depth_anything_runtime_override
 
 client = TestClient(app)
+
+
+def test_agent_pair_boot_can_be_disabled_for_recorded_demos(monkeypatch):
+    monkeypatch.setenv("RUN_AGENT_PAIR_ON_BOOT", "false")
+    assert _should_run_agent_pair_on_boot() is False
+
+    monkeypatch.setenv("RUN_AGENT_PAIR_ON_BOOT", "true")
+    assert _should_run_agent_pair_on_boot() is True
+
+
+def test_windows_transport_disconnect_filter_is_narrow():
+    context = {
+        "exception": ConnectionResetError("closed by browser"),
+        "handle": "<Handle _ProactorBasePipeTransport._call_connection_lost(None)>",
+    }
+    assert _is_windows_transport_disconnect_noise(context) is True
+    assert _is_windows_transport_disconnect_noise({"exception": RuntimeError("boom"), "handle": context["handle"]}) is False
+    assert _is_windows_transport_disconnect_noise({"exception": ConnectionResetError("boom"), "handle": "other"}) is False
 
 
 def test_health_endpoint_returns_ok_status():

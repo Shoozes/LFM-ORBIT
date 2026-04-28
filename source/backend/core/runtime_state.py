@@ -6,6 +6,7 @@ from typing import Any
 
 from core.agent_bus import _connect as _bus_connect, init_bus
 from core.gallery import init_gallery
+from core.link_state import set_link_state
 from core.metrics import init_metrics, read_metrics_summary
 from core.mission import init_missions
 from core.observation_store import clear_observations
@@ -64,6 +65,7 @@ def reset_runtime_state(*, clear_observation_store_files: bool = False) -> dict[
     init_gallery(reset=True)
     init_missions(reset=True)
     init_metrics(reset=True)
+    set_link_state(True)
 
     removed_observations = 0
     if clear_observation_store_files:

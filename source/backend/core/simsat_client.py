@@ -87,7 +87,6 @@ class ImageryResponse:
 
 class SimSatClientError(Exception):
     """Exception raised for SimSat client errors."""
-    pass
 
 
 class SimSatClient:

@@ -1,5 +1,6 @@
 import logging
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -61,9 +62,58 @@ TIMELAPSE_PROVIDER_ORDER = (
 #   3. Unavailable
 # ---------------------------------------------------------------------------
 
-_SECRETS_FILE_PATH = Path(__file__).resolve().parents[3] / ".tools" / ".secrets" / "sentinel.txt"
+_SECRETS_DIR_PATH = Path(__file__).resolve().parents[3] / ".tools" / ".secrets"
+_SECRETS_FILE_PATH = _SECRETS_DIR_PATH / "sentinel.txt"
+_SH_SECRETS_FILE_PATH = _SECRETS_DIR_PATH / "sh.txt"
+_SENTINEL_SECRETS_FILE_PATHS = (_SECRETS_FILE_PATH, _SH_SECRETS_FILE_PATH)
 _NASA_SECRETS_FILE_PATH = Path(__file__).resolve().parents[3] / ".tools" / ".secrets" / "nasa.txt"
 _GEE_SECRETS_FILE_PATH = Path(__file__).resolve().parents[3] / ".tools" / ".secrets" / "gee.txt"
+
+_SENTINEL_CLIENT_ID_KEYS = (
+    "SENTINEL_CLIENT_ID",
+    "SENTINEL_HUB_CLIENT_ID",
+    "SH_CLIENT_ID",
+    "CLIENTID",
+)
+_SENTINEL_CLIENT_SECRET_KEYS = (
+    "SENTINEL_CLIENT_SECRET",
+    "SENTINEL_HUB_CLIENT_SECRET",
+    "SH_CLIENT_SECRET",
+    "CLIENT",
+)
+_SENTINEL_INSTANCE_ID_KEYS = (
+    "SENTINEL_INSTANCE_ID",
+    "SENTINEL_HUB_INSTANCE_ID",
+    "SH_INSTANCE_ID",
+    "SH_API_KEY",
+    "API",
+)
+
+_SENTINEL_LABEL_ALIASES = {
+    "API": "instance_id",
+    "APIKEY": "instance_id",
+    "API_KEY": "instance_id",
+    "INSTANCE": "instance_id",
+    "INSTANCEID": "instance_id",
+    "INSTANCE_ID": "instance_id",
+    "OGC": "instance_id",
+    "WMS": "instance_id",
+    "CLIENTID": "client_id",
+    "CLIENT_ID": "client_id",
+    "USER": "client_id",
+    "USERID": "client_id",
+    "USER_ID": "client_id",
+    "OAUTH_CLIENT": "client_id",
+    "OAUTH_CLIENT_ID": "client_id",
+    "CLIENT": "client_secret",
+    "CLIENTSECRET": "client_secret",
+    "CLIENT_SECRET": "client_secret",
+    "SECRET": "client_secret",
+    "OAUTH": "client_secret",
+    "OAUTHKEY": "client_secret",
+    "OAUTH_KEY": "client_secret",
+    "OAUTH_SECRET": "client_secret",
+}
 
 
 @dataclass(frozen=True)
@@ -72,6 +122,7 @@ class SentinelCredentials:
     client_id: str
     client_secret: str
     source: str  # "env", "file", or "unavailable"
+    instance_id: str = ""
 
     @property
     def available(self) -> bool:
@@ -98,6 +149,83 @@ def _parse_secrets_file(path: Path) -> dict[str, str]:
     return result
 
 
+def _read_plain_secret_lines(path: Path) -> list[str]:
+    """Read non-empty non-comment lines that are not KEY=VALUE pairs."""
+    result: list[str] = []
+    if not path.is_file():
+        return result
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" in stripped:
+                continue
+            result.append(stripped.strip("\"'"))
+    except OSError:
+        logger.debug("Unable to read secrets file %s", path, exc_info=True)
+    return result
+
+
+def _parse_labeled_secret_lines(path: Path) -> dict[str, str]:
+    """Parse local label/value secrets such as ``API <id>`` without logging values."""
+    result = {"client_id": "", "client_secret": "", "instance_id": ""}
+    if not path.is_file():
+        return result
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" in stripped:
+                continue
+            normalized = stripped.replace(":", " ", 1)
+            parts = normalized.split(maxsplit=1)
+            if len(parts) != 2:
+                continue
+            label = parts[0].strip().upper().replace("-", "_")
+            value = parts[1].strip().strip("\"'")
+            target = _SENTINEL_LABEL_ALIASES.get(label)
+            if target and value and not result[target]:
+                result[target] = value
+    except OSError:
+        logger.debug("Unable to read secrets file %s", path, exc_info=True)
+    return result
+
+
+def _first_secret_value(values: Mapping[str, str], keys: tuple[str, ...]) -> str:
+    for key in keys:
+        value = values.get(key, "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _parse_sentinel_credentials_file(path: Path) -> tuple[str, str, str]:
+    values = _parse_secrets_file(path)
+    client_id = _first_secret_value(values, _SENTINEL_CLIENT_ID_KEYS)
+    client_secret = _first_secret_value(values, _SENTINEL_CLIENT_SECRET_KEYS)
+    instance_id = _first_secret_value(values, _SENTINEL_INSTANCE_ID_KEYS)
+    if client_id and client_secret:
+        return client_id, client_secret, instance_id
+
+    labeled_values = _parse_labeled_secret_lines(path)
+    client_id = client_id or labeled_values["client_id"]
+    client_secret = client_secret or labeled_values["client_secret"]
+    instance_id = instance_id or labeled_values["instance_id"]
+    if client_id and client_secret:
+        return client_id, client_secret, instance_id
+
+    plain_lines = _read_plain_secret_lines(path)
+    if len(plain_lines) >= 3:
+        # Trial bundle format:
+        #   line 1: API/OGC instance key
+        #   line 2: OAuth secret
+        #   line 3: OAuth client/user id
+        return plain_lines[2].strip(), plain_lines[1].strip(), plain_lines[0].strip()
+    if len(plain_lines) >= 2:
+        # Legacy seed_sentinel_cache.py format was secret on line 1, id on line 2.
+        return plain_lines[1].strip(), plain_lines[0].strip(), instance_id
+
+    return "", "", instance_id
+
+
 def resolve_sentinel_credentials(secrets_path: Path | None = None) -> SentinelCredentials:
     """Resolve Sentinel credentials using the defined priority order.
 
@@ -105,24 +233,37 @@ def resolve_sentinel_credentials(secrets_path: Path | None = None) -> SentinelCr
         secrets_path: Override path for the secrets file (used in tests).
     """
     # 1. Environment variables first
-    env_id = os.environ.get("SENTINEL_CLIENT_ID", "").strip()
-    env_secret = os.environ.get("SENTINEL_CLIENT_SECRET", "").strip()
+    env_values = os.environ
+    env_id = _first_secret_value(env_values, _SENTINEL_CLIENT_ID_KEYS)
+    env_secret = _first_secret_value(env_values, _SENTINEL_CLIENT_SECRET_KEYS)
+    env_instance_id = _first_secret_value(env_values, _SENTINEL_INSTANCE_ID_KEYS)
     if env_id and env_secret:
         logger.debug("Sentinel credentials resolved from environment variables")
-        return SentinelCredentials(client_id=env_id, client_secret=env_secret, source="env")
+        return SentinelCredentials(
+            client_id=env_id,
+            client_secret=env_secret,
+            source="env",
+            instance_id=env_instance_id,
+        )
 
     # 2. File fallback (local/dev only)
-    file_path = secrets_path if secrets_path is not None else _SECRETS_FILE_PATH
-    file_values = _parse_secrets_file(file_path)
-    file_id = file_values.get("SENTINEL_CLIENT_ID", "").strip()
-    file_secret = file_values.get("SENTINEL_CLIENT_SECRET", "").strip()
-    if file_id and file_secret:
-        logger.debug("Sentinel credentials resolved from %s", file_path)
-        return SentinelCredentials(client_id=file_id, client_secret=file_secret, source="file")
+    file_paths = (secrets_path,) if secrets_path is not None else _SENTINEL_SECRETS_FILE_PATHS
+    checked_paths = []
+    for file_path in file_paths:
+        checked_paths.append(file_path)
+        file_id, file_secret, file_instance_id = _parse_sentinel_credentials_file(file_path)
+        if file_id and file_secret:
+            logger.debug("Sentinel credentials resolved from %s", file_path)
+            return SentinelCredentials(
+                client_id=file_id,
+                client_secret=file_secret,
+                source="file",
+                instance_id=file_instance_id,
+            )
 
     # 3. Unavailable
-    logger.debug("Sentinel credentials not available (checked env and %s)", file_path)
-    return SentinelCredentials(client_id="", client_secret="", source="unavailable")
+    logger.debug("Sentinel credentials not available (checked env and %s)", checked_paths)
+    return SentinelCredentials(client_id="", client_secret="", source="unavailable", instance_id="")
 
 
 @dataclass(frozen=True)

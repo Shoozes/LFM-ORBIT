@@ -88,6 +88,8 @@ export type AlertItem = {
   observation_source?: string;
   before_window?: ScanWindow;
   after_window?: ScanWindow;
+  analysis_summary?: string;
+  ground_action?: string;
   timestamp?: string;
   downlinked?: boolean;
   demo_forced_anomaly?: boolean;

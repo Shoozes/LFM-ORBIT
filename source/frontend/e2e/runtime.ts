@@ -51,6 +51,21 @@ export async function loadSeededReplay(request: APIRequestContext, replayId = "r
   return response.json();
 }
 
+export async function startMission(
+  request: APIRequestContext,
+  body: {
+    task_text: string;
+    bbox: number[];
+    start_date: string;
+    end_date: string;
+    use_case_id: string;
+  },
+) {
+  const response = await request.post(`${API_BASE}/api/mission/start`, { data: body });
+  expect(response.ok()).toBeTruthy();
+  return response.json();
+}
+
 export async function waitForLinkOpen(page: Page, timeoutMs = 30_000) {
   await expect(page.getByText("LINK OPEN")).toBeVisible({ timeout: timeoutMs });
 }

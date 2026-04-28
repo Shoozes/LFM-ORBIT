@@ -1,7 +1,6 @@
-"""
-Spectral index utilities for remote sensing analysis.
-Provides pure functions for common vegetation and disturbance indices.
-"""
+"""Spectral index utilities for remote sensing analysis."""
+
+from typing import Any
 
 def compute_ndvi(nir: float, red: float) -> float:
     """Normalized Difference Vegetation Index."""
@@ -9,6 +8,32 @@ def compute_ndvi(nir: float, red: float) -> float:
     if denominator <= 0:
         return 0.0
     return (nir - red) / denominator
+
+def compute_ndvi_from_bands(bands: dict[str, Any]) -> dict[str, Any]:
+    """Compute NDVI only when explicit NIR and Red bands are available."""
+    if "nir" not in bands or "red" not in bands:
+        return {
+            "available": False,
+            "abstain": True,
+            "ndvi": None,
+            "reason": "NDVI requires explicit NIR and Red bands.",
+        }
+    try:
+        nir = float(bands["nir"])
+        red = float(bands["red"])
+    except (TypeError, ValueError):
+        return {
+            "available": False,
+            "abstain": True,
+            "ndvi": None,
+            "reason": "NDVI requires numeric NIR and Red bands.",
+        }
+    return {
+        "available": True,
+        "abstain": False,
+        "ndvi": compute_ndvi(nir, red),
+        "reason": "",
+    }
 
 def compute_evi2(nir: float, red: float) -> float:
     """Two-band Enhanced Vegetation Index (EVI2).

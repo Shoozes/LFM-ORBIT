@@ -113,7 +113,7 @@ def _read_monitor_reports(monitor_reports_dir: Path | None) -> list[tuple[Path, 
         return []
     root = Path(monitor_reports_dir)
     if not root.exists():
-        raise FileNotFoundError(f"monitor reports path not found: {root}")
+        return []
     paths = [root] if root.is_file() else sorted(root.rglob("*.json"))
     reports: list[tuple[Path, dict[str, Any]]] = []
     for path in paths:
@@ -412,11 +412,88 @@ def _build_api_observation_record(observation: dict[str, Any], *, eval_ratio: fl
     }
 
 
+def _build_seeded_cache_record(meta_path: Path, *, eval_ratio: float) -> dict[str, Any] | None:
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    sig = str(meta.get("chunk_signature") or "").strip()
+    if not sig:
+        return None
+    sample_id = _sample_id(f"seeded_{sig}", sig)
+    training_ready = bool(meta.get("training_ready", False))
+    frame_dates = list(meta.get("frame_dates", [])) if isinstance(meta.get("frame_dates"), list) else []
+    date_windows = list(meta.get("date_windows", [])) if isinstance(meta.get("date_windows"), list) else []
+    frame_quality = list(meta.get("frame_quality", [])) if isinstance(meta.get("frame_quality"), list) else []
+    rejected_windows = list(meta.get("rejected_windows", [])) if isinstance(meta.get("rejected_windows"), list) else []
+    location_name = str(meta.get("location_name") or "")
+    use_case_id = str(meta.get("use_case_id") or "").strip()
+    target_category = str(meta.get("target_category") or "").strip()
+    target_task = str(meta.get("target_task") or "").strip()
+    inferred_deforestation = "rond" in location_name.lower()
+    return {
+        "sample_id": sample_id,
+        "split": _split_for_key(sample_id, eval_ratio),
+        "record_type": "seeded_cache",
+        "review_state": "seeded_training_ready" if training_ready else "seeded_cached",
+        "label_tier": "silver" if training_ready else "unlabeled",
+        "target_action": "review",
+        "target_category": target_category or ("deforestation" if inferred_deforestation else "temporal_change"),
+        "target_task": target_task or ("deforestation_detection" if inferred_deforestation else "temporal_change_review"),
+        "region_id": REGION.region_id,
+        "event_id": f"seeded_{sig}",
+        "cell_id": f"seeded_{sig}",
+        "chunk_signature": sig,
+        "timestamp": frame_dates[-1] if frame_dates else str(meta.get("end_date") or ""),
+        "change_score": 0.0,
+        "confidence": 0.0,
+        "priority": "review",
+        "reason_codes": ["seeded_data", "training_ready"] if training_ready else ["seeded_data"],
+        "observation_source": str(meta.get("source") or "seeded_cache"),
+        "demo_forced_anomaly": False,
+        "before_window": {"label": frame_dates[0]} if frame_dates else None,
+        "after_window": {"label": frame_dates[-1]} if frame_dates else None,
+        "bbox": meta.get("bbox"),
+        "frame_dates": frame_dates,
+        "date_windows": date_windows,
+        "frame_quality": frame_quality,
+        "rejected_windows": rejected_windows,
+        "frames_count": int(meta.get("frames_count") or 0),
+        "seeded_meta_path": str(meta_path),
+        "visual_mode": meta.get("visual_mode"),
+        "location_name": location_name,
+        "region_note": meta.get("region_note"),
+        "use_case_id": use_case_id or None,
+        "confirmation_source": "seeded_data",
+        "timelapse_analysis": str(meta.get("vlm_explanation") or "").strip() or None,
+        "rejection_reason": None,
+        "lat": meta.get("lat"),
+        "lng": meta.get("lon"),
+        "assets": {
+            "context_thumb": None,
+            "timelapse": None,
+        },
+    }
+
+
+def _read_seeded_cache_records(*, eval_ratio: float) -> list[dict[str, Any]]:
+    if not _SEEDED_DATA_DIR.exists():
+        return []
+    records: list[dict[str, Any]] = []
+    for meta_path in sorted(_SEEDED_DATA_DIR.glob("sh_*_meta.json")):
+        record = _build_seeded_cache_record(meta_path, eval_ratio=eval_ratio)
+        if record is not None:
+            records.append(record)
+    return records
+
+
 def build_export_records(
     limit: int = 200,
     eval_ratio: float = 0.2,
     include_rejects: bool = True,
     include_api_observations: bool = False,
+    include_seeded_cache: bool = False,
     monitor_reports_dir: Path | None = None,
 ) -> list[dict[str, Any]]:
     alerts = get_recent_alerts(limit=limit).get("alerts", [])
@@ -440,6 +517,31 @@ def build_export_records(
         for observation in list_observations(training_ready_only=False):
             record = _build_api_observation_record(observation, eval_ratio=eval_ratio)
             if record is not None:
+                records.append(record)
+
+    if include_seeded_cache:
+        seeded_records = _read_seeded_cache_records(eval_ratio=eval_ratio)
+        seeded_signatures = {
+            str(record.get("chunk_signature") or "")
+            for record in seeded_records
+            if record.get("chunk_signature")
+        }
+        if seeded_signatures:
+            records = [
+                record
+                for record in records
+                if not (
+                    record.get("record_type") == "api_observation"
+                    and str(record.get("chunk_signature") or "") in seeded_signatures
+                )
+            ]
+        seen_signatures = {
+            str(record.get("chunk_signature") or "")
+            for record in records
+            if record.get("chunk_signature")
+        }
+        for record in seeded_records:
+            if str(record.get("chunk_signature") or "") not in seen_signatures:
                 records.append(record)
 
     for source_path, report in _read_monitor_reports(monitor_reports_dir):
@@ -480,6 +582,7 @@ def write_dataset_export(
     eval_ratio: float = 0.2,
     include_rejects: bool = True,
     include_api_observations: bool = False,
+    include_seeded_cache: bool = False,
     monitor_reports_dir: Path | None = None,
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -491,6 +594,7 @@ def write_dataset_export(
         eval_ratio=eval_ratio,
         include_rejects=include_rejects,
         include_api_observations=include_api_observations,
+        include_seeded_cache=include_seeded_cache,
         monitor_reports_dir=monitor_reports_dir,
     )
     train_count = 0
@@ -501,6 +605,7 @@ def write_dataset_export(
     control_count = 0
     positive_count = 0
     api_observation_count = 0
+    seeded_cache_count = 0
     monitor_report_count = 0
     use_case_counts: dict[str, int] = {}
 
@@ -524,7 +629,7 @@ def write_dataset_export(
                     str(gallery_item["timelapse_analysis"]),
                     encoding="utf-8",
                 )
-        elif record["record_type"] == "api_observation":
+        elif record["record_type"] in {"api_observation", "seeded_cache"}:
             record["assets"]["timelapse"] = _write_asset(
                 sample_dir,
                 "timelapse",
@@ -546,6 +651,8 @@ def write_dataset_export(
             control_count += 1
         elif record["record_type"] == "api_observation":
             api_observation_count += 1
+        elif record["record_type"] == "seeded_cache":
+            seeded_cache_count += 1
         elif record["record_type"] == "monitor_report":
             monitor_report_count += 1
         else:
@@ -599,6 +706,7 @@ def write_dataset_export(
         "positive_records": positive_count,
         "control_records": control_count,
         "api_observation_records": api_observation_count,
+        "seeded_cache_records": seeded_cache_count,
         "monitor_report_records": monitor_report_count,
         "train_records": train_count,
         "eval_records": eval_count,
@@ -621,6 +729,7 @@ def write_dataset_export(
             "Every export row attempts to materialize a local context thumbnail from gallery evidence or persisted map-pin coordinates.",
             "Each row is auto-classified against the temporal use-case catalog and mirrored into chat-style training JSONL.",
             "API observation rows can be included from the local observation store for near-autonomous data-prep refinement.",
+            "Seeded cache rows can be included directly from assets/seeded_data for replay and timelapse training packs.",
             "Persisted maritime and lifeline monitor-report JSON files can be imported as generated monitor rows.",
             "Ground rejections are weak negatives with explicit provenance rather than operator-reviewed gold controls.",
         ],
@@ -645,6 +754,11 @@ def _parse_args() -> argparse.Namespace:
         help="Skip cached API observation-store rows. CLI exports include them by default.",
     )
     parser.add_argument(
+        "--include-seeded-cache",
+        action="store_true",
+        help="Include WebM timelapses and metadata directly from assets/seeded_data.",
+    )
+    parser.add_argument(
         "--monitor-reports-dir",
         type=Path,
         default=None,
@@ -662,11 +776,12 @@ def main() -> int:
         eval_ratio=eval_ratio,
         include_rejects=not args.no_rejects,
         include_api_observations=not args.no_api_observations,
+        include_seeded_cache=args.include_seeded_cache,
         monitor_reports_dir=args.monitor_reports_dir,
     )
     print(
         "[Orbit] Exported {records} samples to {path} "
-        "({positive_records} positives, {control_records} controls, {api_observation_records} api observations, {monitor_report_records} monitor reports, {train_records} train / {eval_records} eval, {records_with_context_thumb} with context)".format(
+        "({positive_records} positives, {control_records} controls, {api_observation_records} api observations, {seeded_cache_records} seeded cache, {monitor_report_records} monitor reports, {train_records} train / {eval_records} eval, {records_with_context_thumb} with context)".format(
             path=args.output_dir,
             **manifest,
         )

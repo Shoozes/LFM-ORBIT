@@ -20,11 +20,20 @@ from core.config import (
     REGION,
     SentinelCredentials,
 )
-from core.scene_qc import evaluate_scene_quality
+from core.scene_qc import INVALID_SCL_CLASSES, evaluate_scene_quality
 import os
 
 def _get_sentinel_instance_id():
-    return os.environ.get("SENTINEL_INSTANCE_ID", "")
+    explicit = os.environ.get("SENTINEL_INSTANCE_ID", "").strip()
+    if explicit:
+        return explicit
+    try:
+        from core.config import resolve_sentinel_credentials
+
+        return resolve_sentinel_credentials().instance_id.strip()
+    except Exception:
+        logger.debug("Unable to resolve Sentinel Hub instance id from configured credentials", exc_info=True)
+        return ""
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +159,7 @@ def _fetch_window_bands(bbox_coords: tuple, start_date: str, end_date: str, inst
                 logger.debug(f"Skipping scene frame due to QC flags: {qc_result['reasons']}")
                 continue
 
-            valid_mask = ~np.isin(scl_band.astype(int), [0, 1, 3, 8, 9, 10])
+            valid_mask = ~np.isin(scl_band.astype(int), INVALID_SCL_CLASSES)
             valid_count = valid_mask.sum()
             pixel_count = arr.shape[0] * arr.shape[1]
 

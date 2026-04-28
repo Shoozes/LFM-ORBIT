@@ -11,7 +11,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
     // 1. Mission tab
     await page.getByTestId("tab-mission").click();
     await expect(page.getByText("New Mission", { exact: true })).toBeVisible();
-    await expect(page.getByPlaceholder("Search for areas")).toBeVisible();
+    await expect(page.getByTestId("mission-task-input")).toBeVisible();
 
     // 2. Agents tab
     await page.getByTestId("tab-agents").click();
@@ -52,7 +52,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
   test("verify Mission Control text entry and Launch behavior", async ({ page }) => {
     await page.getByTestId("tab-mission").click();
 
-    await page.fill('textarea[placeholder*="Search for areas"]', "Detect canopy loss");
+    await page.getByTestId("mission-task-input").fill("Detect canopy loss");
 
     const launchBtn = page.getByRole("button", { name: /Launch Mission|Mission Complete/i });
     await expect(launchBtn).toBeEnabled();

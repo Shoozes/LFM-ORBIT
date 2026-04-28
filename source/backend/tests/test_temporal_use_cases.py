@@ -4,7 +4,13 @@ from core.temporal_use_cases import classify_temporal_use_case, list_temporal_us
 def test_temporal_use_case_catalog_includes_required_examples():
     cases = {case["id"]: case for case in list_temporal_use_cases()}
 
-    for use_case_id in ("wildfire", "maritime_activity", "civilian_lifeline_disruption", "ice_cap_growth"):
+    for use_case_id in (
+        "wildfire",
+        "maritime_activity",
+        "civilian_lifeline_disruption",
+        "ice_cap_growth",
+        "volcanic_surface_change",
+    ):
         assert use_case_id in cases
         assert cases[use_case_id]["temporal_methods"]
         assert cases[use_case_id]["examples"]
@@ -40,15 +46,31 @@ def test_temporal_use_case_classifier_handles_mission_text():
             "task_text": "Run a close transportation mix scan over the Florida I-4 and SR-536 interchange near Walt Disney World for road access and public mobility.",
         }
     )
-    florida_wildfire = classify_temporal_use_case(
+    highway82_wildfire = classify_temporal_use_case(
         {
-            "task_text": "Review dry Florida wildfire conditions around Big Cypress and Alligator Alley for smoke, burn scar, and vegetation stress.",
+            "task_text": "Review the Highway 82 wildfire near Atkinson and Waynesville, Georgia for smoke, burn scar, and vegetation stress.",
         }
     )
+    future_fire_watch = classify_temporal_use_case(
+        {
+            "task_text": "Watch the SPC Day 2 critical fire-weather corridor across eastern New Mexico and western Texas for new smoke plume or burn-scar evidence.",
+        }
+    )
+    mauna_loa = classify_temporal_use_case(
+        {
+            "task_text": "Review Mauna Loa lava flow and post eruption volcanic surface change in SWIR frames.",
+            "reason_codes": ["lava_flow", "post_eruption_recovery"],
+            "target_category": "volcanic_surface_change",
+        }
+    )
+    explicit_volcanic = classify_temporal_use_case({}, requested_use_case_id="volcanic_surface_change")
 
     assert wildfire["id"] == "wildfire"
     assert maritime["id"] == "maritime_activity"
     assert ice["id"] == "ice_cap_growth"
     assert lifeline["id"] == "civilian_lifeline_disruption"
     assert traffic["id"] == "civilian_lifeline_disruption"
-    assert florida_wildfire["id"] == "wildfire"
+    assert highway82_wildfire["id"] == "wildfire"
+    assert future_fire_watch["id"] == "wildfire"
+    assert mauna_loa["id"] == "volcanic_surface_change"
+    assert explicit_volcanic["target_category"] == "volcanic_surface_change"

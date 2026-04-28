@@ -1,0 +1,38 @@
+{
+  "replay_id": "georgia_wildfire_replay",
+  "title": "Highway 82 Wildfire Candidate Replay",
+  "description": "Current-event wildfire candidate replay using SWIR/NIR/Red Sentinel-2 burn-scar composites.",
+  "task_text": "Review the Highway 82 wildfire near Atkinson and Waynesville, Georgia for smoke, burn scar, and vegetation stress.",
+  "summary": "A candidate-quality wildfire replay. It keeps source dates visible and treats the sequence as review evidence, not a retroactive certainty claim.",
+  "bbox": [-81.916, 31.143, -81.756, 31.303],
+  "start_date": "2026-04-01",
+  "end_date": "2026-04-28",
+  "cells_scanned": 4,
+  "flags_found": 1,
+  "primary_cell_id": "wildfire_highway_82_candidate",
+  "alerts": [
+    {
+      "cell_id": "wildfire_highway_82_candidate",
+      "lat": 31.223,
+      "lng": -81.836,
+      "seeded_video": "sh_4015e8b8",
+      "event_id": "replay_georgia_highway82_wildfire",
+      "change_score": 0.66,
+      "confidence": 0.74,
+      "priority": "high",
+      "reason_codes": ["burn_scar", "ndmi_drop", "smoke_plume", "candidate_review"],
+      "observation_source": "seeded_sentinelhub_replay",
+      "before_window": {"label": "pre-fire", "quality": 0.88, "burn_context": "pre_event_reference", "flags": []},
+      "after_window": {"label": "latest-clear", "quality": 0.86, "burn_context": "candidate_burn_scar_review", "flags": ["burn_scar"]},
+      "timelapse_analysis": "The SWIR/NIR/Red sequence compares pre-fire, ignition-window, active-fire, and latest-clear frames for burn-scar review while preserving the candidate label.",
+      "analysis_summary": "The mission is useful as a show-ready wildfire candidate while avoiding a stronger claim than the imagery supports.",
+      "satellite_note": "Orbital triage detected a burn-scar candidate in the Highway 82 fire window.",
+      "ground_note": "Ground review keeps this as candidate evidence that needs source-backed follow-up before hard labeling.",
+      "ground_action": "REVIEW — wildfire candidate packet is downlink-ready, but remains candidate-quality until post-window verification.",
+      "findings": [
+        "SWIR/NIR/Red composite is appropriate for burn-scar review",
+        "The packet preserves date windows so later verification can confirm or reject the candidate"
+      ]
+    }
+  ]
+}

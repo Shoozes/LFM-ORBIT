@@ -13,9 +13,12 @@ import { Mission } from "../types/mission";
 
 type ReplayCatalogItem = {
   replay_id: string;
+  source_kind?: "curated_replay" | "seeded_cache" | string;
   title: string;
   description: string;
   summary: string;
+  bbox?: number[] | null;
+  use_case_id?: string | null;
   alert_count: number;
   cells_scanned: number;
   primary_cell_id: string;
@@ -79,8 +82,8 @@ type ApiErrorPayload = {
 const MARITIME_PREVIEW_TARGET = {
   lat: 29.92,
   lon: 32.54,
-  timestamp: "2025-03-15",
-  bbox: [32.38, 29.78, 32.7, 30.06],
+  timestamp: "2025-12-15",
+  bbox: [32.5, 29.88, 32.58, 29.96],
   taskText: "Review maritime vessel queueing near the Suez channel.",
 };
 
@@ -124,31 +127,42 @@ const MISSION_LOCATION_PRESETS: MissionPreset[] = [
     place: "Greenland coast",
     useCaseId: "ice_cap_growth",
     taskText: "Compare same-season Greenland ice cap and glacier edge frames for true growth or retreat.",
-    bbox: [-50.6, 69.0, -49.5, 69.8],
-    startDate: "2021-07-01",
-    endDate: "2025-07-01",
+    bbox: [-51.13, 69.1, -50.97, 69.26],
+    startDate: "2024-01-15",
+    endDate: "2025-10-15",
     tone: "ice",
   },
   {
-    id: "wildfire_florida_dry",
+    id: "wildfire_highway82",
     label: "Wildfire",
-    place: "Big Cypress / I-75",
+    place: "Highway 82 fire",
     useCaseId: "wildfire",
-    taskText: "Review dry Florida wildfire conditions around Big Cypress and Alligator Alley for smoke, burn scar, and vegetation stress.",
-    bbox: [-81.55, 25.65, -80.75, 26.25],
-    startDate: "2026-02-01",
-    endDate: "2026-04-24",
+    taskText: "Review the Highway 82 wildfire near Atkinson and Waynesville, Georgia for smoke, burn scar, and vegetation stress.",
+    bbox: [-81.916, 31.143, -81.756, 31.303],
+    startDate: "2026-04-01",
+    endDate: "2026-04-28",
     tone: "fire",
   },
   {
-    id: "flood_bangladesh",
+    id: "wildfire_future_spc_high_plains",
+    label: "Fire Watch",
+    place: "SPC D2 High Plains",
+    useCaseId: "wildfire",
+    taskText: "Watch the SPC Day 2 critical fire-weather corridor across eastern New Mexico and western Texas for new smoke plume, active-fire, or burn-scar evidence after the valid window.",
+    bbox: [-104.9, 31.0, -101.1, 35.5],
+    startDate: "2026-04-28",
+    endDate: "2026-04-29",
+    tone: "fire",
+  },
+  {
+    id: "flood_manchar",
     label: "Flood",
-    place: "Bangladesh floodplain",
+    place: "Manchar Lake flood",
     useCaseId: "flood_extent",
-    taskText: "Find new surface water outside the normal Bangladesh river channel after a storm sequence.",
-    bbox: [90.1, 23.2, 91.0, 24.0],
-    startDate: "2025-05-01",
-    endDate: "2025-08-01",
+    taskText: "Find new surface water and overflow around Pakistan's Manchar Lake during the 2022 flood sequence.",
+    bbox: [67.63, 26.31, 67.87, 26.55],
+    startDate: "2022-06-15",
+    endDate: "2022-09-15",
     tone: "flood",
   },
   {
@@ -179,9 +193,9 @@ const MISSION_LOCATION_PRESETS: MissionPreset[] = [
     place: "Atacama open pit",
     useCaseId: "mining_expansion",
     taskText: "Detect Atacama open-pit mining expansion and separate persistent bare earth from seasonal vegetation loss.",
-    bbox: [-70.6, -23.8, -69.8, -23.1],
-    startDate: "2023-01-01",
-    endDate: "2026-01-01",
+    bbox: [-69.115, -24.29, -69.035, -24.21],
+    startDate: "2024-01-15",
+    endDate: "2025-12-15",
     tone: "mining",
   },
 ];
@@ -249,7 +263,9 @@ type MissionControlProps = {
   onRefresh: () => void;
   isScanComplete?: boolean;
   onReplayLoaded?: (primaryCellId: string | null) => void | Promise<void>;
+  onReplayRescanStarted?: (mission: Mission) => void | Promise<void>;
   onPreviewBbox?: (bbox: number[]) => void;
+  initialPresetId?: string | null;
 };
 
 export default function MissionControl({
@@ -263,7 +279,9 @@ export default function MissionControl({
   onRefresh,
   isScanComplete,
   onReplayLoaded,
+  onReplayRescanStarted,
   onPreviewBbox,
+  initialPresetId = null,
 }: MissionControlProps) {
   const apiBase = getApiBaseUrl();
   const [task, setTask] = useState("");
@@ -311,6 +329,24 @@ export default function MissionControl({
     setEndDate(preset.endDate);
     onPreviewBbox?.([...preset.bbox]);
   };
+
+  useEffect(() => {
+    if (!isOpen || !initialPresetId || selectedPresetId === initialPresetId) {
+      return;
+    }
+    const preset = MISSION_LOCATION_PRESETS.find((item) => item.id === initialPresetId);
+    if (!preset) {
+      return;
+    }
+    setSelectedPresetId(preset.id);
+    setSelectedUseCaseId(preset.useCaseId);
+    setMonitorPreview(null);
+    setErrorMsg("");
+    setTask(preset.taskText);
+    setStartDate(preset.startDate);
+    setEndDate(preset.endDate);
+    onPreviewBbox?.([...preset.bbox]);
+  }, [initialPresetId, isOpen, onPreviewBbox, selectedPresetId]);
 
   const handleSubmit = async () => {
     if (!task.trim()) return;
@@ -372,6 +408,34 @@ export default function MissionControl({
       setReplayNotice("Seeded replay loaded into Mission, Logs, Inspect, and Agent Dialogue.");
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : "Replay failed to load.");
+    } finally {
+      setReplayBusyId(null);
+    }
+  };
+
+  const handleReplayRescan = async (replay: ReplayCatalogItem) => {
+    setReplayBusyId(replay.replay_id);
+    setReplayNotice("");
+    setErrorMsg("");
+    try {
+      const response = await fetch(`${apiBase}/api/replay/rescan/${replay.replay_id}`, { method: "POST" });
+      const payload = (await response.json()) as { error?: string; mission?: Mission };
+      if (!response.ok || !payload.mission) {
+        throw new Error(payload.error || "Replay rescan failed");
+      }
+      if (onReplayRescanStarted) {
+        await onReplayRescanStarted(payload.mission);
+      } else {
+        await onRefresh();
+      }
+      if (payload.mission.bbox) {
+        onPreviewBbox?.([...payload.mission.bbox]);
+      } else if (replay.bbox) {
+        onPreviewBbox?.([...replay.bbox]);
+      }
+      setReplayNotice("Live rescan started from replay metadata with the current model/runtime stack.");
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : "Replay rescan failed.");
     } finally {
       setReplayBusyId(null);
     }
@@ -547,35 +611,61 @@ export default function MissionControl({
           )}
 
           {replays.length > 0 && (
-            <div className="space-y-2">
-              <label className="block text-[10px] uppercase tracking-wider font-semibold text-zinc-500">
-                Seeded Replay
-              </label>
+            <div className="space-y-2" data-testid="fast-replay-panel">
+              <div className="flex items-center justify-between gap-3">
+                <label className="block text-[10px] uppercase tracking-wider font-semibold text-zinc-500">
+                  Fast Replay
+                </label>
+                <span className="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold">
+                  {replays.length} saved
+                </span>
+              </div>
               <p className="text-xs text-zinc-600 leading-relaxed">
-                Load a completed mission with bundled timelapses, persisted alerts, and agent reasoning so judges can inspect a finished Orbit run without waiting on live scan timing.
+                Load a completed mission instantly, or rescan the same bbox/date window with the current model after runtime updates.
               </p>
               <div className="space-y-3">
                 {replays.map((replay) => (
                   <div key={replay.replay_id} className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-zinc-900">{replay.title}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-zinc-900">{replay.title}</p>
+                          <span className={`rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${
+                            replay.source_kind === "seeded_cache"
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : "border-cyan-200 bg-cyan-50 text-cyan-700"
+                          }`}>
+                            {replay.source_kind === "seeded_cache" ? "Seeded Cache" : "Curated Replay"}
+                          </span>
+                        </div>
                         <p className="mt-1 text-xs text-zinc-600 leading-snug">{replay.description}</p>
                       </div>
-                      <button
-                        type="button"
-                        data-testid={`load-replay-${replay.replay_id}`}
-                        onClick={() => void handleReplayLoad(replay.replay_id)}
-                        disabled={submitting || replayBusyId !== null || hasBlockingLiveMission}
-                        className="shrink-0 rounded border border-cyan-200 bg-white px-3 py-1.5 text-[10px] uppercase tracking-wider text-cyan-700 hover:bg-cyan-50 disabled:opacity-40 disabled:cursor-not-allowed transition font-semibold"
-                      >
-                        {replayBusyId === replay.replay_id ? "Loading..." : mission?.mission_mode === "replay" ? "Replace Replay" : "Load Replay"}
-                      </button>
+                      <div className="flex shrink-0 flex-col gap-1.5">
+                        <button
+                          type="button"
+                          data-testid={`load-replay-${replay.replay_id}`}
+                          onClick={() => void handleReplayLoad(replay.replay_id)}
+                          disabled={submitting || replayBusyId !== null || hasBlockingLiveMission}
+                          className="rounded border border-cyan-200 bg-white px-3 py-1.5 text-[10px] uppercase tracking-wider text-cyan-700 hover:bg-cyan-50 disabled:opacity-40 disabled:cursor-not-allowed transition font-semibold"
+                        >
+                          {replayBusyId === replay.replay_id ? "Loading..." : mission?.mission_mode === "replay" ? "Replace Replay" : "Load Replay"}
+                        </button>
+                        <button
+                          type="button"
+                          data-testid={`rescan-replay-${replay.replay_id}`}
+                          onClick={() => void handleReplayRescan(replay)}
+                          disabled={submitting || replayBusyId !== null || hasBlockingLiveMission}
+                          className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-[10px] uppercase tracking-wider text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed transition font-semibold"
+                        >
+                          Rescan
+                        </button>
+                      </div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
                       <span>{replay.cells_scanned} cells scanned</span>
                       <span>{replay.alert_count} alerts loaded</span>
                       <span>Primary: {replay.primary_cell_id}</span>
+                      {replay.use_case_id && <span>{replay.use_case_id.replace(/_/g, " ")}</span>}
                     </div>
                     {replay.summary && (
                       <p className="mt-2 text-xs text-zinc-600 leading-snug">{replay.summary}</p>
@@ -702,10 +792,11 @@ export default function MissionControl({
                 }}
                 className="text-[10px] font-bold text-zinc-400 hover:text-zinc-600 transition"
               >
-                Use Suggested Template
+                Use Forest Template
               </button>
             </div>
             <textarea
+              data-testid="mission-task-input"
               ref={textareaRef}
               value={task}
               onChange={(e) => {
@@ -714,7 +805,7 @@ export default function MissionControl({
                 setSelectedUseCaseId(null);
               }}
               rows={3}
-              placeholder="Search for areas where deforestation seems to have occurred…"
+              placeholder="Describe the satellite mission, target signal, and review outcome..."
               className="w-full resize-none rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 outline-none"
             />
           </div>

@@ -14,6 +14,10 @@ from pathlib import Path
 
 
 PROVIDERS = ("heuristic", "queue", "ollama", "openai")
+DEFAULT_PROVIDER = "ollama"
+DEFAULT_OLLAMA_MODEL = "qwen3.6:27b"
+DEFAULT_MAX_PROVIDER_ASSETS = "16"
+DEFAULT_MAX_PROVIDER_SEQUENCES = "0"
 DEFAULT_DATASET_DIR = Path(__file__).resolve().parents[3] / "runtime-data" / "modeling" / "orbit-export"
 
 
@@ -27,6 +31,8 @@ def build_retag_command(
     min_video_frames: int,
     scan_loose_assets: bool,
     temporal_sequences: bool,
+    max_provider_assets: int = 16,
+    max_provider_sequences: int = 0,
 ) -> list[str]:
     """Build the subprocess command used by the Tkinter wrapper."""
     if provider not in PROVIDERS:
@@ -43,6 +49,10 @@ def build_retag_command(
         str(max(1, int(video_frame_count))),
         "--min-video-frames",
         str(max(2, int(min_video_frames))),
+        "--max-provider-assets",
+        str(int(max_provider_assets)),
+        "--max-provider-sequences",
+        str(int(max_provider_sequences)),
     ]
     if output_dir is not None:
         command.extend(["--output-dir", str(output_dir)])
@@ -52,6 +62,35 @@ def build_retag_command(
         command.append("--no-loose-scan")
     if not temporal_sequences:
         command.append("--no-temporal-sequences")
+    return command
+
+
+def build_hf_upload_command(
+    *,
+    dataset_dir: Path,
+    repo_id: str,
+    private: bool,
+    create_repo: bool,
+    create_pr: bool,
+) -> list[str]:
+    """Build the optional Hugging Face upload command for a retagged output folder."""
+    clean_repo = repo_id.strip()
+    if not clean_repo:
+        raise ValueError("Hugging Face repo id is required")
+    command = [
+        sys.executable,
+        str(Path(__file__).with_name("upload_orbit_dataset_hf.py")),
+        "--dataset-dir",
+        str(dataset_dir),
+        "--repo-id",
+        clean_repo,
+    ]
+    if private:
+        command.append("--private")
+    if create_repo:
+        command.append("--create-repo")
+    if create_pr:
+        command.append("--create-pr")
     return command
 
 
@@ -89,12 +128,19 @@ def main() -> int:
     dataset_var = tk.StringVar(value=str(DEFAULT_DATASET_DIR))
     output_var = tk.StringVar(value=str(_default_output_dir(DEFAULT_DATASET_DIR)))
     last_auto_output = {"value": output_var.get()}
-    provider_var = tk.StringVar(value="heuristic")
-    model_var = tk.StringVar(value="")
+    provider_var = tk.StringVar(value=DEFAULT_PROVIDER)
+    model_var = tk.StringVar(value=DEFAULT_OLLAMA_MODEL)
     frame_count_var = tk.StringVar(value="4")
     min_frames_var = tk.StringVar(value="2")
+    max_provider_assets_var = tk.StringVar(value=DEFAULT_MAX_PROVIDER_ASSETS)
+    max_provider_sequences_var = tk.StringVar(value=DEFAULT_MAX_PROVIDER_SEQUENCES)
     loose_scan_var = tk.BooleanVar(value=True)
     sequence_var = tk.BooleanVar(value=True)
+    hf_upload_var = tk.BooleanVar(value=False)
+    hf_private_var = tk.BooleanVar(value=True)
+    hf_create_repo_var = tk.BooleanVar(value=True)
+    hf_create_pr_var = tk.BooleanVar(value=False)
+    hf_repo_var = tk.StringVar(value="")
     status_var = tk.StringVar(value="Ready.")
 
     def browse_dataset() -> None:
@@ -136,20 +182,33 @@ def main() -> int:
     ttk.Label(frame, text="Minimum video frames").grid(row=5, column=0, sticky=tk.W, pady=4)
     ttk.Entry(frame, textvariable=min_frames_var, width=10).grid(row=5, column=1, sticky=tk.W, pady=4)
 
-    ttk.Checkbutton(frame, text="Scan loose images/videos under dataset directory", variable=loose_scan_var).grid(row=6, column=1, sticky=tk.W, pady=4)
-    ttk.Checkbutton(frame, text="Write ordered temporal sequence rows", variable=sequence_var).grid(row=7, column=1, sticky=tk.W, pady=4)
+    ttk.Label(frame, text="Max model image calls").grid(row=6, column=0, sticky=tk.W, pady=4)
+    ttk.Entry(frame, textvariable=max_provider_assets_var, width=10).grid(row=6, column=1, sticky=tk.W, pady=4)
+
+    ttk.Label(frame, text="Max model sequence calls").grid(row=7, column=0, sticky=tk.W, pady=4)
+    ttk.Entry(frame, textvariable=max_provider_sequences_var, width=10).grid(row=7, column=1, sticky=tk.W, pady=4)
+
+    ttk.Checkbutton(frame, text="Scan loose images/videos under dataset directory", variable=loose_scan_var).grid(row=8, column=1, sticky=tk.W, pady=4)
+    ttk.Checkbutton(frame, text="Write ordered temporal sequence rows", variable=sequence_var).grid(row=9, column=1, sticky=tk.W, pady=4)
+
+    ttk.Checkbutton(frame, text="Upload retagged output to Hugging Face dataset repo", variable=hf_upload_var).grid(row=10, column=1, sticky=tk.W, pady=4)
+    ttk.Label(frame, text="HF dataset repo").grid(row=11, column=0, sticky=tk.W, pady=4)
+    ttk.Entry(frame, textvariable=hf_repo_var).grid(row=11, column=1, sticky=tk.EW, pady=4)
+    ttk.Checkbutton(frame, text="Create repo if missing", variable=hf_create_repo_var).grid(row=12, column=1, sticky=tk.W, pady=2)
+    ttk.Checkbutton(frame, text="Private repo", variable=hf_private_var).grid(row=13, column=1, sticky=tk.W, pady=2)
+    ttk.Checkbutton(frame, text="Upload as PR", variable=hf_create_pr_var).grid(row=14, column=1, sticky=tk.W, pady=2)
 
     log = tk.Text(frame, height=18, wrap=tk.WORD)
-    log.grid(row=9, column=0, columnspan=3, sticky=tk.NSEW, pady=(12, 4))
-    frame.rowconfigure(9, weight=1)
+    log.grid(row=16, column=0, columnspan=3, sticky=tk.NSEW, pady=(12, 4))
+    frame.rowconfigure(16, weight=1)
 
     scrollbar = ttk.Scrollbar(frame, orient=tk.VERTICAL, command=log.yview)
-    scrollbar.grid(row=9, column=3, sticky=tk.NS, pady=(12, 4))
+    scrollbar.grid(row=16, column=3, sticky=tk.NS, pady=(12, 4))
     log.configure(yscrollcommand=scrollbar.set)
 
     run_button = ttk.Button(frame, text="Run Retag")
-    run_button.grid(row=8, column=1, sticky=tk.W, pady=(8, 0))
-    ttk.Label(frame, textvariable=status_var).grid(row=10, column=0, columnspan=3, sticky=tk.W, pady=4)
+    run_button.grid(row=15, column=1, sticky=tk.W, pady=(8, 0))
+    ttk.Label(frame, textvariable=status_var).grid(row=17, column=0, columnspan=3, sticky=tk.W, pady=4)
 
     def append_log(text: str) -> None:
         log.insert(tk.END, text)
@@ -168,6 +227,19 @@ def main() -> int:
                 min_video_frames=int(min_frames_var.get()),
                 scan_loose_assets=loose_scan_var.get(),
                 temporal_sequences=sequence_var.get(),
+                max_provider_assets=int(max_provider_assets_var.get()),
+                max_provider_sequences=int(max_provider_sequences_var.get()),
+            )
+            hf_command = (
+                build_hf_upload_command(
+                    dataset_dir=output_dir,
+                    repo_id=hf_repo_var.get(),
+                    private=hf_private_var.get(),
+                    create_repo=hf_create_repo_var.get(),
+                    create_pr=hf_create_pr_var.get(),
+                )
+                if hf_upload_var.get()
+                else None
             )
         except Exception as exc:
             messagebox.showerror("Invalid settings", str(exc))
@@ -191,11 +263,38 @@ def main() -> int:
                 root.after(0, append_log, line)
             return_code = process.wait()
             def finish() -> None:
-                run_button.configure(state=tk.NORMAL)
                 if return_code == 0:
-                    status_var.set("Done.")
+                    status_var.set("Retag done.")
                     append_log("\n" + read_manifest_summary(output_dir) + "\n")
+                    if hf_command is not None:
+                        status_var.set("Uploading to Hugging Face...")
+                        append_log("\n$ " + " ".join(hf_command) + "\n")
+
+                        def upload_worker() -> None:
+                            upload_process = subprocess.Popen(
+                                hf_command,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT,
+                                text=True,
+                                encoding="utf-8",
+                                errors="replace",
+                            )
+                            assert upload_process.stdout is not None
+                            for upload_line in upload_process.stdout:
+                                root.after(0, append_log, upload_line)
+                            upload_code = upload_process.wait()
+
+                            def upload_finish() -> None:
+                                run_button.configure(state=tk.NORMAL)
+                                status_var.set("Done." if upload_code == 0 else f"HF upload failed with exit code {upload_code}.")
+
+                            root.after(0, upload_finish)
+
+                        threading.Thread(target=upload_worker, daemon=True).start()
+                        return
+                    run_button.configure(state=tk.NORMAL)
                 else:
+                    run_button.configure(state=tk.NORMAL)
                     status_var.set(f"Failed with exit code {return_code}.")
             root.after(0, finish)
 

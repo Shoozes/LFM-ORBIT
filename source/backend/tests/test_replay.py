@@ -2,12 +2,22 @@ import json
 
 from fastapi.responses import JSONResponse
 
-from api.main import mission_current, mission_stop, replay_catalog, replay_load
+from api.main import mission_current, mission_stop, replay_catalog, replay_load, replay_rescan
 from core.agent_bus import get_recent_dialogue, get_recent_messages, list_pins
 from core.gallery import list_gallery
 from core.metrics import read_metrics_summary
 from core.queue import get_recent_alerts
 from core.runtime_state import reset_runtime_state
+
+EXPECTED_REPLAY_IDS = {
+    "rondonia_frontier_judge",
+    "manchar_flood_replay",
+    "atacama_mining_replay",
+    "singapore_maritime_replay",
+    "georgia_wildfire_replay",
+    "delhi_urban_replay",
+}
+
 
 def _json_response_payload(response: JSONResponse) -> dict:
     return json.loads(response.body.decode("utf-8"))
@@ -30,6 +40,10 @@ def test_replay_catalog_lists_seeded_judge_pack(tmp_path, monkeypatch):
     assert replay["title"] == "Rondonia Frontier Judge Replay"
     assert replay["primary_cell_id"] == "sq_-10.0_-63.0"
     assert replay["alert_count"] == 4
+
+    replay_ids = {item["replay_id"] for item in payload["replays"]}
+    assert EXPECTED_REPLAY_IDS.issubset(replay_ids)
+    assert any(item["source_kind"] == "seeded_cache" for item in payload["replays"])
 
 
 def test_replay_load_seeds_runtime_surfaces(tmp_path, monkeypatch):
@@ -83,6 +97,47 @@ def test_replay_load_seeds_runtime_surfaces(tmp_path, monkeypatch):
     assert all(msg["read"] is True for msg in confirmation_messages)
 
 
+def test_each_bundled_replay_loads_runtime_surfaces(tmp_path, monkeypatch):
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+    _reset_runtime_state()
+
+    catalog = replay_catalog()["replays"]
+    assert catalog
+
+    for replay in catalog:
+        payload = replay_load(replay["replay_id"])
+
+        assert isinstance(payload, dict)
+        assert payload["replay_id"] == replay["replay_id"]
+        assert payload["alerts_loaded"] == replay["alert_count"]
+        assert payload["mission"]["mission_mode"] == "replay"
+        assert payload["mission"]["replay_id"] == replay["replay_id"]
+
+        recent_alerts = get_recent_alerts(limit=20)["alerts"]
+        assert len(recent_alerts) == replay["alert_count"]
+        assert all(alert["downlinked"] is True for alert in recent_alerts)
+        assert all(alert["observation_source"] == "seeded_sentinelhub_replay" for alert in recent_alerts)
+
+        gallery = list_gallery(limit=20)
+        assert len(gallery) == replay["alert_count"]
+        assert all(item["has_timelapse"] == 1 for item in gallery)
+        assert all(item["timelapse_source"] == "seeded_replay" for item in gallery)
+
+        metrics = read_metrics_summary()
+        assert metrics["region_id"] == "seeded_replay"
+        assert metrics["total_cells_scanned"] == replay["cells_scanned"]
+        assert metrics["total_alerts_emitted"] == replay["alert_count"]
+
+        pins = list_pins()
+        assert len(pins) == replay["alert_count"] * 2
+
+        dialogue = get_recent_dialogue(limit=20)
+        assert any(msg["msg_type"] == "flag" for msg in dialogue)
+        assert any(msg["msg_type"] == "confirmation" for msg in dialogue)
+
+
 def test_replay_stop_restores_live_mode_note(tmp_path, monkeypatch):
     monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
     monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
@@ -113,3 +168,28 @@ def test_replay_load_returns_400_for_unknown_manifest(tmp_path, monkeypatch):
     assert response.status_code == 400
     payload = _json_response_payload(response)
     assert "Unknown replay_id" in payload["error"]
+
+
+def test_seeded_cache_replay_loads_and_rescans(tmp_path, monkeypatch):
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+    _reset_runtime_state()
+
+    seeded = next(item for item in replay_catalog()["replays"] if item["source_kind"] == "seeded_cache")
+    replay_payload = replay_load(seeded["replay_id"])
+
+    assert isinstance(replay_payload, dict)
+    assert replay_payload["replay_id"] == seeded["replay_id"]
+    assert replay_payload["mission"]["mission_mode"] == "replay"
+    assert replay_payload["alerts_loaded"] == 1
+    assert list_gallery(limit=5)[0]["timelapse_source"] == "seeded_replay"
+
+    rescan_payload = replay_rescan(seeded["replay_id"])
+
+    assert isinstance(rescan_payload, dict)
+    assert rescan_payload["source_replay_id"] == seeded["replay_id"]
+    assert rescan_payload["mission"]["mission_mode"] == "live"
+    assert rescan_payload["mission"]["bbox"] == seeded["bbox"]
+    assert "current runtime/model stack" in rescan_payload["mission"]["summary"]
+    assert get_recent_alerts(limit=5)["alerts"] == []

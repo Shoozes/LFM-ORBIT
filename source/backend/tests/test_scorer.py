@@ -89,3 +89,24 @@ def test_score_cell_structural_deforestation(mock_loader):
     assert "multi_index_consensus" in score["reason_codes"]
 
     assert score["change_score"] >= DETECTION.critical_severity_threshold
+
+
+@patch("core.scorer.load_temporal_observations")
+def test_score_cell_cloud_degraded_window_abstains_even_with_large_raw_change(mock_loader):
+    before_bands = {"nir": 0.65, "red": 0.05, "swir": 0.20}
+    after_bands = {"nir": 0.20, "red": 0.35, "swir": 0.70}
+
+    mock_loader.return_value = {
+        "source": "mock",
+        "before": {"label": "Before", "quality": 1.0, "flags": [], "bands": before_bands},
+        "after": {"label": "After", "quality": 0.2, "flags": ["cloud_degraded"], "bands": after_bands}
+    }
+
+    score = score_cell_change("mock_cell")
+
+    assert score["raw_change_score"] >= DETECTION.critical_severity_threshold
+    assert score["change_score"] == 0.0
+    assert score["confidence"] <= 0.25
+    assert "quality_gate_failed" in score["reason_codes"]
+    assert "abstained_cloud_coverage" in score["reason_codes"]
+    assert "suspected_canopy_loss" not in score["reason_codes"]

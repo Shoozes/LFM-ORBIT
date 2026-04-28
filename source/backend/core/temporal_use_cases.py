@@ -105,15 +105,24 @@ _TEMPORAL_USE_CASES: list[dict[str, Any]] = [
             "vegetation stress",
             "alligator alley",
             "big cypress",
+            "highway 82",
+            "spc",
+            "fire-weather",
+            "fire weather",
+            "southern high plains",
+            "eastern new mexico",
+            "western texas",
+            "atkinson",
+            "waynesville",
         ],
         "examples": [
             {
-                "name": "Post-fire burn scar",
-                "task_text": "Detect a new wildfire burn scar by comparing pre-fire and post-fire Sentinel windows.",
-                "bbox": [-121.8, 38.4, -121.0, 39.0],
-                "start_date": "2024-07",
-                "end_date": "2024-10",
-                "expected_signal": "NBR and NDMI drop sharply with darkened spatial context and reduced vegetation response.",
+                "name": "Highway 82 burn-scar candidate",
+                "task_text": "Review the Highway 82 wildfire near Atkinson and Waynesville, Georgia for smoke, burn scar, and vegetation stress.",
+                "bbox": [-81.916, 31.143, -81.756, 31.303],
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-28",
+                "expected_signal": "Pre-fire and active-fire windows should be compared with real SWIR/NIR/Red bands; cloudy or smoke-obscured frames should remain review candidates.",
                 "training_label": {"target_action": "alert", "target_category": "wildfire"},
             },
             {
@@ -197,9 +206,9 @@ _TEMPORAL_USE_CASES: list[dict[str, Any]] = [
             {
                 "name": "Canal blockage investigation",
                 "task_text": "Review vessel queueing around a canal choke point and explore N/E/S/W context for a likely blockage cause.",
-                "bbox": [32.25, 29.72, 32.75, 30.12],
-                "start_date": "2025-03",
-                "end_date": "2025-04",
+                "bbox": [32.5, 29.88, 32.58, 29.96],
+                "start_date": "2024-01",
+                "end_date": "2025-12",
                 "expected_signal": "Vessel clusters or queues persist across distinct dates near a narrow maritime corridor.",
                 "training_label": {"target_action": "review", "target_category": "maritime"},
             },
@@ -327,9 +336,9 @@ _TEMPORAL_USE_CASES: list[dict[str, Any]] = [
             {
                 "name": "Glacier terminus retreat negative",
                 "task_text": "Reject an ice-growth label when the terminus edge recedes over the temporal sequence.",
-                "bbox": [-50.6, 69.0, -49.5, 69.8],
-                "start_date": "2021-07",
-                "end_date": "2025-07",
+                "bbox": [-51.13, 69.1, -50.97, 69.26],
+                "start_date": "2024-01",
+                "end_date": "2025-12",
                 "expected_signal": "Ice edge retreats and exposed rock/water increases, producing an ice-loss label instead.",
                 "training_label": {"target_action": "review", "target_category": "ice_retreat"},
             },
@@ -363,12 +372,12 @@ _TEMPORAL_USE_CASES: list[dict[str, Any]] = [
         ],
         "examples": [
             {
-                "name": "River overbank flood",
-                "task_text": "Find new surface water outside the normal channel after a storm sequence.",
-                "bbox": [90.1, 23.2, 91.0, 24.0],
-                "start_date": "2025-05",
-                "end_date": "2025-08",
-                "expected_signal": "Water-like pixels expand into floodplain cells and persist across multiple frames.",
+                "name": "Manchar Lake flood overflow",
+                "task_text": "Find new surface water and overflow around Pakistan's Manchar Lake during the 2022 flood sequence.",
+                "bbox": [67.63, 26.31, 67.87, 26.55],
+                "start_date": "2022-06",
+                "end_date": "2022-09",
+                "expected_signal": "Water expands beyond the normal lake boundary and persists across the flood sequence.",
                 "training_label": {"target_action": "alert", "target_category": "flood"},
             }
         ],
@@ -480,11 +489,62 @@ _TEMPORAL_USE_CASES: list[dict[str, Any]] = [
             {
                 "name": "Open-pit expansion",
                 "task_text": "Detect an expanding open-pit mine and separate it from seasonal vegetation loss.",
-                "bbox": [-70.6, -23.8, -69.8, -23.1],
-                "start_date": "2023-01",
-                "end_date": "2026-01",
+                "bbox": [-69.115, -24.29, -69.035, -24.21],
+                "start_date": "2024-01",
+                "end_date": "2025-12",
                 "expected_signal": "Persistent bare-earth footprint expands across consecutive same-season frames.",
                 "training_label": {"target_action": "alert", "target_category": "mining"},
+            }
+        ],
+    },
+    {
+        "id": "volcanic_surface_change",
+        "display_name": "Volcanic lava flow and surface-change review",
+        "target_task": "volcanic_lava_flow_temporal_review",
+        "target_category": "volcanic_surface_change",
+        "default_target_action": "review",
+        "temporal_methods": [
+            "pre-eruption to post-eruption lava-flow comparison",
+            "SWIR/NIR/Red surface-change review",
+            "cloud-free multi-frame lava-field persistence check",
+        ],
+        "signals": [
+            "lava_flow",
+            "new_lava_field",
+            "volcanic_surface_change",
+            "thermal_or_swir_anomaly",
+            "post_eruption_recovery",
+        ],
+        "keywords": [
+            "volcanic",
+            "volcano",
+            "lava",
+            "lava flow",
+            "eruption",
+            "mauna loa",
+            "basalt",
+            "swir",
+            "post eruption",
+            "volcanic surface",
+        ],
+        "examples": [
+            {
+                "name": "Mauna Loa lava-flow review",
+                "task_text": (
+                    "Compare pre-eruption, active-eruption, post-eruption, and recovery frames "
+                    "for durable lava-flow surface change."
+                ),
+                "bbox": [-155.635, 19.465, -155.565, 19.535],
+                "start_date": "2022-08",
+                "end_date": "2025-02",
+                "expected_signal": (
+                    "SWIR/NIR/Red composite shows a durable lava-flow footprint emerging across "
+                    "clear Sentinel-2 frames."
+                ),
+                "training_label": {
+                    "target_action": "review",
+                    "target_category": "volcanic_surface_change",
+                },
             }
         ],
     },

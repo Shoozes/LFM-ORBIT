@@ -1,0 +1,52 @@
+{
+  "chunk_signature": "4015e8b8",
+  "bbox": [
+    -81.916,
+    31.143,
+    -81.756,
+    31.302999999999997
+  ],
+  "lat": 31.223,
+  "lon": -81.836,
+  "location_name": "Highway 82 Fire candidate [+0,+0]",
+  "region_note": "Reported southeast Georgia Highway 82 wildfire near Atkinson and Waynesville, April 2026",
+  "start_date": "2026-01",
+  "end_date": "2026-04",
+  "frames_count": 4,
+  "frame_dates": [
+    "pre-fire",
+    "ignition-window",
+    "active-fire",
+    "latest-clear"
+  ],
+  "date_windows": [
+    {
+      "label": "pre-fire",
+      "start_date": "2026-04-01",
+      "end_date": "2026-04-10"
+    },
+    {
+      "label": "ignition-window",
+      "start_date": "2026-04-20",
+      "end_date": "2026-04-23"
+    },
+    {
+      "label": "active-fire",
+      "start_date": "2026-04-24",
+      "end_date": "2026-04-26"
+    },
+    {
+      "label": "latest-clear",
+      "start_date": "2026-04-27",
+      "end_date": "2026-04-28"
+    }
+  ],
+  "vlm_explanation": "Sentinel-2 L2A timelapse seeded for Highway 82 Fire candidate [+0,+0] from 2026-01 to 2026-04. Metadata inference was skipped for this cache refresh.",
+  "source": "Sentinel Hub Sentinel-2 L2A SWIR/NIR/Red burn-scar composite",
+  "visual_mode": "burn_scar",
+  "seeded_at": "2026-04-27",
+  "training_ready": true,
+  "use_case_id": "wildfire",
+  "target_category": "wildfire",
+  "target_task": "wildfire_temporal_detection"
+}

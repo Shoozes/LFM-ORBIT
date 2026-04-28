@@ -9,6 +9,18 @@ from typing import Any
 from core.indices import compute_ndvi, compute_nbr, compute_evi2, compute_ndmi, compute_swir_nir_ratio
 
 
+QUALITY_GATE_REASON_CODES = [
+    "low_quality_window",
+    "quality_gate_failed",
+    "abstained_cloud_coverage",
+]
+
+
+def _window_is_cloud_degraded(window: dict) -> bool:
+    flags = {str(flag).lower() for flag in window.get("flags", [])}
+    return "cloud_degraded" in flags or "insufficient_valid_pixels" in flags
+
+
 def _to_window_payload(window: dict) -> WindowObservation:
     bands = window["bands"]
     ndvi = compute_ndvi(bands["nir"], bands["red"])
@@ -56,43 +68,53 @@ def score_cell_change(cell_id: str, observer: Any = None) -> dict:
 
     quality_factor = min(before_window["quality"], after_window["quality"])
 
-    # Evi2 and NDMI are included in change_score calculation to enforce multi-index agreement weight
+    # Evi2 and NDMI are included in raw_change_score calculation to enforce multi-index agreement weight
     # Soil ratio spike is added as positive evidence of cleared ground
-    change_score = min(
+    raw_change_score = min(
         1.0,
         (ndvi_drop * 0.25) + (evi2_drop * 0.2) + (nir_drop_ratio * 0.15) + (nbr_drop * 0.15) + (ndmi_drop * 0.15) + (soil_ratio_spike * 0.1),
     )
 
     reason_codes: list[str] = []
-    if ndvi_drop >= DETECTION.ndvi_drop_threshold:
-        reason_codes.append("ndvi_drop")
-    if evi2_drop >= DETECTION.evi2_drop_threshold:
-        reason_codes.append("evi2_drop")
-    if nir_drop_ratio >= DETECTION.nir_drop_ratio_threshold:
-        reason_codes.append("nir_drop")
-    if nbr_drop >= DETECTION.nbr_drop_threshold:
-        reason_codes.append("nbr_drop")
-    if ndmi_drop >= DETECTION.ndmi_drop_threshold:
-        reason_codes.append("ndmi_drop")
-    if soil_ratio_spike >= DETECTION.soil_ratio_spike_threshold:
-        reason_codes.append("soil_exposure_spike")
+    quality_blocked = (
+        quality_factor < DETECTION.min_quality_threshold
+        or _window_is_cloud_degraded(before_window)
+        or _window_is_cloud_degraded(after_window)
+    )
+    change_score = 0.0 if quality_blocked else raw_change_score
 
-    if "evi2_drop" in reason_codes and ("ndvi_drop" in reason_codes or "nbr_drop" in reason_codes):
-        reason_codes.append("multi_index_consensus")
-    if "disturbance_pattern" in after_window["flags"]:
-        reason_codes.append("observation_pattern_match")
-    if quality_factor < DETECTION.min_quality_threshold:
-        reason_codes.append("low_quality_window")
-    if change_score >= REGION.anomaly_threshold:
-        reason_codes.append("suspected_canopy_loss")
-    if not reason_codes:
-        reason_codes.append("stable_vegetation")
+    if quality_blocked:
+        reason_codes.extend(QUALITY_GATE_REASON_CODES)
+    else:
+        if ndvi_drop >= DETECTION.ndvi_drop_threshold:
+            reason_codes.append("ndvi_drop")
+        if evi2_drop >= DETECTION.evi2_drop_threshold:
+            reason_codes.append("evi2_drop")
+        if nir_drop_ratio >= DETECTION.nir_drop_ratio_threshold:
+            reason_codes.append("nir_drop")
+        if nbr_drop >= DETECTION.nbr_drop_threshold:
+            reason_codes.append("nbr_drop")
+        if ndmi_drop >= DETECTION.ndmi_drop_threshold:
+            reason_codes.append("ndmi_drop")
+        if soil_ratio_spike >= DETECTION.soil_ratio_spike_threshold:
+            reason_codes.append("soil_exposure_spike")
+
+        if "evi2_drop" in reason_codes and ("ndvi_drop" in reason_codes or "nbr_drop" in reason_codes):
+            reason_codes.append("multi_index_consensus")
+        if "disturbance_pattern" in after_window["flags"]:
+            reason_codes.append("observation_pattern_match")
+        if change_score >= REGION.anomaly_threshold:
+            reason_codes.append("suspected_canopy_loss")
+        if not reason_codes:
+            reason_codes.append("stable_vegetation")
 
     confidence = DETECTION.confidence_base + (quality_factor * DETECTION.confidence_quality_multiplier)
     if change_score < DETECTION.low_change_threshold:
         confidence -= DETECTION.confidence_penalty_low_change
     if "low_quality_window" in reason_codes:
         confidence -= DETECTION.confidence_penalty_low_quality
+    if quality_blocked:
+        confidence = min(confidence, 0.25)
     if "suspected_canopy_loss" in reason_codes and "multi_index_consensus" not in reason_codes:
         confidence -= DETECTION.confidence_penalty_single_index
 
@@ -141,6 +163,7 @@ def score_cell_change(cell_id: str, observer: Any = None) -> dict:
         "before_window": before_window,
         "after_window": after_window,
         "change_score": round(change_score, 4),
+        "raw_change_score": round(raw_change_score, 4),
         "confidence": round(confidence, 4),
         "reason_codes": reason_codes,
     }

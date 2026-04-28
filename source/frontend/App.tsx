@@ -13,6 +13,7 @@ const loadMissionControl = () => import("./components/MissionControl");
 const loadTimelapseViewer = () => import("./components/TimelapseViewer");
 const loadVlmPanel = () => import("./components/VlmPanel");
 const loadAlertsLogs = () => import("./components/AlertsLogs");
+const loadJudgeModePanel = () => import("./components/JudgeModePanel");
 
 const MapVisualizer = lazy(loadMapVisualizer);
 const ValidationPanel = lazy(loadValidationPanel);
@@ -23,6 +24,97 @@ const MissionControl = lazy(loadMissionControl);
 const TimelapseViewer = lazy(loadTimelapseViewer);
 const VlmPanel = lazy(loadVlmPanel);
 const AlertsLogs = lazy(loadAlertsLogs);
+const JudgeModePanel = lazy(loadJudgeModePanel);
+
+type DemoCase = "judge" | "payload" | "provenance" | "abstain" | "eclipse";
+
+const JUDGE_REPLAY_ID = "rondonia_frontier_judge";
+const JUDGE_PRIMARY_CELL_ID = "sq_-10.0_-63.0";
+const JUDGE_FALLBACK_BBOX = [-63.15, -10.15, -62.85, -9.85];
+const DEMO_STEPS_BY_CASE: Record<DemoCase, string[]> = {
+  judge: [
+    "Step 1: Replay loaded",
+    "Step 2: BBox selected",
+    "Step 3: Edge triage passed",
+    "Step 4: VLM invoked",
+    "Step 5: Alert compressed",
+    "Step 6: Downlink packet ready",
+  ],
+  payload: [
+    "Step 1: Flood mission loaded",
+    "Step 2: Floodplain bbox selected",
+    "Step 3: Raw frame measured",
+    "Step 4: VLM invoked",
+    "Step 5: JSON compressed",
+    "Step 6: Downlink savings shown",
+  ],
+  provenance: [
+    "Step 1: Mining mission loaded",
+    "Step 2: Mine bbox selected",
+    "Step 3: Source resolved",
+    "Step 4: Model invoked",
+    "Step 5: Prompt captured",
+    "Step 6: Audit JSON ready",
+  ],
+  abstain: [
+    "Step 1: Ice mission loaded",
+    "Step 2: BBox selected",
+    "Step 3: Quality gate failed",
+    "Step 4: VLM abstained",
+    "Step 5: Alert blocked",
+    "Step 6: No downlink sent",
+  ],
+  eclipse: [
+    "Step 1: Maritime mission loaded",
+    "Step 2: BBox selected",
+    "Step 3: Edge triage passed",
+    "Step 4: Link offline",
+    "Step 5: Packets queued",
+    "Step 6: Queue flushed",
+  ],
+};
+
+const DEMO_START_PROFILES: Partial<Record<DemoCase, { presetId: string; bbox: number[]; readyLabel: string }>> = {
+  payload: {
+    presetId: "flood_manchar",
+    bbox: [67.63, 26.31, 67.87, 26.55],
+    readyLabel: "Payload demo ready",
+  },
+  provenance: {
+    presetId: "mining_atacama",
+    bbox: [-69.115, -24.29, -69.035, -24.21],
+    readyLabel: "Provenance demo ready",
+  },
+  abstain: {
+    presetId: "ice_greenland",
+    bbox: [-51.13, 69.1, -50.97, 69.26],
+    readyLabel: "Abstain demo ready",
+  },
+  eclipse: {
+    presetId: "maritime_suez",
+    bbox: [32.5, 29.88, 32.58, 29.96],
+    readyLabel: "Eclipse demo ready",
+  },
+};
+
+function normalizeDemoCase(value: string | null): DemoCase {
+  if (value === "payload") return "payload";
+  if (value === "provenance") return "provenance";
+  if (value === "abstain") return "abstain";
+  if (value === "eclipse") return "eclipse";
+  return "judge";
+}
+
+function readDemoQuery(): { enabled: boolean; demoCase: DemoCase } {
+  if (typeof window === "undefined") {
+    return { enabled: false, demoCase: "judge" };
+  }
+  const params = new URLSearchParams(window.location.search);
+  return {
+    enabled: params.get("demo") === "1",
+    demoCase: normalizeDemoCase(params.get("demoCase") ?? params.get("case")),
+  };
+}
 
 function LoadingPanel({ label, className = "" }: { label: string; className?: string }) {
   return (
@@ -63,12 +155,20 @@ async function postAgentBusMessage(
 
 
 export default function App() {
+  const demoQuery = useMemo(readDemoQuery, []);
+  const demoSteps = DEMO_STEPS_BY_CASE[demoQuery.demoCase];
+  const demoStartProfile = demoQuery.enabled ? DEMO_START_PROFILES[demoQuery.demoCase] : undefined;
   const [drawBboxActive, setDrawBboxActive] = useState(false);
-  const [drawnBbox, setDrawnBbox] = useState<number[] | null>(null);
+  const [drawnBbox, setDrawnBbox] = useState<number[] | null>(() => (
+    demoStartProfile ? [...demoStartProfile.bbox] : null
+  ));
   const [vlmBoxes, setVlmBoxes] = useState<VlmBox[]>([]);
   const [showMissionTimelapse, setShowMissionTimelapse] = useState(false);
   const [showBboxTools, setShowBboxTools] = useState(false);
   const [mission, setMission] = useState<Mission | null>(null);
+  const [judgeModeActive, setJudgeModeActive] = useState(false);
+  const [judgeMission, setJudgeMission] = useState<Mission | null>(null);
+  const [demoStepIndex, setDemoStepIndex] = useState(0);
   const apiBaseUrl = getApiBaseUrl();
 
   const fetchMission = useCallback(async () => {
@@ -77,8 +177,13 @@ export default function App() {
       if (res.ok) {
         const d = await res.json() as { mission: Mission | null };
         setMission(d.mission);
+        return d.mission;
       }
-    } catch { /* ignore */ }
+      console.debug(`Mission refresh failed with HTTP ${res.status}.`);
+    } catch (error) {
+      console.debug("Mission refresh failed.", error);
+    }
+    return null;
   }, [apiBaseUrl]);
 
   useEffect(() => {
@@ -110,11 +215,11 @@ export default function App() {
   } = useTelemetry();
 
   const handleReplayLoaded = useCallback(async (primaryCellId: string | null) => {
-    await Promise.all([
+    const [, loadedMission] = await Promise.all([
       refreshTelemetry({ replaceAlerts: true }),
       fetchMission(),
     ]);
-    setDrawnBbox(null);
+    setDrawnBbox(loadedMission?.bbox ? [...loadedMission.bbox] : null);
     setVlmBoxes([]);
     setShowMissionTimelapse(false);
     setShowBboxTools(false);
@@ -124,6 +229,19 @@ export default function App() {
     } else {
       setActiveTab("logs");
     }
+  }, [fetchMission, refreshTelemetry, setSelectedCellId]);
+
+  const handleReplayRescanStarted = useCallback(async (rescanMission: Mission) => {
+    await Promise.all([
+      refreshTelemetry({ replaceAlerts: true }),
+      fetchMission(),
+    ]);
+    setSelectedCellId(null);
+    setDrawnBbox(rescanMission.bbox ? [...rescanMission.bbox] : null);
+    setVlmBoxes([]);
+    setShowMissionTimelapse(false);
+    setShowBboxTools(false);
+    setActiveTab("mission");
   }, [fetchMission, refreshTelemetry, setSelectedCellId]);
 
   const handleOpenTimelapseForCell = (cellId: string) => {
@@ -146,6 +264,85 @@ export default function App() {
   }, [drawnBbox, geoJsonGrid]);
 
   const [activeTab, setActiveTab] = useState<"mission" | "agents" | "logs" | "inspect" | "settings">("mission");
+
+  const handleJudgeModeStart = useCallback(async () => {
+    setDemoStepIndex(0);
+    setJudgeModeActive(true);
+
+    let activeMission = mission;
+    let requiresSeededReplay = demoQuery.demoCase === "judge" && !mission?.replay_id;
+    let primaryCellId: string | null = selectedCellId ?? (requiresSeededReplay ? JUDGE_PRIMARY_CELL_ID : null);
+
+    try {
+      const currentResponse = await fetch(`${apiBaseUrl}/api/mission/current`);
+      if (currentResponse.ok) {
+        const currentPayload = await currentResponse.json() as { mission?: Mission | null };
+        if (currentPayload.mission) {
+          activeMission = currentPayload.mission;
+        }
+      }
+
+      requiresSeededReplay = demoQuery.demoCase === "judge" && !activeMission?.replay_id;
+      if (requiresSeededReplay && !primaryCellId) {
+        primaryCellId = JUDGE_PRIMARY_CELL_ID;
+      }
+
+      if (requiresSeededReplay && activeMission?.replay_id !== JUDGE_REPLAY_ID) {
+        if (activeMission?.replay_id !== JUDGE_REPLAY_ID) {
+          const response = await fetch(`${apiBaseUrl}/api/replay/load/${JUDGE_REPLAY_ID}`, { method: "POST" });
+          const payload = await response.json() as {
+            mission?: Mission;
+            primary_cell_id?: string | null;
+            error?: string;
+          };
+          if (!response.ok) {
+            throw new Error(payload.error || `Replay load failed with HTTP ${response.status}.`);
+          }
+          activeMission = payload.mission ?? activeMission;
+          primaryCellId = payload.primary_cell_id ?? primaryCellId;
+        }
+      }
+
+      if (activeMission) {
+        setJudgeMission(activeMission);
+      }
+      setDemoStepIndex(1);
+
+      await Promise.all([
+        refreshTelemetry({ replaceAlerts: true }),
+        fetchMission(),
+      ]);
+
+      const bbox = (!requiresSeededReplay && demoStartProfile ? demoStartProfile.bbox : activeMission?.bbox) ?? JUDGE_FALLBACK_BBOX;
+      setDrawnBbox([...bbox]);
+      setShowMissionTimelapse(false);
+      setShowBboxTools(false);
+      const label = demoQuery.demoCase === "payload"
+        ? "flood extent"
+        : demoQuery.demoCase === "provenance"
+          ? "mine expansion"
+          : demoQuery.demoCase === "eclipse"
+            ? "vessel queue"
+            : demoQuery.demoCase === "abstain"
+              ? "quality gate"
+              : "clearing";
+      setVlmBoxes([{ label, bbox: [0.24, 0.18, 0.74, 0.76] }]);
+      if (primaryCellId) {
+        setSelectedCellId(primaryCellId);
+      }
+      setActiveTab("mission");
+      setDemoStepIndex(2);
+    } catch (error) {
+      console.error("Judge Mode failed to load replay", error);
+      setJudgeMission(activeMission);
+      setDrawnBbox(JUDGE_FALLBACK_BBOX);
+      setVlmBoxes([{ label: "clearing", bbox: [0.24, 0.18, 0.74, 0.76] }]);
+      if (primaryCellId) {
+        setSelectedCellId(primaryCellId);
+      }
+      setDemoStepIndex(2);
+    }
+  }, [apiBaseUrl, demoQuery.demoCase, demoStartProfile, fetchMission, mission, refreshTelemetry, selectedCellId, setSelectedCellId]);
 
   useEffect(() => {
     if (selectedCellId && activeTab !== "inspect") {
@@ -194,7 +391,7 @@ export default function App() {
   }, [activeTab]);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-zinc-50 text-zinc-900 font-sans text-sm">
+    <div className="relative flex h-screen w-screen overflow-hidden bg-zinc-50 text-zinc-900 font-sans text-sm">
       {/* LEFT PANE: MAP */}
       <div className="flex-1 relative h-full">
         <Suspense fallback={<LoadingPanel label="Map" className="bg-[#05070b] text-zinc-500" />}>
@@ -334,12 +531,14 @@ export default function App() {
                       onRefresh={fetchMission}
                       isScanComplete={isScanComplete}
                       onReplayLoaded={handleReplayLoaded}
+                      onReplayRescanStarted={handleReplayRescanStarted}
                       onPreviewBbox={(bbox) => {
                         setDrawnBbox(bbox);
                         setVlmBoxes([]);
                         setShowMissionTimelapse(false);
                         setShowBboxTools(false);
                       }}
+                      initialPresetId={demoStartProfile?.presetId ?? null}
                     />
                   </Suspense>
                 </div>
@@ -451,6 +650,64 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {demoQuery.enabled && (
+        <div
+          data-testid="demo-caption"
+          className="pointer-events-none absolute bottom-4 left-4 z-50 w-[340px] rounded border border-zinc-800 bg-zinc-950/92 p-3 text-zinc-100 shadow-xl backdrop-blur"
+        >
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-200">
+              {demoStepIndex === 0
+                ? demoStartProfile?.readyLabel ?? "Judge demo ready"
+                : demoSteps[Math.min(demoStepIndex - 1, demoSteps.length - 1)]}
+            </span>
+            <button
+              type="button"
+              data-testid="judge-mode-button"
+              onClick={() => void handleJudgeModeStart()}
+              className="pointer-events-auto shrink-0 rounded border border-cyan-300/50 bg-cyan-500/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100 hover:border-cyan-200"
+            >
+              Judge Mode
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {demoSteps.map((step, index) => {
+              const stepNumber = index + 1;
+              const active = demoStepIndex >= stepNumber;
+              return (
+                <div
+                  key={step}
+                  data-testid="demo-step"
+                  data-active={active ? "true" : "false"}
+                  className={`rounded border px-2 py-1 text-[10px] font-semibold ${
+                    active
+                      ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-100"
+                      : "border-zinc-800 bg-zinc-900 text-zinc-500"
+                  }`}
+                >
+                  {step}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {judgeModeActive && (
+        <Suspense fallback={<LoadingPanel label="Judge Mode" className="absolute inset-0 z-40 bg-zinc-950 text-zinc-400" />}>
+          <JudgeModePanel
+            apiBaseUrl={apiBaseUrl}
+            demoCase={demoQuery.demoCase}
+            mission={judgeMission ?? mission}
+            alerts={alerts}
+            metricsSummary={metricsSummary}
+            selectedCellId={selectedCellId}
+            onClose={() => setJudgeModeActive(false)}
+            onStepChange={setDemoStepIndex}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

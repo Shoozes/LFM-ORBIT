@@ -1,6 +1,6 @@
 # Orbit Model Handoff
 
-Updated April 27, 2026.
+Updated April 28, 2026.
 
 ## Purpose
 
@@ -113,11 +113,13 @@ The export now includes:
 - alert-only positives with a materialized `context_thumb` from fetched API imagery when pin coordinates are available
 - recent ground-agent `reject` outcomes as weak negative/control rows
 - cached API observation-store rows when the CLI is run without `--no-api-observations`
+- direct seeded-cache rows when the CLI is run with `--include-seeded-cache`
 - persisted maritime/lifeline monitor-report JSON rows when passed through `--monitor-reports-dir`
 - SimSat Sentinel, optional SimSat Mapbox, Sentinel Hub, NASA, GEE, seeded-cache, and offline provenance fields where available
 - temporal use-case metadata and examples for deforestation, wildfire, civilian lifeline disruption, maritime monitoring, ice-cap growth, floods, agriculture, urban expansion, mining, and generic temporal review
 - chat-style `training.jsonl`, `train_training.jsonl`, and `eval_training.jsonl` files for supervised data-refinement workflows
 - second-pass asset retagging through `scripts/retag_training_assets.py`, including deduplicated still images, sampled timelapse frames, ordered temporal sequence rows, Hugging Face ImageFolder-compatible `images/ + metadata.jsonl`, and provider adapters for heuristic/manual queue, Ollama vision models, or OpenAI-compatible vision models
+- optional Hugging Face dataset upload through `scripts/upload_orbit_dataset_hf.py`, using `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or `.tools/.secrets/hf.txt`
 - explicit metadata fields such as `target_action`, `target_category`, `target_task`, and `label_tier`
 
 Current ground rejects are useful as weak negatives because they come from the real validation loop, but they are still not the same as operator-reviewed gold controls.
@@ -136,9 +138,10 @@ Orbit's observation cache is now stricter about handoff readiness:
 - a record is only marked `training_ready` after both satellite and ground observations exist for the same region
 - single-role cached notes are still useful context, but they should not be treated as paired supervision during downstream import
 
-Orbit also now supports seeded replay manifests for completed missions. That is useful for model handoff work in two ways:
+Orbit also now supports curated replay manifests and dynamic Fast Replay entries from valid seeded-cache WebMs. That is useful for model handoff work in two ways:
 
 - a trained-model review can be demonstrated against a fixed, inspectable mission instead of live scan timing
+- the same prior replay metadata can be rescanned after a model/runtime update to compare behavior
 - future model eval packs can mirror the replay manifest structure so mission evidence and modeling artifacts stay aligned
 
 For deterministic local review, Orbit exposes a runtime reset path before replay load:
@@ -146,9 +149,27 @@ For deterministic local review, Orbit exposes a runtime reset path before replay
 1. `POST /api/runtime/reset`
 2. `POST /api/replay/load/{replay_id}`
 
+Current seeded mission cache includes Rondonia replay coverage plus Sentinel-2 L2A mission seeds for Pakistan Manchar Lake flooding, Atacama mining, Greenland ice-edge abstain review, Suez maritime queueing, Singapore maritime anchorage, Kansas crop phenology, Delhi urban expansion, Highway 82 Georgia wildfire candidate, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead. These are intentionally small repo fixtures, not a full training corpus.
+
+Recorded proof demos now export both the full proof screen and the isolated `evidence-frame.png` surface. That keeps model/dataset review aligned with the exact visible evidence frame used in Judge Mode, not just the longer Playwright recording.
+
+Orbit also stores timestamped future-watch manifests under `source/backend/assets/watchlists/`. These are source-backed risk watches, not labels; the current SPC Day 2 Southern High Plains fire-weather watch must stay `watch_only_unverified` until independent post-window evidence exists.
+
+Current local export after including seeded cache:
+
+- `56` current-cycle Orbit samples
+- `24` seeded-cache rows
+- `25` rows with timelapse references
+- `179` deduplicated retagged image/frame assets
+- `26` temporal sequence rows
+- `40` bounded Qwen/Ollama image calls plus `6` sequence calls with deterministic heuristic fallback for remaining assets
+- `74` image tags reused from the previous retag folder to avoid rescanning already-tagged assets
+
+Hugging Face upload is wired and completed locally for the current retagged training export. The dataset is published at `Shoozes/LFM-Orbit-SatData`, with latest data commit `5a2798e7d16cd76df08eff3725dcf3ade9340b58` and card commit `60e8ae913f61315740a640c532eb1aa9ae7cfe75`.
+
 ## Integration Sequence
 
-1. Export Orbit samples with `source/backend/scripts/export_orbit_dataset.py`.
+1. Export Orbit samples with `source/backend/scripts/export_orbit_dataset.py --include-seeded-cache`.
 2. Import, train, and package the model in an external training workspace.
 3. Generate `orbit_model_handoff.json`.
 4. Optionally upload the staged folder to Hugging Face.

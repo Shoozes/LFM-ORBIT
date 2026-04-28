@@ -17,6 +17,8 @@ from core.observability import RuntimeObserver, log_throttled
 
 logger = logging.getLogger(__name__)
 
+QUALITY_REJECTION_REASONS = {"insufficient_valid_pixels", "scene_quality_rejected"}
+
 
 def _rejection_reason_from_exception(exc: Exception) -> str:
     text = str(exc).strip().lower().replace(" ", "_")
@@ -27,12 +29,54 @@ def _rejection_reason_from_exception(exc: Exception) -> str:
     return "scan_failure"
 
 
+def _is_quality_rejection(reason: str) -> bool:
+    return reason in QUALITY_REJECTION_REASONS
+
+
+def _should_force_demo_anomaly(cell_index: int, total_cells: int, rejection_reason: str) -> bool:
+    if _is_quality_rejection(rejection_reason):
+        return False
+    return (cell_index % 3 == 1) or (total_cells <= 2 and cell_index == 0)
+
+
+def _quality_gate_fallback_score(reason: str) -> dict:
+    flags = [reason, "cloud_or_nodata_blocked"]
+    empty_window = {
+        "label": "quality gate",
+        "quality": 0.0,
+        "nir": 0.0,
+        "red": 0.0,
+        "swir": 0.0,
+        "ndvi": 0.0,
+        "nbr": 0.0,
+        "evi2": 0.0,
+        "ndmi": 0.0,
+        "soil_ratio": 0.0,
+        "flags": flags,
+    }
+    return {
+        "change_score": 0.0,
+        "raw_change_score": 0.0,
+        "confidence": 0.0,
+        "reason_codes": ["low_quality_window", "quality_gate_failed", reason],
+        "observation_source": "quality_gate_fallback",
+        "before_window": empty_window,
+        "after_window": empty_window,
+    }
+
+
 async def stream_region_scan(websocket: WebSocket):
-    grid_data = generate_scan_grid(
-        REGION.center_lat,
-        REGION.center_lng,
-        resolution=REGION.grid_resolution,
-        ring_size=REGION.ring_size,
+    mission = get_active_mission()
+    mission_bbox = mission["bbox"] if mission else None
+    grid_data = (
+        generate_grid_for_bbox(mission_bbox)
+        if mission_bbox
+        else generate_scan_grid(
+            REGION.center_lat,
+            REGION.center_lng,
+            resolution=REGION.grid_resolution,
+            ring_size=REGION.ring_size,
+        )
     )
 
     await websocket.send_text(json.dumps(build_grid_init_message(grid_data)))
@@ -40,7 +84,7 @@ async def stream_region_scan(websocket: WebSocket):
     features = grid_data["features"]
     total_cells = len(features)
     cycle_index = 0
-    current_mission_id = None
+    current_mission_id = mission["id"] if mission else None
     replay_idle_mission_id = None
 
     while True:
@@ -93,7 +137,8 @@ async def stream_region_scan(websocket: WebSocket):
                         with observer.Stage("Multi-Index Scoring"):
                             score = score_cell_change(cell_id, observer)
                     except Exception as exc:
-                        observer.reject(_rejection_reason_from_exception(exc))
+                        rejection_reason = _rejection_reason_from_exception(exc)
+                        observer.reject(rejection_reason)
                         log_throttled(
                             logger,
                             logging.WARNING,
@@ -102,41 +147,44 @@ async def stream_region_scan(websocket: WebSocket):
                             cell_id,
                             exc,
                         )
-                        # FORCE AN ANOMALY IN THE VERY FIRST FEW CELLS for tutorial generation fallback!
-                        force_anomaly = (cell_index % 3 == 1) or (total_cells <= 2 and cell_index == 0)
+                        force_anomaly = _should_force_demo_anomaly(cell_index, total_cells, rejection_reason)
                         demo_forced_anomaly = force_anomaly
-                        score = {
-                            "change_score": 0.85 if force_anomaly else 0.0,
-                            "confidence": 0.92 if force_anomaly else 0.0,
-                            "reason_codes": ["demo_seeded_highlight", "suspected_canopy_loss"] if force_anomaly else [],
-                            "observation_source": "error_fallback",
-                            "before_window": {
-                                "label": "2023-01-01",
-                                "quality": 1.0,
-                                "nir": 0.82,
-                                "red": 0.12,
-                                "swir": 0.15,
-                                "ndvi": 0.74,
-                                "nbr": 0.61,
-                                "evi2": 0.68,
-                                "ndmi": 0.55,
-                                "soil_ratio": 0.18,
-                                "flags": ["MOCK"]
-                            },
-                            "after_window": {
-                                "label": "2023-08-01",
-                                "quality": 1.0,
-                                "nir": 0.45,
-                                "red": 0.35,
-                                "swir": 0.38,
-                                "ndvi": 0.12,
-                                "nbr": 0.08,
-                                "evi2": 0.15,
-                                "ndmi": 0.08,
-                                "soil_ratio": 0.84,
-                                "flags": ["MOCK"]
+                        if _is_quality_rejection(rejection_reason):
+                            score = _quality_gate_fallback_score(rejection_reason)
+                        else:
+                            score = {
+                                "change_score": 0.85 if force_anomaly else 0.0,
+                                "raw_change_score": 0.85 if force_anomaly else 0.0,
+                                "confidence": 0.92 if force_anomaly else 0.0,
+                                "reason_codes": ["demo_seeded_highlight", "suspected_canopy_loss"] if force_anomaly else [],
+                                "observation_source": "error_fallback",
+                                "before_window": {
+                                    "label": "2023-01-01",
+                                    "quality": 1.0,
+                                    "nir": 0.82,
+                                    "red": 0.12,
+                                    "swir": 0.15,
+                                    "ndvi": 0.74,
+                                    "nbr": 0.61,
+                                    "evi2": 0.68,
+                                    "ndmi": 0.55,
+                                    "soil_ratio": 0.18,
+                                    "flags": ["MOCK"]
+                                },
+                                "after_window": {
+                                    "label": "2023-08-01",
+                                    "quality": 1.0,
+                                    "nir": 0.45,
+                                    "red": 0.35,
+                                    "swir": 0.38,
+                                    "ndvi": 0.12,
+                                    "nbr": 0.08,
+                                    "evi2": 0.15,
+                                    "ndmi": 0.08,
+                                    "soil_ratio": 0.84,
+                                    "flags": ["MOCK"]
+                                }
                             }
-                        }
 
                     is_anomaly = score["change_score"] >= REGION.anomaly_threshold
                     is_confirmed_anomaly = False

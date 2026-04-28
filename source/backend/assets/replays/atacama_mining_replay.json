@@ -1,0 +1,38 @@
+{
+  "replay_id": "atacama_mining_replay",
+  "title": "Atacama Mining Expansion Replay",
+  "description": "Completed mining-expansion mission replay with provider, bbox, and prompt provenance attached.",
+  "task_text": "Detect Atacama open-pit mining expansion and separate persistent bare earth from seasonal vegetation loss.",
+  "summary": "A provenance-focused replay for open-pit mining review, using seeded Sentinel-2 frames and a compact alert packet.",
+  "bbox": [-69.115, -24.29, -69.035, -24.21],
+  "start_date": "2024-01-15",
+  "end_date": "2025-12-15",
+  "cells_scanned": 5,
+  "flags_found": 1,
+  "primary_cell_id": "mining_atacama_open_pit",
+  "alerts": [
+    {
+      "cell_id": "mining_atacama_open_pit",
+      "lat": -24.25,
+      "lng": -69.075,
+      "seeded_video": "sh_fbe644a9",
+      "event_id": "replay_atacama_mining_expansion",
+      "change_score": 0.73,
+      "confidence": 0.86,
+      "priority": "high",
+      "reason_codes": ["bare_ground_expansion", "tailings_change", "excavation_growth", "provider_bound"],
+      "observation_source": "seeded_sentinelhub_replay",
+      "before_window": {"label": "2024-01-15", "quality": 0.96, "bare_ground": "baseline_open_pit", "flags": []},
+      "after_window": {"label": "2025-12-15", "quality": 0.97, "bare_ground": "expanded_open_pit_edges", "flags": ["excavation_growth"]},
+      "timelapse_analysis": "The Atacama sequence keeps arid terrain stable while the open-pit footprint and access/tailings surfaces remain the focus of review.",
+      "analysis_summary": "The replay is useful for provenance training because the source, capture window, bbox, and mission prompt stay attached to the mining output JSON.",
+      "satellite_note": "Orbital triage detected persistent bare-earth expansion at the open-pit target.",
+      "ground_note": "Ground review keeps this as an auditable mining-expansion packet with explicit provenance.",
+      "ground_action": "CONFIRM — mining expansion candidate is ready for provenance-bound review JSON.",
+      "findings": [
+        "Open-pit and tailings surfaces are visible across the sequence",
+        "Bare-earth context is persistent rather than a seasonal vegetation artifact"
+      ]
+    }
+  ]
+}

@@ -32,6 +32,10 @@ def _replay_paths() -> list[Path]:
     return sorted(_REPLAYS_DIR.glob("*.json"))
 
 
+def _seeded_meta_paths() -> list[Path]:
+    return sorted(_SEEDED_DIR.glob("sh_*_meta.json"))
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     with open(path, "r", encoding="utf-8") as handle:
         data = json.load(handle)
@@ -40,10 +44,92 @@ def _load_json(path: Path) -> dict[str, Any]:
     return data
 
 
+def _seeded_replay_id(signature: str) -> str:
+    return f"seeded_cache_sh_{signature}"
+
+
+def _seeded_meta_to_replay_spec(path: Path) -> dict[str, Any] | None:
+    data = _load_json(path)
+    signature = str(data.get("chunk_signature") or path.stem.removeprefix("sh_").removesuffix("_meta"))
+    asset_key = f"sh_{signature}"
+    webm_path = _SEEDED_DIR / f"{asset_key}.webm"
+    if not webm_path.exists():
+        return None
+    frames_count = int(data.get("frames_count") or 0)
+    if frames_count < 2:
+        return None
+
+    bbox = data.get("bbox")
+    if not isinstance(bbox, list) or len(bbox) != 4:
+        return None
+    lat = float(data.get("lat") or (float(bbox[1]) + float(bbox[3])) / 2.0)
+    lon = float(data.get("lon") or (float(bbox[0]) + float(bbox[2])) / 2.0)
+    location = str(data.get("location_name") or f"Seeded cache {signature}")
+    target_task = str(data.get("target_task") or "temporal_change_review")
+    target_category = str(data.get("target_category") or data.get("use_case_id") or "temporal_change")
+    use_case_id = str(data.get("use_case_id") or target_category or "temporal_change_generic")
+    frame_dates = [str(item) for item in data.get("frame_dates", []) if item]
+    before_label = frame_dates[0] if frame_dates else str(data.get("start_date") or "baseline")
+    after_label = frame_dates[-1] if frame_dates else str(data.get("end_date") or "current")
+    source = str(data.get("source") or "seeded_sentinelhub_replay")
+    summary = (
+        f"Fast replay generated from seeded cache {asset_key}: {frames_count} cloud-gated frames "
+        f"for {target_category.replace('_', ' ')}."
+    )
+
+    return {
+        "replay_id": _seeded_replay_id(signature),
+        "source_kind": "seeded_cache",
+        "title": location,
+        "description": str(data.get("region_note") or summary),
+        "summary": summary,
+        "task_text": (
+            f"Replay {location} and review {target_task.replace('_', ' ')} with current proof surfaces."
+        ),
+        "bbox": bbox,
+        "start_date": data.get("start_date"),
+        "end_date": data.get("end_date"),
+        "use_case_id": use_case_id,
+        "cells_scanned": 1,
+        "flags_found": 1,
+        "primary_cell_id": f"seeded_{signature}",
+        "alerts": [
+            {
+                "seeded_video": asset_key,
+                "event_id": f"replay_seeded_{signature}",
+                "cell_id": f"seeded_{signature}",
+                "lat": lat,
+                "lng": lon,
+                "change_score": 0.0,
+                "confidence": 0.68,
+                "priority": "review",
+                "reason_codes": ["seeded_data", "training_ready", use_case_id],
+                "observation_source": "seeded_sentinelhub_replay",
+                "before_window": {"label": before_label},
+                "after_window": {"label": after_label},
+                "timelapse_analysis": str(data.get("vlm_explanation") or summary),
+                "analysis_summary": summary,
+                "satellite_note": f"Seeded cache replay restored from {source}.",
+                "ground_note": "Ground review can inspect the cached timelapse immediately, or rescan the same bbox with the current runtime model.",
+                "findings": [
+                    f"{frames_count} accepted frames",
+                    f"source: {source}",
+                    f"use case: {use_case_id}",
+                ],
+            }
+        ],
+    }
+
+
 def _load_replay_spec(replay_id: str) -> dict[str, Any]:
     for path in _replay_paths():
         data = _load_json(path)
         if str(data.get("replay_id")) == replay_id:
+            data.setdefault("source_kind", "curated_replay")
+            return data
+    for path in _seeded_meta_paths():
+        data = _seeded_meta_to_replay_spec(path)
+        if data and data["replay_id"] == replay_id:
             return data
     raise ValueError(f"Unknown replay_id '{replay_id}'")
 
@@ -60,6 +146,7 @@ def list_seeded_replays() -> list[dict[str, Any]]:
         catalog.append(
             {
                 "replay_id": str(data.get("replay_id") or path.stem),
+                "source_kind": "curated_replay",
                 "title": str(data.get("title") or path.stem),
                 "description": str(data.get("description") or ""),
                 "task_text": str(data.get("task_text") or ""),
@@ -70,6 +157,30 @@ def list_seeded_replays() -> list[dict[str, Any]]:
                 "cells_scanned": int(data.get("cells_scanned") or 0),
                 "flags_found": int(data.get("flags_found") or len(alerts)),
                 "primary_cell_id": primary_cell_id,
+                "alert_count": len(alerts),
+            }
+        )
+    curated_ids = {item["replay_id"] for item in catalog}
+    for path in _seeded_meta_paths():
+        data = _seeded_meta_to_replay_spec(path)
+        if not data or data["replay_id"] in curated_ids:
+            continue
+        alerts = list(data.get("alerts") or [])
+        catalog.append(
+            {
+                "replay_id": data["replay_id"],
+                "source_kind": "seeded_cache",
+                "title": str(data.get("title") or data["replay_id"]),
+                "description": str(data.get("description") or ""),
+                "task_text": str(data.get("task_text") or ""),
+                "summary": str(data.get("summary") or ""),
+                "bbox": data.get("bbox"),
+                "start_date": data.get("start_date"),
+                "end_date": data.get("end_date"),
+                "use_case_id": data.get("use_case_id"),
+                "cells_scanned": int(data.get("cells_scanned") or 0),
+                "flags_found": int(data.get("flags_found") or len(alerts)),
+                "primary_cell_id": str(data.get("primary_cell_id") or (alerts[0].get("cell_id") if alerts else "")),
                 "alert_count": len(alerts),
             }
         )
@@ -88,7 +199,12 @@ def _seeded_signature(asset_key: str) -> str:
     return parts[1] if len(parts) == 2 else asset_key
 
 
-def _severity_to_action(priority: str) -> str:
+def _severity_to_action(alert: dict[str, Any]) -> str:
+    custom_action = str(alert.get("ground_action") or "").strip()
+    if custom_action:
+        return custom_action
+
+    priority = str(alert.get("priority") or "")
     if priority == "critical":
         return "ESCALATE — replay confirms severe canopy-loss evidence."
     if priority == "high":
@@ -275,7 +391,7 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
             cell_id=str(alert["cell_id"]),
             payload={
                 "severity": str(alert["priority"]),
-                "action": _severity_to_action(str(alert["priority"])),
+                "action": _severity_to_action(alert),
                 "analysis_summary": str(alert.get("analysis_summary") or ""),
                 "timelapse_analysis": str(alert.get("timelapse_analysis") or ""),
                 "findings": list(alert.get("findings") or []),
@@ -302,6 +418,40 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
         "primary_cell_id": str(spec.get("primary_cell_id") or alerts[0]["cell_id"]),
         "alerts_loaded": len(alerts),
         "metrics": metrics,
+        "title": str(spec.get("title") or replay_id),
+        "summary": str(spec.get("summary") or ""),
+    }
+
+
+def rescan_seeded_replay(replay_id: str) -> dict[str, Any]:
+    """Start a live mission from replay metadata so new model/runtime behavior can rescan it."""
+    spec = _load_replay_spec(replay_id)
+    reset_runtime_state()
+    mission = start_mission(
+        task_text=str(spec.get("task_text") or spec.get("title") or replay_id),
+        bbox=spec.get("bbox"),
+        start_date=spec.get("start_date"),
+        end_date=spec.get("end_date"),
+        mission_mode="live",
+        replay_id=None,
+        summary=f"Rescan from replay {replay_id}. Uses the current runtime/model stack.",
+        use_case_id=str(spec.get("use_case_id") or "") or None,
+    )
+    post_message(
+        sender="operator",
+        recipient="broadcast",
+        msg_type="mission",
+        payload={
+            "mission_id": mission["id"],
+            "task": mission["task_text"],
+            "bbox": mission.get("bbox"),
+            "source_replay_id": replay_id,
+            "note": f"[RESCAN #{mission['id']}] Started live rescan from replay: {spec.get('title', replay_id)}",
+        },
+    )
+    return {
+        "source_replay_id": replay_id,
+        "mission": mission,
         "title": str(spec.get("title") or replay_id),
         "summary": str(spec.get("summary") or ""),
     }

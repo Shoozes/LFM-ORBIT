@@ -301,7 +301,13 @@ test.describe("Phase 4.75 – Seeded replay flow", () => {
     await waitForLinkOpen(page);
     await page.locator("[data-testid='tab-mission']").click();
 
-    await page.getByRole("button", { name: "Load Replay" }).first().click();
+    await expect(page.getByTestId("fast-replay-panel")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("load-replay-rondonia_frontier_judge")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("rescan-replay-rondonia_frontier_judge")).toBeVisible();
+    await expect(page.getByTestId("load-replay-manchar_flood_replay")).toBeVisible();
+    await expect(page.getByTestId("load-replay-singapore_maritime_replay")).toBeVisible();
+
+    await page.getByTestId("load-replay-rondonia_frontier_judge").click();
     await expect(page.getByText("REPLAY ACTIVE: rondonia_frontier_judge")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("Seeded Replay Evidence", { exact: true })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("sq_-10.0_-63.0").first()).toBeVisible({ timeout: 10_000 });
@@ -314,6 +320,10 @@ test.describe("Phase 4.75 – Seeded replay flow", () => {
     await expect(page.getByText("Replay Mission · rondonia_frontier_judge")).toBeVisible({ timeout: 10_000 });
     await page.getByRole("button", { name: "Exit Replay" }).click();
     await expect(page.getByText("REPLAY ACTIVE: rondonia_frontier_judge")).not.toBeVisible({ timeout: 10_000 });
+
+    await page.getByTestId("rescan-replay-rondonia_frontier_judge").click();
+    await expect(page.getByText("Live rescan started from replay metadata")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/Active Mission #/)).toBeVisible({ timeout: 10_000 });
   });
 });
 
@@ -500,8 +510,7 @@ test.describe("Phase 9 - Context Module and Timelapse Validation", () => {
   test("context menu drops on right click", async ({ page }) => {
     await gotoApp(page);
     await waitForLinkOpen(page);
-    // Give map time to mount canvas completely
-    await page.waitForTimeout(3_000);
+    await waitForBasemapReady(page);
 
     await openMapContextMenu(page);
 
@@ -536,7 +545,7 @@ test.describe("Phase 9 - Context Module and Timelapse Validation", () => {
 
     await gotoApp(page);
     await waitForLinkOpen(page);
-    await page.waitForTimeout(3_000);
+    await waitForBasemapReady(page);
 
     await openMapContextMenu(page);
 
@@ -574,7 +583,7 @@ test.describe("Phase 9 - Context Module and Timelapse Validation", () => {
 
     await gotoApp(page);
     await waitForLinkOpen(page);
-    await page.waitForTimeout(1_000);
+    await waitForBasemapReady(page);
 
     await openMapContextMenu(page);
     await page.getByText("▷ Generate Temporal Timelapse").click();
@@ -587,7 +596,7 @@ test.describe("Phase 9 - Context Module and Timelapse Validation", () => {
     await resetRuntimeState(request);
     await gotoApp(page);
     await waitForLinkOpen(page);
-    await page.waitForTimeout(3_000);
+    await waitForBasemapReady(page);
 
     await openMapContextMenu(page, { xRatio: 0.56, yRatio: 0.56 });
 

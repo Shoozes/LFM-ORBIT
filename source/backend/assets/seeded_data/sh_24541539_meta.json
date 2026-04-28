@@ -1,0 +1,31 @@
+{
+  "chunk_signature": "24541539",
+  "bbox": [
+    67.63,
+    26.31,
+    67.87,
+    26.55
+  ],
+  "lat": 26.43,
+  "lon": 67.75,
+  "location_name": "Pakistan Manchar Lake flood [+0,+0]",
+  "region_note": "Known 2022 Pakistan flood overflow around Manchar Lake",
+  "start_date": "2022-06",
+  "end_date": "2022-11",
+  "frames_count": 6,
+  "frame_dates": [
+    "2022-06-15",
+    "2022-07-15",
+    "2022-08-15",
+    "2022-09-15",
+    "2022-10-15",
+    "2022-11-15"
+  ],
+  "vlm_explanation": "Sentinel-2 L2A timelapse seeded for Pakistan Manchar Lake flood [+0,+0] from 2022-06 to 2022-11. Metadata inference was skipped for this cache refresh.",
+  "source": "Sentinel Hub Sentinel-2 L2A",
+  "seeded_at": "2026-04-27",
+  "training_ready": true,
+  "use_case_id": "flood_extent",
+  "target_category": "flooding",
+  "target_task": "surface_water_expansion"
+}

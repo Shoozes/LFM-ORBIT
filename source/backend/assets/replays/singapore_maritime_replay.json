@@ -1,0 +1,38 @@
+{
+  "replay_id": "singapore_maritime_replay",
+  "title": "Singapore Strait Maritime Replay",
+  "description": "Completed maritime replay using dynamic Sentinel-2 anchorage and port-traffic context.",
+  "task_text": "Review vessel and port activity around the Singapore Strait anchorage.",
+  "summary": "A maritime replay with three cloud-gated Sentinel-2 frames selected from quarterly windows. Cloudy windows were rejected before the replay was packaged.",
+  "bbox": [103.8, 1.2, 103.9, 1.3],
+  "start_date": "2025-01-01",
+  "end_date": "2025-11-01",
+  "cells_scanned": 5,
+  "flags_found": 1,
+  "primary_cell_id": "maritime_singapore_strait",
+  "alerts": [
+    {
+      "cell_id": "maritime_singapore_strait",
+      "lat": 1.25,
+      "lng": 103.85,
+      "seeded_video": "sh_99548137",
+      "event_id": "replay_singapore_maritime_activity",
+      "change_score": 0.67,
+      "confidence": 0.82,
+      "priority": "medium",
+      "reason_codes": ["vessel_presence", "port_activity_change", "ship_wake", "cloud_windows_rejected"],
+      "observation_source": "seeded_sentinelhub_replay",
+      "before_window": {"label": "q1_2025", "quality": 0.98, "channel_context": "baseline_anchorage", "flags": []},
+      "after_window": {"label": "q4_2025", "quality": 0.91, "channel_context": "review_port_activity", "flags": ["port_activity_change"]},
+      "timelapse_analysis": "The Singapore Strait replay uses three accepted Sentinel-2 frames and rejects two cloud-dominated windows before packaging maritime evidence.",
+      "analysis_summary": "This replay broadens mission coverage into maritime traffic while preserving the quality-gate record that kept clouds out of the result.",
+      "satellite_note": "Orbital triage retained the anchorage sequence because vessel and port context changed across accepted frames.",
+      "ground_note": "Ground review confirms this sequence is more dynamic than the older Suez fixture and suitable for replay evidence.",
+      "ground_action": "REVIEW — maritime activity packet is downlink-ready with rejected cloud windows recorded.",
+      "findings": [
+        "Accepted frames show dynamic maritime/port context",
+        "Two cloudy windows were rejected before the replay was built"
+      ]
+    }
+  ]
+}

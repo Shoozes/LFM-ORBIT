@@ -1,0 +1,38 @@
+{
+  "replay_id": "manchar_flood_replay",
+  "title": "Manchar Lake Flood Replay",
+  "description": "Completed flood-extent mission replay using the seeded Pakistan Manchar Lake Sentinel-2 sequence.",
+  "task_text": "Find new surface water and overflow around Pakistan's Manchar Lake during the 2022 flood sequence.",
+  "summary": "A compact replay showing raw flood imagery staying local while a single water-extent alert is pushed as downlink-ready JSON.",
+  "bbox": [67.63, 26.31, 67.87, 26.55],
+  "start_date": "2022-06-15",
+  "end_date": "2022-11-15",
+  "cells_scanned": 6,
+  "flags_found": 1,
+  "primary_cell_id": "flood_manchar_lake",
+  "alerts": [
+    {
+      "cell_id": "flood_manchar_lake",
+      "lat": 26.43,
+      "lng": 67.75,
+      "seeded_video": "sh_24541539",
+      "event_id": "replay_manchar_flood_extent",
+      "change_score": 0.78,
+      "confidence": 0.89,
+      "priority": "high",
+      "reason_codes": ["water_extent_growth", "river_overbank", "surface_water_persistence", "downlink_saved"],
+      "observation_source": "seeded_sentinelhub_replay",
+      "before_window": {"label": "2022-06-15", "quality": 0.92, "water_extent": "baseline_lake_boundary", "flags": []},
+      "after_window": {"label": "2022-09-15", "quality": 0.9, "water_extent": "expanded_floodplain", "flags": ["floodplain_expansion"]},
+      "timelapse_analysis": "The seeded Sentinel-2 sequence shows Manchar Lake and adjacent floodplain water expansion through the 2022 flood window, then persistence into later frames.",
+      "analysis_summary": "The replay isolates a flood extent candidate: raw frames remain local, while the mission downlinks compact water-extent evidence JSON.",
+      "satellite_note": "Orbital triage detected persistent surface-water expansion around the lake boundary and requested ground validation.",
+      "ground_note": "Ground review confirms the flood extent replay is suitable as a payload-reduction training sample.",
+      "ground_action": "CONFIRM — flood overflow evidence is downlink-ready as compact water-extent JSON.",
+      "findings": [
+        "Surface water expands beyond the normal lake boundary",
+        "Floodwater remains visible across multiple contextual frames"
+      ]
+    }
+  ]
+}

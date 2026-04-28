@@ -52,6 +52,7 @@ _DEFAULT_OUTPUT_DIR = "retagged_training"
 _PROMPT_VERSION = "orbit_asset_retag_prompt_v1"
 _SCRIPT_VERSION = "orbit_retag_training_assets_v1"
 _HF_IMAGE_DIR = "images"
+_DEFAULT_OLLAMA_MODEL = "qwen3.6:27b"
 
 
 @dataclass
@@ -323,8 +324,9 @@ def _extract_video_frames(
 
     expanded: list[AssetCandidate] = []
     sampled_indices = _sample_indices(len(frames), frame_count)
+    video_key = _sha256(candidate.path)[:16]
     for index in sampled_indices:
-        frame_path = frames_dir / f"{_safe_name(candidate.path.stem)}__frame_{index:04d}.jpg"
+        frame_path = frames_dir / f"{_safe_name(candidate.path.stem)}_{video_key}__frame_{index:04d}.jpg"
         _save_frame(frames[index], frame_path)
         refs = []
         for ref in candidate.refs:
@@ -543,6 +545,7 @@ def _ollama_retag(
         "images": [image_b64],
         "format": "json",
         "stream": False,
+        "think": False,
     }
     response = _post_json(
         f"{base_url.rstrip('/')}/api/generate",
@@ -641,6 +644,7 @@ def _ollama_sequence_retag(
         "images": [base64.b64encode(frame.path.read_bytes()).decode("ascii") for frame in sequence.frame_candidates],
         "format": "json",
         "stream": False,
+        "think": False,
     }
     response = _post_json(
         f"{base_url.rstrip('/')}/api/generate",
@@ -734,6 +738,20 @@ def _copy_unique_image(source: Path, images_dir: Path, asset_id: str) -> str:
     return f"{_HF_IMAGE_DIR}/{target.name}"
 
 
+def _load_existing_retag_rows(existing_dir: Path | None, filename: str, key_name: str) -> dict[str, dict[str, Any]]:
+    if existing_dir is None:
+        return {}
+    path = existing_dir / filename
+    if not path.exists():
+        return {}
+    rows: dict[str, dict[str, Any]] = {}
+    for row in _read_jsonl(path):
+        key = str(row.get(key_name) or "")
+        if key and isinstance(row.get("retag"), dict):
+            rows.setdefault(key, row)
+    return rows
+
+
 def retag_dataset(
     dataset_dir: Path,
     output_dir: Path,
@@ -749,21 +767,33 @@ def retag_dataset(
     openai_detail: str = "low",
     timeout: float = 120.0,
     sleep_seconds: float = 0.0,
+    max_provider_assets: int | None = None,
+    max_provider_sequences: int | None = None,
+    reuse_existing_dir: Path | None = None,
+    reuse_existing_sequences: bool = True,
     tagger: Callable[[AssetCandidate, list[AssetRef], str], dict[str, Any]] | None = None,
     sequence_tagger: Callable[[TemporalSequenceCandidate, str, list[str]], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     dataset_dir = dataset_dir.resolve()
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    reuse_existing_dir = reuse_existing_dir.resolve() if reuse_existing_dir else None
     frames_dir = output_dir / "frames"
     images_dir = output_dir / _HF_IMAGE_DIR
 
     model_name = model or {
         "heuristic": "orbit_heuristic_v1",
         "queue": "manual_review_queue",
-        "ollama": "qwen2.5vl:7b",
+        "ollama": _DEFAULT_OLLAMA_MODEL,
         "openai": "gpt-4.1-mini",
     }.get(provider, "orbit_heuristic_v1")
+
+    existing_asset_rows = _load_existing_retag_rows(reuse_existing_dir, "retagged_assets.jsonl", "asset_sha256")
+    existing_sequence_rows = (
+        _load_existing_retag_rows(reuse_existing_dir, "temporal_sequences.jsonl", "video_sha256")
+        if reuse_existing_sequences
+        else {}
+    )
 
     record_candidates, skipped = _collect_record_assets(dataset_dir, output_dir)
     candidates = record_candidates
@@ -799,6 +829,19 @@ def retag_dataset(
     failures: list[dict[str, Any]] = []
     sequence_failures: list[dict[str, Any]] = []
     digest_to_file: dict[str, str] = {}
+    provider_asset_calls = 0
+    provider_sequence_calls = 0
+    provider_budget_fallbacks = 0
+    provider_sequence_budget_fallbacks = 0
+    reused_asset_tags = 0
+    reused_sequence_tags = 0
+
+    def provider_budget_allows(limit: int | None, used: int) -> bool:
+        if limit is None or limit < 0:
+            return True
+        if limit == 0:
+            return False
+        return used < limit
 
     for index, (digest, candidate) in enumerate(sorted(unique.items()), start=1):
         asset_id = digest[:16]
@@ -806,39 +849,64 @@ def retag_dataset(
         image_file = _copy_unique_image(candidate.path, images_dir, asset_id)
         digest_to_file[digest] = image_file
         prompt = _prompt_for_asset(candidate, refs)
+        asset_provider = provider
+        asset_model = model_name
+        existing_asset_row = existing_asset_rows.get(digest)
 
-        try:
-            if tagger is not None:
-                raw_retag = tagger(candidate, refs, model_name)
-            elif provider == "queue":
-                raw_retag = _heuristic_retag(candidate, refs, model_name)
-            elif provider == "ollama":
-                raw_retag = _ollama_retag(
-                    candidate,
-                    refs,
-                    model_name,
-                    base_url=ollama_base_url,
-                    timeout=timeout,
-                )
-            elif provider == "openai":
-                api_key = os.getenv("OPENAI_API_KEY", "")
-                if not api_key:
-                    raise RuntimeError("OPENAI_API_KEY is required for --provider openai")
-                raw_retag = _openai_retag(
-                    candidate,
-                    refs,
-                    model_name,
-                    api_key=api_key,
-                    base_url=openai_base_url,
-                    detail=openai_detail,
-                    timeout=timeout,
-                )
-            else:
-                raw_retag = _heuristic_retag(candidate, refs, model_name)
-            retag = _normalize_retag(raw_retag)
-        except Exception as exc:
-            failures.append({"asset_id": asset_id, "path": str(candidate.path), "error": str(exc)})
-            retag = _normalize_retag(_heuristic_retag(candidate, refs, "orbit_heuristic_fallback_v1"))
+        if existing_asset_row is not None:
+            reused_asset_tags += 1
+            asset_provider = str(existing_asset_row.get("provider") or "reused")
+            asset_model = str(existing_asset_row.get("model") or model_name)
+            retag = _normalize_retag(existing_asset_row.get("retag") or {})
+        else:
+            try:
+                if tagger is not None:
+                    raw_retag = tagger(candidate, refs, model_name)
+                elif provider == "queue":
+                    raw_retag = _heuristic_retag(candidate, refs, asset_model)
+                elif provider == "ollama":
+                    if provider_budget_allows(max_provider_assets, provider_asset_calls):
+                        provider_asset_calls += 1
+                        raw_retag = _ollama_retag(
+                            candidate,
+                            refs,
+                            model_name,
+                            base_url=ollama_base_url,
+                            timeout=timeout,
+                        )
+                    else:
+                        provider_budget_fallbacks += 1
+                        asset_provider = "heuristic"
+                        asset_model = "orbit_heuristic_budget_fallback_v1"
+                        raw_retag = _heuristic_retag(candidate, refs, asset_model)
+                elif provider == "openai":
+                    api_key = os.getenv("OPENAI_API_KEY", "")
+                    if not api_key:
+                        raise RuntimeError("OPENAI_API_KEY is required for --provider openai")
+                    if provider_budget_allows(max_provider_assets, provider_asset_calls):
+                        provider_asset_calls += 1
+                        raw_retag = _openai_retag(
+                            candidate,
+                            refs,
+                            model_name,
+                            api_key=api_key,
+                            base_url=openai_base_url,
+                            detail=openai_detail,
+                            timeout=timeout,
+                        )
+                    else:
+                        provider_budget_fallbacks += 1
+                        asset_provider = "heuristic"
+                        asset_model = "orbit_heuristic_budget_fallback_v1"
+                        raw_retag = _heuristic_retag(candidate, refs, asset_model)
+                else:
+                    raw_retag = _heuristic_retag(candidate, refs, asset_model)
+                retag = _normalize_retag(raw_retag)
+            except Exception as exc:
+                failures.append({"asset_id": asset_id, "path": str(candidate.path), "error": str(exc)})
+                asset_provider = "heuristic"
+                asset_model = "orbit_heuristic_fallback_v1"
+                retag = _normalize_retag(_heuristic_retag(candidate, refs, asset_model))
 
         references = _refs_to_json(refs)
         duplicate_reference_count = max(0, len(references) - 1)
@@ -850,10 +918,12 @@ def retag_dataset(
             "file_name": image_file,
             "source_kind": candidate.source_kind,
             "mime_type": _mime_type(candidate.path),
-            "provider": provider,
-            "model": model_name,
+            "requested_provider": provider,
+            "provider": asset_provider,
+            "model": asset_model,
             "script_version": _SCRIPT_VERSION,
             "prompt_version": _PROMPT_VERSION,
+            "reused_existing_tag": existing_asset_row is not None,
             "duplicate_reference_count": duplicate_reference_count,
             "references": references,
             "retag": retag,
@@ -893,8 +963,9 @@ def retag_dataset(
             "metadata": {
                 "asset_sha256": digest,
                 "source_kind": candidate.source_kind,
-                "provider": provider,
-                "model": model_name,
+                "requested_provider": provider,
+                "provider": asset_provider,
+                "model": asset_model,
                 "references": references,
             },
         })
@@ -934,36 +1005,62 @@ def retag_dataset(
                 for index, frame_hash in enumerate(frame_hashes)
             ]
             try:
-                if sequence_tagger is not None:
+                sequence_provider = provider
+                sequence_model = model_name
+                existing_sequence_row = existing_sequence_rows.get(video_digest)
+                if existing_sequence_row is not None:
+                    reused_sequence_tags += 1
+                    sequence_provider = str(existing_sequence_row.get("provider") or "reused")
+                    sequence_model = str(existing_sequence_row.get("model") or model_name)
+                    sequence_retag = _normalize_sequence_retag(existing_sequence_row.get("retag") or {})
+                elif sequence_tagger is not None:
                     raw_sequence = sequence_tagger(sequence, model_name, frame_hashes)
-                elif provider == "queue":
-                    raw_sequence = _heuristic_sequence_retag(sequence, model_name, frame_hashes)
-                elif provider == "ollama":
-                    raw_sequence = _ollama_sequence_retag(
-                        sequence,
-                        model_name,
-                        base_url=ollama_base_url,
-                        timeout=timeout,
-                    )
-                elif provider == "openai":
-                    api_key = os.getenv("OPENAI_API_KEY", "")
-                    if not api_key:
-                        raise RuntimeError("OPENAI_API_KEY is required for --provider openai")
-                    raw_sequence = _openai_sequence_retag(
-                        sequence,
-                        model_name,
-                        api_key=api_key,
-                        base_url=openai_base_url,
-                        detail=openai_detail,
-                        timeout=timeout,
-                    )
+                    sequence_retag = _normalize_sequence_retag(raw_sequence)
                 else:
-                    raw_sequence = _heuristic_sequence_retag(sequence, model_name, frame_hashes)
-                sequence_retag = _normalize_sequence_retag(raw_sequence)
+                    if provider == "queue":
+                        raw_sequence = _heuristic_sequence_retag(sequence, model_name, frame_hashes)
+                    elif provider == "ollama":
+                        if provider_budget_allows(max_provider_sequences, provider_sequence_calls):
+                            provider_sequence_calls += 1
+                            raw_sequence = _ollama_sequence_retag(
+                                sequence,
+                                model_name,
+                                base_url=ollama_base_url,
+                                timeout=timeout,
+                            )
+                        else:
+                            provider_sequence_budget_fallbacks += 1
+                            sequence_provider = "heuristic"
+                            sequence_model = "orbit_heuristic_sequence_budget_fallback_v1"
+                            raw_sequence = _heuristic_sequence_retag(sequence, sequence_model, frame_hashes)
+                    elif provider == "openai":
+                        api_key = os.getenv("OPENAI_API_KEY", "")
+                        if not api_key:
+                            raise RuntimeError("OPENAI_API_KEY is required for --provider openai")
+                        if provider_budget_allows(max_provider_sequences, provider_sequence_calls):
+                            provider_sequence_calls += 1
+                            raw_sequence = _openai_sequence_retag(
+                                sequence,
+                                model_name,
+                                api_key=api_key,
+                                base_url=openai_base_url,
+                                detail=openai_detail,
+                                timeout=timeout,
+                            )
+                        else:
+                            provider_sequence_budget_fallbacks += 1
+                            sequence_provider = "heuristic"
+                            sequence_model = "orbit_heuristic_sequence_budget_fallback_v1"
+                            raw_sequence = _heuristic_sequence_retag(sequence, sequence_model, frame_hashes)
+                    else:
+                        raw_sequence = _heuristic_sequence_retag(sequence, model_name, frame_hashes)
+                    sequence_retag = _normalize_sequence_retag(raw_sequence)
             except Exception as exc:
                 sequence_failures.append({"video_sha256": video_digest, "path": str(sequence.video_path), "error": str(exc)})
+                sequence_provider = "heuristic"
+                sequence_model = "orbit_heuristic_sequence_fallback_v1"
                 sequence_retag = _normalize_sequence_retag(
-                    _heuristic_sequence_retag(sequence, "orbit_heuristic_sequence_fallback_v1", frame_hashes)
+                    _heuristic_sequence_retag(sequence, sequence_model, frame_hashes)
                 )
 
             references = _refs_to_json(sequence.refs)
@@ -977,10 +1074,12 @@ def retag_dataset(
                 "sampled_indices": sequence.sampled_indices,
                 "ordered_frames": ordered_frames,
                 "unique_frame_assets": len({frame["asset_sha256"] for frame in ordered_frames}),
-                "provider": provider,
-                "model": model_name,
+                "requested_provider": provider,
+                "provider": sequence_provider,
+                "model": sequence_model,
                 "script_version": _SCRIPT_VERSION,
                 "prompt_version": _PROMPT_VERSION,
+                "reused_existing_tag": video_digest in existing_sequence_rows,
                 "references": references,
                 "retag": sequence_retag,
             })
@@ -1005,8 +1104,9 @@ def retag_dataset(
                 "metadata": {
                     "video_sha256": video_digest,
                     "ordered_frames": ordered_frames,
-                    "provider": provider,
-                    "model": model_name,
+                    "requested_provider": provider,
+                    "provider": sequence_provider,
+                    "model": sequence_model,
                     "references": references,
                 },
             })
@@ -1025,8 +1125,18 @@ def retag_dataset(
         "format": "orbit_retag_manifest_v1",
         "dataset_dir": str(dataset_dir),
         "output_dir": str(output_dir),
+        "reuse_existing_dir": str(reuse_existing_dir) if reuse_existing_dir else None,
+        "reuse_existing_sequences": reuse_existing_sequences,
         "provider": provider,
         "model": model_name,
+        "provider_asset_call_budget": max_provider_assets,
+        "provider_sequence_call_budget": max_provider_sequences,
+        "provider_asset_calls": provider_asset_calls,
+        "provider_sequence_calls": provider_sequence_calls,
+        "provider_budget_fallbacks": provider_budget_fallbacks,
+        "provider_sequence_budget_fallbacks": provider_sequence_budget_fallbacks,
+        "reused_asset_tags": reused_asset_tags,
+        "reused_sequence_tags": reused_sequence_tags,
         "unique_training_assets": len(asset_rows),
         "unique_temporal_sequences": len(sequence_rows),
         "source_candidates": len(candidates),
@@ -1063,8 +1173,8 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Retag Orbit dataset images and timelapse frames into deduplicated training assets.")
     parser.add_argument("--dataset-dir", type=Path, default=Path("."), help="Orbit export/data directory. Defaults to the current directory.")
     parser.add_argument("--output-dir", type=Path, default=None, help=f"Output directory. Defaults to <dataset-dir>/{_DEFAULT_OUTPUT_DIR}.")
-    parser.add_argument("--provider", choices=["heuristic", "queue", "ollama", "openai"], default="heuristic", help="Retag provider.")
-    parser.add_argument("--model", default=None, help="Provider model name, e.g. qwen2.5vl:32b for Ollama.")
+    parser.add_argument("--provider", choices=["heuristic", "queue", "ollama", "openai"], default="ollama", help="Retag provider.")
+    parser.add_argument("--model", default=None, help=f"Provider model name. Ollama defaults to {_DEFAULT_OLLAMA_MODEL}.")
     parser.add_argument("--video-frame-count", type=int, default=4, help="Maximum frames to extract per valid timelapse video.")
     parser.add_argument("--min-video-frames", type=int, default=2, help="Minimum decoded frames required before a video becomes training evidence.")
     parser.add_argument("--no-temporal-sequences", action="store_true", help="Extract video frames but skip ordered temporal sequence JSONL rows.")
@@ -1074,6 +1184,29 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--openai-detail", choices=["low", "high", "auto"], default="low", help="OpenAI image detail level.")
     parser.add_argument("--timeout", type=float, default=120.0, help="Provider HTTP timeout in seconds.")
     parser.add_argument("--sleep-seconds", type=float, default=0.0, help="Optional pause between provider calls.")
+    parser.add_argument(
+        "--reuse-existing-dir",
+        type=Path,
+        default=None,
+        help="Reuse retag/sequence labels from an existing retagged_training folder when SHA-256 hashes match.",
+    )
+    parser.add_argument(
+        "--no-reuse-existing-sequences",
+        action="store_true",
+        help="Reuse matching image tags but force temporal sequence labels to be regenerated.",
+    )
+    parser.add_argument(
+        "--max-provider-assets",
+        type=int,
+        default=16,
+        help="Maximum Ollama/OpenAI image calls before heuristic fallback. Use -1 for unlimited full-model retagging.",
+    )
+    parser.add_argument(
+        "--max-provider-sequences",
+        type=int,
+        default=0,
+        help="Maximum Ollama/OpenAI temporal-sequence calls before heuristic fallback. Use 0 to keep sequences heuristic, -1 for unlimited.",
+    )
     return parser.parse_args()
 
 
@@ -1095,6 +1228,10 @@ def main() -> int:
         openai_detail=args.openai_detail,
         timeout=max(1.0, float(args.timeout)),
         sleep_seconds=max(0.0, float(args.sleep_seconds)),
+        max_provider_assets=int(args.max_provider_assets),
+        max_provider_sequences=int(args.max_provider_sequences),
+        reuse_existing_dir=args.reuse_existing_dir,
+        reuse_existing_sequences=not args.no_reuse_existing_sequences,
     )
     print(
         "[Orbit] Retagged {unique_training_assets} unique assets to {path} "

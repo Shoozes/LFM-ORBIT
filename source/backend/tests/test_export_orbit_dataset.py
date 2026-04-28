@@ -321,3 +321,183 @@ def test_write_dataset_export_includes_persisted_monitor_reports(tmp_path, monke
         "civilian_lifeline_disruption",
         "maritime_activity",
     }
+
+
+def test_write_dataset_export_ignores_missing_optional_monitor_report_dir(tmp_path, monkeypatch):
+    db_path = tmp_path / "alerts.sqlite"
+    bus_path = tmp_path / "agent_bus.sqlite"
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(db_path))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(bus_path))
+
+    init_db(reset=True)
+    init_bus(reset=True)
+
+    output_dir = tmp_path / "export"
+    manifest = export_orbit_dataset.write_dataset_export(
+        output_dir,
+        limit=10,
+        eval_ratio=0.5,
+        include_rejects=False,
+        monitor_reports_dir=tmp_path / "missing-monitor-reports",
+    )
+
+    assert manifest["records"] == 0
+    assert manifest["monitor_report_records"] == 0
+
+
+def test_write_dataset_export_can_include_seeded_cache_records(tmp_path, monkeypatch):
+    db_path = tmp_path / "alerts.sqlite"
+    bus_path = tmp_path / "agent_bus.sqlite"
+    seeded_dir = tmp_path / "seeded_data"
+    seeded_dir.mkdir()
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(db_path))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(bus_path))
+    monkeypatch.setattr(export_orbit_dataset, "_SEEDED_DATA_DIR", seeded_dir)
+    monkeypatch.setattr(export_orbit_dataset, "resolve_context_thumb", lambda lat, lng: _png_data_url())
+
+    init_db(reset=True)
+    init_bus(reset=True)
+
+    (seeded_dir / "sh_demo1234.webm").write_bytes(b"webm-bytes")
+    (seeded_dir / "sh_demo1234_meta.json").write_text(
+        json.dumps(
+            {
+                "chunk_signature": "demo1234",
+                "bbox": [-63.1, -10.1, -63.0, -10.0],
+                "lat": -10.05,
+                "lon": -63.05,
+                "location_name": "Rondonia test cell",
+                "region_note": "Seeded replay fixture",
+                "start_date": "2023-01",
+                "end_date": "2025-01",
+                "frames_count": 25,
+                "frame_dates": ["2023-01-15", "2025-01-15"],
+                "date_windows": [
+                    {"label": "before", "start_date": "2023-01-01", "end_date": "2023-02-01"},
+                    {"label": "after", "start_date": "2025-01-01", "end_date": "2025-02-01"},
+                ],
+                "frame_quality": [
+                    {"label": "before", "valid_pixel_ratio": 0.97, "cloud_pixel_ratio": 0.01, "reasons": []},
+                    {"label": "after", "valid_pixel_ratio": 0.95, "cloud_pixel_ratio": 0.02, "reasons": []},
+                ],
+                "rejected_windows": [
+                    {
+                        "label": "cloudy",
+                        "quality": {
+                            "accepted": False,
+                            "valid_pixel_ratio": 0.2,
+                            "cloud_pixel_ratio": 0.8,
+                            "reasons": ["insufficient_valid_pixels"],
+                        },
+                    },
+                ],
+                "visual_mode": "burn_scar",
+                "vlm_explanation": "Seeded Sentinel-2 timelapse.",
+                "source": "Sentinel Hub Sentinel-2 L2A",
+                "training_ready": True,
+                "use_case_id": "deforestation",
+                "target_category": "deforestation",
+                "target_task": "deforestation_detection",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "export"
+    manifest = export_orbit_dataset.write_dataset_export(
+        output_dir,
+        limit=10,
+        include_rejects=False,
+        include_api_observations=False,
+        include_seeded_cache=True,
+    )
+    records = [
+        json.loads(line)
+        for line in (output_dir / "samples.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    assert manifest["records"] == 1
+    assert manifest["seeded_cache_records"] == 1
+    assert manifest["records_with_timelapse"] == 1
+    record = records[0]
+    assert record["record_type"] == "seeded_cache"
+    assert record["confirmation_source"] == "seeded_data"
+    assert record["target_category"] == "deforestation"
+    assert record["target_task"] == "deforestation_detection"
+    assert record["visual_mode"] == "burn_scar"
+    assert record["date_windows"][0]["label"] == "before"
+    assert record["frame_quality"][0]["valid_pixel_ratio"] == 0.97
+    assert record["rejected_windows"][0]["quality"]["cloud_pixel_ratio"] == 0.8
+    assert record["assets"]["timelapse"] == "timelapse.webm"
+    assert (output_dir / "samples" / record["sample_id"] / "timelapse.webm").read_bytes() == b"webm-bytes"
+
+
+def test_seeded_cache_record_replaces_duplicate_api_observation(tmp_path, monkeypatch):
+    db_path = tmp_path / "alerts.sqlite"
+    bus_path = tmp_path / "agent_bus.sqlite"
+    seeded_dir = tmp_path / "seeded_data"
+    seeded_dir.mkdir()
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(db_path))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(bus_path))
+    monkeypatch.setattr(export_orbit_dataset, "_SEEDED_DATA_DIR", seeded_dir)
+    monkeypatch.setattr(export_orbit_dataset, "resolve_context_thumb", lambda lat, lng: _png_data_url())
+    monkeypatch.setattr(
+        export_orbit_dataset,
+        "list_observations",
+        lambda training_ready_only=False: [
+            {
+                "chunk_signature": "demo1234",
+                "bbox": [-63.1, -10.1, -63.0, -10.0],
+                "source": "sentinelhub_process",
+                "training_ready": True,
+                "observations": [{"vlm_text": "generic observation row"}],
+            }
+        ],
+    )
+
+    init_db(reset=True)
+    init_bus(reset=True)
+
+    (seeded_dir / "sh_demo1234.webm").write_bytes(b"webm-bytes")
+    (seeded_dir / "sh_demo1234_meta.json").write_text(
+        json.dumps(
+            {
+                "chunk_signature": "demo1234",
+                "bbox": [-63.1, -10.1, -63.0, -10.0],
+                "lat": -10.05,
+                "lon": -63.05,
+                "location_name": "Seeded flood target",
+                "frames_count": 4,
+                "frame_dates": ["before", "after"],
+                "vlm_explanation": "richer seeded metadata",
+                "source": "Sentinel Hub Sentinel-2 L2A",
+                "training_ready": True,
+                "use_case_id": "flood_extent",
+                "target_category": "flood",
+                "target_task": "flood_temporal_detection",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "export"
+    manifest = export_orbit_dataset.write_dataset_export(
+        output_dir,
+        limit=10,
+        include_rejects=False,
+        include_api_observations=True,
+        include_seeded_cache=True,
+    )
+    records = [
+        json.loads(line)
+        for line in (output_dir / "samples.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    assert manifest["records"] == 1
+    assert manifest["api_observation_records"] == 0
+    assert manifest["seeded_cache_records"] == 1
+    assert records[0]["record_type"] == "seeded_cache"
+    assert records[0]["target_task"] == "flood_temporal_detection"
+    assert records[0]["timelapse_analysis"] == "richer seeded metadata"

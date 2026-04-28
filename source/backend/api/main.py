@@ -48,6 +48,7 @@ from core.lifeline_monitoring import (
     evaluate_lifeline_predictions,
     list_lifeline_assets,
 )
+from core.link_state import is_link_connected, set_link_state
 from core.maritime_monitoring import (
     build_maritime_monitor_report,
     normalize_maritime_timestamp,
@@ -55,7 +56,7 @@ from core.maritime_monitoring import (
 from core.metrics import read_metrics_summary
 from core.mission import get_active_mission, list_missions, start_mission, stop_mission
 from core.queue import get_alert_counts, get_recent_alerts
-from core.replay import list_seeded_replays, load_seeded_replay
+from core.replay import list_seeded_replays, load_seeded_replay, rescan_seeded_replay
 from core.runtime_state import ensure_runtime_state, reset_runtime_state
 from core.satellite_agent import run_satellite_agent
 from core.scanner import stream_region_scan
@@ -107,6 +108,35 @@ def _should_reset_on_boot() -> bool:
     return os.getenv("RESET_RUNTIME_STATE_ON_BOOT", "false").lower() in ("true", "1", "yes")
 
 
+def _should_run_agent_pair_on_boot() -> bool:
+    return os.getenv("RUN_AGENT_PAIR_ON_BOOT", "true").lower() not in ("false", "0", "no")
+
+
+def _is_windows_transport_disconnect_noise(context: dict[str, Any]) -> bool:
+    exc = context.get("exception")
+    handle = str(context.get("handle") or "")
+    return (
+        isinstance(exc, ConnectionResetError)
+        and "_ProactorBasePipeTransport._call_connection_lost" in handle
+    )
+
+
+def _install_asyncio_disconnect_noise_filter() -> None:
+    loop = asyncio.get_running_loop()
+    previous_handler = loop.get_exception_handler()
+
+    def _handler(loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
+        if _is_windows_transport_disconnect_noise(context):
+            logger.debug("Suppressed benign Windows websocket disconnect noise: %s", context.get("exception"))
+            return
+        if previous_handler is not None:
+            previous_handler(loop, context)
+            return
+        loop.default_exception_handler(context)
+
+    loop.set_exception_handler(_handler)
+
+
 def _decode_bus_payload(raw_payload: str):
     try:
         return json.loads(raw_payload)
@@ -126,6 +156,8 @@ async def _safe_send_text(websocket: WebSocket, payload: dict) -> bool:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    _install_asyncio_disconnect_noise_filter()
+
     reset = _should_reset_on_boot()
     if reset:
         reset_runtime_state()
@@ -139,17 +171,24 @@ async def lifespan(_: FastAPI):
     )
 
     stop_event = asyncio.Event()
-    sat_task = asyncio.create_task(run_satellite_agent(stop_event))
-    gnd_task = asyncio.create_task(run_ground_agent(stop_event))
-    logger.info("Agent pair launched: satellite_agent + ground_agent")
+    agent_tasks: list[asyncio.Task] = []
+    if _should_run_agent_pair_on_boot():
+        agent_tasks = [
+            asyncio.create_task(run_satellite_agent(stop_event)),
+            asyncio.create_task(run_ground_agent(stop_event)),
+        ]
+        logger.info("Agent pair launched: satellite_agent + ground_agent")
+    else:
+        logger.info("Agent pair launch skipped by RUN_AGENT_PAIR_ON_BOOT=false")
 
     yield
 
     stop_event.set()
-    sat_task.cancel()
-    gnd_task.cancel()
+    for task in agent_tasks:
+        task.cancel()
     try:
-        await asyncio.gather(sat_task, gnd_task, return_exceptions=True)
+        if agent_tasks:
+            await asyncio.gather(*agent_tasks, return_exceptions=True)
     except Exception as exc:
         logger.debug("Agent pair shutdown gather raised: %s", exc)
     logger.info("Agent pair stopped.")
@@ -183,6 +222,38 @@ def recent_alerts(limit: int = Query(default=50, ge=1, le=200)):
 @app.get("/api/metrics/summary")
 def metrics_summary():
     return read_metrics_summary()
+
+
+class LinkStateBody(BaseModel):
+    connected: bool
+
+
+@app.get("/api/link/status")
+def link_status():
+    """Return simulated SAT-to-ground downlink state for demos."""
+    connected = is_link_connected()
+    stats = get_bus_stats()
+    return {
+        "connected": connected,
+        "state": "LINK OPEN" if connected else "LINK OFFLINE",
+        "queued_messages": stats["unread_messages"],
+    }
+
+
+@app.post("/api/link/state")
+def update_link_state(body: LinkStateBody):
+    """Toggle simulated downlink connectivity without restarting the stack."""
+    set_link_state(body.connected)
+    bus_post(
+        sender="operator",
+        recipient="broadcast",
+        msg_type="status",
+        payload={
+            "connected": body.connected,
+            "note": "LINK RESTORED" if body.connected else "LINK OFFLINE",
+        },
+    )
+    return link_status()
 
 
 
@@ -660,6 +731,17 @@ def replay_load(replay_id: str = Path(...)):
     """Reset runtime state and load a bundled replay mission into the standard app surfaces."""
     try:
         return load_seeded_replay(replay_id)
+    except FileNotFoundError as exc:
+        return JSONResponse(status_code=404, content={"error": str(exc)})
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
+
+
+@app.post("/api/replay/rescan/{replay_id}")
+def replay_rescan(replay_id: str = Path(...)):
+    """Start a live rescan from a replay mission using the current runtime/model stack."""
+    try:
+        return rescan_seeded_replay(replay_id)
     except FileNotFoundError as exc:
         return JSONResponse(status_code=404, content={"error": str(exc)})
     except ValueError as exc:

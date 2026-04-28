@@ -6,6 +6,13 @@ import pytest
 from scripts import retag_training_assets_ui
 
 
+def test_ui_defaults_use_local_ollama_qwen_model():
+    assert retag_training_assets_ui.DEFAULT_PROVIDER == "ollama"
+    assert retag_training_assets_ui.DEFAULT_OLLAMA_MODEL == "qwen3.6:27b"
+    assert retag_training_assets_ui.DEFAULT_MAX_PROVIDER_ASSETS == "16"
+    assert retag_training_assets_ui.DEFAULT_MAX_PROVIDER_SEQUENCES == "0"
+
+
 def test_build_retag_command_includes_selected_options(tmp_path):
     dataset_dir = tmp_path / "dataset"
     output_dir = tmp_path / "out"
@@ -30,6 +37,8 @@ def test_build_retag_command_includes_selected_options(tmp_path):
     assert command[command.index("--model") + 1] == "qwen2.5vl:32b"
     assert command[command.index("--video-frame-count") + 1] == "6"
     assert command[command.index("--min-video-frames") + 1] == "3"
+    assert command[command.index("--max-provider-assets") + 1] == "16"
+    assert command[command.index("--max-provider-sequences") + 1] == "0"
     assert "--no-loose-scan" in command
     assert "--no-temporal-sequences" in command
 
@@ -45,6 +54,37 @@ def test_build_retag_command_rejects_unknown_provider(tmp_path):
             min_video_frames=2,
             scan_loose_assets=True,
             temporal_sequences=True,
+        )
+
+
+def test_build_hf_upload_command_includes_optional_flags(tmp_path):
+    command = retag_training_assets_ui.build_hf_upload_command(
+        dataset_dir=tmp_path / "retagged",
+        repo_id="user/orbit-data",
+        private=True,
+        create_repo=True,
+        create_pr=True,
+    )
+
+    assert command[0] == sys.executable
+    assert command[1].endswith("upload_orbit_dataset_hf.py")
+    assert "--dataset-dir" in command
+    assert str(tmp_path / "retagged") in command
+    assert "--repo-id" in command
+    assert command[command.index("--repo-id") + 1] == "user/orbit-data"
+    assert "--private" in command
+    assert "--create-repo" in command
+    assert "--create-pr" in command
+
+
+def test_build_hf_upload_command_rejects_empty_repo(tmp_path):
+    with pytest.raises(ValueError, match="repo id"):
+        retag_training_assets_ui.build_hf_upload_command(
+            dataset_dir=tmp_path,
+            repo_id="",
+            private=False,
+            create_repo=False,
+            create_pr=False,
         )
 
 

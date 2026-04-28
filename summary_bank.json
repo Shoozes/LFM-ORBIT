@@ -7,6 +7,7 @@
       ".DS_Store",
       ".agents",
       ".coverage",
+      ".env",
       ".eslintcache",
       ".gemini",
       ".git",
@@ -47,6 +48,7 @@
       "release",
       "runtime",
       "runtime-data",
+      "source/frontend/e2e/artifacts",
       "target",
       "test",
       "test-results",
@@ -59,22 +61,25 @@
   },
   "groups": {
     "docs_state_and_tracking": {
-      "note": "Canonical current-state docs and active repo tracking surfaces, with detailed progress history consolidated into TODO and the README kept to the current high-signal baseline.",
+      "note": "README is the Liquid AI x DPhi Space Hackathon-facing presentation surface; deeper current-state, architecture, demo, dataset-cycle, and backlog tracking lives in focused docs.",
       "files": [
         "README.md",
         "docs/ARCHITECTURE.md",
         "docs/TODO.md",
-        "summary_bank.json"
+        "summary_bank.json",
+        "docs/JUDGE_DEMO.md",
+        "docs/DATASET_CYCLE_TUTORIAL.md"
       ]
     },
     "docs_model_runtime_and_handoff": {
-      "note": "Supplemental model handoff docs. README, ARCHITECTURE, and TODO remain the canonical progress surfaces.",
+      "note": "Supplemental model and fine-tuning handoff docs. README remains judge-facing; ARCHITECTURE, TODO, and handoff docs carry implementation detail.",
       "files": [
-        "docs/MODEL_HANDOFF.md"
+        "docs/MODEL_HANDOFF.md",
+        "docs/FINE_TUNING_PLAN.md"
       ]
     },
     "issue_group_import_contracts_and_env_resilience": {
-      "note": "Repo integrity guardrails for broken backend imports/exports, seed/GEE/debug entrypoints, satellite-debug render sanitization, safe manual Sentinel probe imports, malformed local environment overrides, and offline-safe cold-start .env defaults.",
+      "note": "Repo integrity guardrails for broken backend imports/exports, seed/GEE/debug entrypoints, safe local credential discovery including labeled Sentinel Hub trial bundles, malformed local environment overrides, and offline-safe cold-start defaults.",
       "files": [
         ".env.example",
         "run.ps1",
@@ -90,11 +95,13 @@
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_import_contracts.py",
         "source/backend/tests/test_satellite_debug.py",
-        "source/backend/tests/test_simsat_client.py"
+        "source/backend/tests/test_simsat_client.py",
+        "source/backend/core/config.py",
+        "source/backend/tests/test_sentinel_credentials.py"
       ]
     },
     "issue_group_error_handling_and_parser_integrity": {
-      "note": "Malformed Depth Anything image payloads fail before optional model loading, nested fenced LFM tool-call JSON parses correctly, and non-fatal fallback paths now leave debug diagnostics.",
+      "note": "Malformed Depth Anything image payloads fail before optional model loading, nested fenced LFM tool-call JSON parses correctly, benign Windows websocket teardown noise is filtered narrowly, Mission refresh failures leave debug diagnostics, and non-fatal fallback paths now leave traceable diagnostics.",
       "files": [
         "source/backend/api/main.py",
         "source/backend/core/config.py",
@@ -103,6 +110,7 @@
         "source/backend/core/observability.py",
         "source/backend/core/observation_store.py",
         "source/backend/core/timelapse.py",
+        "source/frontend/App.tsx",
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_depth_anything.py",
         "source/backend/tests/test_inference.py",
@@ -110,14 +118,17 @@
       ]
     },
     "issue_group_e2e_state_isolation_and_run_conditions": {
-      "note": "Playwright state reset, replay determinism, shared retryable app navigation, settings API and basemap readiness waits, seeded-WebM visual proof, agent-dialogue REST polling, canvas-relative context-menu retries with Map Actions fallback, opt-in debug HTML dumps/logging, and explicit opt-in server reuse to avoid stale local runtime leakage.",
+      "note": "Playwright state reset, replay determinism, shared retryable app navigation, readiness-gated map actions, artifact-based HTML dumps, normal-test/demo-test separation, seeded-WebM proof recording, proof-frame luminance guards, and explicit opt-in server reuse to avoid stale local runtime leakage.",
       "files": [
         "source/frontend/playwright.config.ts",
         "source/frontend/e2e/app.spec.ts",
         "source/frontend/e2e/runtime.ts",
         "source/frontend/e2e/test_page_html.spec.ts",
         "source/backend/core/runtime_state.py",
-        "source/backend/api/main.py"
+        "source/backend/api/main.py",
+        "source/frontend/playwright.demo.config.ts",
+        "source/frontend/e2e/demos/demoHelpers.ts",
+        "source/frontend/e2e/demos/judge-mode.demo.spec.ts"
       ]
     },
     "issue_group_context_menu_vlm_and_visual_polish": {
@@ -152,7 +163,7 @@
       ]
     },
     "issue_group_operator_input_validation_and_timing": {
-      "note": "Shared bbox/date validation, unsupported cell-id rejection, bounded timelapse frame fetches, and UI-visible mission validation errors for safer operator-facing APIs.",
+      "note": "Shared bbox/date validation, unsupported cell-id rejection, readiness-gated map action tests, bounded timelapse frame fetches, and UI-visible mission validation errors for safer operator-facing APIs.",
       "files": [
         "source/backend/api/main.py",
         "source/backend/core/grid.py",
@@ -206,7 +217,7 @@
       ]
     },
     "feature_group_scene_qc_and_observability": {
-      "note": "Scene acceptance, runtime timings, rejection accounting, stable rejection-reason metrics, Logs-tab visibility, decision-gate output, and scoring integrity.",
+      "note": "Scene acceptance, SCL cloud/no-data accounting, hard quality-gate abstain behavior, runtime timings, rejection accounting, stable rejection-reason metrics, Logs-tab visibility, decision-gate output, and scoring integrity.",
       "files": [
         "source/backend/core/analyzer.py",
         "source/backend/core/contracts.py",
@@ -241,13 +252,14 @@
       ]
     },
     "issue_group_gallery_cache_and_offline_fallbacks": {
-      "note": "Gallery thumbnail fallbacks, seeded timelapse cache reuse, provenance labels, and offline evidence regression coverage.",
+      "note": "Gallery thumbnail fallbacks, seeded timelapse cache reuse, provenance labels, offline evidence regression coverage, and guards against fake still-image timelapses.",
       "files": [
         "source/backend/core/gallery.py",
         "source/backend/core/timelapse.py",
         "source/backend/tests/test_gallery.py",
         "source/backend/tests/test_timelapse.py",
-        "source/frontend/components/ValidationPanel.tsx"
+        "source/frontend/components/ValidationPanel.tsx",
+        "source/backend/tests/test_seeded_timelapse_integrity.py"
       ]
     },
     "feature_group_agents_and_mission_runtime": {
@@ -281,18 +293,42 @@
       ]
     },
     "feature_group_dataset_export_and_eval_lane": {
-      "note": "Orbit dataset export, asset retagging, optional Tkinter retag UI with README screenshot, and eval tooling, including recent alerts, weak rejects, cached API observations, persisted monitor-report JSON imports, deduplicated image/frame training assets, temporal sequence JSONL, and training JSONL generation.",
+      "note": "Orbit dataset export, seeded-cache export with frame-quality/rejected-window cloud metadata, bounded Qwen/Ollama asset retagging with deterministic fallback budgets, prior-tag reuse for already-tagged image hashes, frame-safe timelapse extraction namespaced by video SHA-256, optional Tkinter retag UI with HF upload controls, Hugging Face upload helper with successful publication to Shoozes/LFM-Orbit-SatData, viewer-safe dataset-card configs for mixed JSONL schemas, current cycle at 56 samples / 179 assets / 26 temporal sequences with Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead seeded missions, and eval tooling, including recent alerts, weak rejects, cached API observations, persisted monitor-report JSON imports, deduplicated image/frame training assets, temporal sequence JSONL, and training JSONL generation.",
       "files": [
         "docs/MODEL_HANDOFF.md",
+        "docs/DATASET_CYCLE_TUTORIAL.md",
+        "source/backend/data/HF_DATASET_CARD.md",
         "docs/retag-training-assets-ui.png",
         "source/backend/data/README.md",
         "source/backend/scripts/export_orbit_dataset.py",
         "source/backend/scripts/retag_training_assets.py",
         "source/backend/scripts/retag_training_assets_ui.py",
+        "source/backend/scripts/upload_orbit_dataset_hf.py",
         "source/backend/scripts/evaluate_model.py",
+        "source/backend/assets/seeded_data/sh_8342a218.webm",
+        "source/backend/assets/seeded_data/sh_8342a218_meta.json",
+        "source/backend/assets/seeded_data/sh_f03170dc.webm",
+        "source/backend/assets/seeded_data/sh_f03170dc_meta.json",
+        "source/backend/assets/seeded_data/sh_99548137.webm",
+        "source/backend/assets/seeded_data/sh_99548137_meta.json",
+        "source/backend/assets/seeded_data/sh_53c969f1.webm",
+        "source/backend/assets/seeded_data/sh_53c969f1_meta.json",
+        "source/backend/assets/seeded_data/sh_3ceea0a9.webm",
+        "source/backend/assets/seeded_data/sh_3ceea0a9_meta.json",
+        "source/backend/assets/seeded_data/sh_73634fe8.webm",
+        "source/backend/assets/seeded_data/sh_73634fe8_meta.json",
+        "source/backend/assets/seeded_data/sh_a7815591.webm",
+        "source/backend/assets/seeded_data/sh_a7815591_meta.json",
+        "source/backend/assets/seeded_data/sh_b9993f84.webm",
+        "source/backend/assets/seeded_data/sh_b9993f84_meta.json",
+        "source/backend/assets/seeded_data/sh_07ea2b1b.webm",
+        "source/backend/assets/seeded_data/sh_07ea2b1b_meta.json",
+        "source/backend/assets/seeded_data/sh_c8ec6b43.webm",
+        "source/backend/assets/seeded_data/sh_c8ec6b43_meta.json",
         "source/backend/tests/test_export_orbit_dataset.py",
         "source/backend/tests/test_retag_training_assets.py",
         "source/backend/tests/test_retag_training_assets_ui.py",
+        "source/backend/tests/test_upload_orbit_dataset_hf.py",
         "source/backend/tests/test_evaluate_model.py"
       ]
     },
@@ -307,24 +343,35 @@
       ]
     },
     "feature_group_runtime_reset_and_replay_determinism": {
-      "note": "Deterministic runtime reset, seeded replay hydration, stricter observation readiness, and replay-backed demo/test helpers including visible replay-driven tutorial recordings.",
+      "note": "Deterministic runtime reset, seeded replay hydration, dynamic seeded-cache Fast Replay catalog entries, rescan from saved replay metadata for current model/runtime checks, multi-mission replay packs, mission-specific replay actions, stricter observation readiness, seeded-WebM integrity checks, and replay-backed demo/test helpers including visible tutorial and judge recordings.",
       "files": [
         "source/backend/api/main.py",
         "source/backend/core/observation_store.py",
         "source/backend/core/replay.py",
         "source/backend/core/runtime_state.py",
+        "source/frontend/App.tsx",
+        "source/frontend/components/MissionControl.tsx",
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_observation_store.py",
         "source/backend/tests/test_replay.py",
+        "source/frontend/e2e/app.spec.ts",
         "source/frontend/e2e/capture_screenshots.spec.ts",
         "source/frontend/e2e/dual_agent_demo.spec.ts",
         "source/frontend/e2e/runtime.ts",
         "source/frontend/e2e/tutorialHelpers.ts",
-        "source/frontend/e2e/tutorial_video.spec.ts"
+        "source/frontend/e2e/tutorial_video.spec.ts",
+        "source/backend/assets/replays/rondonia_frontier_judge.json",
+        "source/backend/assets/replays/manchar_flood_replay.json",
+        "source/backend/assets/replays/atacama_mining_replay.json",
+        "source/backend/assets/replays/singapore_maritime_replay.json",
+        "source/backend/assets/replays/georgia_wildfire_replay.json",
+        "source/backend/assets/replays/delhi_urban_replay.json",
+        "source/backend/tests/test_seeded_timelapse_integrity.py",
+        "source/frontend/e2e/demos/demoHelpers.ts"
       ]
     },
     "feature_group_timelapse_gallery_and_vlm": {
-      "note": "Timelapse generation, provenance labels, seeded-WebM visual proof, retryable API-error rendering, gallery evidence with clearer pending/unavailable copy, explicit VLM Find/Ask/Generate controls, deterministic image-fetch fallback behavior, and demo flows.",
+      "note": "Timelapse generation, provenance labels, seeded-WebM visual proof, retryable API-error rendering, gallery evidence, VLM Find/Ask/Generate controls, deterministic image-fetch fallback behavior, and judge demo flows.",
       "files": [
         "source/backend/core/gallery.py",
         "source/backend/core/timelapse.py",
@@ -337,11 +384,17 @@
         "source/frontend/components/TimelapseViewer.tsx",
         "source/frontend/components/VlmPanel.tsx",
         "source/frontend/e2e/tutorial_video.spec.ts",
-        "source/frontend/e2e/vlm.spec.ts"
+        "source/frontend/e2e/vlm.spec.ts",
+        "source/frontend/components/JudgeModePanel.tsx",
+        "source/frontend/e2e/demos/judge-mode.demo.spec.ts",
+        "source/frontend/e2e/demos/payload-reduction.demo.spec.ts",
+        "source/frontend/e2e/demos/provenance.demo.spec.ts",
+        "source/frontend/e2e/demos/abstain-safety.demo.spec.ts",
+        "source/frontend/e2e/demos/orbital-eclipse.demo.spec.ts"
       ]
     },
     "feature_group_provider_pipeline_and_seed_scripts": {
-      "note": "Provider resolution, offline-safe cold-start defaults, SimSat Sentinel/Mapbox routing, fallback order, seeded caches, observation-record integrity, and debug diagnostics for safe fallback paths.",
+      "note": "Provider resolution, offline-safe cold-start defaults, SimSat Sentinel/Mapbox routing, Sentinel Hub secret-file compatibility including current labeled sh.txt shape, fallback order, seeded caches, event-window Sentinel seeding, SCL-gated frame rejection, burn-scar visual composites, observation-record integrity, and debug diagnostics for safe fallback paths.",
       "files": [
         ".env.example",
         "source/backend/test_evalscript.py",
@@ -362,7 +415,9 @@
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_config.py",
         "source/backend/tests/test_loader.py",
-        "source/backend/tests/test_simsat_client.py"
+        "source/backend/tests/test_seed_sentinel_cache.py",
+        "source/backend/tests/test_simsat_client.py",
+        "source/backend/tests/test_sentinel_credentials.py"
       ]
     },
     "feature_group_maritime_stac_and_investigation": {
@@ -420,7 +475,7 @@
       ]
     },
     "qa_suite_and_demo_flows": {
-      "note": "Playwright coverage for main flows, mission/timelapse validation errors, shared retryable app navigation, settings readiness, agent-bus visual/error assertions, Ground Agent backend-error rendering, replay-backed demos/screenshots, shared tutorial and basemap/context-menu helpers with Map Actions fallback, keyboard/touch map action coverage, debug dashboard, opt-in HTML dump logging, CI-safe web test wiring, and configurable loopback test ports.",
+      "note": "Playwright coverage for main flows, mission/timelapse validation, normal E2E correctness, separate recorded Judge Mode demos, tutorial-style subtitles, seeded-WebM video quality checks, proof JSON artifacts, and docs video exports.",
       "files": [
         ".github/workflows/ci.yml",
         "source/frontend/playwright.config.ts",
@@ -437,7 +492,15 @@
         "source/frontend/e2e/testUrls.ts",
         "source/frontend/e2e/tutorialHelpers.ts",
         "source/frontend/e2e/tutorial_video.spec.ts",
-        "source/frontend/e2e/vlm.spec.ts"
+        "source/frontend/e2e/vlm.spec.ts",
+        "source/frontend/playwright.demo.config.ts",
+        "source/frontend/e2e/demos/demoHelpers.ts",
+        "source/frontend/e2e/demos/judge-mode.demo.spec.ts",
+        "source/frontend/e2e/demos/payload-reduction.demo.spec.ts",
+        "source/frontend/e2e/demos/provenance.demo.spec.ts",
+        "source/frontend/e2e/demos/abstain-safety.demo.spec.ts",
+        "source/frontend/e2e/demos/orbital-eclipse.demo.spec.ts",
+        "source/backend/tests/test_seeded_timelapse_integrity.py"
       ]
     },
     "runtime_entrypoints_and_tools": {
@@ -458,6 +521,64 @@
         "source/backend/satellite_debug.py",
         "source/backend/start_edge.py",
         "source/backend/tests/test_autonomous_agent.py"
+      ]
+    },
+    "issue_group_spectral_band_contract": {
+      "note": "NDVI requires explicit NIR and Red bands; RGB-only, missing, or non-numeric spectral inputs return unavailable/abstain instead of fabricated index values.",
+      "files": [
+        "source/backend/core/indices.py",
+        "source/backend/tests/test_spectral_band_contract.py",
+        "docs/TODO.md"
+      ]
+    },
+    "feature_group_wildfire_seed_and_future_watch": {
+      "note": "Real wildfire candidate handling and timestamped future-catch proof. Highway 82 Georgia remains candidate-quality Sentinel-2 SWIR/NIR/Red seeded evidence; the SPC Southern High Plains watch is source-backed, timestamped, and unverified until post-window FIRMS/NIFC or Sentinel evidence exists.",
+      "files": [
+        "docs/TODO.md",
+        "source/backend/data/README.md",
+        "source/backend/assets/seeded_data/sh_4015e8b8.webm",
+        "source/backend/assets/seeded_data/sh_4015e8b8_meta.json",
+        "source/backend/assets/watchlists/wildfire_spc_day2_southern_high_plains_2026-04-28.json",
+        "source/backend/core/temporal_use_cases.py",
+        "source/backend/scripts/seed_sentinel_cache.py",
+        "source/backend/tests/test_future_watchlists.py",
+        "source/backend/tests/test_seed_sentinel_cache.py",
+        "source/backend/tests/test_temporal_use_cases.py",
+        "source/frontend/components/MissionControl.tsx",
+        "source/frontend/e2e/monitor_features.spec.ts"
+      ]
+    },
+    "feature_group_judge_demo_mode": {
+      "note": "Judge-ready deterministic demo lane with visual overlay, tutorial-style UI flow, Judge Mode proof panel, Playwright video/trace/screenshots, proof JSON export, per-demo evidence-frame screenshot/luminance guards, preloaded mission/replay starts that avoid the legacy Amazonas sweep, Rondonia replay proof, Pakistan Manchar Lake payload reduction, Atacama provenance, Greenland abstain safety, Suez maritime link outage recovery, real Sentinel-2 L2A demo frames and seeded WebMs, active-replay Judge Mode proof binding, clearer replay proof-panel playback windows, and refreshed tutorial video output covering Singapore maritime plus Atacama mining.",
+      "files": [
+        "README.md",
+        "docs/JUDGE_DEMO.md",
+        "source/frontend/App.tsx",
+        "source/frontend/components/JudgeModePanel.tsx",
+        "source/frontend/package.json",
+        "source/frontend/playwright.config.ts",
+        "source/frontend/playwright.demo.config.ts",
+        "source/frontend/e2e/demos/demoHelpers.ts",
+        "source/frontend/e2e/demos/judge-mode.demo.spec.ts",
+        "source/frontend/e2e/demos/payload-reduction.demo.spec.ts",
+        "source/frontend/e2e/demos/provenance.demo.spec.ts",
+        "source/frontend/e2e/demos/abstain-safety.demo.spec.ts",
+        "source/frontend/e2e/demos/orbital-eclipse.demo.spec.ts",
+        "source/frontend/public/demo-assets/pakistan-manchar-flood.png",
+        "source/frontend/public/demo-assets/atacama-mining.png",
+        "source/frontend/public/demo-assets/greenland-ice.png",
+        "source/frontend/public/demo-assets/suez-maritime.png",
+        "source/backend/assets/seeded_data/sh_24541539.webm",
+        "source/backend/assets/seeded_data/sh_24541539_meta.json",
+        "source/backend/assets/seeded_data/sh_fbe644a9.webm",
+        "source/backend/assets/seeded_data/sh_fbe644a9_meta.json",
+        "source/backend/assets/seeded_data/sh_cc0e95b7.webm",
+        "source/backend/assets/seeded_data/sh_cc0e95b7_meta.json",
+        "source/backend/assets/seeded_data/sh_2d990c6b.webm",
+        "source/backend/assets/seeded_data/sh_2d990c6b_meta.json",
+        "source/backend/api/main.py",
+        "source/backend/core/runtime_state.py",
+        "source/backend/tests/test_seeded_timelapse_integrity.py"
       ]
     }
   },
@@ -480,6 +601,12 @@
     "source/backend/assets/seeded_data": {
       "note": "[collapsed (+)]"
     },
+    "source/backend/assets/replays": {
+      "note": "[collapsed (+)]"
+    },
+    "source/backend/assets/watchlists": {
+      "note": "[collapsed (+)]"
+    },
     "source/backend/core": {
       "note": "[collapsed (+)]"
     },
@@ -498,6 +625,12 @@
     "source/frontend/e2e": {
       "note": "[collapsed (+)]"
     },
+    "source/frontend/e2e/artifacts": {
+      "note": "[collapsed (+)]"
+    },
+    "source/frontend/e2e/demos": {
+      "note": "[collapsed (+)]"
+    },
     "source/frontend/e2e/screenshots": {
       "note": "[collapsed (+)]"
     },
@@ -511,6 +644,9 @@
       "note": "[collapsed (+)]"
     },
     "source/backend/canopy_sentinel_backend.egg-info": {
+      "note": "[collapsed (+)]"
+    },
+    "source/backend/lfm_orbit_backend.egg-info": {
       "note": "[collapsed (+)]"
     },
     "source/backend/core/overlays": {

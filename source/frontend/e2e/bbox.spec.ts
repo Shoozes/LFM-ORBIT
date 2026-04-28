@@ -1,11 +1,11 @@
 import { test, expect } from "@playwright/test";
-import { gotoApp, openMapContextMenu, resetRuntimeState } from "./runtime";
+import { gotoApp, openMapContextMenu, resetRuntimeState, waitForBasemapReady } from "./runtime";
 
 test.describe("Bounding Box Draw Validation", () => {
   test("assigning a bbox from the map populates mission focus controls", async ({ page }) => {
     await gotoApp(page);
 
-    await page.waitForTimeout(3_000);
+    await waitForBasemapReady(page);
     await openMapContextMenu(page);
     await expect(page.getByText("Spatial Options")).toBeVisible({ timeout: 5_000 });
     await page.getByText("◫ Set Mission BBox Here").click();
@@ -37,7 +37,7 @@ test.describe("Bounding Box Draw Validation", () => {
     await gotoApp(page);
     await page.locator("[data-testid='tab-mission']").click();
 
-    await page.getByPlaceholder(/Search for areas/).fill("Detect temporal edge case validation.");
+    await page.getByTestId("mission-task-input").fill("Detect temporal edge case validation.");
     await page.locator('input[type="date"]').first().fill("2025-06-01");
     await page.locator('input[type="date"]').nth(1).fill("2024-06-01");
     await page.getByRole("button", { name: "Launch Mission" }).click();
