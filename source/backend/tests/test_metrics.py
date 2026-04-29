@@ -38,7 +38,7 @@ def test_metrics_summary_tracks_cycles_and_examples(tmp_path):
             "change_score": 0.61,
             "confidence": 0.94,
             "priority": "critical",
-            "reason_codes": ["demo_seeded_highlight", "suspected_canopy_loss"],
+            "reason_codes": ["replay_highlight", "suspected_canopy_loss"],
             "payload_bytes": 123,
             "timestamp": "2026-04-15T00:00:00Z",
             "demo_forced_anomaly": True,

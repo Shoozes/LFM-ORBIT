@@ -1,4 +1,4 @@
-from core.config import REGION
+from core.config import REGION, runtime_truth_mode_for_source
 from core.contracts import AlertRecord, GridInitMessage, HealthResponse, ScanResultMessage
 
 
@@ -34,6 +34,7 @@ def build_grid_init_message(grid_data: dict) -> GridInitMessage:
 
 
 def build_health_payload(counts: dict[str, int]) -> HealthResponse:
+    runtime_truth_mode = runtime_truth_mode_for_source(REGION.observation_mode)
     return {
         "status": "ok",
         "region_id": REGION.region_id,
@@ -47,6 +48,7 @@ def build_health_payload(counts: dict[str, int]) -> HealthResponse:
         "after_label": REGION.after_label,
         "total_alerts": counts["total_alerts"],
         "total_payload_bytes": counts["total_payload_bytes"],
+        "runtime_truth_mode": runtime_truth_mode,
         "demo_mode_enabled": False,
     }
 
@@ -69,6 +71,9 @@ def build_alert_payload(
         "priority": get_priority(change_score),
         "reason_codes": reason_codes,
         "payload_bytes": 0,
+        "runtime_truth_mode": runtime_truth_mode_for_source(
+            demo_forced_anomaly=demo_forced_anomaly,
+        ),
     }
     if boundary_context:
         result["boundary_context"] = boundary_context
@@ -103,6 +108,10 @@ def build_scan_result_message(
         "payload_bytes": payload_bytes,
         "estimated_bandwidth_saved_mb": estimated_bandwidth_saved_mb,
         "observation_source": score["observation_source"],
+        "runtime_truth_mode": runtime_truth_mode_for_source(
+            score.get("observation_source"),
+            demo_forced_anomaly=bool(alert_payload.get("demo_forced_anomaly", False)),
+        ),
         "before_window": score["before_window"],
         "after_window": score["after_window"],
         "heartbeat": {

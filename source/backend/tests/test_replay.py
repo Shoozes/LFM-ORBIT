@@ -74,11 +74,12 @@ def test_replay_load_seeds_runtime_surfaces(tmp_path, monkeypatch):
     gallery = list_gallery(limit=10)
     assert len(gallery) == 4
     assert all(item["has_timelapse"] == 1 for item in gallery)
-    assert all(item["timelapse_source"] == "seeded_replay" for item in gallery)
+    assert all(item["timelapse_source"] == "replay" for item in gallery)
     assert all(item["context_thumb_source"] == "seeded_cache" for item in gallery)
 
     metrics = read_metrics_summary()
-    assert metrics["region_id"] == "seeded_replay"
+    assert metrics["region_id"] == "replay"
+    assert metrics["runtime_truth_mode"] == "replay"
     assert metrics["total_cells_scanned"] == 9
     assert metrics["total_alerts_emitted"] == 4
 
@@ -123,10 +124,11 @@ def test_each_bundled_replay_loads_runtime_surfaces(tmp_path, monkeypatch):
         gallery = list_gallery(limit=20)
         assert len(gallery) == replay["alert_count"]
         assert all(item["has_timelapse"] == 1 for item in gallery)
-        assert all(item["timelapse_source"] == "seeded_replay" for item in gallery)
+        assert all(item["timelapse_source"] == "replay" for item in gallery)
 
         metrics = read_metrics_summary()
-        assert metrics["region_id"] == "seeded_replay"
+        assert metrics["region_id"] == "replay"
+        assert metrics["runtime_truth_mode"] == "replay"
         assert metrics["total_cells_scanned"] == replay["cells_scanned"]
         assert metrics["total_alerts_emitted"] == replay["alert_count"]
 
@@ -183,7 +185,7 @@ def test_seeded_cache_replay_loads_and_rescans(tmp_path, monkeypatch):
     assert replay_payload["replay_id"] == seeded["replay_id"]
     assert replay_payload["mission"]["mission_mode"] == "replay"
     assert replay_payload["alerts_loaded"] == 1
-    assert list_gallery(limit=5)[0]["timelapse_source"] == "seeded_replay"
+    assert list_gallery(limit=5)[0]["timelapse_source"] == "replay"
 
     rescan_payload = replay_rescan(seeded["replay_id"])
 

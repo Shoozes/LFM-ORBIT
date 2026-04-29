@@ -247,13 +247,15 @@ def _seed_metrics(spec: dict[str, Any], alerts: list[dict[str, Any]]) -> dict[st
             "payload_bytes": _alert_payload_bytes(alert),
             "timestamp": timestamp,
             "demo_forced_anomaly": False,
+            "runtime_truth_mode": "replay",
         }
         for alert in alerts[:5]
     ]
     metrics = {
-        "region_id": "seeded_replay",
+        "region_id": "replay",
         "demo_mode_enabled": False,
         "demo_mode_loop_scan": False,
+        "runtime_truth_mode": "replay",
         "total_cycles_completed": 1,
         "total_cells_scanned": cells_scanned,
         "total_alerts_emitted": alerts_found,
@@ -319,14 +321,15 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
         alert_payload_bytes = _alert_payload_bytes(alert)
         push_alert(
             event_id=str(alert["event_id"]),
-            region_id="seeded_replay",
+            region_id="replay",
             cell_id=str(alert["cell_id"]),
             change_score=float(alert["change_score"]),
             confidence=float(alert["confidence"]),
             priority=str(alert["priority"]),
             reason_codes=list(alert.get("reason_codes") or []),
             payload_bytes=alert_payload_bytes,
-            observation_source=str(alert.get("observation_source") or "seeded_replay"),
+            observation_source=str(alert.get("observation_source") or "replay"),
+            runtime_truth_mode="replay",
             before_window=dict(alert.get("before_window") or {}),
             after_window=dict(alert.get("after_window") or {}),
             downlinked=True,
@@ -347,7 +350,7 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
             timelapse_analysis=str(alert.get("timelapse_analysis") or ""),
             context_thumb=thumb,
             context_thumb_source="seeded_cache" if thumb else None,
-            timelapse_source="seeded_replay",
+            timelapse_source="replay",
         )
 
         upsert_pin(
@@ -379,7 +382,8 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
                 "change_score": float(alert["change_score"]),
                 "confidence": float(alert["confidence"]),
                 "reason_codes": list(alert.get("reason_codes") or []),
-                "observation_source": str(alert.get("observation_source") or "seeded_replay"),
+                "observation_source": str(alert.get("observation_source") or "replay"),
+                "runtime_truth_mode": "replay",
                 "before_window": dict(alert.get("before_window") or {}),
                 "after_window": dict(alert.get("after_window") or {}),
             },

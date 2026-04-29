@@ -3,7 +3,7 @@ import os
 import sqlite3
 from typing import Any
 
-from core.config import REGION
+from core.config import REGION, runtime_truth_mode_for_source
 from core.contracts import RecentAlertsResponse
 
 DEFAULT_DB_PATH = os.path.join(os.path.dirname(__file__), "../../../runtime-data/dtn_queue.sqlite")
@@ -70,6 +70,9 @@ def _migrate_alerts_schema(connection: sqlite3.Connection):
     if "observation_source" not in columns:
         connection.execute("ALTER TABLE alerts ADD COLUMN observation_source TEXT DEFAULT 'unknown'")
 
+    if "runtime_truth_mode" not in columns:
+        connection.execute("ALTER TABLE alerts ADD COLUMN runtime_truth_mode TEXT DEFAULT 'unknown'")
+
     if "before_window" not in columns:
         connection.execute("ALTER TABLE alerts ADD COLUMN before_window TEXT")
 
@@ -128,6 +131,7 @@ def push_alert(
     payload_bytes: int,
     demo_forced_anomaly: bool = False,
     observation_source: str = "unknown",
+    runtime_truth_mode: str | None = None,
     before_window: dict | None = None,
     after_window: dict | None = None,
     boundary_context: list[dict] | None = None,
@@ -149,10 +153,11 @@ def push_alert(
                 downlinked,
                 demo_forced_anomaly,
                 observation_source,
+                runtime_truth_mode,
                 before_window,
                 after_window,
                 boundary_context
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event_id,
@@ -166,6 +171,11 @@ def push_alert(
                 1 if downlinked else 0,
                 1 if demo_forced_anomaly else 0,
                 observation_source,
+                runtime_truth_mode
+                or runtime_truth_mode_for_source(
+                    observation_source,
+                    demo_forced_anomaly=demo_forced_anomaly,
+                ),
                 json.dumps(before_window) if before_window else None,
                 json.dumps(after_window) if after_window else None,
                 json.dumps(boundary_context) if boundary_context else None,
@@ -224,6 +234,7 @@ def get_recent_alerts(limit: int = 50) -> RecentAlertsResponse:
                 downlinked,
                 demo_forced_anomaly,
                 observation_source,
+                runtime_truth_mode,
                 before_window,
                 after_window,
                 boundary_context
@@ -250,6 +261,10 @@ def get_recent_alerts(limit: int = 50) -> RecentAlertsResponse:
                 "downlinked": bool(row["downlinked"]),
                 "demo_forced_anomaly": bool(row["demo_forced_anomaly"]),
                 "observation_source": row["observation_source"] if "observation_source" in row.keys() else "unknown",
+                "runtime_truth_mode": row["runtime_truth_mode"] if "runtime_truth_mode" in row.keys() else runtime_truth_mode_for_source(
+                    row["observation_source"] if "observation_source" in row.keys() else "unknown",
+                    demo_forced_anomaly=bool(row["demo_forced_anomaly"]),
+                ),
                 "before_window": json.loads(row["before_window"]) if "before_window" in row.keys() and row["before_window"] else None,
                 "after_window": json.loads(row["after_window"]) if "after_window" in row.keys() and row["after_window"] else None,
                 "boundary_context": json.loads(row["boundary_context"]) if "boundary_context" in row.keys() and row["boundary_context"] else None,

@@ -16,7 +16,7 @@ except ImportError:
 
 from core.grid import cell_to_boundary, cell_to_latlng, is_supported_cell_id, normalize_bbox
 import httpx
-from fastapi import FastAPI, HTTPException, Path, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Path, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -67,7 +67,7 @@ from core.temporal_use_cases import (
     list_temporal_use_cases,
 )
 from core.timelapse import generate_timelapse_frames
-from core.vlm import run_vlm_grounding, run_vlm_vqa, run_vlm_caption
+from core.vlm import explain_vlm_caption, explain_vlm_grounding, explain_vlm_vqa
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +110,29 @@ def _should_reset_on_boot() -> bool:
 
 def _should_run_agent_pair_on_boot() -> bool:
     return os.getenv("RUN_AGENT_PAIR_ON_BOOT", "true").lower() not in ("false", "0", "no")
+
+
+def _cors_allow_origins() -> list[str]:
+    configured = os.getenv("ORBIT_CORS_ALLOW_ORIGINS", "").strip()
+    if configured:
+        origins = [origin.strip() for origin in configured.split(",") if origin.strip()]
+        if origins:
+            return origins
+    return [
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:4173",
+        "http://localhost:4173",
+    ]
+
+
+def _require_local_request(request: Request | None = None) -> None:
+    if request is None:
+        return
+    host = request.client.host if request.client else ""
+    if host in {"127.0.0.1", "::1", "localhost", "testclient"}:
+        return
+    raise HTTPException(status_code=403, detail="Local-only control endpoint")
 
 
 def _is_windows_transport_disconnect_noise(context: dict[str, Any]) -> bool:
@@ -203,7 +226,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_allow_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -230,7 +253,7 @@ class LinkStateBody(BaseModel):
 
 @app.get("/api/link/status")
 def link_status():
-    """Return simulated SAT-to-ground downlink state for demos."""
+    """Return local SAT-to-ground downlink state for replay exercises."""
     connected = is_link_connected()
     stats = get_bus_stats()
     return {
@@ -241,8 +264,9 @@ def link_status():
 
 
 @app.post("/api/link/state")
-def update_link_state(body: LinkStateBody):
-    """Toggle simulated downlink connectivity without restarting the stack."""
+def update_link_state(body: LinkStateBody, request: Request = None):
+    """Toggle local downlink connectivity without restarting the stack."""
+    _require_local_request(request)
     set_link_state(body.connected)
     bus_post(
         sender="operator",
@@ -299,10 +323,12 @@ def provider_status():
     sentinelhub_available = sentinel_creds.available
     nasa_available = nasa_creds.available
 
+    mode = get_runtime_mode_summary()
     return {
         "active_provider": REGION.observation_mode,
-        "demo_mode_enabled": False,
-        "describe_demo_as_semi_real": False,
+        "runtime_truth_mode": mode["runtime_truth_mode"],
+        "demo_mode_enabled": mode["demo_mode_enabled"],
+        "imagery_backed_scoring_enabled": mode["imagery_backed_scoring_enabled"],
         "providers": {
             PROVIDER_SIMSAT_SENTINEL: {
                 "available": simsat_available,
@@ -514,11 +540,12 @@ def agent_bus_dialogue(limit: int = Query(default=60, ge=1, le=200)):
 
 
 @app.post("/api/agent/bus/inject")
-def inject_operator_message(body: dict):
+def inject_operator_message(body: dict, request: Request = None):
     """
     Inject an operator message into the agent bus.
     Allows the human operator to interrupt agents with queries or commands.
     """
+    _require_local_request(request)
     content = str(body.get("message", "")).strip()
     if not content:
         return JSONResponse(status_code=400, content={"error": "message is required"})
@@ -661,8 +688,9 @@ class RuntimeResetBody(BaseModel):
 
 
 @app.post("/api/mission/start")
-def mission_start(body: MissionStartBody):
+def mission_start(body: MissionStartBody, request: Request = None):
     """Start a new autonomous scan mission. Agents will restrict scanning to bbox if provided."""
+    _require_local_request(request)
     mission = start_mission(
         task_text=body.task_text,
         bbox=body.bbox,
@@ -694,8 +722,9 @@ def mission_current():
 
 
 @app.post("/api/mission/stop")
-def mission_stop():
+def mission_stop(request: Request = None):
     """Stop the active mission."""
+    _require_local_request(request)
     active = get_active_mission()
     stop_mission()
     bus_post(
@@ -727,8 +756,9 @@ def replay_catalog():
 
 
 @app.post("/api/replay/load/{replay_id}")
-def replay_load(replay_id: str = Path(...)):
+def replay_load(replay_id: str = Path(...), request: Request = None):
     """Reset runtime state and load a bundled replay mission into the standard app surfaces."""
+    _require_local_request(request)
     try:
         return load_seeded_replay(replay_id)
     except FileNotFoundError as exc:
@@ -738,8 +768,9 @@ def replay_load(replay_id: str = Path(...)):
 
 
 @app.post("/api/replay/rescan/{replay_id}")
-def replay_rescan(replay_id: str = Path(...)):
+def replay_rescan(replay_id: str = Path(...), request: Request = None):
     """Start a live rescan from a replay mission using the current runtime/model stack."""
+    _require_local_request(request)
     try:
         return rescan_seeded_replay(replay_id)
     except FileNotFoundError as exc:
@@ -749,8 +780,9 @@ def replay_rescan(replay_id: str = Path(...)):
 
 
 @app.post("/api/runtime/reset")
-def runtime_reset(body: RuntimeResetBody | None = None):
+def runtime_reset(body: RuntimeResetBody | None = None, request: Request = None):
     """Reset mutable runtime state for deterministic local runs, demos, and tests."""
+    _require_local_request(request)
     payload = body or RuntimeResetBody()
     summary = reset_runtime_state(
         clear_observation_store_files=payload.clear_observation_store_files,
@@ -767,8 +799,9 @@ class CredentialsBody(BaseModel):
     client_secret: str
 
 @app.post("/api/settings/credentials")
-def update_credentials(body: CredentialsBody):
+def update_credentials(body: CredentialsBody, request: Request = None):
     """Save Sentinel Hub credentials to the secrets file."""
+    _require_local_request(request)
     from pathlib import Path
 
     secrets_dir = Path(__file__).resolve().parents[3] / ".tools" / ".secrets"
@@ -908,18 +941,15 @@ class DepthEstimateBody(BaseModel):
 
 @app.post("/api/vlm/grounding")
 def vlm_grounding(body: VlmGroundingBody):
-    items = run_vlm_grounding(body.bbox, body.prompt)
-    return {"results": items}
+    return explain_vlm_grounding(body.bbox, body.prompt)
 
 @app.post("/api/vlm/vqa")
 def vlm_vqa(body: VlmVqaBody):
-    answer = run_vlm_vqa(body.bbox, body.question)
-    return {"answer": answer}
+    return explain_vlm_vqa(body.bbox, body.question)
 
 @app.post("/api/vlm/caption")
 def vlm_caption(body: VlmCaptionBody):
-    caption = run_vlm_caption(body.bbox)
-    return {"caption": caption}
+    return explain_vlm_caption(body.bbox)
 
 
 @app.get("/api/depth/status")

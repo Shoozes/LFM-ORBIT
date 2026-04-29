@@ -2,7 +2,7 @@
  * TimelapseViewer — filmstrip visualization of historical scan data.
  *
  * Uses the /api/timelapse/generate endpoint to build a sequence
- * of image frames over the given time range acting as a simulated
+ * of image frames over the given time range as a replayable
  * time-series representation.
  */
 import { useEffect, useState } from "react";

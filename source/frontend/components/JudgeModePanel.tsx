@@ -564,7 +564,7 @@ export default function JudgeModePanel({
   const imageSource = usesReplayEvidence ? galleryItem?.context_thumb : DEMO_PROFILES[demoCase].visualAsset ?? null;
   const timelapseSource = proof.abstained || !usesReplayEvidence ? null : galleryItem?.timelapse_b64;
   const visualSourceLabel = timelapseSource
-    ? formatSourceLabel(galleryItem?.timelapse_source ?? "seeded_replay")
+    ? formatSourceLabel(galleryItem?.timelapse_source ?? "replay")
     : imageSource
       ? usesReplayEvidence
         ? formatSourceLabel(galleryItem?.context_thumb_source ?? evidenceAlert?.observation_source)

@@ -4,7 +4,7 @@ NASA Earth Imagery provider for LFM Orbit.
 Fetches RGB imagery from api.nasa.gov. Because true multispectral bands
 (NIR, SWIR) are unavailable via this endpoint, it successfully tests
 connectivity and imagery retrieval, and then pairs the request with
-deterministic synthetic bands to fulfill the ObservationPair schema.
+deterministic proxy bands to fulfill the ObservationPair schema.
 """
 
 import hashlib
@@ -60,7 +60,7 @@ def fetch_nasa_observations(cell_id: str) -> Optional[ObservationPair]:
         logger.warning(f"NASA API connection failed for {cell_id}: {e}")
         return None
 
-    # Verification successful; construct the synthetic ObservationPair representing this pull
+    # Verification successful; construct proxy bands representing this pull.
     h = int(hashlib.md5(cell_id.encode()).hexdigest(), 16)
     
     before_bands = {

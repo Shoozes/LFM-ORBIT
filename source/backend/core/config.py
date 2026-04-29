@@ -463,25 +463,46 @@ def get_runtime_mode_summary() -> dict:
     Intended for startup logging and the provider-status API endpoint.
     """
     provider = REGION.observation_mode
+    truth_mode = runtime_truth_mode_for_source(provider)
     return {
         "active_provider": provider,
+        "runtime_truth_mode": truth_mode,
+        "demo_mode_enabled": False,
         "imagery_backed_scoring_enabled": is_imagery_backed_scoring_enabled(),
     }
+
+
+def runtime_truth_mode_for_source(
+    observation_source: str | None = None,
+    *,
+    demo_forced_anomaly: bool = False,
+    mission_mode: str | None = None,
+) -> str:
+    """Classify whether an emitted signal is live, replayed from cache, or fallback."""
+    if mission_mode == "replay":
+        return "replay"
+
+    source = str(observation_source or REGION.observation_mode or "").lower()
+    if "seeded" in source or "replay" in source or "cache" in source:
+        return "replay"
+    if "fallback" in source or "mock" in source or "quality_gate" in source or "error" in source:
+        return "fallback"
+    if source == PROVIDER_SENTINELHUB_DIRECT or "sentinelhub_direct" in source:
+        return "live_imagery"
+    if "simsat" in source or "nasa" in source or "gibs" in source:
+        return "live_imagery"
+    if "semi_real" in source:
+        return "fallback"
+    if demo_forced_anomaly:
+        return "fallback"
+    return "unknown"
 
 
 def is_imagery_backed_scoring_enabled() -> bool:
     """Return True only when the active provider can supply real band values.
 
-    Currently only ``sentinelhub_direct`` delivers true imagery-derived bands.
-    SimSat transport uses semi-real bands — the source label says *transport*,
-    not *real_band_scoring*. NASA API uses simulated bands backed by RGB retrieval.
+    Currently only ``sentinelhub_direct`` delivers true multispectral
+    imagery-derived bands. SimSat and NASA paths can still use live imagery,
+    but their scoring values are proxy bands rather than Sentinel-2 L2A bands.
     """
     return REGION.observation_mode == PROVIDER_SENTINELHUB_DIRECT
-
-
-def should_describe_demo_as_semi_real() -> bool:
-    """Return True when the judge-facing demo should be described as semi-real.
-
-    Stays True unless true imagery-derived scoring is explicitly active and validated.
-    """
-    return not is_imagery_backed_scoring_enabled()

@@ -16,6 +16,7 @@ Main application runs on port 8000 (api/main.py).
 """
 
 import json
+import os
 import sqlite3
 import asyncio
 import html as html_mod
@@ -27,7 +28,23 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Satellite Debug Hub")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+
+def _debug_cors_allow_origins() -> list[str]:
+    configured = os.getenv("ORBIT_DEBUG_CORS_ALLOW_ORIGINS", "").strip()
+    if configured:
+        origins = [origin.strip() for origin in configured.split(",") if origin.strip()]
+        if origins:
+            return origins
+    return ["http://127.0.0.1:8080", "http://localhost:8080"]
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_debug_cors_allow_origins(),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 DB_PATH = Path(__file__).parent.parent.parent / "runtime-data" / "agent_bus.sqlite"
 

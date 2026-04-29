@@ -2,7 +2,7 @@ import json
 import os
 from typing import Any
 
-from core.config import REGION
+from core.config import REGION, runtime_truth_mode_for_source
 from core.contracts import MetricsFlaggedExample, MetricsSummary
 from core.utils import utc_timestamp
 
@@ -21,6 +21,7 @@ def _default_metrics_state() -> MetricsSummary:
         "region_id": REGION.region_id,
         "demo_mode_enabled": False,
         "demo_mode_loop_scan": bool(getattr(REGION, "demo_mode_loop_scan", True)),
+        "runtime_truth_mode": runtime_truth_mode_for_source(REGION.observation_mode),
         "total_cycles_completed": 0,
         "total_cells_scanned": 0,
         "total_alerts_emitted": 0,
@@ -51,6 +52,7 @@ def _coerce_state(raw: dict[str, Any]) -> MetricsSummary:
             "region_id": str(raw.get("region_id", state["region_id"])),
             "demo_mode_enabled": bool(raw.get("demo_mode_enabled", state["demo_mode_enabled"])),
             "demo_mode_loop_scan": bool(raw.get("demo_mode_loop_scan", state["demo_mode_loop_scan"])),
+            "runtime_truth_mode": str(raw.get("runtime_truth_mode", state["runtime_truth_mode"])),
             "total_cycles_completed": int(raw.get("total_cycles_completed", state["total_cycles_completed"])),
             "total_cells_scanned": int(raw.get("total_cells_scanned", state["total_cells_scanned"])),
             "total_alerts_emitted": int(raw.get("total_alerts_emitted", state["total_alerts_emitted"])),

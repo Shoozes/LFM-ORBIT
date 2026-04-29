@@ -62,6 +62,7 @@ export type ScanResultMessage = {
   payload_bytes: number;
   estimated_bandwidth_saved_mb: number;
   observation_source: string;
+  runtime_truth_mode?: string;
   before_window: ScanWindow;
   after_window: ScanWindow;
   heartbeat: ScanHeartbeat;
@@ -86,6 +87,7 @@ export type AlertItem = {
   reason_codes: string[];
   payload_bytes: number;
   observation_source?: string;
+  runtime_truth_mode?: string;
   before_window?: ScanWindow;
   after_window?: ScanWindow;
   analysis_summary?: string;
@@ -110,6 +112,7 @@ export type ApiHealth = {
   total_alerts: number;
   total_payload_bytes: number;
   demo_mode_enabled: boolean;
+  runtime_truth_mode: string;
 };
 
 export type MetricsFlaggedExample = {
@@ -123,6 +126,7 @@ export type MetricsFlaggedExample = {
   payload_bytes: number;
   timestamp: string;
   demo_forced_anomaly?: boolean;
+  runtime_truth_mode?: string;
   boundary_context?: BoundaryContext[];
 };
 
@@ -130,6 +134,7 @@ export type ApiMetricsSummary = {
   region_id: string;
   demo_mode_enabled: boolean;
   demo_mode_loop_scan: boolean;
+  runtime_truth_mode?: string;
   total_cycles_completed: number;
   total_cells_scanned: number;
   total_alerts_emitted: number;

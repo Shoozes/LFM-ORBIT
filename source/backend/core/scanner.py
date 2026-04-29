@@ -6,7 +6,7 @@ from uuid import uuid4
 from fastapi import WebSocket
 
 from core.mission import get_active_mission
-from core.config import REGION
+from core.config import REGION, runtime_truth_mode_for_source
 from core.grid import generate_scan_grid, generate_grid_for_bbox, cell_to_latlng
 from core.metrics import record_cycle_complete, record_cycle_start, record_scan_result
 from core.queue import estimate_payload_bytes, push_alert, upsert_candidate, remove_candidate
@@ -33,16 +33,10 @@ def _is_quality_rejection(reason: str) -> bool:
     return reason in QUALITY_REJECTION_REASONS
 
 
-def _should_force_demo_anomaly(cell_index: int, total_cells: int, rejection_reason: str) -> bool:
-    if _is_quality_rejection(rejection_reason):
-        return False
-    return (cell_index % 3 == 1) or (total_cells <= 2 and cell_index == 0)
-
-
-def _quality_gate_fallback_score(reason: str) -> dict:
-    flags = [reason, "cloud_or_nodata_blocked"]
+def _zero_confidence_fallback_score(reason: str, *, observation_source: str, reason_codes: list[str]) -> dict:
+    flags = [reason]
     empty_window = {
-        "label": "quality gate",
+        "label": "unavailable",
         "quality": 0.0,
         "nir": 0.0,
         "red": 0.0,
@@ -58,11 +52,27 @@ def _quality_gate_fallback_score(reason: str) -> dict:
         "change_score": 0.0,
         "raw_change_score": 0.0,
         "confidence": 0.0,
-        "reason_codes": ["low_quality_window", "quality_gate_failed", reason],
-        "observation_source": "quality_gate_fallback",
+        "reason_codes": reason_codes,
+        "observation_source": observation_source,
         "before_window": empty_window,
         "after_window": empty_window,
     }
+
+
+def _quality_gate_fallback_score(reason: str) -> dict:
+    return _zero_confidence_fallback_score(
+        reason,
+        observation_source="quality_gate_fallback",
+        reason_codes=["low_quality_window", "quality_gate_failed", reason],
+    )
+
+
+def _score_unavailable_fallback_score(reason: str) -> dict:
+    return _zero_confidence_fallback_score(
+        reason,
+        observation_source="provider_error_fallback",
+        reason_codes=["score_unavailable", reason],
+    )
 
 
 async def stream_region_scan(websocket: WebSocket):
@@ -124,7 +134,7 @@ async def stream_region_scan(websocket: WebSocket):
         latest_discard_ratio = 0.0
 
         try:
-            for cell_index, feature in enumerate(features):
+            for feature in features:
                 cell_id = str(feature["id"])
 
                 observer = RuntimeObserver(run_id=f"run_{cycle_index}_{cell_id}", cell_id=cell_id)
@@ -147,44 +157,10 @@ async def stream_region_scan(websocket: WebSocket):
                             cell_id,
                             exc,
                         )
-                        force_anomaly = _should_force_demo_anomaly(cell_index, total_cells, rejection_reason)
-                        demo_forced_anomaly = force_anomaly
                         if _is_quality_rejection(rejection_reason):
                             score = _quality_gate_fallback_score(rejection_reason)
                         else:
-                            score = {
-                                "change_score": 0.85 if force_anomaly else 0.0,
-                                "raw_change_score": 0.85 if force_anomaly else 0.0,
-                                "confidence": 0.92 if force_anomaly else 0.0,
-                                "reason_codes": ["demo_seeded_highlight", "suspected_canopy_loss"] if force_anomaly else [],
-                                "observation_source": "error_fallback",
-                                "before_window": {
-                                    "label": "2023-01-01",
-                                    "quality": 1.0,
-                                    "nir": 0.82,
-                                    "red": 0.12,
-                                    "swir": 0.15,
-                                    "ndvi": 0.74,
-                                    "nbr": 0.61,
-                                    "evi2": 0.68,
-                                    "ndmi": 0.55,
-                                    "soil_ratio": 0.18,
-                                    "flags": ["MOCK"]
-                                },
-                                "after_window": {
-                                    "label": "2023-08-01",
-                                    "quality": 1.0,
-                                    "nir": 0.45,
-                                    "red": 0.35,
-                                    "swir": 0.38,
-                                    "ndvi": 0.12,
-                                    "nbr": 0.08,
-                                    "evi2": 0.15,
-                                    "ndmi": 0.08,
-                                    "soil_ratio": 0.84,
-                                    "flags": ["MOCK"]
-                                }
-                            }
+                            score = _score_unavailable_fallback_score(rejection_reason)
 
                     is_anomaly = score["change_score"] >= REGION.anomaly_threshold
                     is_confirmed_anomaly = False
@@ -271,6 +247,10 @@ async def stream_region_scan(websocket: WebSocket):
                             payload_bytes=payload_bytes,
                             demo_forced_anomaly=demo_forced_anomaly,
                             observation_source=score.get("observation_source", "unknown"),
+                            runtime_truth_mode=runtime_truth_mode_for_source(
+                                score.get("observation_source", "unknown"),
+                                demo_forced_anomaly=demo_forced_anomaly,
+                            ),
                             before_window=score.get("before_window"),
                             after_window=score.get("after_window"),
                             boundary_context=boundary_context,
@@ -291,6 +271,10 @@ async def stream_region_scan(websocket: WebSocket):
                             "payload_bytes": payload_bytes,
                             "timestamp": utc_timestamp(),
                             "demo_forced_anomaly": demo_forced_anomaly,
+                            "runtime_truth_mode": runtime_truth_mode_for_source(
+                                score.get("observation_source", "unknown"),
+                                demo_forced_anomaly=demo_forced_anomaly,
+                            ),
                         }
                         if boundary_context:
                             flagged_example["boundary_context"] = boundary_context

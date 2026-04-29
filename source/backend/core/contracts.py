@@ -87,6 +87,7 @@ class AlertRecord(TypedDict):
     timestamp: NotRequired[str]
     downlinked: NotRequired[bool]
     observation_source: NotRequired[str]
+    runtime_truth_mode: NotRequired[str]
     before_window: NotRequired[WindowObservation]
     after_window: NotRequired[WindowObservation]
     demo_forced_anomaly: NotRequired[bool]
@@ -104,6 +105,7 @@ class MetricsFlaggedExample(TypedDict):
     payload_bytes: int
     timestamp: str
     demo_forced_anomaly: bool
+    runtime_truth_mode: NotRequired[str]
     boundary_context: NotRequired[list[BoundaryContext]]
 
 
@@ -148,6 +150,7 @@ class ScanResultMessage(TypedDict):
     payload_bytes: int
     estimated_bandwidth_saved_mb: float
     observation_source: str
+    runtime_truth_mode: str
     before_window: WindowObservation
     after_window: WindowObservation
     heartbeat: ScanHeartbeat
@@ -170,6 +173,7 @@ class HealthResponse(TypedDict):
     total_alerts: int
     total_payload_bytes: int
     demo_mode_enabled: bool
+    runtime_truth_mode: str
 
 
 class RecentAlertsResponse(TypedDict):

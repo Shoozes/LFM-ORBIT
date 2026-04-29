@@ -46,3 +46,12 @@ def test_satellite_debug_server_render_escapes_message_fields():
     assert all(name == "onclick" and value.startswith("switchTab(") for name, value in event_attrs)
     assert all("alert" not in value for _name, value in event_attrs)
     assert "&lt;script&gt;alert" in html
+
+
+def test_satellite_debug_cors_defaults_to_localhost(monkeypatch):
+    monkeypatch.delenv("ORBIT_DEBUG_CORS_ALLOW_ORIGINS", raising=False)
+
+    origins = satellite_debug._debug_cors_allow_origins()
+
+    assert "*" not in origins
+    assert "http://127.0.0.1:8080" in origins

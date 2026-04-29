@@ -26,13 +26,14 @@ export function formatSourceLabel(source: string | undefined): string {
     case "nasa_gibs":
       return "NASA GIBS";
     case "semi_real_loader_v1":
-      return "Semi-Real (Offline Demo)";
+      return "Cached Proxy Fallback";
     case "seeded_sentinelhub_replay":
-      return "Seeded Replay (Sentinel Hub Cache)";
+      return "Replay (Sentinel Hub Cache)";
     case "seeded_replay":
-      return "Seeded Replay";
+    case "replay":
+      return "Replay";
     case "seeded_cache":
-      return "Seeded Local Cache";
+      return "Cached API Imagery";
     case "esri_arcgis":
       return "Esri World Imagery";
     case "offline_svg":
@@ -46,7 +47,7 @@ export function formatSourceLabel(source: string | undefined): string {
     case "gee":
       return "GEE Sentinel-2";
     case "Seeded Orbital Video Cache":
-      return "Seeded Orbital Cache";
+      return "Replay Video Cache";
     case "error_fallback":
       return "Fallback Observation";
     default: return source;
@@ -232,6 +233,7 @@ export function parseTelemetryMessage(raw: string): TelemetryMessage | null {
       payload_bytes: parsed.payload_bytes,
       estimated_bandwidth_saved_mb: parsed.estimated_bandwidth_saved_mb,
       observation_source: parsed.observation_source,
+      runtime_truth_mode: isString(parsed.runtime_truth_mode) ? parsed.runtime_truth_mode : undefined,
       before_window: beforeWindow,
       after_window: afterWindow,
       heartbeat: {
@@ -262,6 +264,7 @@ export function toAlertItem(message: ScanResultMessage): AlertItem {
     reason_codes: message.reason_codes,
     payload_bytes: message.payload_bytes,
     observation_source: message.observation_source,
+    runtime_truth_mode: message.runtime_truth_mode,
     before_window: message.before_window,
     after_window: message.after_window,
     timestamp: new Date().toISOString(),

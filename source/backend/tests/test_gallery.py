@@ -103,11 +103,11 @@ def test_add_gallery_item_stores_evidence_provenance(monkeypatch, tmp_path):
         context_thumb="data:image/png;base64,provided",
         context_thumb_source="seeded_cache",
         timelapse_b64="data:video/webm;base64,video",
-        timelapse_source="seeded_replay",
+        timelapse_source="replay",
     )
 
     item = gallery.get_gallery_item("sq_test_cell")
 
     assert item is not None
     assert item["context_thumb_source"] == "seeded_cache"
-    assert item["timelapse_source"] == "seeded_replay"
+    assert item["timelapse_source"] == "replay"

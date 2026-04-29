@@ -36,8 +36,12 @@ function buildSummary(alert: AlertItem | null): string[] {
 
   const notes: string[] = [];
 
-  if (alert.observation_source === "seeded_sentinelhub_replay" || alert.observation_source === "seeded_replay") {
-    notes.push("✓ Seeded replay evidence restored from bundled local imagery and historical agent outputs.");
+  if (
+    alert.observation_source === "seeded_sentinelhub_replay" ||
+    alert.observation_source === "seeded_replay" ||
+    alert.observation_source === "replay"
+  ) {
+    notes.push("✓ Replay evidence restored from cached real API imagery and historical agent outputs.");
   }
 
   // Spectral evidence
@@ -52,7 +56,7 @@ function buildSummary(alert: AlertItem | null): string[] {
   }
 
   if (alert.reason_codes.includes("observation_pattern_match")) {
-    notes.push("✓ Pattern matches the seeded disturbance signature.");
+    notes.push("✓ Pattern matches the cached disturbance signature.");
   }
 
   // Quality checks

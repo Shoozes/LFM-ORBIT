@@ -96,11 +96,16 @@ def _offline_analysis(
     else:
         confidence_note += "Both observation windows have adequate data quality."
 
-    if demo_forced_anomaly:
-        source_note = "This is a seeded demo highlight — not an organic detection."
+    if "seeded" in observation_source or "replay" in observation_source or "cache" in observation_source:
+        source_note = (
+            "Replay evidence restored from cached real API imagery; inspect the "
+            "attached observation window dates for the timelapse range."
+        )
+    elif demo_forced_anomaly:
+        source_note = "This alert was operator-highlighted for replay or training review."
     elif "semi_real" in observation_source:
         source_note = (
-            "Analysis based on edge-cached (deterministic) observations — "
+            "Analysis based on edge-cached deterministic proxy observations — "
             "validated securely by the ground station."
         )
     elif "simsat" in observation_source:

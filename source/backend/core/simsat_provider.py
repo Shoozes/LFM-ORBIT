@@ -2,8 +2,8 @@
 SimSat API provider for LFM Orbit.
 
 Fetches proxy imagery from the locally running SimSat instance.
-Validates the availability of telemetry bytes from the simulation dashboard
-and pairs successful retrievals with synthetic deterministic multispectral bands
+Validates the availability of telemetry bytes from the SimSat dashboard
+and pairs successful retrievals with deterministic proxy multispectral bands
 to satisfy downstream models (NDVI calculations).
 """
 
@@ -23,7 +23,7 @@ SOURCE_SIMSAT_MAPBOX = "simsat_mapbox_imagery"
 
 
 def fetch_simsat_observations(cell_id: str, provider: str | None = None) -> Optional[ObservationPair]:
-    """Fetch simulated observations directly through the local SimSat client API."""
+    """Fetch observations directly through the local SimSat client API."""
     centroid_lat, centroid_lng = cell_to_latlng(cell_id)
     observation_mode = provider or REGION.observation_mode
 

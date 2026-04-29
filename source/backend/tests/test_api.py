@@ -7,7 +7,13 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from api.main import _is_windows_transport_disconnect_noise, _should_run_agent_pair_on_boot, app
+from api.main import (
+    _cors_allow_origins,
+    _is_windows_transport_disconnect_noise,
+    _require_local_request,
+    _should_run_agent_pair_on_boot,
+    app,
+)
 from core.depth_anything import clear_depth_anything_runtime_override
 
 client = TestClient(app)
@@ -29,6 +35,39 @@ def test_windows_transport_disconnect_filter_is_narrow():
     assert _is_windows_transport_disconnect_noise(context) is True
     assert _is_windows_transport_disconnect_noise({"exception": RuntimeError("boom"), "handle": context["handle"]}) is False
     assert _is_windows_transport_disconnect_noise({"exception": ConnectionResetError("boom"), "handle": "other"}) is False
+
+
+def test_cors_defaults_to_localhost_allowlist(monkeypatch):
+    monkeypatch.delenv("ORBIT_CORS_ALLOW_ORIGINS", raising=False)
+
+    origins = _cors_allow_origins()
+
+    assert "*" not in origins
+    assert "http://127.0.0.1:5173" in origins
+    assert "http://localhost:5173" in origins
+
+
+def test_local_only_guard_rejects_remote_control_requests():
+    class Client:
+        host = "203.0.113.10"
+
+    class Request:
+        client = Client()
+
+    try:
+        _require_local_request(Request())
+    except Exception as exc:
+        assert getattr(exc, "status_code", None) == 403
+    else:
+        raise AssertionError("remote control request should be rejected")
+
+
+def test_control_endpoint_rejects_remote_testclient():
+    remote_client = TestClient(app, client=("203.0.113.10", 1234))
+
+    response = remote_client.post("/api/link/state", json={"connected": True})
+
+    assert response.status_code == 403
 
 
 def test_health_endpoint_returns_ok_status():
@@ -111,9 +150,11 @@ def test_health_endpoint_shows_observation_mode():
     data = response.json()
     
     assert "observation_mode" in data
+    assert "runtime_truth_mode" in data
     # Observation mode should be a non-empty string describing the loader
     assert isinstance(data["observation_mode"], str)
     assert len(data["observation_mode"]) > 0
+    assert data["runtime_truth_mode"] in {"live_imagery", "replay", "fallback", "unknown"}
 
 
 def test_invalid_limit_returns_validation_error():
@@ -734,14 +775,14 @@ def test_runtime_reset_endpoint_clears_mutable_runtime_state(tmp_path, monkeypat
     )
     push_alert(
         event_id="evt_reset",
-        region_id="seeded_replay",
+        region_id="replay",
         cell_id="sq_-10.0_-63.0",
         change_score=0.82,
         confidence=0.94,
         priority="critical",
         reason_codes=["ndvi_drop", "soil_exposure_spike"],
         payload_bytes=123,
-        observation_source="seeded_replay",
+        observation_source="replay",
     )
     add_gallery_item(
         cell_id="sq_-10.0_-63.0",

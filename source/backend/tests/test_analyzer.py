@@ -164,9 +164,9 @@ class TestOfflineAnalysis:
         assert len(result["findings"]) >= 1
         assert "composite" in result["findings"][0].lower() or "change score" in result["findings"][0].lower()
 
-    def test_demo_seeded_source_note(self):
+    def test_operator_highlight_source_note(self):
         result = self._run(demo=True)
-        assert "seeded demo" in result["source_note"].lower() or "demo" in result["source_note"].lower()
+        assert "replay" in result["source_note"].lower() or "training" in result["source_note"].lower()
 
     def test_semi_real_source_note(self):
         result = self._run(observation_source="semi_real_loader_v1")

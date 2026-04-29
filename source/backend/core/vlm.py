@@ -19,6 +19,16 @@ _PIPELINE_UNAVAILABLE = object()
 
 _ESRI_MAP = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export"
 
+
+def _provenance(*, mode: str, model: str, reason: str = "") -> dict[str, str | bool]:
+    return {
+        "runtime_truth_mode": "fallback" if mode == "fallback" else "model_inference",
+        "output_source": mode,
+        "model": model,
+        "heuristic_fallback": mode == "fallback",
+        "reason": reason,
+    }
+
 def _normalize_prompt_label(prompt: str) -> str:
     text = (prompt or "").strip().lower()
     if any(token in text for token in ("airplane", "airplanes", "plane", "planes", "airport")):
@@ -129,24 +139,38 @@ def _fetch_image(bbox: list[float]):
         return None
 
 def run_vlm_grounding(bbox: list[float], prompt: str) -> list[dict]:
+    return explain_vlm_grounding(bbox, prompt)["results"]
+
+
+def explain_vlm_grounding(bbox: list[float], prompt: str) -> dict[str, Any]:
     """Run grounding with a transformers pipeline when available, otherwise degrade safely."""
     global _grounding_pipeline
+    model = "google/owlvit-base-patch32"
     if _grounding_pipeline is None:
-        logger.info("[VLM] Initializing Grounding model (google/owlvit-base-patch32)...")
-        _grounding_pipeline = _load_pipeline("zero-shot-object-detection", "google/owlvit-base-patch32") or _PIPELINE_UNAVAILABLE
+        logger.info("[VLM] Initializing Grounding model (%s)...", model)
+        _grounding_pipeline = _load_pipeline("zero-shot-object-detection", model) or _PIPELINE_UNAVAILABLE
 
     if _grounding_pipeline is _PIPELINE_UNAVAILABLE:
-        return _fallback_grounding(prompt)
+        return {
+            "results": _fallback_grounding(prompt),
+            "provenance": _provenance(mode="fallback", model=model, reason="pipeline_unavailable"),
+        }
 
     image = _fetch_image(bbox)
     if image is None:
-        return _fallback_grounding(prompt)
+        return {
+            "results": _fallback_grounding(prompt),
+            "provenance": _provenance(mode="fallback", model=model, reason="image_unavailable"),
+        }
 
     try:
         results = _grounding_pipeline(image, candidate_labels=[prompt])
     except Exception as exc:
         logger.warning("[VLM] Grounding inference failed; using fallback responses: %s", exc)
-        return _fallback_grounding(prompt)
+        return {
+            "results": _fallback_grounding(prompt),
+            "provenance": _provenance(mode="fallback", model=model, reason="inference_failed"),
+        }
 
     out = []
     width, height = image.size
@@ -159,52 +183,97 @@ def run_vlm_grounding(bbox: list[float], prompt: str) -> list[dict]:
             ymax = box["ymax"] / height
             out.append({"label": r["label"], "bbox": [ymin, xmin, ymax, xmax]})
 
-    return out or _fallback_grounding(prompt)
+    if out:
+        return {"results": out, "provenance": _provenance(mode="model", model=model)}
+    return {
+        "results": _fallback_grounding(prompt),
+        "provenance": _provenance(mode="fallback", model=model, reason="empty_model_result"),
+    }
 
 def run_vlm_vqa(bbox: list[float], question: str) -> str:
+    return str(explain_vlm_vqa(bbox, question)["answer"])
+
+
+def explain_vlm_vqa(bbox: list[float], question: str) -> dict[str, Any]:
     """Run VQA when available, otherwise return a deterministic offline fallback."""
     global _vqa_pipeline
+    model = "dandelin/vilt-b32-finetuned-vqa"
     if _vqa_pipeline is None:
-        logger.info("[VLM] Initializing VQA model (dandelin/vilt-b32-finetuned-vqa)...")
-        _vqa_pipeline = _load_pipeline("visual-question-answering", "dandelin/vilt-b32-finetuned-vqa") or _PIPELINE_UNAVAILABLE
+        logger.info("[VLM] Initializing VQA model (%s)...", model)
+        _vqa_pipeline = _load_pipeline("visual-question-answering", model) or _PIPELINE_UNAVAILABLE
 
     if _vqa_pipeline is _PIPELINE_UNAVAILABLE:
-        return _fallback_vqa(question, bbox)
+        return {
+            "answer": _fallback_vqa(question, bbox),
+            "provenance": _provenance(mode="fallback", model=model, reason="pipeline_unavailable"),
+        }
 
     image = _fetch_image(bbox)
     if image is None:
-        return _fallback_vqa(question, bbox)
+        return {
+            "answer": _fallback_vqa(question, bbox),
+            "provenance": _provenance(mode="fallback", model=model, reason="image_unavailable"),
+        }
 
     try:
         results = _vqa_pipeline(image=image, question=question, top_k=1)
     except Exception as exc:
         logger.warning("[VLM] VQA inference failed; using fallback response: %s", exc)
-        return _fallback_vqa(question, bbox)
+        return {
+            "answer": _fallback_vqa(question, bbox),
+            "provenance": _provenance(mode="fallback", model=model, reason="inference_failed"),
+        }
 
     if results and len(results) > 0:
-        return results[0]["answer"].capitalize() + "."
-    return _fallback_vqa(question, bbox)
+        return {
+            "answer": results[0]["answer"].capitalize() + ".",
+            "provenance": _provenance(mode="model", model=model),
+        }
+    return {
+        "answer": _fallback_vqa(question, bbox),
+        "provenance": _provenance(mode="fallback", model=model, reason="empty_model_result"),
+    }
 
 def run_vlm_caption(bbox: list[float]) -> str:
+    return str(explain_vlm_caption(bbox)["caption"])
+
+
+def explain_vlm_caption(bbox: list[float]) -> dict[str, Any]:
     """Run captioning when available, otherwise return a deterministic offline fallback."""
     global _caption_pipeline
+    model = "nlpconnect/vit-gpt2-image-captioning"
     if _caption_pipeline is None:
-        logger.info("[VLM] Initializing Caption model (nlpconnect/vit-gpt2-image-captioning)...")
-        _caption_pipeline = _load_pipeline("image-to-text", "nlpconnect/vit-gpt2-image-captioning") or _PIPELINE_UNAVAILABLE
+        logger.info("[VLM] Initializing Caption model (%s)...", model)
+        _caption_pipeline = _load_pipeline("image-to-text", model) or _PIPELINE_UNAVAILABLE
 
     if _caption_pipeline is _PIPELINE_UNAVAILABLE:
-        return _fallback_caption(bbox)
+        return {
+            "caption": _fallback_caption(bbox),
+            "provenance": _provenance(mode="fallback", model=model, reason="pipeline_unavailable"),
+        }
 
     image = _fetch_image(bbox)
     if image is None:
-        return _fallback_caption(bbox)
+        return {
+            "caption": _fallback_caption(bbox),
+            "provenance": _provenance(mode="fallback", model=model, reason="image_unavailable"),
+        }
 
     try:
         results = _caption_pipeline(image)
     except Exception as exc:
         logger.warning("[VLM] Caption inference failed; using fallback response: %s", exc)
-        return _fallback_caption(bbox)
+        return {
+            "caption": _fallback_caption(bbox),
+            "provenance": _provenance(mode="fallback", model=model, reason="inference_failed"),
+        }
 
     if isinstance(results, list) and len(results) > 0:
-        return results[0]["generated_text"].capitalize() + "."
-    return _fallback_caption(bbox)
+        return {
+            "caption": results[0]["generated_text"].capitalize() + ".",
+            "provenance": _provenance(mode="model", model=model),
+        }
+    return {
+        "caption": _fallback_caption(bbox),
+        "provenance": _provenance(mode="fallback", model=model, reason="empty_model_result"),
+    }

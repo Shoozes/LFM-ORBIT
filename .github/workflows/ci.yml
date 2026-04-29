@@ -14,6 +14,59 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  security-static:
+    name: Security and Static Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Ruff syntax/static sanity
+        run: uvx ruff check source/backend --select E9
+
+      - name: Python dependency audit
+        working-directory: source/backend
+        run: |
+          uv export --extra dev --format requirements-txt --no-hashes --output-file requirements-audit.txt
+          # diskcache is pulled transitively by llama-cpp-python; keep the audit active while that upstream fixes CVE-2025-69872.
+          uvx pip-audit -r requirements-audit.txt --ignore-vuln CVE-2025-69872
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: source/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: source/frontend
+        run: npm ci
+
+      - name: Frontend dependency audit
+        working-directory: source/frontend
+        run: npm audit --audit-level=high
+
   backend:
     name: Backend Tests
     runs-on: ubuntu-latest

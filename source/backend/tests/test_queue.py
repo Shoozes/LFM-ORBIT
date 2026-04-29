@@ -27,6 +27,7 @@ def test_queue_round_trip(tmp_path):
     assert counts["total_payload_bytes"] == 123
     assert recent["region_id"] == "amazonas_region_alpha"
     assert recent["alerts"][0]["cell_id"] == "85283473fffffff"
+    assert recent["alerts"][0]["runtime_truth_mode"] == "unknown"
 
 
 def test_demo_forced_anomaly_persists(tmp_path):
@@ -66,6 +67,7 @@ def test_demo_forced_anomaly_persists(tmp_path):
     organic = next(a for a in alerts if a["event_id"] == "evt_organic")
 
     assert seeded["demo_forced_anomaly"] is True
+    assert seeded["runtime_truth_mode"] == "fallback"
     assert organic["demo_forced_anomaly"] is False
 
 

@@ -1,8 +1,10 @@
 # LFM-ORBIT
 
-LFM-ORBIT is a production-ready mission control app for the **Liquid AI x DPhi Space Hackathon: Hack #05, AI in Space**.
+LFM-ORBIT is a demo-ready, local-first mission control prototype for the **Liquid AI x DPhi Space Hackathon: Hack #05, AI in Space**.
 
 It turns satellite imagery into compact, evidence-backed orbital alerts: the satellite scans too much data, edge triage ignores noise, a Liquid vision-language model checks the important frame, and only small proof JSON is downlinked.
+
+The current repo is built for local judging and research workflows, not unattended production deployment. API responses expose `runtime_truth_mode` so live imagery, replayed cached API imagery, and fallback paths stay distinguishable.
 
 [Hackathon event](https://luma.com/n9cw58h0) | [Judging criteria](docs/Liquid_AI_x_DPhi_Space_Judging_Criteria.md) | [Judge demo guide](docs/JUDGE_DEMO.md)
 
@@ -82,7 +84,7 @@ The demo is meant to be understandable muted.
 
 | Criterion | LFM-ORBIT Evidence |
 |---|---|
-| Satellite imagery | Mission Control uses satellite frames, DPhi/SimSat-compatible provider lanes, and real Sentinel-2 L2A seeded demo assets for deterministic review. |
+| Satellite imagery | Mission Control uses satellite frames, DPhi/SimSat-compatible provider lanes, and real Sentinel-2 L2A seeded replay assets for deterministic review. |
 | Innovation and problem fit | The app targets the core space constraint: satellites see too much data to downlink everything. It performs edge triage and transmits compact evidence packets. |
 | Technical implementation | Full React/FastAPI app, dual-agent runtime, replay loading, provider fallback, tests, recorded Playwright demos, proof JSON, and local dataset export. |
 | Demo and communication | One command records the product walking judges through the end-to-end mission without needing live narration. |
@@ -125,6 +127,18 @@ The current show pack uses distinct missions and geography. The flood story uses
 | Shoreline recovery | Lake Mead | Sentinel-2 L2A true-color seeded WebM |
 
 Timelapse integrity rule: a timelapse must contain multiple contextual satellite imagery slices. A static image with color shifts is invalid evidence and should be rejected.
+
+## Runtime Truth Modes
+
+Orbit now labels runtime surfaces with `runtime_truth_mode`:
+
+| Mode | Meaning |
+|---|---|
+| `live_imagery` | Direct Sentinel Hub imagery-derived scoring is active. |
+| `replay` | Curated replay or seeded cache evidence has been loaded from stored real API imagery for deterministic inspection and cost control. |
+| `fallback` | Heuristic, quality-gate, provider-error, or VLM fallback behavior produced the response. |
+
+Local control endpoints such as runtime reset, replay load/rescan, mission start/stop, credential save, link state, and bus injection are intended for localhost operation.
 
 ## Validation
 

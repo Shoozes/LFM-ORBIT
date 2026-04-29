@@ -41,6 +41,16 @@ def test_vlm_caption_uses_fallback_when_transformers_unavailable():
         assert vlm.run_vlm_caption([-60.5, -3.5, -60.4, -3.4]) == "Deforested clearing beside intact canopy."
 
 
+def test_vlm_explain_caption_marks_heuristic_fallback():
+    with patch("core.vlm._load_pipeline", return_value=None):
+        vlm._caption_pipeline = None
+        payload = vlm.explain_vlm_caption([-60.5, -3.5, -60.4, -3.4])
+
+    assert payload["caption"] == "Deforested clearing beside intact canopy."
+    assert payload["provenance"]["heuristic_fallback"] is True
+    assert payload["provenance"]["runtime_truth_mode"] == "fallback"
+
+
 def test_vlm_fetch_image_failure_returns_none_instead_of_blank_tile():
     with patch("core.vlm.httpx.Client") as mock_client:
         mock_client.return_value.__enter__.return_value.get.side_effect = RuntimeError("network down")

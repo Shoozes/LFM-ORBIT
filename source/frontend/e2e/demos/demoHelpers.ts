@@ -85,7 +85,7 @@ const DEMO_SCENARIOS: Record<DemoCase, DemoScenario> = {
     useCaseId: "mining_expansion",
   },
   abstain: {
-    intro: "Abstain safety uses a Greenland ice mission to show that low-quality imagery does not become a fake answer.",
+    intro: "Abstain safety uses a Greenland ice mission to show that low-quality imagery does not become an unsupported answer.",
     proofSubtitle: "No timelapse or alert is transmitted when the quality gate fails.",
     presetId: "ice_greenland",
     presetLabel: "Greenland coast",
