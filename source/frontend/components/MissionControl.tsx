@@ -123,13 +123,13 @@ const MISSION_LOCATION_PRESETS: MissionPreset[] = [
   },
   {
     id: "ice_greenland",
-    label: "Ice Cap",
+    label: "Ice/Snow",
     place: "Greenland coast",
-    useCaseId: "ice_cap_growth",
-    taskText: "Compare same-season Greenland ice cap and glacier edge frames for true growth or retreat.",
+    useCaseId: "ice_snow_extent",
+    taskText: "Review Greenland edge snow and ice extent using NDSI, SCL cloud rejection, and multi-frame persistence before any extent-change label.",
     bbox: [-51.13, 69.1, -50.97, 69.26],
     startDate: "2024-01-15",
-    endDate: "2025-10-15",
+    endDate: "2025-12-15",
     tone: "ice",
   },
   {

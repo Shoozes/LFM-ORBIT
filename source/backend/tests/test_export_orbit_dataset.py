@@ -402,6 +402,33 @@ def test_write_dataset_export_can_include_seeded_cache_records(tmp_path, monkeyp
         ),
         encoding="utf-8",
     )
+    (seeded_dir / "sh_ice1234.webm").write_bytes(b"ice-webm-bytes")
+    (seeded_dir / "sh_ice1234_meta.json").write_text(
+        json.dumps(
+            {
+                "chunk_signature": "ice1234",
+                "bbox": [-51.13, 69.1, -50.97, 69.26],
+                "lat": 69.18,
+                "lon": -51.05,
+                "location_name": "Greenland ice/snow extent test cell",
+                "region_note": "NDSI/SCL fixture",
+                "start_date": "2024-01",
+                "end_date": "2025-12",
+                "frames_count": 4,
+                "frame_dates": ["2024-01-15", "2025-12-15"],
+                "vlm_explanation": "Seeded ice/snow extent metadata.",
+                "source": "Sentinel Hub Sentinel-2 L2A",
+                "runtime_truth_mode": "replay",
+                "imagery_origin": "cached_api",
+                "scoring_basis": "multispectral_bands",
+                "training_ready": True,
+                "use_case_id": "ice_snow_extent",
+                "target_category": "cryosphere",
+                "target_task": "ice_snow_extent_monitoring",
+            }
+        ),
+        encoding="utf-8",
+    )
 
     output_dir = tmp_path / "export"
     manifest = export_orbit_dataset.write_dataset_export(
@@ -417,10 +444,12 @@ def test_write_dataset_export_can_include_seeded_cache_records(tmp_path, monkeyp
         if line.strip()
     ]
 
-    assert manifest["records"] == 1
-    assert manifest["seeded_cache_records"] == 1
-    assert manifest["records_with_timelapse"] == 1
-    record = records[0]
+    assert manifest["records"] == 2
+    assert manifest["seeded_cache_records"] == 2
+    assert manifest["records_with_timelapse"] == 2
+    assert manifest["use_case_counts"]["ice_snow_extent"] == 1
+    record = next(item for item in records if item["chunk_signature"] == "demo1234")
+    ice_record = next(item for item in records if item["chunk_signature"] == "ice1234")
     assert record["record_type"] == "seeded_cache"
     assert record["confirmation_source"] == "seeded_data"
     assert record["target_category"] == "deforestation"
@@ -431,6 +460,12 @@ def test_write_dataset_export_can_include_seeded_cache_records(tmp_path, monkeyp
     assert record["rejected_windows"][0]["quality"]["cloud_pixel_ratio"] == 0.8
     assert record["assets"]["timelapse"] == "timelapse.webm"
     assert (output_dir / "samples" / record["sample_id"] / "timelapse.webm").read_bytes() == b"webm-bytes"
+    assert ice_record["target_category"] == "cryosphere"
+    assert ice_record["target_task"] == "ice_snow_extent_monitoring"
+    assert ice_record["runtime_truth_mode"] == "replay"
+    assert ice_record["imagery_origin"] == "cached_api"
+    assert ice_record["scoring_basis"] == "multispectral_bands"
+    assert ice_record["temporal_use_case"]["id"] == "ice_snow_extent"
 
 
 def test_seeded_cache_record_replaces_duplicate_api_observation(tmp_path, monkeypatch):

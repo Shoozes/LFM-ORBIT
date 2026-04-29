@@ -2,25 +2,23 @@
 
 **Local-first satellite mission control for the Liquid AI x DPhi Space Hackathon: Hack #05, AI in Space.**
 
-LFM-ORBIT turns satellite imagery into compact, evidence-backed orbital alerts. The edge agent scans too much data, ignores low-value noise, asks a Liquid VLM to inspect the important frame, and downlinks proof JSON instead of raw imagery.
+LFM-ORBIT turns satellite imagery into compact, evidence-backed orbital alerts. The satellite-side agent scans large areas, filters noisy scenes, invokes a local Liquid VLM path for the important frame, and downlinks compact proof JSON instead of raw imagery.
 
-It is demo-ready and research-oriented, not an unattended production deployment. Runtime surfaces expose `runtime_truth_mode`, `imagery_origin`, and `scoring_basis` so realtime provider imagery, replayed cached API imagery, and fallback paths stay distinguishable.
+This is a demo-ready research prototype, not an unattended production deployment. Evidence surfaces keep `runtime_truth_mode`, `imagery_origin`, and `scoring_basis` separate so realtime imagery, cached API replay, and fallback paths are never confused.
 
 [Hackathon event](https://luma.com/n9cw58h0) | [Judging criteria](docs/Liquid_AI_x_DPhi_Space_Judging_Criteria.md) | [Judge demo guide](docs/JUDGE_DEMO.md)
 
 ![LFM-ORBIT Judge Mode proof surface](docs/readme-judge-mode.png)
 
-## Run The Proof
+## Run The Judge Proof
 
 ```bash
 cd source/frontend
-npm install
+npm ci
 npm run demo:judge
 ```
 
-That command launches the app, loads a deterministic replay from cached real API imagery, runs the VLM proof flow, and writes screenshot, video, trace, and `proof.json` artifacts.
-
-The proof JSON includes `payload_accounting` so `alert_payload_bytes` is clearly scoped to compact downlink alert JSON, not the larger screenshot/video/trace proof envelope.
+This starts the app, loads a deterministic replay from cached real API imagery, runs the proof flow, and writes video, screenshot, trace, and `proof.json` artifacts. The proof uses saved replay assets, so the judge path does not need fresh provider API calls.
 
 | Artifact | Path |
 |---|---|
@@ -30,13 +28,13 @@ The proof JSON includes `payload_accounting` so `alert_payload_bytes` is clearly
 | Evidence frame | `source/frontend/e2e/artifacts/judge-mode/evidence-frame.png` |
 | Proof JSON | `source/frontend/e2e/artifacts/judge-mode/proof.json` |
 
-Run every recorded proof:
+Run every recorded proof from `source/frontend`:
 
 ```bash
 npm run demo:record
 ```
 
-## What It Shows
+## Screenshots
 
 <table>
   <tr>
@@ -44,7 +42,7 @@ npm run demo:record
     <td width="50%"><img src="docs/readme-provenance.png" alt="Atacama provenance proof with provider, capture time, bbox, prompt, model, and output JSON" /></td>
   </tr>
   <tr>
-    <td><strong>Payload reduction</strong><br />Raw satellite frame stays local; compact alert JSON is downlinked.</td>
+    <td><strong>Payload reduction</strong><br />Raw imagery stays local; only compact alert JSON is downlinked.</td>
     <td><strong>Provenance chain</strong><br />Provider, capture time, bbox, prompt, model, confidence, and JSON stay attached.</td>
   </tr>
   <tr>
@@ -57,48 +55,59 @@ npm run demo:record
   </tr>
 </table>
 
-## Why It Fits
+## What Judges Should Notice
 
-| Criterion | Evidence |
+| Area | What is shown |
 |---|---|
-| Satellite imagery | Real Sentinel-2 L2A replay assets cached from API imagery, plus provider lanes for SimSat, Sentinel Hub, NASA, and GEE-style flows. |
-| Innovation | The app attacks the core space constraint: satellites cannot downlink everything, so the edge agent triages before transmission. |
-| Implementation | FastAPI backend, React/Vite frontend, SQLite runtime stores, autonomous SAT/GND agents, telemetry WebSockets, replay loading, tests, and CI-ready checks. |
-| Communication | One command records a self-contained judge proof with video, screenshots, trace, and proof JSON. |
+| Space constraint | The edge agent compresses a raw satellite frame into a small alert payload before downlink. |
+| Real imagery | Sentinel-2 L2A replay assets are cached from API imagery and keep date/provenance metadata. |
+| Agent loop | Satellite Pruner Agent and Ground Validator Agent exchange visible SAT/GND mission context. |
+| Evidence contract | Every alert separates truth mode, imagery origin, and scoring basis. |
+| Show path | One command records a reproducible proof with video, screenshots, trace, and JSON. |
 
 ## Product Surface
 
-- Mission Control map with bbox selection, Fast Replay load/rescan, and location presets.
-- Satellite Pruner Agent and Ground Validator Agent with visible SAT/GND dialogue.
+- Mission Control map with bbox selection, Fast Replay load/rescan, and mission presets.
+- SAT/GND agent dialogue with compact orbital telemetry and ground validation.
 - Evidence gallery with imagery, timelapse, provenance, alert analysis, and VLM tools.
 - Judge Mode proof panel with stable artifact export.
 - Delay-tolerant link outage simulator.
 - Dataset export, Qwen/Ollama retagging, replay-cache packaging, and Hugging Face upload tooling.
 
-Current proof missions include Rondonia deforestation, Pakistan Manchar Lake flooding, Atacama mining, Greenland abstain safety, Suez maritime outage, Singapore maritime replay, Georgia wildfire candidate, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead.
+Current proof missions include deforestation, flood extent, mining expansion, maritime activity, wildfire candidates, urban expansion, volcano/lake events, and the new Greenland ice/snow extent lane.
+
+## Ice/Snow Extent
+
+The cryosphere lane is long-window ice and snow extent monitoring, not a visual-only ice-growth claim. It uses cached Sentinel-2 L2A replay metadata with:
+
+- NDSI from Green and SWIR1 bands.
+- SCL cloud, shadow, no-data, and snow/ice support.
+- NDWI/SWIR water-ice ambiguity flags.
+- Multi-frame persistence before any extent-change review label.
+- Static-video rejection so color-shift-only clips are not treated as timelapse proof.
 
 ## Evidence Modes
 
-| Field | Values |
+| Field | Purpose |
 |---|---|
-| `runtime_truth_mode` | `realtime`, `replay`, `fallback`, `unknown` |
-| `imagery_origin` | `sentinelhub`, `simsat`, `nasa_gibs`, `gee`, `cached_api`, `fallback_none`, etc. |
-| `scoring_basis` | `multispectral_bands`, `proxy_bands`, `visual_only`, `fallback_none`, `unknown` |
+| `runtime_truth_mode` | `realtime`, `replay`, `fallback`, or `unknown`. |
+| `imagery_origin` | Provider/source family such as `sentinelhub`, `simsat`, `nasa_gibs`, `gee`, or `cached_api`. |
+| `scoring_basis` | `multispectral_bands`, `proxy_bands`, `visual_only`, `fallback_none`, or `unknown`. |
 
-Replay means stored real API imagery with preserved date/provenance for deterministic review and cost control. Fallback means degraded runtime behavior such as provider error, quality gate, heuristic response, or VLM compatibility fallback.
+Replay means stored real API imagery with preserved date/provenance for deterministic review and cost control. Fallback means degraded runtime behavior and must not be presented as realtime evidence.
 
 ## Validation
 
 | Check | Result |
 |---|---|
-| Backend tests | `289 passed` |
-| Frontend lint | passing |
-| Frontend build | passing |
+| Cold-start verification | `.\run.ps1 -Verify` passing |
+| Backend tests | `299 passed` |
+| Frontend lint/build | passing |
 | Normal Playwright E2E | `73 passed`, `1 skipped` |
 | Recorded demo suite | `5 passed` |
 | Dataset export | `56` samples, `24` replay-cache rows |
 | Retagged training export | `179` assets, `26` temporal sequences |
-| Hugging Face dataset | [Shoozes/LFM-Orbit-SatData](https://huggingface.co/datasets/Shoozes/LFM-Orbit-SatData) |
+| Hugging Face dataset | [Shoozes/LFM-Orbit-SatData](https://huggingface.co/datasets/Shoozes/LFM-Orbit-SatData), including `mission_metadata=1` |
 
 ## Run Locally
 

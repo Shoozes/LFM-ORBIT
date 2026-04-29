@@ -10,9 +10,11 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 - Mission Control can run realtime provider/API scans, replay cached real API imagery, monitor previews, VLM helper calls, timelapse generation, and dataset export paths.
 - Runtime evidence surfaces expose three separate fields: `runtime_truth_mode` (`realtime`, `replay`, `fallback`), `imagery_origin` (`sentinelhub`, `simsat`, `nasa_gibs`, `gee`, `cached_api`, etc.), and `scoring_basis` (`multispectral_bands`, `proxy_bands`, `visual_only`, `fallback_none`).
 - Replay-cache entries are stored real API imagery with preserved date/provenance for deterministic review and cost control. They are not generated evidence.
+- The first `ice_snow_extent` lane scores cached Sentinel-2 L2A replay metadata with NDSI, SCL cloud rejection, snow/ice SCL support, water/ice ambiguity flags, and multi-frame persistence.
 - Fallback means degraded runtime behavior: provider error, quality gate, heuristic proxy, or VLM compatibility fallback. Fallback paths must not masquerade as realtime imagery or high-confidence model output.
-- Fast Replay can load curated replay packs and valid cached API WebMs, then rescan saved metadata through the current runtime/model stack.
-- NDVI has an explicit spectral-band contract: RGB-only, missing, or invalid band data returns unavailable/abstain instead of fabricated NDVI.
+- Fast Replay can load curated replay packs and structurally valid cached API WebMs, then rescan saved metadata through the current runtime/model stack.
+- Fast Replay excludes cached WebMs that fail structural timelapse-integrity checks, so static or color-shift-only videos are not presented as temporal proof.
+- NDVI and NDSI have explicit spectral-band contracts: RGB-only, missing, or invalid band data returns unavailable/abstain instead of fabricated indices.
 - Cloud and no-data coverage are hard quality gates: Sentinel SCL cloud/shadow/cirrus classes are tracked, cloudy cached frames are skipped, and cloud-blocked scoring windows return no-transmit quality-gate results.
 - VLM responses now carry structured provenance with output source, model, fallback reason, runtime truth mode, imagery origin, and scoring basis.
 - Judge Mode proof JSON now includes `payload_accounting` so byte-reduction claims state which fields are counted and which proof artifacts are excluded.
@@ -23,8 +25,10 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 
 - [x] Split runtime metadata into `runtime_truth_mode`, `imagery_origin`, and `scoring_basis` across provider status, health, telemetry, metrics, recent alerts, replay, timelapse, VLM provenance, and frontend normalization.
 - [x] Standardized the primary active-provider truth label as `realtime` while preserving backward compatibility for old stored rows and source labels.
-- [x] Kept replay/cached API evidence labeled as `replay` with `imagery_origin=cached_api` and `scoring_basis=visual_only`.
+- [x] Kept replay/cached API evidence labeled as `replay` with `imagery_origin=cached_api`; visual replay defaults to `scoring_basis=visual_only`, while band-derived replay manifests can explicitly use `scoring_basis=multispectral_bands`.
 - [x] Changed cached timelapse provenance to `kind=replay_cache`, `label=Cached real API timelapse`, and `legacy_kind=seeded_cache`.
+- [x] Applied a structural timelapse-integrity gate to dynamic Fast Replay catalog entries, excluding the legacy static Greenland WebM while keeping metadata-only cryosphere scoring available.
+- [x] Added the first ice/snow evidence lane with NDSI, SCL cloud rejection, water/ice ambiguity flags, multi-frame persistence, API tests, replay/export provenance, and an Ice/Snow Mission Control preset.
 - [x] Ensured provider failures and quality-gate failures produce zero-score/zero-confidence fallback or no-transmit results instead of forced positive alerts.
 - [x] Updated frontend labels to distinguish realtime provider fetches, replay caches, cached API imagery, and fallback/proxy paths.
 - [x] Added explicit Judge Mode payload-accounting metadata and proof assertions so `alert_payload_bytes` is scoped to compact downlink JSON, not the larger proof artifact envelope.
@@ -45,6 +49,8 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 - [ ] Persist API-generated maritime/lifeline monitor reports into `runtime-data/monitor-reports/` directly from UI/API usage.
 - [ ] Add full replay snapshot export/import so completed realtime missions can be packaged outside bundled replay packs and cached API WebMs.
 - [ ] Add a reusable Sentinel Hub replay seeding manifest command that refreshes exact replay assets without relying on manual grid/cell-dim selection.
+- [ ] Wire `core/ice_snow_monitoring.py` into a live Sentinel Hub Process API path that stores frame-level Green/SWIR1/NIR/SCL summaries during cache seeding instead of relying on curated precomputed replay metadata.
+- [ ] Refresh the Greenland ice/snow replay with a contextual WebM that passes the structural timelapse-integrity guard before presenting it as video proof.
 - [ ] Add Sentinel Hub OGC/WMS instance-id seeding support only if a valid WMS-only instance appears; current Process API seeding uses validated OAuth credentials.
 - [ ] Add optional Planet/Planet Insights imagery ingestion once a local API token is available; the current shared workspace URL is a browser account page, not an API credential.
 - [ ] Add mocked SimSat Mapbox and Element84 STAC fixture coverage with visual asset URLs and operator-facing provenance checks.
@@ -65,6 +71,8 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 - Quality-gated cloud/no-data failures must not emit `suspected_canopy_loss`, even when raw band deltas look large.
 - Cached Sentinel replay/training frames must carry frame-quality metadata and reject cloudy frames before WebM creation.
 - Timelapse evidence must contain multiple contextual satellite imagery slices; single still-image color shifts are invalid temporal evidence.
+- Dynamic Fast Replay must not list cached videos that fail structural frame-change checks, even when matching metadata exists.
+- Ice/snow conclusions must require spectral bands and temporal persistence; RGB-only snow/cloud lookalikes should abstain or stay metadata-only.
 - Link-offline mode must queue compact JSON alerts locally and flush only after link recovery.
 - Payload-reduction proof must keep `payload_accounting` explicit so screenshots, videos, traces, and UI-only audit fields are not confused with downlink alert bytes.
 - Demo and test runs should reset runtime state and avoid stale local server reuse unless explicitly requested.
@@ -83,6 +91,6 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 - Frontend contract guard: `npm run lint` and `npm run build` from `source/frontend`.
 - Judge acceptance path: `npm run demo:judge` from `source/frontend`.
 - Full local validation remains `.\run.ps1 -Verify` from repo root.
-- Latest integrity validation: backend `289 passed`; frontend `npm run lint` passed; frontend `npm run build` passed; focused Playwright replay/timelapse specs passed `5`; QA verification passed `8`; `npm run demo:judge` passed; `npm run demo:tutorial` passed and refreshed `docs/tutorial_video.webm`; `summary_bank.json` parsed; `uvx ruff check source/backend --select E9` passed; `git diff --check` reported only CRLF normalization warnings.
+- Latest integrity validation: cold-start `.\run.ps1 -Verify` passed with backend `299 passed`, frontend lint/build passing, and normal Playwright E2E `73 passed`, `1 skipped`; focused replay/export/timelapse checks passed `14`; Ice/Snow preset Playwright check passed `1`; focused Playwright replay/timelapse specs passed `5`; QA verification passed `8`; `npm run demo:judge` passed; `npm run demo:tutorial` passed and refreshed `docs/tutorial_video.webm`; `summary_bank.json` parsed; `uvx ruff check source/backend --select E9` passed; `git diff --check` reported only CRLF normalization warnings.
 - Latest dataset-cycle validation: dataset export produced `56` current-cycle samples, `24` replay-cache rows, and `25` timelapse rows; bounded Qwen retag produced `179` assets and `26` temporal sequences with `74` reused image tags, `9` SVG placeholder skips, and zero tagger failures.
-- Hugging Face remote config verification: `default=179`, `temporal_sft=26`, `asset_metadata=179`, `retagged_assets=179`, `temporal_metadata=26`, `review_queue=179`.
+- Hugging Face remote config verification: `default=179`, `temporal_sft=26`, `asset_metadata=179`, `retagged_assets=179`, `temporal_metadata=26`, `review_queue=179`, `mission_metadata=1`; latest data/card commit `1ebd19065e8a8124372425c4c0df9c0332275c9c`.

@@ -16,7 +16,11 @@ EXPECTED_REPLAY_IDS = {
     "singapore_maritime_replay",
     "georgia_wildfire_replay",
     "delhi_urban_replay",
+    "greenland_ice_snow_extent_replay",
 }
+
+MULTISPECTRAL_REPLAY_IDS = {"greenland_ice_snow_extent_replay"}
+METADATA_ONLY_REPLAY_IDS = {"greenland_ice_snow_extent_replay"}
 
 
 def _json_response_payload(response: JSONResponse) -> dict:
@@ -44,6 +48,8 @@ def test_replay_catalog_lists_seeded_judge_pack(tmp_path, monkeypatch):
     replay_ids = {item["replay_id"] for item in payload["replays"]}
     assert EXPECTED_REPLAY_IDS.issubset(replay_ids)
     assert any(item["source_kind"] == "seeded_cache" for item in payload["replays"])
+    assert next(item for item in payload["replays"] if item["replay_id"] == "greenland_ice_snow_extent_replay")["use_case_id"] == "ice_snow_extent"
+    assert "seeded_cache_sh_cc0e95b7" not in replay_ids
 
 
 def test_replay_load_seeds_runtime_surfaces(tmp_path, monkeypatch):
@@ -111,6 +117,15 @@ def test_each_bundled_replay_loads_runtime_surfaces(tmp_path, monkeypatch):
 
     for replay in catalog:
         payload = replay_load(replay["replay_id"])
+        expected_scoring_basis = (
+            "multispectral_bands" if replay["replay_id"] in MULTISPECTRAL_REPLAY_IDS else "visual_only"
+        )
+        expected_observation_source = (
+            "seeded_sentinelhub_multispectral_replay"
+            if replay["replay_id"] in MULTISPECTRAL_REPLAY_IDS
+            else "seeded_sentinelhub_replay"
+        )
+        expected_has_timelapse = replay["replay_id"] not in METADATA_ONLY_REPLAY_IDS
 
         assert isinstance(payload, dict)
         assert payload["replay_id"] == replay["replay_id"]
@@ -121,18 +136,22 @@ def test_each_bundled_replay_loads_runtime_surfaces(tmp_path, monkeypatch):
         recent_alerts = get_recent_alerts(limit=20)["alerts"]
         assert len(recent_alerts) == replay["alert_count"]
         assert all(alert["downlinked"] is True for alert in recent_alerts)
-        assert all(alert["observation_source"] == "seeded_sentinelhub_replay" for alert in recent_alerts)
+        assert all(alert["observation_source"] == expected_observation_source for alert in recent_alerts)
+        assert all(alert["scoring_basis"] == expected_scoring_basis for alert in recent_alerts)
 
         gallery = list_gallery(limit=20)
         assert len(gallery) == replay["alert_count"]
-        assert all(item["has_timelapse"] == 1 for item in gallery)
-        assert all(item["timelapse_source"] == "replay" for item in gallery)
+        if expected_has_timelapse:
+            assert all(item["has_timelapse"] == 1 for item in gallery)
+            assert all(item["timelapse_source"] == "replay" for item in gallery)
+        else:
+            assert all(item["has_timelapse"] == 0 for item in gallery)
 
         metrics = read_metrics_summary()
         assert metrics["region_id"] == "replay"
         assert metrics["runtime_truth_mode"] == "replay"
         assert metrics["imagery_origin"] == "cached_api"
-        assert metrics["scoring_basis"] == "visual_only"
+        assert metrics["scoring_basis"] == expected_scoring_basis
         assert metrics["total_cells_scanned"] == replay["cells_scanned"]
         assert metrics["total_alerts_emitted"] == replay["alert_count"]
 

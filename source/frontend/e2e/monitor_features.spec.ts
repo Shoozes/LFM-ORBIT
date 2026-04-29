@@ -188,7 +188,7 @@ test.describe("Monitor Feature Visual Proof", () => {
     });
   });
 
-  test("visual proof: Greenland ice cap mission preset", async ({ page, request }) => {
+  test("visual proof: Greenland ice/snow extent mission preset", async ({ page, request }) => {
     test.setTimeout(45_000);
     await resetRuntimeState(request);
     await gotoApp(page);
@@ -198,7 +198,7 @@ test.describe("Monitor Feature Visual Proof", () => {
 
     await page.locator("[data-testid='mission-preset-ice_greenland']").click();
     await expect(page.locator("[data-testid='selected-mission-preset']")).toContainText("Greenland coast");
-    await expect(page.locator("textarea")).toHaveValue(/Greenland ice cap/);
+    await expect(page.locator("textarea")).toHaveValue(/Greenland edge snow and ice extent/);
     await expect(page.locator("[data-testid='bbox-badge']")).toContainText("-51.13", { timeout: 10_000 });
     await page.locator("[data-testid='selected-mission-preset']").scrollIntoViewIfNeeded();
     await page.waitForTimeout(1_500);

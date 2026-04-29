@@ -358,6 +358,7 @@ def test_temporal_use_cases_endpoint_returns_examples():
     assert "wildfire" in by_id
     assert "maritime_activity" in by_id
     assert "civilian_lifeline_disruption" in by_id
+    assert "ice_snow_extent" in by_id
     assert "ice_cap_growth" in by_id
     assert by_id["wildfire"]["examples"]
 
@@ -376,6 +377,21 @@ def test_temporal_classify_endpoint_auto_decides_use_case():
     data = response.json()
     assert data["id"] == "ice_cap_growth"
     assert data["examples"]
+
+
+def test_temporal_classify_endpoint_prefers_ndsi_ice_snow_lane():
+    response = client.post(
+        "/api/temporal/classify",
+        json={
+            "task_text": "Review Greenland snow versus clouds with Sentinel-2 L2A NDSI and SCL support.",
+            "reason_codes": ["ndsi_increase", "multi_frame_persistence", "cloud_rejected"],
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == "ice_snow_extent"
+    assert "snow_ice_scl_support" in data["signals"]
 
 
 def test_lifeline_assets_endpoint_returns_seed_assets():
@@ -499,6 +515,56 @@ def test_lifeline_evaluate_endpoint_requires_cases():
     response = client.post("/api/lifelines/evaluate", json={"cases": []})
 
     assert response.status_code == 422
+
+
+def test_ice_snow_score_endpoint_returns_multispectral_contract():
+    response = client.post(
+        "/api/ice-snow/score",
+        json={
+            "frames": [
+                {
+                    "label": "2024-01-15",
+                    "bands": {"green": 0.66, "swir1": 0.24, "nir": 0.49},
+                    "valid_pixel_ratio": 0.9,
+                    "cloud_pixel_ratio": 0.02,
+                    "snow_ice_ratio": 0.42,
+                    "snow_ice_scl_ratio": 0.30,
+                },
+                {
+                    "label": "2024-02-15",
+                    "bands": {"green": 0.67, "swir1": 0.23, "nir": 0.49},
+                    "valid_pixel_ratio": 0.9,
+                    "cloud_pixel_ratio": 0.02,
+                    "snow_ice_ratio": 0.43,
+                    "snow_ice_scl_ratio": 0.31,
+                },
+                {
+                    "label": "2025-01-15",
+                    "bands": {"green": 0.73, "swir1": 0.20, "nir": 0.52},
+                    "valid_pixel_ratio": 0.88,
+                    "cloud_pixel_ratio": 0.03,
+                    "snow_ice_ratio": 0.57,
+                    "snow_ice_scl_ratio": 0.39,
+                },
+                {
+                    "label": "2025-02-15",
+                    "bands": {"green": 0.74, "swir1": 0.20, "nir": 0.52},
+                    "valid_pixel_ratio": 0.88,
+                    "cloud_pixel_ratio": 0.03,
+                    "snow_ice_ratio": 0.58,
+                    "snow_ice_scl_ratio": 0.40,
+                },
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["runtime_truth_mode"] == "replay"
+    assert data["imagery_origin"] == "cached_api"
+    assert data["scoring_basis"] == "multispectral_bands"
+    assert data["use_case"] == "ice_snow_extent"
+    assert "ndsi_increase" in data["reason_codes"]
 
 
 def test_maritime_monitor_endpoint_returns_offline_investigation_plan():

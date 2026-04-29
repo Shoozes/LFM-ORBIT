@@ -431,6 +431,9 @@ def _build_seeded_cache_record(meta_path: Path, *, eval_ratio: float) -> dict[st
     use_case_id = str(meta.get("use_case_id") or "").strip()
     target_category = str(meta.get("target_category") or "").strip()
     target_task = str(meta.get("target_task") or "").strip()
+    runtime_truth_mode = str(meta.get("runtime_truth_mode") or "replay")
+    imagery_origin = str(meta.get("imagery_origin") or "cached_api")
+    scoring_basis = str(meta.get("scoring_basis") or "visual_only")
     inferred_deforestation = "rond" in location_name.lower()
     return {
         "sample_id": sample_id,
@@ -451,6 +454,9 @@ def _build_seeded_cache_record(meta_path: Path, *, eval_ratio: float) -> dict[st
         "priority": "review",
         "reason_codes": ["seeded_data", "training_ready"] if training_ready else ["seeded_data"],
         "observation_source": str(meta.get("source") or "seeded_cache"),
+        "runtime_truth_mode": runtime_truth_mode,
+        "imagery_origin": imagery_origin,
+        "scoring_basis": scoring_basis,
         "demo_forced_anomaly": False,
         "before_window": {"label": frame_dates[0]} if frame_dates else None,
         "after_window": {"label": frame_dates[-1]} if frame_dates else None,

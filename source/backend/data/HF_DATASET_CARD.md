@@ -35,6 +35,10 @@ configs:
   data_files:
   - split: train
     path: review_queue.jsonl
+- config_name: mission_metadata
+  data_files:
+  - split: train
+    path: mission_metadata.jsonl
 ---
 
 # LFM Orbit SatData
@@ -53,6 +57,7 @@ The default viewer config is `training_assets.jsonl`, which contains single-imag
 | `retagged_assets` | `retagged_assets.jsonl` | Full retag records and source references |
 | `temporal_metadata` | `temporal_sequences.jsonl` | Full temporal-sequence provenance |
 | `review_queue` | `review_queue.jsonl` | Human-review prompts and references |
+| `mission_metadata` | `mission_metadata.jsonl` | Metadata-only scored mission rows, including missions without valid video proof |
 
 ## Current Export
 
@@ -61,6 +66,7 @@ The default viewer config is `training_assets.jsonl`, which contains single-imag
 - 25 records with timelapse references
 - 179 deduplicated image/frame assets
 - 26 temporal sequences
+- 1 metadata-only scored mission row for Greenland ice/snow extent
 - 40 bounded Qwen/Ollama image calls
 - 6 bounded Qwen/Ollama temporal-sequence calls
 - 74 reused existing image tags
@@ -78,6 +84,7 @@ Latest replay-cache additions:
 - Kakhovka reservoir drawdown review, `flood_extent`, Sentinel-2 L2A true color.
 - Kilauea summit eruption review, `volcanic_surface_change`, Sentinel-2 L2A SWIR/NIR/Red.
 - Lake Mead shoreline recovery review, `flood_extent`, Sentinel-2 L2A true color.
+- Greenland ice/snow extent review, `ice_snow_extent`, Sentinel-2 L2A NDSI/SCL metadata-only replay. The legacy static Greenland WebM is intentionally not used as timelapse proof.
 
 Frame extraction now namespaces sampled frames by video SHA-256 so different `timelapse.webm` files cannot overwrite each other in the generated training folder.
 
@@ -91,6 +98,7 @@ from datasets import load_dataset
 assets = load_dataset("Shoozes/LFM-Orbit-SatData", split="train")
 temporal = load_dataset("Shoozes/LFM-Orbit-SatData", "temporal_sft", split="train")
 metadata = load_dataset("Shoozes/LFM-Orbit-SatData", "asset_metadata", split="train")
+missions = load_dataset("Shoozes/LFM-Orbit-SatData", "mission_metadata", split="train")
 ```
 
 For streaming:

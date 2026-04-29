@@ -295,7 +295,7 @@
       ]
     },
     "feature_group_dataset_export_and_eval_lane": {
-      "note": "Orbit dataset export, replay-cache export with frame-quality/rejected-window cloud metadata, bounded Qwen/Ollama asset retagging with deterministic fallback budgets, prior-tag reuse for already-tagged image hashes, frame-safe timelapse extraction namespaced by video SHA-256, optional Tkinter retag UI with HF upload controls, Hugging Face upload helper with successful publication to Shoozes/LFM-Orbit-SatData, viewer-safe dataset-card configs with replay-cache wording for mixed JSONL schemas, current cycle at 56 samples / 179 assets / 26 temporal sequences with Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead replay missions, and eval tooling, including recent alerts, weak rejects, cached API observations, persisted monitor-report JSON imports, deduplicated image/frame training assets, temporal sequence JSONL, and training JSONL generation.",
+      "note": "Orbit dataset export, replay-cache export with frame-quality/rejected-window cloud metadata, evidence-mode fields for runtime truth, imagery origin, and scoring basis, bounded Qwen/Ollama asset retagging with deterministic fallback budgets, prior-tag reuse for already-tagged image hashes, frame-safe timelapse extraction namespaced by video SHA-256, optional Tkinter retag UI with HF upload controls, Hugging Face upload helper with successful publication to Shoozes/LFM-Orbit-SatData, viewer-safe dataset-card configs with replay-cache wording for mixed JSONL schemas, current cycle at 56 samples / 179 assets / 26 temporal sequences plus mission_metadata=1 for metadata-only Greenland ice/snow extent, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead replay missions, ice/snow seeded-cache provenance fixtures, and eval tooling, including recent alerts, weak rejects, cached API observations, persisted monitor-report JSON imports, deduplicated image/frame training assets, temporal sequence JSONL, mission metadata JSONL, and training JSONL generation.",
       "files": [
         "docs/MODEL_HANDOFF.md",
         "docs/DATASET_CYCLE_TUTORIAL.md",
@@ -345,7 +345,7 @@
       ]
     },
     "feature_group_runtime_reset_and_replay_determinism": {
-      "note": "Deterministic runtime reset, replay hydration from cached real API imagery, dynamic cached-API Fast Replay catalog entries, rescan from saved replay metadata for current model/runtime checks, multi-mission replay packs, mission-specific replay actions, stricter observation readiness, cached-WebM integrity checks, and replay-backed demo/test helpers including visible tutorial and judge recordings.",
+      "note": "Deterministic runtime reset, replay hydration from cached real API imagery, dynamic cached-API Fast Replay catalog entries with structural WebM integrity gating, metadata-only replay support for valid scored evidence without video proof, rescan from saved replay metadata for current model/runtime checks, multi-mission replay packs, mission-specific replay actions, stricter observation readiness, cached-WebM integrity checks, and replay-backed demo/test helpers including visible tutorial and judge recordings.",
       "files": [
         "source/backend/api/main.py",
         "source/backend/core/observation_store.py",
@@ -368,6 +368,7 @@
         "source/backend/assets/replays/singapore_maritime_replay.json",
         "source/backend/assets/replays/georgia_wildfire_replay.json",
         "source/backend/assets/replays/delhi_urban_replay.json",
+        "source/backend/assets/replays/greenland_ice_snow_extent_replay.json",
         "source/backend/tests/test_seeded_timelapse_integrity.py",
         "source/frontend/e2e/demos/demoHelpers.ts"
       ]
@@ -526,11 +527,38 @@
       ]
     },
     "issue_group_spectral_band_contract": {
-      "note": "NDVI requires explicit NIR and Red bands; RGB-only, missing, or non-numeric spectral inputs return unavailable/abstain instead of fabricated index values.",
+      "note": "NDVI and NDSI require explicit spectral bands; RGB-only, missing, or non-numeric spectral inputs return unavailable/abstain instead of fabricated index values.",
       "files": [
         "source/backend/core/indices.py",
+        "source/backend/core/ice_snow_monitoring.py",
         "source/backend/tests/test_spectral_band_contract.py",
+        "source/backend/tests/test_ice_snow_monitoring.py",
         "docs/TODO.md"
+      ]
+    },
+    "feature_group_ice_snow_extent_monitoring": {
+      "note": "Ice/Snow Extent mission lane: Sentinel-2 L2A NDSI/SCL scoring, cloud/shadow/no-data rejection, water/ice ambiguity flags, multi-frame persistence gating, metadata-only Greenland replay, Ice/Snow UI preset, API score endpoint, and export/replay provenance propagation.",
+      "files": [
+        "README.md",
+        "docs/ARCHITECTURE.md",
+        "docs/JUDGE_DEMO.md",
+        "docs/MODEL_HANDOFF.md",
+        "docs/TODO.md",
+        "source/backend/core/ice_snow_monitoring.py",
+        "source/backend/core/indices.py",
+        "source/backend/core/temporal_use_cases.py",
+        "source/backend/api/main.py",
+        "source/backend/assets/replays/greenland_ice_snow_extent_replay.json",
+        "source/backend/scripts/export_orbit_dataset.py",
+        "source/backend/tests/test_ice_snow_monitoring.py",
+        "source/backend/tests/test_api.py",
+        "source/backend/tests/test_export_orbit_dataset.py",
+        "source/backend/tests/test_replay.py",
+        "source/backend/tests/test_spectral_band_contract.py",
+        "source/backend/tests/test_temporal_use_cases.py",
+        "source/frontend/components/MissionControl.tsx",
+        "source/frontend/e2e/monitor_features.spec.ts",
+        "source/backend/data/README.md"
       ]
     },
     "feature_group_wildfire_seed_and_future_watch": {
@@ -589,7 +617,7 @@
       ]
     },
     "issue_group_runtime_truth_provenance_and_modes": {
-      "note": "Current truth/provenance split: runtime_truth_mode distinguishes realtime, replay, fallback, and unknown; imagery_origin captures provider/source family; scoring_basis captures multispectral, proxy, visual-only, fallback-none, or unknown scoring. Replay means stored real API imagery with date/provenance; fallback means degraded runtime behavior and must not promote generated or forced positives. Frontend evidence labels now use cached-API replay wording consistently, and Judge Mode proof JSON carries explicit payload_accounting.",
+      "note": "Current truth/provenance split: runtime_truth_mode distinguishes realtime, replay, fallback, and unknown; imagery_origin captures provider/source family; scoring_basis captures multispectral, proxy, visual-only, fallback-none, or unknown scoring. Replay means stored real API imagery with date/provenance; fallback means degraded runtime behavior and must not promote generated or forced positives. Replay manifests and seeded-cache export preserve the evidence triplet, including multispectral ice/snow replay metadata. Frontend evidence labels now use cached-API replay wording consistently, and Judge Mode proof JSON carries explicit payload_accounting.",
       "files": [
         "README.md",
         "docs/ARCHITECTURE.md",
@@ -623,7 +651,8 @@
         "source/frontend/components/ValidationPanel.tsx",
         "source/frontend/e2e/tutorial_video.spec.ts",
         "source/backend/data/HF_DATASET_CARD.md",
-        "source/backend/scripts/export_orbit_dataset.py"
+        "source/backend/scripts/export_orbit_dataset.py",
+        "source/backend/assets/replays/greenland_ice_snow_extent_replay.json"
       ]
     }
   },

@@ -23,7 +23,7 @@ The backend runs two long-lived loops during app lifespan:
 1. `MissionControl.tsx` posts mission state to `/api/mission/start` and exposes one-click maritime/lifeline monitor preview cards.
 2. `api/main.py` boots `run_satellite_agent()` and `run_ground_agent()` during lifespan and exposes REST/WebSocket endpoints.
 3. `core/runtime_state.py` centralizes deterministic store initialization/reset so replay loading, backend tests, and Playwright demos all reset the same runtime surfaces.
-4. `core/temporal_use_cases.py` auto-classifies the mission into a temporal use case such as deforestation, wildfire, civilian lifeline disruption, maritime activity, or ice-cap growth.
+4. `core/temporal_use_cases.py` auto-classifies the mission into a temporal use case such as deforestation, wildfire, civilian lifeline disruption, maritime activity, ice/snow extent, or legacy ice-cap visual review.
 5. `core/lifeline_monitoring.py` validates before/after candidate schemas, preserves baseline/current frame metadata, and decides `discard`, `defer`, or `downlink_now` only after frame-pair integrity gates pass.
 6. `core/maritime_monitoring.py` adds deterministic maritime monitor reports, optional Element84 STAC metadata search, and N/E/S/W investigation planning.
 7. `core/grid.py` validates operator bboxes/cell IDs and generates the active square-grid scan geometry.
@@ -86,6 +86,8 @@ The backend runs two long-lived loops during app lifespan:
   Civilian lifeline before/after candidate validation, frame-pair preservation, distinct-frame downlink gating, eval metrics, and acceptance checks.
 - `source/backend/core/maritime_monitoring.py`
   Orbit-native maritime monitor report, optional Element84 Sentinel-2 STAC metadata search, and cardinal investigation planning.
+- `source/backend/core/ice_snow_monitoring.py`
+  Sentinel-2 L2A ice/snow extent scoring helpers. They compute NDSI, use SCL cloud/shadow/no-data rejection, preserve snow/ice SCL support, flag water/ice ambiguity, and require multi-frame persistence.
 - `source/backend/core/runtime_state.py`
   Deterministic runtime initialization/reset helper used by app boot, replay loading, and automated validation.
 - `source/backend/core/agent_bus.py`
@@ -180,7 +182,7 @@ The backend runs two long-lived loops during app lifespan:
 - Final safety net: local deterministic fallback data
 - Cold-start `.env.example` sets `DISABLE_EXTERNAL_APIS=true` so fresh installs do not depend on network credentials or realtime provider quota unless the operator opts in.
 - Direct Sentinel Hub credentials resolve from env first, then `.tools/.secrets/sentinel.txt`, then `.tools/.secrets/sh.txt`. The seeding path never logs credential values. `sh.txt` supports key/value fields, legacy two-line secret-then-id files, three-line trial bundles, and labeled local bundles such as `API`, `CLIENTID`, and `CLIENT`.
-- Current Sentinel-2 L2A replay cache includes Pakistan Manchar Lake flooding, Atacama mining, Greenland Ilulissat ice-edge, Suez maritime, Singapore Strait, Georgia wildfire candidate, Kansas crop phenology, Delhi urban expansion, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead WebMs in `source/backend/assets/seeded_data/`.
+- Current Sentinel-2 L2A replay cache includes Pakistan Manchar Lake flooding, Atacama mining, Suez maritime, Singapore Strait, Georgia wildfire candidate, Kansas crop phenology, Delhi urban expansion, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead WebMs in `source/backend/assets/seeded_data/`. The legacy Greenland ice-edge WebM is excluded from Fast Replay because it fails the structural timelapse-integrity gate. The first `ice_snow_extent` replay is metadata-scored and deliberately does not attach that static cache as timelapse proof.
 
 ### Runtime Truth and Provenance
 
@@ -191,6 +193,8 @@ Runtime evidence now carries three separate labels:
 - `scoring_basis`: `multispectral_bands`, `proxy_bands`, `visual_only`, `fallback_none`, or `unknown`.
 
 This keeps cached real API replay imagery distinct from degraded fallback behavior. It also prevents proxy scoring or VLM compatibility fallbacks from looking like realtime multispectral evidence.
+
+Cached replay imagery can still carry `scoring_basis=multispectral_bands` when the replay manifest includes precomputed band-derived metadata, as in the `ice_snow_extent` lane. In that case `runtime_truth_mode=replay` and `imagery_origin=cached_api` remain unchanged.
 
 ### Analysis Models
 
@@ -206,7 +210,7 @@ This keeps cached real API replay imagery distinct from degraded fallback behavi
 Current repo-wide validation results:
 
 - `uv sync --extra dev --locked` -> passing
-- `uv run --no-sync pytest -q` -> `289 passed`
+- `uv run --no-sync pytest -q` -> `299 passed`
 - `npm run lint` -> passing
 - `npm run build` -> passing, with split chunks and no large-chunk warning
 - `npx playwright test` -> `73 passed`, `1 skipped` debug-only HTML dump

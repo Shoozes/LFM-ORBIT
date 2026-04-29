@@ -86,7 +86,8 @@ Current high-quality replay assets:
 |---|---|---|
 | `flood_extent` | Pakistan Manchar Lake flood | `assets/seeded_data/sh_24541539.webm` |
 | `mining_expansion` | Atacama open-pit mining | `assets/seeded_data/sh_fbe644a9.webm` |
-| `ice_cap_growth` | Greenland Ilulissat ice edge | `assets/seeded_data/sh_cc0e95b7.webm` |
+| `ice_cap_growth` | Greenland Ilulissat ice edge abstain preview | Legacy static cache excluded from Fast Replay |
+| `ice_snow_extent` | Greenland ice/snow extent replay with NDSI/SCL metadata | Metadata-only curated replay until a refreshed contextual WebM is seeded |
 | `maritime_activity` | Suez maritime channel | `assets/seeded_data/sh_2d990c6b.webm` |
 | `maritime_activity` | Singapore Strait maritime anchorage | `assets/seeded_data/sh_99548137.webm` |
 | `wildfire` | Highway 82 Georgia wildfire candidate | `assets/seeded_data/sh_4015e8b8.webm` |
@@ -268,8 +269,8 @@ Current local packaging result after Sentinel demo seeding:
 
 - Dataset export: `56` current-cycle samples, `24` replay-cache rows, `25` rows with timelapse references, `2` wildfire rows, and `2` volcanic surface-change rows.
 - Retag output: `179` deduplicated training assets, `26` temporal sequences, `40` bounded Qwen/Ollama image calls, `6` bounded Qwen/Ollama sequence calls, `74` reused image tags, `9` skipped SVG placeholders, and `0` tagger failures.
-- Hugging Face dataset: `Shoozes/LFM-Orbit-SatData`, latest data commit `5a2798e7d16cd76df08eff3725dcf3ade9340b58`, latest card commit `60e8ae913f61315740a640c532eb1aa9ae7cfe75`.
-- Dataset Viewer schema note: upload `source/backend/data/HF_DATASET_CARD.md` as the Hub `README.md` so single-image SFT rows, temporal SFT rows, metadata, and review records load as separate configs instead of one mixed inferred JSON split.
+- Hugging Face dataset: `Shoozes/LFM-Orbit-SatData`, latest data/card commit `1ebd19065e8a8124372425c4c0df9c0332275c9c`, with `mission_metadata=1` for the metadata-only Greenland ice/snow extent replay.
+- Dataset Viewer schema note: upload `source/backend/data/HF_DATASET_CARD.md` as the Hub `README.md` so single-image SFT rows, temporal SFT rows, metadata, mission metadata, and review records load as separate configs instead of one mixed inferred JSON split.
 
 ## Optional Tkinter UI
 

@@ -43,6 +43,7 @@ from core.depth_anything import (
 from core.gallery import list_gallery, get_gallery_item
 from core.ground_agent import run_ground_agent
 from core.inference import model_status as llm_model_status
+from core.ice_snow_monitoring import score_ice_snow_extent
 from core.lifeline_monitoring import (
     build_lifeline_monitor_report,
     evaluate_lifeline_predictions,
@@ -385,6 +386,14 @@ class LifelineEvalBody(BaseModel):
     cases: list[dict[str, Any]] = Field(min_length=1, max_length=200)
 
 
+class IceSnowScoreBody(BaseModel):
+    frames: list[dict[str, Any]] = Field(min_length=1, max_length=120)
+    runtime_truth_mode: str = Field(default="replay", max_length=40)
+    imagery_origin: str = Field(default="cached_api", max_length=80)
+    observation_source: str = Field(default="seeded_sentinelhub_multispectral_replay", max_length=120)
+    min_accepted_frames: int = Field(default=3, ge=2, le=24)
+
+
 @app.get("/api/lifelines/assets")
 def lifeline_assets(category: str | None = None, region: str | None = None):
     """Return seeded civilian lifeline assets for before/after monitoring."""
@@ -412,6 +421,18 @@ def lifeline_monitor(body: LifelineMonitorBody):
 def lifeline_evaluate(body: LifelineEvalBody):
     """Evaluate lifeline candidate decisions against expected actions."""
     return evaluate_lifeline_predictions(body.cases)
+
+
+@app.post("/api/ice-snow/score")
+def ice_snow_score(body: IceSnowScoreBody):
+    """Score long-window ice/snow extent from Sentinel-2 L2A frame summaries."""
+    return score_ice_snow_extent(
+        body.frames,
+        runtime_truth_mode=body.runtime_truth_mode,
+        imagery_origin=body.imagery_origin,
+        observation_source=body.observation_source,
+        min_accepted_frames=body.min_accepted_frames,
+    )
 
 
 class MaritimeMonitorBody(BaseModel):

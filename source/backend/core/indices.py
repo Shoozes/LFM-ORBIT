@@ -9,6 +9,20 @@ def compute_ndvi(nir: float, red: float) -> float:
         return 0.0
     return (nir - red) / denominator
 
+def compute_ndsi(green: float, swir1: float) -> float:
+    """Normalized Difference Snow Index."""
+    denominator = green + swir1
+    if denominator <= 0:
+        return 0.0
+    return (green - swir1) / denominator
+
+def compute_ndwi(green: float, nir: float) -> float:
+    """Green/NIR Normalized Difference Water Index."""
+    denominator = green + nir
+    if denominator <= 0:
+        return 0.0
+    return (green - nir) / denominator
+
 def compute_ndvi_from_bands(bands: dict[str, Any]) -> dict[str, Any]:
     """Compute NDVI only when explicit NIR and Red bands are available."""
     if "nir" not in bands or "red" not in bands:
@@ -32,6 +46,32 @@ def compute_ndvi_from_bands(bands: dict[str, Any]) -> dict[str, Any]:
         "available": True,
         "abstain": False,
         "ndvi": compute_ndvi(nir, red),
+        "reason": "",
+    }
+
+def compute_ndsi_from_bands(bands: dict[str, Any]) -> dict[str, Any]:
+    """Compute NDSI only when explicit Green and SWIR1 bands are available."""
+    if "green" not in bands or "swir1" not in bands:
+        return {
+            "available": False,
+            "abstain": True,
+            "ndsi": None,
+            "reason": "NDSI requires explicit Green and SWIR1 bands.",
+        }
+    try:
+        green = float(bands["green"])
+        swir1 = float(bands["swir1"])
+    except (TypeError, ValueError):
+        return {
+            "available": False,
+            "abstain": True,
+            "ndsi": None,
+            "reason": "NDSI requires numeric Green and SWIR1 bands.",
+        }
+    return {
+        "available": True,
+        "abstain": False,
+        "ndsi": compute_ndsi(green, swir1),
         "reason": "",
     }
 

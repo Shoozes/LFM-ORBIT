@@ -8,6 +8,7 @@ def test_temporal_use_case_catalog_includes_required_examples():
         "wildfire",
         "maritime_activity",
         "civilian_lifeline_disruption",
+        "ice_snow_extent",
         "ice_cap_growth",
         "volcanic_surface_change",
     ):
@@ -33,6 +34,12 @@ def test_temporal_use_case_classifier_handles_mission_text():
         {
             "task_text": "Compare glacier and ice cap growth across same-season frames.",
             "reason_codes": ["ice_extent_growth", "albedo_change"],
+        }
+    )
+    ice_snow = classify_temporal_use_case(
+        {
+            "task_text": "Review Greenland snow versus clouds with Sentinel-2 L2A NDSI and SCL support.",
+            "reason_codes": ["ndsi_increase", "multi_frame_persistence", "cloud_rejected"],
         }
     )
     lifeline = classify_temporal_use_case(
@@ -68,6 +75,7 @@ def test_temporal_use_case_classifier_handles_mission_text():
     assert wildfire["id"] == "wildfire"
     assert maritime["id"] == "maritime_activity"
     assert ice["id"] == "ice_cap_growth"
+    assert ice_snow["id"] == "ice_snow_extent"
     assert lifeline["id"] == "civilian_lifeline_disruption"
     assert traffic["id"] == "civilian_lifeline_disruption"
     assert highway82_wildfire["id"] == "wildfire"

@@ -127,9 +127,8 @@ Dataset: [Shoozes/LFM-Orbit-SatData](https://huggingface.co/datasets/Shoozes/LFM
 
 Current refresh:
 
-- Data commit: `5a2798e7d16cd76df08eff3725dcf3ade9340b58`
-- Card commit: `60e8ae913f61315740a640c532eb1aa9ae7cfe75`
-- Remote config verification: `default=179`, `temporal_sft=26`, `asset_metadata=179`, `retagged_assets=179`, `temporal_metadata=26`, `review_queue=179`
+- Data/card commit: `1ebd19065e8a8124372425c4c0df9c0332275c9c`
+- Remote config verification: `default=179`, `temporal_sft=26`, `asset_metadata=179`, `retagged_assets=179`, `temporal_metadata=26`, `review_queue=179`, `mission_metadata=1`
 
 The Hub card keeps schemas separate:
 
@@ -141,3 +140,4 @@ The Hub card keeps schemas separate:
 | `retagged_assets` | `retagged_assets.jsonl` |
 | `temporal_metadata` | `temporal_sequences.jsonl` |
 | `review_queue` | `review_queue.jsonl` |
+| `mission_metadata` | `mission_metadata.jsonl` |

@@ -22,6 +22,7 @@ from core.runtime_state import reset_runtime_state
 
 _REPLAYS_DIR = Path(__file__).resolve().parent.parent / "assets" / "replays"
 _SEEDED_DIR = Path(__file__).resolve().parent.parent / "assets" / "seeded_data"
+_SEEDED_WEBM_INTEGRITY_CACHE: dict[str, bool] = {}
 
 
 def _now() -> str:
@@ -48,12 +49,52 @@ def _seeded_replay_id(signature: str) -> str:
     return f"seeded_cache_sh_{signature}"
 
 
+def _seeded_webm_has_contextual_change(path: Path) -> bool:
+    """Return True when a cached WebM has structural frame change."""
+    cache_key = str(path.resolve())
+    if cache_key in _SEEDED_WEBM_INTEGRITY_CACHE:
+        return _SEEDED_WEBM_INTEGRITY_CACHE[cache_key]
+    try:
+        import imageio.v3 as iio
+        import numpy as np
+        from PIL import Image
+
+        first_frame = None
+        last_frame = None
+        frame_count = 0
+        for frame in iio.imiter(path, plugin="pyav"):
+            if first_frame is None:
+                first_frame = frame
+            last_frame = frame
+            frame_count += 1
+        if frame_count < 2 or first_frame is None or last_frame is None:
+            _SEEDED_WEBM_INTEGRITY_CACHE[cache_key] = False
+            return False
+
+        def edge_map(frame: Any) -> Any:
+            img = Image.fromarray(frame).convert("L").resize((96, 72))
+            arr = np.asarray(img, dtype=np.float32) / 255.0
+            gx = np.abs(arr[:, 1:] - arr[:, :-1])
+            gy = np.abs(arr[1:, :] - arr[:-1, :])
+            return gx[:71, :95] + gy[:71, :95]
+
+        edge_diff = float(np.mean(np.abs(edge_map(first_frame) - edge_map(last_frame))))
+        accepted = edge_diff > 0.02
+        _SEEDED_WEBM_INTEGRITY_CACHE[cache_key] = accepted
+        return accepted
+    except Exception:
+        _SEEDED_WEBM_INTEGRITY_CACHE[cache_key] = False
+        return False
+
+
 def _seeded_meta_to_replay_spec(path: Path) -> dict[str, Any] | None:
     data = _load_json(path)
     signature = str(data.get("chunk_signature") or path.stem.removeprefix("sh_").removesuffix("_meta"))
     asset_key = f"sh_{signature}"
     webm_path = _SEEDED_DIR / f"{asset_key}.webm"
     if not webm_path.exists():
+        return None
+    if not _seeded_webm_has_contextual_change(webm_path):
         return None
     frames_count = int(data.get("frames_count") or 0)
     if frames_count < 2:
@@ -72,6 +113,9 @@ def _seeded_meta_to_replay_spec(path: Path) -> dict[str, Any] | None:
     before_label = frame_dates[0] if frame_dates else str(data.get("start_date") or "baseline")
     after_label = frame_dates[-1] if frame_dates else str(data.get("end_date") or "current")
     source = str(data.get("source") or "seeded_sentinelhub_replay")
+    runtime_truth_mode = str(data.get("runtime_truth_mode") or "replay")
+    imagery_origin = str(data.get("imagery_origin") or "cached_api")
+    scoring_basis = str(data.get("scoring_basis") or "visual_only")
     summary = (
         f"Fast replay generated from replay cache {asset_key}: {frames_count} cloud-gated frames "
         f"for {target_category.replace('_', ' ')}."
@@ -90,6 +134,9 @@ def _seeded_meta_to_replay_spec(path: Path) -> dict[str, Any] | None:
         "start_date": data.get("start_date"),
         "end_date": data.get("end_date"),
         "use_case_id": use_case_id,
+        "runtime_truth_mode": runtime_truth_mode,
+        "imagery_origin": imagery_origin,
+        "scoring_basis": scoring_basis,
         "cells_scanned": 1,
         "flags_found": 1,
         "primary_cell_id": f"seeded_{signature}",
@@ -105,6 +152,9 @@ def _seeded_meta_to_replay_spec(path: Path) -> dict[str, Any] | None:
                 "priority": "review",
                 "reason_codes": ["seeded_data", "training_ready", use_case_id],
                 "observation_source": "seeded_sentinelhub_replay",
+                "runtime_truth_mode": runtime_truth_mode,
+                "imagery_origin": imagery_origin,
+                "scoring_basis": scoring_basis,
                 "before_window": {"label": before_label},
                 "after_window": {"label": after_label},
                 "timelapse_analysis": str(data.get("vlm_explanation") or summary),
@@ -154,6 +204,7 @@ def list_seeded_replays() -> list[dict[str, Any]]:
                 "bbox": data.get("bbox"),
                 "start_date": data.get("start_date"),
                 "end_date": data.get("end_date"),
+                "use_case_id": data.get("use_case_id"),
                 "cells_scanned": int(data.get("cells_scanned") or 0),
                 "flags_found": int(data.get("flags_found") or len(alerts)),
                 "primary_cell_id": primary_cell_id,
@@ -229,6 +280,14 @@ def _alert_payload_bytes(alert: dict[str, Any]) -> int:
     return estimate_payload_bytes(payload)
 
 
+def _alert_runtime_metadata(spec: dict[str, Any], alert: dict[str, Any]) -> dict[str, str]:
+    return {
+        "runtime_truth_mode": str(alert.get("runtime_truth_mode") or spec.get("runtime_truth_mode") or "replay"),
+        "imagery_origin": str(alert.get("imagery_origin") or spec.get("imagery_origin") or "cached_api"),
+        "scoring_basis": str(alert.get("scoring_basis") or spec.get("scoring_basis") or "visual_only"),
+    }
+
+
 def _seed_metrics(spec: dict[str, Any], alerts: list[dict[str, Any]]) -> dict[str, Any]:
     total_payload_bytes = sum(_alert_payload_bytes(alert) for alert in alerts)
     cells_scanned = int(spec.get("cells_scanned") or len(alerts))
@@ -237,6 +296,7 @@ def _seed_metrics(spec: dict[str, Any], alerts: list[dict[str, Any]]) -> dict[st
     timestamp = _now()
     flagged_examples = [
         {
+            **_alert_runtime_metadata(spec, alert),
             "event_id": str(alert["event_id"]),
             "cell_id": str(alert["cell_id"]),
             "cycle_index": 1,
@@ -247,19 +307,15 @@ def _seed_metrics(spec: dict[str, Any], alerts: list[dict[str, Any]]) -> dict[st
             "payload_bytes": _alert_payload_bytes(alert),
             "timestamp": timestamp,
             "demo_forced_anomaly": False,
-            "runtime_truth_mode": "replay",
-            "imagery_origin": "cached_api",
-            "scoring_basis": "visual_only",
         }
         for alert in alerts[:5]
     ]
+    runtime_metadata = _alert_runtime_metadata(spec, alerts[0] if alerts else {})
     metrics = {
         "region_id": "replay",
         "demo_mode_enabled": False,
         "demo_mode_loop_scan": False,
-        "runtime_truth_mode": "replay",
-        "imagery_origin": "cached_api",
-        "scoring_basis": "visual_only",
+        **runtime_metadata,
         "total_cycles_completed": 1,
         "total_cells_scanned": cells_scanned,
         "total_alerts_emitted": alerts_found,
@@ -296,6 +352,7 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
         mission_mode="replay",
         replay_id=replay_id,
         summary=str(spec.get("summary") or spec.get("description") or ""),
+        use_case_id=str(spec.get("use_case_id") or "") or None,
     )
     mission_id = int(mission["id"])
 
@@ -323,6 +380,7 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
 
     for alert in alerts:
         alert_payload_bytes = _alert_payload_bytes(alert)
+        runtime_metadata = _alert_runtime_metadata(spec, alert)
         push_alert(
             event_id=str(alert["event_id"]),
             region_id="replay",
@@ -333,17 +391,17 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
             reason_codes=list(alert.get("reason_codes") or []),
             payload_bytes=alert_payload_bytes,
             observation_source=str(alert.get("observation_source") or "replay"),
-            runtime_truth_mode="replay",
-            imagery_origin="cached_api",
-            scoring_basis="visual_only",
+            runtime_truth_mode=runtime_metadata["runtime_truth_mode"],
+            imagery_origin=runtime_metadata["imagery_origin"],
+            scoring_basis=runtime_metadata["scoring_basis"],
             before_window=dict(alert.get("before_window") or {}),
             after_window=dict(alert.get("after_window") or {}),
             downlinked=True,
         )
 
-        seeded_video = str(alert["seeded_video"])
-        video_b64 = _seeded_video_data_url(seeded_video)
-        thumb = resolve_seeded_thumbnail(_seeded_signature(seeded_video))
+        seeded_video = str(alert.get("seeded_video") or "").strip()
+        video_b64 = _seeded_video_data_url(seeded_video) if seeded_video else None
+        thumb = resolve_seeded_thumbnail(_seeded_signature(seeded_video)) if seeded_video else None
         add_gallery_item(
             cell_id=str(alert["cell_id"]),
             lat=float(alert["lat"]),
@@ -356,7 +414,7 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
             timelapse_analysis=str(alert.get("timelapse_analysis") or ""),
             context_thumb=thumb,
             context_thumb_source="seeded_cache" if thumb else None,
-            timelapse_source="replay",
+            timelapse_source="replay" if video_b64 else None,
         )
 
         upsert_pin(
@@ -389,9 +447,9 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
                 "confidence": float(alert["confidence"]),
                 "reason_codes": list(alert.get("reason_codes") or []),
                 "observation_source": str(alert.get("observation_source") or "replay"),
-                "runtime_truth_mode": "replay",
-                "imagery_origin": "cached_api",
-                "scoring_basis": "visual_only",
+                "runtime_truth_mode": runtime_metadata["runtime_truth_mode"],
+                "imagery_origin": runtime_metadata["imagery_origin"],
+                "scoring_basis": runtime_metadata["scoring_basis"],
                 "before_window": dict(alert.get("before_window") or {}),
                 "after_window": dict(alert.get("after_window") or {}),
             },

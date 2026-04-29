@@ -1,0 +1,102 @@
+{
+  "replay_id": "greenland_ice_snow_extent_replay",
+  "source_kind": "curated_replay",
+  "title": "Greenland Ice/Snow Extent Replay",
+  "description": "Sentinel-2 L2A cached API replay for long-window Greenland snow/ice extent review with NDSI, SCL support, and cloud rejection metadata.",
+  "summary": "Replay uses cached real Sentinel Hub imagery plus precomputed multispectral snow/ice scoring metadata. RGB alone is not used for the extent conclusion.",
+  "task_text": "Review Greenland edge snow and ice extent using NDSI, SCL cloud rejection, and multi-frame persistence before any extent-change label.",
+  "bbox": [-51.13, 69.1, -50.97, 69.26],
+  "start_date": "2024-01-15",
+  "end_date": "2025-12-15",
+  "use_case_id": "ice_snow_extent",
+  "runtime_truth_mode": "replay",
+  "imagery_origin": "cached_api",
+  "scoring_basis": "multispectral_bands",
+  "cells_scanned": 1,
+  "flags_found": 1,
+  "primary_cell_id": "greenland_ice_snow_extent",
+  "alerts": [
+    {
+      "event_id": "replay_greenland_ice_snow_extent",
+      "cell_id": "greenland_ice_snow_extent",
+      "lat": 69.18,
+      "lng": -51.05,
+      "change_score": 0.57,
+      "confidence": 0.78,
+      "priority": "medium",
+      "reason_codes": [
+        "ndsi_increase",
+        "multi_frame_persistence",
+        "cloud_rejected",
+        "snow_ice_scl_support"
+      ],
+      "observation_source": "seeded_sentinelhub_multispectral_replay",
+      "runtime_truth_mode": "replay",
+      "imagery_origin": "cached_api",
+      "scoring_basis": "multispectral_bands",
+      "before_window": {
+        "label": "2024 accepted-frame baseline",
+        "quality": 0.9,
+        "green": 0.66,
+        "nir": 0.49,
+        "swir1": 0.24,
+        "ndsi": 0.467,
+        "ndwi": 0.148,
+        "snow_ice_ratio": 0.42,
+        "snow_ice_scl_ratio": 0.31,
+        "flags": [
+          "sentinel2_l2a",
+          "ndsi_scored",
+          "scl_cloud_rejected"
+        ]
+      },
+      "after_window": {
+        "label": "2025 accepted-frame current",
+        "quality": 0.88,
+        "green": 0.73,
+        "nir": 0.52,
+        "swir1": 0.20,
+        "ndsi": 0.57,
+        "ndwi": 0.168,
+        "snow_ice_ratio": 0.57,
+        "snow_ice_scl_ratio": 0.39,
+        "flags": [
+          "sentinel2_l2a",
+          "ndsi_scored",
+          "scl_cloud_rejected"
+        ]
+      },
+      "ice_snow_score": {
+        "runtime_truth_mode": "replay",
+        "imagery_origin": "cached_api",
+        "scoring_basis": "multispectral_bands",
+        "use_case": "ice_snow_extent",
+        "date_range": {
+          "start": "2024-01-15",
+          "end": "2025-12-15"
+        },
+        "accepted_frames": 14,
+        "rejected_cloud_frames": 5,
+        "baseline_snow_ice_ratio": 0.42,
+        "current_snow_ice_ratio": 0.57,
+        "delta_ratio": 0.15,
+        "reason_codes": [
+          "ndsi_increase",
+          "multi_frame_persistence",
+          "cloud_rejected",
+          "snow_ice_scl_support"
+        ]
+      },
+      "timelapse_analysis": "The existing Greenland WebM cache is intentionally not attached as timelapse proof because the integrity guard classifies it as structurally static. This replay starts the multispectral evidence lane with precomputed Green, SWIR1, NIR, and SCL metadata until a refreshed contextual sequence is seeded.",
+      "analysis_summary": "NDSI-supported snow/ice extent increased across accepted frames; cloud/SCL rejection prevents a visual-only snow-versus-cloud claim.",
+      "satellite_note": "SAT emitted compact ice/snow extent metadata: accepted frame dates, NDSI trend, snow/ice ratio delta, rejected cloud count, and provenance.",
+      "ground_note": "GND should review the cached replay and treat the result as cryosphere extent evidence, not an RGB-only ice-growth conclusion.",
+      "findings": [
+        "14 accepted Sentinel-2 L2A frames",
+        "5 cloudy/SCL-invalid frames rejected",
+        "NDSI and SCL support snow/ice persistence",
+        "scoring_basis=multispectral_bands"
+      ]
+    }
+  ]
+}

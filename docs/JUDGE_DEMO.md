@@ -105,5 +105,6 @@ Current cached Sentinel-2 replay assets:
 |---|---|---|
 | Payload Reduction | `flood_extent` | `source/backend/assets/seeded_data/sh_24541539.webm` |
 | Provenance | `mining_expansion` | `source/backend/assets/seeded_data/sh_fbe644a9.webm` |
-| Greenland Abstain Safety | `ice_cap_growth` | `source/backend/assets/seeded_data/sh_cc0e95b7.webm` |
+| Greenland Abstain Safety | `ice_cap_growth` | Local static preview; static WebM is excluded from Fast Replay |
+| Greenland Ice/Snow Extent | `ice_snow_extent` | Metadata-only curated replay until a refreshed contextual WebM is seeded |
 | Suez Maritime Eclipse | `maritime_activity` | `source/backend/assets/seeded_data/sh_2d990c6b.webm` |
