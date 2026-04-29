@@ -57,7 +57,7 @@ npm run demo:record
   </tr>
 </table>
 
-## What Judges Should Notice
+## What Users Notice
 
 | Area | What is shown |
 |---|---|
