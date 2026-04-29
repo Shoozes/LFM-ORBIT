@@ -72,14 +72,14 @@
       ]
     },
     "docs_model_runtime_and_handoff": {
-      "note": "Supplemental model and fine-tuning handoff docs. README remains judge-facing; ARCHITECTURE, TODO, and handoff docs carry implementation detail.",
+      "note": "Supplemental model and fine-tuning handoff docs. README remains judge-facing; ARCHITECTURE, TODO, and handoff docs carry implementation detail. NM-UNI is the external dataset-import, training, GGUF quantization, model-bundle staging, and optional Hugging Face model-publish lane; Orbit consumes the resulting orbit_model_handoff.json.",
       "files": [
         "docs/MODEL_HANDOFF.md",
         "docs/FINE_TUNING_PLAN.md"
       ]
     },
     "issue_group_import_contracts_and_env_resilience": {
-      "note": "Repo integrity guardrails for broken backend imports/exports, seed/GEE/debug entrypoints, safe local credential discovery including labeled Sentinel Hub trial bundles, malformed local environment overrides, and offline-safe cold-start defaults.",
+      "note": "Repo integrity guardrails for broken backend imports/exports, seed/GEE/debug entrypoints, DPhi SimSat-first cold-start defaults, safe optional local credential discovery including labeled Sentinel Hub trial bundles, malformed local environment overrides, and offline-safe fallback behavior.",
       "files": [
         ".env.example",
         "run.ps1",
@@ -92,6 +92,7 @@
         "source/backend/scripts/gee_auth.py",
         "source/backend/scripts/seed_nasa_cache.py",
         "source/backend/scripts/seed_sentinel_cache.py",
+        "source/backend/scripts/smoke_satellite_model.py",
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_import_contracts.py",
         "source/backend/tests/test_satellite_debug.py",
@@ -283,19 +284,20 @@
       ]
     },
     "feature_group_model_runtime_and_handoff": {
-      "note": "Manifest-based satellite artifact resolution, runtime status exposure, nested fenced JSON tool-call parsing, and model fetch handoff tooling.",
+      "note": "Manifest-based satellite artifact resolution, runtime status exposure, nested fenced JSON tool-call parsing, model fetch handoff tooling, and an optional model-present smoke script for fetched NM-UNI GGUF bundles.",
       "files": [
         "source/backend/api/main.py",
         "source/backend/core/inference.py",
         "source/backend/core/model_manifest.py",
         "source/backend/scripts/fetch_satellite_model.py",
+        "source/backend/scripts/smoke_satellite_model.py",
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_inference.py",
         "source/backend/tests/test_model_manifest.py"
       ]
     },
     "feature_group_dataset_export_and_eval_lane": {
-      "note": "Orbit dataset export, replay-cache export with frame-quality/rejected-window cloud metadata, evidence-mode fields for runtime truth, imagery origin, and scoring basis, bounded Qwen/Ollama asset retagging with deterministic fallback budgets, prior-tag reuse for already-tagged image hashes, frame-safe timelapse extraction namespaced by video SHA-256, optional Tkinter retag UI with HF upload controls, Hugging Face upload helper with successful publication to Shoozes/LFM-Orbit-SatData, viewer-safe dataset-card configs with replay-cache wording for mixed JSONL schemas, current cycle at 56 samples / 179 assets / 26 temporal sequences plus mission_metadata=1 for metadata-only Greenland ice/snow extent, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead replay missions, ice/snow seeded-cache provenance fixtures, and eval tooling, including recent alerts, weak rejects, cached API observations, persisted monitor-report JSON imports, deduplicated image/frame training assets, temporal sequence JSONL, mission metadata JSONL, and training JSONL generation.",
+      "note": "Orbit dataset export, replay-cache export with frame-quality/rejected-window cloud metadata, evidence-mode fields for runtime truth, imagery origin, and scoring basis, orbit_training_contract_v1 metadata for NM-UNI import/review/localization, SVG fallback rasterization to PNG before retagging, bounded Qwen/Ollama asset retagging with deterministic fallback budgets, prior-tag reuse for already-tagged image hashes, frame-safe timelapse extraction namespaced by video SHA-256, optional Tkinter retag UI with HF upload controls, Hugging Face upload helper with successful publication to Shoozes/LFM-Orbit-SatData, viewer-safe dataset-card configs with replay-cache wording for mixed JSONL schemas, current cycle at 56 samples / 179 assets / 26 temporal sequences plus mission_metadata=1 for metadata-only Greenland ice/snow extent, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead replay missions, ice/snow seeded-cache provenance fixtures, and eval tooling now including orbit_eval_v2 baseline-vs-candidate comparison and promotion.json artifacts.",
       "files": [
         "docs/MODEL_HANDOFF.md",
         "docs/DATASET_CYCLE_TUTORIAL.md",
@@ -307,6 +309,7 @@
         "source/backend/scripts/retag_training_assets_ui.py",
         "source/backend/scripts/upload_orbit_dataset_hf.py",
         "source/backend/scripts/evaluate_model.py",
+        "source/backend/core/monitor_reports.py",
         "source/backend/assets/seeded_data/sh_8342a218.webm",
         "source/backend/assets/seeded_data/sh_8342a218_meta.json",
         "source/backend/assets/seeded_data/sh_f03170dc.webm",
@@ -335,21 +338,25 @@
       ]
     },
     "issue_group_monitor_report_dataset_bridge": {
-      "note": "Optional import path for persisted maritime/lifeline monitor reports so STAC metadata and before/after candidates can flow into dataset exports.",
+      "note": "API-generated maritime/lifeline monitor reports are persisted under runtime-data/monitor-reports and can be imported into dataset exports so STAC metadata and before/after candidates flow into training rows.",
       "files": [
         "README.md",
         "docs/TODO.md",
         "docs/MODEL_HANDOFF.md",
+        "source/backend/api/main.py",
+        "source/backend/core/monitor_reports.py",
         "source/backend/scripts/export_orbit_dataset.py",
+        "source/backend/tests/test_api.py",
         "source/backend/tests/test_export_orbit_dataset.py"
       ]
     },
     "feature_group_runtime_reset_and_replay_determinism": {
-      "note": "Deterministic runtime reset, replay hydration from cached real API imagery, dynamic cached-API Fast Replay catalog entries with structural WebM integrity gating, metadata-only replay support for valid scored evidence without video proof, rescan from saved replay metadata for current model/runtime checks, multi-mission replay packs, mission-specific replay actions, stricter observation readiness, cached-WebM integrity checks, and replay-backed demo/test helpers including visible tutorial and judge recordings.",
+      "note": "Deterministic runtime reset, replay hydration from cached real API imagery, dynamic cached-API Fast Replay catalog entries with structural WebM integrity gating, metadata-only replay support for valid scored evidence without video proof, rescan from saved replay metadata for current model/runtime checks, portable replay snapshot export/import for completed runtime surfaces, multi-mission replay packs, mission-specific replay actions, stricter observation readiness, cached-WebM integrity checks, and replay-backed demo/test helpers including visible tutorial and judge recordings.",
       "files": [
         "source/backend/api/main.py",
         "source/backend/core/observation_store.py",
         "source/backend/core/replay.py",
+        "source/backend/core/replay_snapshot.py",
         "source/backend/core/runtime_state.py",
         "source/frontend/App.tsx",
         "source/frontend/components/MissionControl.tsx",
@@ -397,7 +404,7 @@
       ]
     },
     "feature_group_provider_pipeline_and_seed_scripts": {
-      "note": "Provider resolution, offline-safe cold-start defaults, SimSat Sentinel/Mapbox routing, Sentinel Hub secret-file compatibility including current labeled sh.txt shape, fallback order, cached real API replay assets, event-window Sentinel seeding, SCL-gated frame rejection, burn-scar visual composites, observation-record integrity, and debug diagnostics for safe fallback paths.",
+      "note": "Provider resolution, offline-safe cold-start defaults, DPhi SimSat Sentinel as the hackathon primary lane, optional SimSat Mapbox routing, optional Sentinel Hub secret-file compatibility including current labeled sh.txt shape, fallback order, cached real API replay assets, optional event-window Sentinel seeding for development, SCL-gated frame rejection where metadata exists, burn-scar visual composites, observation-record integrity, and debug diagnostics for safe fallback paths.",
       "files": [
         ".env.example",
         "source/backend/test_evalscript.py",
@@ -537,7 +544,7 @@
       ]
     },
     "feature_group_ice_snow_extent_monitoring": {
-      "note": "Ice/Snow Extent mission lane: Sentinel-2 L2A NDSI/SCL scoring, cloud/shadow/no-data rejection, water/ice ambiguity flags, multi-frame persistence gating, metadata-only Greenland replay, Ice/Snow UI preset, API score endpoint, and export/replay provenance propagation.",
+      "note": "Ice/Snow Extent mission lane: optional cached Sentinel-2 L2A NDSI/SCL metadata scoring, cloud/shadow/no-data rejection, water/ice ambiguity flags, multi-frame persistence gating, metadata-only Greenland replay, Ice/Snow UI preset, API score endpoint, and export/replay provenance propagation without making Sentinel Hub a judge dependency.",
       "files": [
         "README.md",
         "docs/ARCHITECTURE.md",

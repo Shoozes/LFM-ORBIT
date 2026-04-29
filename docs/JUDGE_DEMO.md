@@ -2,6 +2,8 @@
 
 This is the recorded proof path for the Liquid AI x DPhi Space Hackathon submission.
 
+The hackathon integration target is DPhi Space SimSat. The judge proof does not require Sentinel Hub credentials; bundled replay fixtures and SimSat-first runtime defaults keep the demo deterministic and quota-free.
+
 Run the main recorded proof:
 
 ```bash
@@ -66,7 +68,7 @@ Current mission split:
 
 The tutorial walkthrough uses the app like an operator: load the Singapore maritime replay, inspect and analyze the retained alert, replace it with the Atacama mining replay, inspect that alert, then open Judge Mode on the active replay. The current recorded file is about 28 seconds and has distinct sampled frames across mission catalog, maritime evidence, Atacama evidence, and proof panel views.
 
-Replay-backed Judge Mode can now keep the active replay instead of forcing Rondonia, so mission-specific proof copy stays attached to maritime, mining, flood, wildfire, and urban replay packs. Mission-preset demos use visible Sentinel-2 L2A frames and explicitly reject invalid still-image color-shift timelapses. Their real monthly WebMs are kept in the legacy `source/backend/assets/seeded_data/` cache for dataset export and training.
+Replay-backed Judge Mode can now keep the active replay instead of forcing Rondonia, so mission-specific proof copy stays attached to maritime, mining, flood, wildfire, and urban replay packs. Some development replay fixtures use visible Sentinel-2 L2A frames and explicitly reject invalid still-image color-shift timelapses. Their real monthly WebMs are kept in the legacy `source/backend/assets/seeded_data/` cache for dataset export and training, but they are not a Sentinel Hub dependency for judges.
 
 Replay WebMs may include cloudy context frames, but the proof panel keeps playback inside a clearer evidence window for final screenshots. Cloudy/no-data frames remain quality-gated in seeded creation and do not become positive detections.
 
@@ -74,7 +76,7 @@ Each recorded demo also saves `evidence-frame.png` beside `final-screen.png` and
 
 Recorded demos preload their target mission or replay before the browser connects to telemetry. Demo config also disables the boot-time live agent pair, so recordings should not open on the legacy Amazonas sweep.
 
-Cloud policy: cloudy or no-data Sentinel windows are not allowed to become positive detections. The backend quality gate records SCL cloud/no-data ratios, replay-cache creation skips cloudy frames, and the scanner emits no-transmit quality-gate results when cloud cover blocks evidence.
+Cloud policy: cloudy or no-data windows are not allowed to become positive detections. When SCL metadata is available, the backend quality gate records cloud/no-data ratios, replay-cache creation skips cloudy frames, and the scanner emits no-transmit quality-gate results when cloud cover blocks evidence.
 
 Refresh the tutorial video:
 
@@ -82,14 +84,14 @@ Refresh the tutorial video:
 npm run demo:tutorial
 ```
 
-Refresh high-quality Sentinel Hub replay cache after adding OAuth credentials:
+Optional development only: refresh high-quality Sentinel Hub replay cache after adding OAuth credentials:
 
 ```bash
 cd source/backend
 uv run --no-sync python scripts/seed_sentinel_cache.py --target rondoniaWS --grid 3 --cell-dim 0.05 --start 2023-01 --end 2025-01 --force --skip-vlm-metadata
 ```
 
-Credentials can come from environment variables, `.tools/.secrets/sentinel.txt`, or `.tools/.secrets/sh.txt`. The Process API path needs an OAuth client id and client secret, either as `SH_CLIENT_ID`/`SH_CLIENT_SECRET` assignments or the legacy two-line secret-then-id format. A single OGC/WMS instance id is only usable if its `GetCapabilities` endpoint is valid; it is not enough for Process API seeding.
+This is useful for local real-data testing and dataset refreshes. It is not part of the DPhi SimSat judge path. Credentials can come from environment variables, `.tools/.secrets/sentinel.txt`, or `.tools/.secrets/sh.txt`. The Process API path needs an OAuth client id and client secret, either as `SH_CLIENT_ID`/`SH_CLIENT_SECRET` assignments or the legacy two-line secret-then-id format. A single OGC/WMS instance id is only usable if its `GetCapabilities` endpoint is valid; it is not enough for Process API seeding.
 
 The current local `sh.txt` label format is also supported:
 
@@ -99,7 +101,7 @@ CLIENTID <oauth-client-id>
 CLIENT <oauth-client-secret>
 ```
 
-Current cached Sentinel-2 replay assets:
+Current cached development replay assets:
 
 | Demo | Use case | WebM |
 |---|---|---|

@@ -28,7 +28,7 @@ The backend runs two long-lived loops during app lifespan:
 6. `core/maritime_monitoring.py` adds deterministic maritime monitor reports, optional Element84 STAC metadata search, and N/E/S/W investigation planning.
 7. `core/grid.py` validates operator bboxes/cell IDs and generates the active square-grid scan geometry.
 8. `core/depth_anything.py` exposes optional Depth Anything V3 status, runtime toggling, and compact depth-summary inference without making DA3 a required dependency.
-9. `core/loader.py` resolves observations from the configured provider chain, including optional SimSat Mapbox, and caches by provider plus date-window labels.
+9. `core/loader.py` resolves observations from the configured provider chain, with DPhi SimSat as the hackathon path, and caches by provider plus date-window labels.
 10. `core/paths.py` centralizes repo-root runtime-data/model/boundary paths so cache and model resolution do not drift with working directory.
 11. `core/model_manifest.py` resolves the optional satellite artifact from a runtime manifest plus environment overrides.
 12. `core/scene_qc.py` rejects unusable scenes before scoring.
@@ -36,7 +36,7 @@ The backend runs two long-lived loops during app lifespan:
 14. `core/overlays/attribution.py` adds governance/boundary context when available.
 15. `core/telemetry.py` emits typed `scan_result` payloads defined in `core/contracts.py`.
 16. `core/queue.py` persists confirmed alerts for `Logs`, `Inspect`, and recent-alert APIs.
-17. `core/gallery.py` expands confirmed alerts into imagery/timelapse evidence and now reuses local replay cache imagery for thumbnail fallback before dropping to SVG-only offline chips.
+17. `core/gallery.py` expands confirmed alerts into imagery/timelapse evidence and now reuses local replay cache imagery for thumbnail fallback before dropping to offline chips; dataset export rasterizes SVG fallbacks to PNG.
 18. `core/replay.py` can reset runtime state and load a completed mission directly into the same mission, queue, gallery, metrics, and dialogue stores used by realtime operations. It also exposes cached API WebMs as Fast Replay entries and can rescan replay metadata through the current runtime/model stack.
 19. `ValidationPanel.tsx`, `TimelapseViewer.tsx`, and `VlmPanel.tsx` expand a selected alert into imagery, analysis, exports, and timelapse context. Mission-tab timelapse output renders ahead of VLM actions so active temporal video evidence remains visible.
 20. `SettingsPanel.tsx` queries provider, SimSat, analysis, and depth status endpoints independently, with short retries so one transient miss does not force a false offline settings surface.
@@ -96,6 +96,10 @@ The backend runs two long-lived loops during app lifespan:
   Ground-confirmed imagery/timelapse evidence store.
 - `source/backend/core/replay.py`
   Replay catalog/loading path that hydrates the existing runtime tables for judge walkthroughs and fixture-driven demos, dynamically catalogs valid cached API WebMs, and starts realtime rescans from replay metadata.
+- `source/backend/core/replay_snapshot.py`
+  Portable runtime snapshot export/import for completed missions. It packages mission, alert, gallery, pin, dialogue, and metrics surfaces without changing the bundled replay manifest format.
+- `source/backend/core/monitor_reports.py`
+  Runtime persistence helper for API-generated maritime and lifeline monitor reports under `runtime-data/monitor-reports/`.
 - `source/backend/core/timelapse.py`
   Temporal frame generation and video assembly; `steps` caps provider frame fetches for long windows.
 - `source/backend/core/vlm.py`
@@ -113,9 +117,11 @@ The backend runs two long-lived loops during app lifespan:
 - `source/backend/scripts/upload_orbit_dataset_hf.py`
   Hugging Face dataset upload helper for exported or retagged dataset folders. It resolves `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or `.tools/.secrets/hf.txt` without printing token values.
 - `source/backend/scripts/evaluate_model.py`
-  First-pass baseline eval harness that replays exported samples through the offline analyzer and writes eval artifacts.
+  Eval harness that replays exported samples through the offline analyzer, writes `orbit_eval_v2` artifacts, compares baseline vs candidate summaries, and emits promotion decisions.
+- `source/backend/scripts/smoke_satellite_model.py`
+  Optional model-present smoke path for manifest-resolved GGUF artifacts. Missing models skip by default and fail only with `--require-present`.
 - `source/backend/scripts/seed_sentinel_cache.py`
-  Direct Sentinel Hub cache seeder for high-quality replay/dataset timelapses. It accepts environment credentials, `.tools/.secrets/sentinel.txt`, or `.tools/.secrets/sh.txt`, and can skip local VLM metadata generation for faster cache refreshes.
+  Optional development-only Sentinel Hub cache seeder for high-quality replay/dataset timelapses. It is not required for the judge path, which is built around DPhi SimSat plus bundled replay fixtures.
 - `source/backend/satellite_debug.py`
   Separate port-8080 debugging surface for the agent bus.
 - `source/backend/autonomous_agent.py`
@@ -175,14 +181,13 @@ The backend runs two long-lived loops during app lifespan:
 
 ### Observation Providers
 
-- Primary: `simsat_sentinel`
-- Optional SimSat imagery provider: `simsat_mapbox` via `MAPBOX_ACCESS_TOKEN`
-- Secondary: `sentinelhub_direct`
-- Tertiary: `nasa_api_direct`
-- Final safety net: local deterministic fallback data
-- Cold-start `.env.example` sets `DISABLE_EXTERNAL_APIS=true` so fresh installs do not depend on network credentials or realtime provider quota unless the operator opts in.
-- Direct Sentinel Hub credentials resolve from env first, then `.tools/.secrets/sentinel.txt`, then `.tools/.secrets/sh.txt`. The seeding path never logs credential values. `sh.txt` supports key/value fields, legacy two-line secret-then-id files, three-line trial bundles, and labeled local bundles such as `API`, `CLIENTID`, and `CLIENT`.
-- Current Sentinel-2 L2A replay cache includes Pakistan Manchar Lake flooding, Atacama mining, Suez maritime, Singapore Strait, Georgia wildfire candidate, Kansas crop phenology, Delhi urban expansion, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead WebMs in `source/backend/assets/seeded_data/`. The legacy Greenland ice-edge WebM is excluded from Fast Replay because it fails the structural timelapse-integrity gate. The first `ice_snow_extent` replay is metadata-scored and deliberately does not attach that static cache as timelapse proof.
+- Hackathon primary: `simsat_sentinel` from DPhi Space SimSat.
+- Optional SimSat imagery provider: `simsat_mapbox` via `MAPBOX_ACCESS_TOKEN`.
+- Optional development/replay support: `sentinelhub_direct`, `nasa_api_direct`, and GEE-style paths.
+- Final safety net: local deterministic fallback data.
+- Cold-start `.env.example` sets `OBSERVATION_PROVIDER=simsat_sentinel` and `DISABLE_EXTERNAL_APIS=true` so fresh installs and judge demos do not depend on Sentinel Hub, NASA, GEE, or provider quota unless the operator explicitly opts in.
+- Direct Sentinel Hub credentials are supported only for local development, replay-cache refreshes, and dataset experiments. They resolve from env first, then `.tools/.secrets/sentinel.txt`, then `.tools/.secrets/sh.txt`; the seeding path never logs credential values.
+- Current cached replay fixtures include Pakistan Manchar Lake flooding, Atacama mining, Suez maritime, Singapore Strait, Georgia wildfire candidate, Kansas crop phenology, Delhi urban expansion, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead WebMs in `source/backend/assets/seeded_data/`. These fixtures are preserved to avoid repeated API usage. The legacy Greenland ice-edge WebM is excluded from Fast Replay because it fails the structural timelapse-integrity gate. The first `ice_snow_extent` replay is metadata-scored and deliberately does not attach that static cache as timelapse proof.
 
 ### Runtime Truth and Provenance
 
@@ -202,6 +207,7 @@ Cached replay imagery can still carry `scoring_basis=multispectral_bands` when t
 - Optional manifest-resolved local GGUF: `runtime-data/models/lfm2.5-vlm-450m/model_manifest.json`
 - Default GGUF target artifact: `runtime-data/models/lfm2.5-vlm-450m/LFM2.5-VL-450M-Q4_0.gguf`
 - Optional remote handoff path: `source/backend/scripts/fetch_satellite_model.py` can fetch a published Hugging Face artifact and write the local runtime manifest
+- Optional NM-UNI handoff producer: `C:\DevStuff\NM-UNI-main`, which imports Orbit exports, prepares training/quantization, stages `orbit_model_handoff.json`, and can publish model bundles for Orbit to fetch
 - Optional VLM actions: safe offline fallback responses when compatible transformers paths are unavailable
 - Optional Depth Anything V3: disabled by default through `DEPTH_ANYTHING_V3_ENABLED=false`; when enabled, `/api/depth/status` reports package/model/device readiness, and malformed image payloads are rejected before optional model loading.
 
@@ -210,7 +216,7 @@ Cached replay imagery can still carry `scoring_basis=multispectral_bands` when t
 Current repo-wide validation results:
 
 - `uv sync --extra dev --locked` -> passing
-- `uv run --no-sync pytest -q` -> `299 passed`
+- `uv run --no-sync pytest -q` -> `305 passed`
 - `npm run lint` -> passing
 - `npm run build` -> passing, with split chunks and no large-chunk warning
 - `npx playwright test` -> `73 passed`, `1 skipped` debug-only HTML dump
@@ -218,7 +224,7 @@ Current repo-wide validation results:
 - `npm run demo:record` -> passing for judge, payload-reduction, provenance, abstain-safety, and orbital-eclipse demo specs
 - `npm run demo:tutorial` -> passing with refreshed `docs/tutorial_video.webm`
 - Dataset export with `--include-seeded-cache` -> `56` current-cycle samples, `24` replay-cache rows, `25` timelapse rows, `2` wildfire replay-cache rows, and `2` volcanic surface-change rows; bounded Qwen/Ollama retagged training export -> `179` deduplicated assets, `26` temporal sequences, `40` model image calls, `6` sequence calls, `74` reused image tags, and deterministic heuristic fallback for the rest
-- Sentinel Hub Process API OAuth -> validated with local `sh.txt`; Hugging Face dataset upload -> published to `Shoozes/LFM-Orbit-SatData` with viewer-safe configs at data commit `5a2798e7d16cd76df08eff3725dcf3ade9340b58` and card commit `60e8ae913f61315740a640c532eb1aa9ae7cfe75`
+- Optional Sentinel Hub Process API OAuth -> validated locally for replay-cache development only; Hugging Face dataset upload -> published to `Shoozes/LFM-Orbit-SatData` with viewer-safe configs at commit `1ebd19065e8a8124372425c4c0df9c0332275c9c`
 - `.\run.ps1 -Verify` -> passing from repo root; backend, frontend, and E2E component checks were rerun after the latest preset and screenshot updates.
 - Screenshot captures include Settings, timelapse, context-menu, agent-evaluation, monitor-preview, known-location mission presets, debug-dashboard, and VLM road-corridor proof images.
 - `.github/workflows/ci.yml` runs the same backend, frontend, and Playwright checks in GitHub Actions using the repo-pinned Node version from `.nvmrc`.
@@ -234,8 +240,8 @@ Current repo-wide validation results:
 - Depth Anything V3 is integrated as an optional adapter and Settings toggle, but depth statistics are not yet part of the live alert scoring or promotion gate.
 - Tool-call parsing supports nested fenced JSON arguments for local LFM output. Inline JSON extraction remains intentionally conservative to avoid over-parsing normal prose.
 - The primary UI is desktop-operator oriented with a fixed right mission rail. The map now has a non-right-click action path, but responsive/mobile layout coverage remains follow-up work.
-- The current eval lane is replay/baseline-only. It is not yet a multi-model benchmark or a tuned-model promotion gate.
-- The runtime now supports curated replay loading plus dynamic cached-API Fast Replay entries with rescan. Full export/import of arbitrary completed realtime missions remains follow-up work.
+- The eval lane now writes baseline-vs-candidate promotion artifacts, but it still depends on exported labels and should not be treated as a substitute for operator-reviewed gold benchmarks.
+- The runtime supports curated replay loading, dynamic cached-API Fast Replay entries with rescan, and portable snapshot export/import. Bundled replay packs remain the stable judge path.
 - Judge Mode is intentionally app-level demo UI, not a correctness substitute. Correctness remains covered by backend tests, frontend type checks, and normal Playwright specs.
 - Satellite GGUF reasoning is only active when a manifest-resolved model artifact is installed locally.
-- The current scan grid is still the repo-local square-cell compatibility layer. A true H3 parser/generator remains the right follow-up before production geospatial scale-out.
+- The current scan grid is the repo-local square-cell compatibility layer, which is sufficient for the SimSat hackathon demo. Production geospatial scale-out is intentionally parked outside the active scope.

@@ -1,4 +1,5 @@
 from core import model_manifest
+from scripts import smoke_satellite_model
 
 
 def test_resolve_satellite_model_artifact_defaults(monkeypatch):
@@ -65,3 +66,16 @@ def test_resolve_satellite_model_artifact_reads_manifest(monkeypatch, tmp_path):
     assert status["source_handoff_present"] is True
     assert status["training_result_manifest_present"] is True
     assert status["readme_present"] is True
+
+
+def test_satellite_model_smoke_skips_when_optional_model_missing(monkeypatch, tmp_path):
+    runtime_dir = tmp_path / "runtime-data"
+    monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(runtime_dir))
+    monkeypatch.delenv("CANOPY_SENTINEL_MODEL_MANIFEST", raising=False)
+    monkeypatch.delenv("CANOPY_SENTINEL_MODEL_SUBDIR", raising=False)
+
+    payload = smoke_satellite_model.run_model_smoke()
+
+    assert payload["format"] == "orbit_satellite_model_smoke_v1"
+    assert payload["status"] == "skipped"
+    assert payload["reason"] == "model file not found"

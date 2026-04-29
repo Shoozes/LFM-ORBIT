@@ -20,6 +20,7 @@ SCRIPT_MODULES = (
     "scripts.retag_training_assets_ui",
     "scripts.seed_nasa_cache",
     "scripts.seed_sentinel_cache",
+    "scripts.smoke_satellite_model",
     "scripts.upload_orbit_dataset_hf",
 )
 

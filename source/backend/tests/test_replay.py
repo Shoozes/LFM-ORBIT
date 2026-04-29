@@ -7,6 +7,7 @@ from core.agent_bus import get_recent_dialogue, get_recent_messages, list_pins
 from core.gallery import list_gallery
 from core.metrics import read_metrics_summary
 from core.queue import get_recent_alerts
+from core.replay_snapshot import SNAPSHOT_FORMAT, export_replay_snapshot, import_replay_snapshot
 from core.runtime_state import reset_runtime_state
 
 EXPECTED_REPLAY_IDS = {
@@ -218,3 +219,30 @@ def test_seeded_cache_replay_loads_and_rescans(tmp_path, monkeypatch):
     assert rescan_payload["mission"]["bbox"] == seeded["bbox"]
     assert "current runtime/model stack" in rescan_payload["mission"]["summary"]
     assert get_recent_alerts(limit=5)["alerts"] == []
+
+
+def test_replay_snapshot_export_import_round_trips_runtime_surfaces(tmp_path, monkeypatch):
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+    _reset_runtime_state()
+
+    replay_load("rondonia_frontier_judge")
+    snapshot = export_replay_snapshot(limit=50)
+
+    assert snapshot["format"] == SNAPSHOT_FORMAT
+    assert len(snapshot["alerts"]) == 4
+    assert len(snapshot["gallery"]) == 4
+    assert snapshot["active_mission"]["mission_mode"] == "replay"
+
+    _reset_runtime_state()
+    payload = import_replay_snapshot(snapshot)
+
+    assert payload["status"] == "imported"
+    assert payload["alerts_imported"] == 4
+    assert payload["gallery_imported"] == 4
+    assert payload["pins_imported"] == 8
+    assert payload["messages_imported"] >= 2
+    assert len(get_recent_alerts(limit=10)["alerts"]) == 4
+    assert len(list_gallery(limit=10)) == 4
+    assert read_metrics_summary()["runtime_truth_mode"] == "replay"

@@ -52,9 +52,13 @@ The export writes:
 - `samples/<sample_id>/sample.json`
 - local assets such as `context_thumb.png` and `timelapse.webm`
 
-Export rows include target task/category/action, temporal use-case metadata, alert scores, agent evidence, local imagery/video references, provenance, replay-cache timelapse rows when enabled, and weak-negative reject rows when available.
+Export rows include target task/category/action, temporal use-case metadata, alert scores, agent evidence, local imagery/video references, provenance, replay-cache timelapse rows when enabled, weak-negative reject rows when available, and `orbit_training_contract_v1` review/localization metadata for NM-UNI import.
 
-## Refresh Sentinel Replay Data
+If a context thumbnail falls back to an offline SVG chip, the exporter rasterizes it to PNG before writing the sample asset. Future Qwen/Ollama tagging cycles should therefore receive raster image files, not unsupported SVG placeholders.
+
+## Optional Sentinel Replay Data
+
+LFM Orbit's hackathon runtime is DPhi Space SimSat-first. Sentinel Hub is optional support for local real-data testing, replay-cache refreshes, and dataset development; judges should not need Sentinel Hub credentials.
 
 High-quality replay timelapses can be refreshed from Sentinel Hub and then reused by demos and dataset export through the existing `assets/seeded_data/sh_<signature>.webm` cache. The folder name is legacy; the data is stored real API imagery, not generated evidence.
 
@@ -265,10 +269,18 @@ uv run --no-sync python scripts\upload_orbit_dataset_hf.py `
 
 The helper reads `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or `.tools/.secrets/hf.txt`, then calls the `hf` CLI with the token in process environment only. Use `--dry-run` to inspect the upload command without network calls.
 
-Current local packaging result after Sentinel demo seeding:
+Current local packaging result after optional replay seeding:
 
 - Dataset export: `56` current-cycle samples, `24` replay-cache rows, `25` rows with timelapse references, `2` wildfire rows, and `2` volcanic surface-change rows.
-- Retag output: `179` deduplicated training assets, `26` temporal sequences, `40` bounded Qwen/Ollama image calls, `6` bounded Qwen/Ollama sequence calls, `74` reused image tags, `9` skipped SVG placeholders, and `0` tagger failures.
+- Retag output: `179` deduplicated training assets, `26` temporal sequences, `40` bounded Qwen/Ollama image calls, `6` bounded Qwen/Ollama sequence calls, `74` reused image tags, `9` historical skipped SVG placeholders, and `0` tagger failures. New exports rasterize SVG fallbacks to PNG before retagging.
+
+## Dataset Refresh Cadence
+
+- Use semantic refresh labels such as `orbit-satdata-YYYY-MM-DD` for local export/retag folders.
+- Publish only changed assets and metadata configs; avoid re-uploading already-present hashes unless a schema changes.
+- Keep `mission_metadata` for metadata-only missions such as the Greenland ice/snow extent replay instead of forcing invalid timelapse assets into image configs.
+- Record each Hub refresh in this README, `docs/DATASET_CYCLE_TUTORIAL.md`, and `summary_bank.json` with counts, commit hash, tagger source, and skipped/failed asset counts.
+- For hackathon demos, prefer seeded replay data and SimSat runtime evidence before spending direct-provider quota on refreshes.
 - Hugging Face dataset: `Shoozes/LFM-Orbit-SatData`, latest data/card commit `1ebd19065e8a8124372425c4c0df9c0332275c9c`, with `mission_metadata=1` for the metadata-only Greenland ice/snow extent replay.
 - Dataset Viewer schema note: upload `source/backend/data/HF_DATASET_CARD.md` as the Hub `README.md` so single-image SFT rows, temporal SFT rows, metadata, mission metadata, and review records load as separate configs instead of one mixed inferred JSON split.
 

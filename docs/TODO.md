@@ -7,6 +7,7 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 ## Current App State
 
 - LFM Orbit is a demo-ready, local-first mission-control prototype, not an unattended production deployment.
+- The hackathon runtime is built around DPhi Space SimSat (`simsat_sentinel`). Direct Sentinel Hub, NASA, and GEE-style providers are optional development/replay support and must not become judge-path dependencies.
 - Mission Control can run realtime provider/API scans, replay cached real API imagery, monitor previews, VLM helper calls, timelapse generation, and dataset export paths.
 - Runtime evidence surfaces expose three separate fields: `runtime_truth_mode` (`realtime`, `replay`, `fallback`), `imagery_origin` (`sentinelhub`, `simsat`, `nasa_gibs`, `gee`, `cached_api`, etc.), and `scoring_basis` (`multispectral_bands`, `proxy_bands`, `visual_only`, `fallback_none`).
 - Replay-cache entries are stored real API imagery with preserved date/provenance for deterministic review and cost control. They are not generated evidence.
@@ -15,11 +16,11 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 - Fast Replay can load curated replay packs and structurally valid cached API WebMs, then rescan saved metadata through the current runtime/model stack.
 - Fast Replay excludes cached WebMs that fail structural timelapse-integrity checks, so static or color-shift-only videos are not presented as temporal proof.
 - NDVI and NDSI have explicit spectral-band contracts: RGB-only, missing, or invalid band data returns unavailable/abstain instead of fabricated indices.
-- Cloud and no-data coverage are hard quality gates: Sentinel SCL cloud/shadow/cirrus classes are tracked, cloudy cached frames are skipped, and cloud-blocked scoring windows return no-transmit quality-gate results.
+- Cloud and no-data coverage are hard quality gates: SCL metadata is used when available, cloudy cached frames are skipped, and cloud-blocked scoring windows return no-transmit quality-gate results.
 - VLM responses now carry structured provenance with output source, model, fallback reason, runtime truth mode, imagery origin, and scoring basis.
 - Judge Mode proof JSON now includes `payload_accounting` so byte-reduction claims state which fields are counted and which proof artifacts are excluded.
 - Local control endpoints are guarded for localhost use, and default CORS is a localhost allowlist unless overridden.
-- Dataset export and retagging can carry cached real Sentinel-2 timelapses into local ImageFolder-style training data; the current bounded Qwen/Ollama cycle is published to `Shoozes/LFM-Orbit-SatData`.
+- Dataset export and retagging can carry cached replay timelapses into local ImageFolder-style training data; the current bounded Qwen/Ollama cycle is published to `Shoozes/LFM-Orbit-SatData`.
 
 ## Recent Integrity Pass
 
@@ -35,31 +36,37 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 - [x] Cleaned stale public-facing replay wording in Inspect, Alerts, Mission replay notices, tutorial subtitles, dataset-card notes, and replay/timelapse runtime dialogue.
 - [x] Re-scanned repo-local TODO/FIXME/stub/incomplete markers; remaining hits are intentional UI placeholders, test fixtures, compatibility labels, optional fallback paths, or backlog items tracked here.
 - [x] Consolidated progress tracking so `README.md` stays judge-facing, `docs/ARCHITECTURE.md` stays system-facing, `docs/DATASET_CYCLE_TUTORIAL.md` stays workflow-facing, and this file stays backlog-facing.
+- [x] Confirmed NM-UNI's role from `C:\DevStuff\NM-UNI-main`: it is the external Orbit dataset-import, Liquid training, GGUF quantization, `orbit_model_handoff.json`, and optional Hugging Face model-publish lane. Orbit should consume that handoff; it should not absorb NM-UNI's training UI/runtime.
+- [x] Added `runtime-data/monitor-reports/` persistence for API-generated maritime and lifeline monitor reports, plus API/listing tests.
+- [x] Added replay snapshot export/import for completed runtime surfaces so realtime or replay missions can be packaged outside bundled replay manifests and cached API WebMs.
+- [x] Added `orbit_training_contract_v1` to exported samples, including operator-review, localization, evidence, and NM-UNI import metadata.
+- [x] Rasterized SVG fallback context thumbnails to PNG during dataset export so future Qwen/Ollama cycles receive image assets instead of unsupported SVG placeholders.
+- [x] Expanded `scripts/evaluate_model.py` into `orbit_eval_v2` with independent label-source handling, base-vs-candidate comparison, thresholds, and `promotion.json` artifacts.
+- [x] Added `scripts/smoke_satellite_model.py` for manifest-resolved GGUF smoke checks when an NM-UNI handoff bundle is actually installed.
+- [x] Added backend smoke coverage that keeps `simsat_sentinel` first in the provider fallback chain.
+- [x] Deprecated user-facing use of `demo_mode_enabled`: current matches are backend metrics/contracts/types compatibility fields, not data-source labels shown as evidence.
 
 ## Active Backlog
 
-- [ ] Add a production image-conditioned satellite inference adapter that consumes `GGUF + mmproj` artifacts, not only scored metadata.
-- [ ] Replace VLM VQA/caption compatibility fallbacks with explicitly supported on-device implementations for the selected local runtime.
-- [ ] Add a model-present smoke path that validates manifest-resolved GGUF loading separately from fallback-only default runs.
-- [ ] Expand `scripts/evaluate_model.py` into a base-vs-tuned benchmark lane with independent labels, thresholds, and promotion artifacts.
-- [ ] Feed Depth Anything V3 summaries into alert evidence/eval scoring and add a model-present smoke test where DA3 artifacts are installed.
-- [ ] Expand dataset export from weak negatives into a full training contract with operator-reviewed controls and stronger localization labels.
-- [ ] Add a versioned update cadence for future `Shoozes/LFM-Orbit-SatData` refreshes.
-- [ ] Replace remaining SVG context placeholder outputs with raster thumbnails before dataset export so future Qwen cycles have zero unsupported assets.
-- [ ] Persist API-generated maritime/lifeline monitor reports into `runtime-data/monitor-reports/` directly from UI/API usage.
-- [ ] Add full replay snapshot export/import so completed realtime missions can be packaged outside bundled replay packs and cached API WebMs.
-- [ ] Add a reusable Sentinel Hub replay seeding manifest command that refreshes exact replay assets without relying on manual grid/cell-dim selection.
-- [ ] Wire `core/ice_snow_monitoring.py` into a live Sentinel Hub Process API path that stores frame-level Green/SWIR1/NIR/SCL summaries during cache seeding instead of relying on curated precomputed replay metadata.
-- [ ] Refresh the Greenland ice/snow replay with a contextual WebM that passes the structural timelapse-integrity guard before presenting it as video proof.
-- [ ] Add Sentinel Hub OGC/WMS instance-id seeding support only if a valid WMS-only instance appears; current Process API seeding uses validated OAuth credentials.
-- [ ] Add optional Planet/Planet Insights imagery ingestion once a local API token is available; the current shared workspace URL is a browser account page, not an API credential.
-- [ ] Add mocked SimSat Mapbox and Element84 STAC fixture coverage with visual asset URLs and operator-facing provenance checks.
-- [ ] Replace the square-grid compatibility layer with true H3 parsing/generation before production geospatial scale-out.
-- [ ] Add a custom temporal-use-case editor so operators can save preset libraries beyond bundled examples.
-- [ ] Add responsive/mobile Playwright coverage for the map, fixed right rail, and Judge Mode panel.
-- [ ] Add lightweight frontend unit/component tests for hooks such as `useMapPins`, telemetry normalization, and settings retry behavior.
-- [ ] Deprecate user-facing data-source use of `demo_mode_enabled`; keep it as a run-context flag only where needed for legacy metrics/contracts.
+- No unblocked hackathon-path backlog remains in this file. The current judge path is DPhi SimSat-first, replay-safe, dataset-exportable, and locally verifiable.
+
+## Blocked External Artifact Lane
+
+- [ ] After NM-UNI exports a real Orbit bundle, fetch it with `scripts/fetch_satellite_model.py`, then run `python scripts\smoke_satellite_model.py --require-present` from `source/backend`.
+- [ ] Add a production image-conditioned satellite inference adapter that consumes the fetched `GGUF + mmproj` artifacts. This should extend the manifest contract instead of adding hardcoded model paths.
+- [ ] Replace VLM VQA/caption compatibility fallbacks with explicitly supported on-device implementations once the selected local runtime and model family are fixed.
+
+## Time-Gated Watch
+
 - [ ] After `2026-04-29T18:00:00Z`, verify the SPC Southern High Plains fire-weather watch against FIRMS/NIFC and only promote it from `watch_only_unverified` if independent detections or incident reports exist inside the bbox.
+
+## Parked Post-Hackathon Ideas
+
+- Sentinel Hub replay seeding manifests, live Sentinel Process API ice/snow summaries, OGC/WMS instance-id support, and refreshed Greenland contextual WebM proof.
+- Planet/Planet Insights ingestion, broader Element84 STAC fixture work, and other non-SimSat direct-provider expansion.
+- True H3 grid generation, a custom temporal-use-case editor, and Depth Anything V3 promotion into live alert scoring.
+- Responsive/mobile Playwright coverage for the fixed right rail and Judge Mode panel.
+- Lightweight frontend unit/component tests for hooks such as `useMapPins`, telemetry normalization, and settings retry behavior.
 
 ## Edge Cases To Keep Covered
 
@@ -69,7 +76,7 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 - Empty or malformed provider credentials must report unavailable status without switching to external calls unexpectedly.
 - Cloudy, stale, missing, RGB-only, or non-numeric spectral inputs must abstain rather than fabricate spectral indices.
 - Quality-gated cloud/no-data failures must not emit `suspected_canopy_loss`, even when raw band deltas look large.
-- Cached Sentinel replay/training frames must carry frame-quality metadata and reject cloudy frames before WebM creation.
+- Cached replay/training frames must carry frame-quality metadata and reject cloudy frames before WebM creation.
 - Timelapse evidence must contain multiple contextual satellite imagery slices; single still-image color shifts are invalid temporal evidence.
 - Dynamic Fast Replay must not list cached videos that fail structural frame-change checks, even when matching metadata exists.
 - Ice/snow conclusions must require spectral bands and temporal persistence; RGB-only snow/cloud lookalikes should abstain or stay metadata-only.
@@ -91,6 +98,7 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 - Frontend contract guard: `npm run lint` and `npm run build` from `source/frontend`.
 - Judge acceptance path: `npm run demo:judge` from `source/frontend`.
 - Full local validation remains `.\run.ps1 -Verify` from repo root.
-- Latest integrity validation: cold-start `.\run.ps1 -Verify` passed with backend `299 passed`, frontend lint/build passing, and normal Playwright E2E `73 passed`, `1 skipped`; focused replay/export/timelapse checks passed `14`; Ice/Snow preset Playwright check passed `1`; focused Playwright replay/timelapse specs passed `5`; QA verification passed `8`; `npm run demo:judge` passed; `npm run demo:tutorial` passed and refreshed `docs/tutorial_video.webm`; `summary_bank.json` parsed; `uvx ruff check source/backend --select E9` passed; `git diff --check` reported only CRLF normalization warnings.
-- Latest dataset-cycle validation: dataset export produced `56` current-cycle samples, `24` replay-cache rows, and `25` timelapse rows; bounded Qwen retag produced `179` assets and `26` temporal sequences with `74` reused image tags, `9` SVG placeholder skips, and zero tagger failures.
+- Latest integrity validation: cold-start `.\run.ps1 -Verify` passed with backend `305 passed`, frontend lint/build passing, and normal Playwright E2E `73 passed`, `1 skipped`; focused replay/export/timelapse checks passed `14`; Ice/Snow preset Playwright check passed `1`; focused Playwright replay/timelapse specs passed `5`; QA verification passed `8`; `npm run demo:judge` passed; `npm run demo:tutorial` passed and refreshed `docs/tutorial_video.webm`; `summary_bank.json` parsed; `uvx ruff check source/backend --select E9` passed; `git diff --check` reported only CRLF normalization warnings.
+- Latest dataset-cycle validation: dataset export produced `56` current-cycle samples, `24` replay-cache rows, and `25` timelapse rows; bounded Qwen retag produced `179` assets and `26` temporal sequences with `74` reused image tags, `9` historical SVG placeholder skips, and zero tagger failures. New exports rasterize SVG fallbacks to PNG before retagging.
 - Hugging Face remote config verification: `default=179`, `temporal_sft=26`, `asset_metadata=179`, `retagged_assets=179`, `temporal_metadata=26`, `review_queue=179`, `mission_metadata=1`; latest data/card commit `1ebd19065e8a8124372425c4c0df9c0332275c9c`.
+- Latest focused backend validation after backlog closure: `python -m pytest source/backend/tests/test_api.py source/backend/tests/test_replay.py -q` -> `55 passed`; `python -m pytest source/backend/tests/test_export_orbit_dataset.py source/backend/tests/test_evaluate_model.py source/backend/tests/test_model_manifest.py source/backend/tests/test_import_contracts.py -q` -> `17 passed`.

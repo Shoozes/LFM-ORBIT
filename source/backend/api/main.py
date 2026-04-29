@@ -56,8 +56,10 @@ from core.maritime_monitoring import (
 )
 from core.metrics import read_metrics_summary
 from core.mission import get_active_mission, list_missions, start_mission, stop_mission
+from core.monitor_reports import list_monitor_report_files, persist_monitor_report
 from core.queue import get_alert_counts, get_recent_alerts
 from core.replay import list_seeded_replays, load_seeded_replay, rescan_seeded_replay
+from core.replay_snapshot import export_replay_snapshot, import_replay_snapshot
 from core.runtime_state import ensure_runtime_state, reset_runtime_state
 from core.satellite_agent import run_satellite_agent
 from core.scanner import stream_region_scan
@@ -405,7 +407,7 @@ def lifeline_assets(category: str | None = None, region: str | None = None):
 def lifeline_monitor(body: LifelineMonitorBody):
     """Build a before/after civilian lifeline report and downlink decision."""
     try:
-        return build_lifeline_monitor_report(
+        report = build_lifeline_monitor_report(
             asset_id=body.asset_id,
             asset=body.asset,
             candidate=body.candidate,
@@ -413,6 +415,8 @@ def lifeline_monitor(body: LifelineMonitorBody):
             current_frame=body.current_frame,
             task_text=body.task_text,
         )
+        report["persistence"] = persist_monitor_report(report)
+        return report
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -458,7 +462,7 @@ class MaritimeMonitorBody(BaseModel):
 @app.post("/api/maritime/monitor")
 def maritime_monitor(body: MaritimeMonitorBody):
     """Build an Orbit-native maritime monitor and cardinal investigation plan."""
-    return build_maritime_monitor_report(
+    report = build_maritime_monitor_report(
         lat=body.lat,
         lon=body.lon,
         timestamp=body.timestamp,
@@ -470,6 +474,8 @@ def maritime_monitor(body: MaritimeMonitorBody):
         max_items=body.max_items,
         max_cloud_cover=body.max_cloud_cover,
     )
+    report["persistence"] = persist_monitor_report(report)
+    return report
 
 
 @app.websocket("/ws/telemetry")
@@ -778,6 +784,29 @@ def replay_catalog():
     return {"replays": list_seeded_replays()}
 
 
+@app.get("/api/replay/snapshot/export")
+def replay_snapshot_export(limit: int = Query(default=200, ge=1, le=500), request: Request = None):
+    """Export the current runtime surfaces into a portable replay snapshot."""
+    _require_local_request(request)
+    return export_replay_snapshot(limit=limit)
+
+
+@app.post("/api/replay/snapshot/import")
+async def replay_snapshot_import(request: Request):
+    """Import a portable replay snapshot into the local runtime stores."""
+    _require_local_request(request)
+    try:
+        body = await request.json()
+    except Exception as exc:
+        return JSONResponse(status_code=400, content={"error": f"invalid snapshot JSON: {exc}"})
+    snapshot = body.get("snapshot") if isinstance(body, dict) and isinstance(body.get("snapshot"), dict) else body
+    reset = bool(body.get("reset", True)) if isinstance(body, dict) else True
+    try:
+        return import_replay_snapshot(snapshot, reset=reset)
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
+
+
 @app.post("/api/replay/load/{replay_id}")
 def replay_load(replay_id: str = Path(...), request: Request = None):
     """Reset runtime state and load a bundled replay mission into the standard app surfaces."""
@@ -814,6 +843,14 @@ def runtime_reset(body: RuntimeResetBody | None = None, request: Request = None)
         "status": "reset",
         **summary,
     }
+
+
+@app.get("/api/runtime/monitor-reports")
+def runtime_monitor_reports(limit: int = Query(default=100, ge=1, le=500), request: Request = None):
+    """List persisted maritime and lifeline monitor reports."""
+    _require_local_request(request)
+    reports = list_monitor_report_files(limit=limit)
+    return {"reports": reports, "count": len(reports)}
 
 
 

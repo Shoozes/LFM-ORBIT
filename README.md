@@ -6,6 +6,8 @@ LFM-ORBIT turns satellite imagery into compact, evidence-backed orbital alerts. 
 
 This is a demo-ready research prototype, not an unattended production deployment. Evidence surfaces keep `runtime_truth_mode`, `imagery_origin`, and `scoring_basis` separate so realtime imagery, cached API replay, and fallback paths are never confused.
 
+The hackathon runtime is built around DPhi Space SimSat. Direct Sentinel Hub, NASA, and GEE-style paths are optional development/replay support; judges do not need Sentinel Hub credentials to run the proof.
+
 [Hackathon event](https://luma.com/n9cw58h0) | [Judging criteria](docs/Liquid_AI_x_DPhi_Space_Judging_Criteria.md) | [Judge demo guide](docs/JUDGE_DEMO.md)
 
 ![LFM-ORBIT Judge Mode proof surface](docs/readme-judge-mode.png)
@@ -60,7 +62,7 @@ npm run demo:record
 | Area | What is shown |
 |---|---|
 | Space constraint | The edge agent compresses a raw satellite frame into a small alert payload before downlink. |
-| Real imagery | Sentinel-2 L2A replay assets are cached from API imagery and keep date/provenance metadata. |
+| Hackathon provider path | DPhi SimSat is the primary runtime lane; cached replay fixtures make the proof deterministic without external credentials. |
 | Agent loop | Satellite Pruner Agent and Ground Validator Agent exchange visible SAT/GND mission context. |
 | Evidence contract | Every alert separates truth mode, imagery origin, and scoring basis. |
 | Show path | One command records a reproducible proof with video, screenshots, trace, and JSON. |
@@ -72,7 +74,7 @@ npm run demo:record
 - Evidence gallery with imagery, timelapse, provenance, alert analysis, and VLM tools.
 - Judge Mode proof panel with stable artifact export.
 - Delay-tolerant link outage simulator.
-- Dataset export, Qwen/Ollama retagging, replay-cache packaging, and Hugging Face upload tooling.
+- Dataset export, Qwen/Ollama retagging, replay-cache packaging, snapshot export/import, NM-UNI model handoff, and Hugging Face upload tooling.
 
 Current proof missions include deforestation, flood extent, mining expansion, maritime activity, wildfire candidates, urban expansion, volcano/lake events, and the new Greenland ice/snow extent lane.
 
@@ -101,7 +103,7 @@ Replay means stored real API imagery with preserved date/provenance for determin
 | Check | Result |
 |---|---|
 | Cold-start verification | `.\run.ps1 -Verify` passing |
-| Backend tests | `299 passed` |
+| Backend tests | `305 passed` |
 | Frontend lint/build | passing |
 | Normal Playwright E2E | `73 passed`, `1 skipped` |
 | Recorded demo suite | `5 passed` |

@@ -1,13 +1,13 @@
 # Dataset Cycle Tutorial
 
-This is the show-ready data loop for LFM Orbit: seed real satellite evidence, package it as replayable training data, retag it with Qwen, and publish a viewer-safe Hugging Face dataset.
+This is the optional data loop for LFM Orbit: package replayable training data, retag it with Qwen, and publish a viewer-safe Hugging Face dataset. It supports real-data development, but the hackathon runtime remains DPhi Space SimSat-first.
 
 ## Story
 
 One cycle creates evidence like an operator would:
 
 1. Pick an interesting mission area.
-2. Fetch cloud-gated Sentinel-2 frames.
+2. Optionally fetch cloud-gated Sentinel-2 frames for cached replay fixtures.
 3. Save the replay as a cached real API WebM plus metadata.
 4. Export Orbit records into a local dataset pack.
 5. Retag deduplicated images and temporal sequences with `qwen3.6:27b`.
@@ -28,7 +28,7 @@ One cycle creates evidence like an operator would:
 
 The Mauna Loa and Kilauea runs are classified as `volcanic_surface_change`, not wildfire. Lake Urmia, Kakhovka, and Lake Mead stay in water/flood extent style temporal review lanes. The Mayon candidate was rejected for this cycle because the available windows were too cloudy to produce a valid timelapse.
 
-## Run The Cycle
+## Optional Sentinel Development Cycle
 
 From `source/backend`:
 
@@ -106,7 +106,7 @@ uv run --no-sync python scripts\upload_orbit_dataset_hf.py `
 | Reused existing image tags | `74` |
 | Deterministic image fallbacks | `65` |
 | Deterministic sequence fallbacks | `20` |
-| Skipped assets | `9` SVG placeholders |
+| Skipped assets | `9` historical SVG placeholders |
 | Tagger failures | `0` |
 
 The sample count is a current runtime-cycle export, not a claim of total possible mission history. The durable replay cache increased and now includes seven newer temporal missions.
@@ -116,7 +116,8 @@ The sample count is a current runtime-cycle export, not a claim of total possibl
 - Clouds and no-data are quality gates before frames enter replay WebMs.
 - A valid timelapse needs multiple contextual satellite slices.
 - Static image recolors are invalid temporal evidence.
-- Unsupported SVG placeholders are skipped, not forced into vision tagging.
+- New exports rasterize offline SVG placeholder chips to PNG before retagging; the `9` SVG skips above are historical from the previous published cycle.
+- Unsupported non-raster assets should still be skipped rather than forced into vision tagging.
 - Already-tagged image hashes are reused from the previous retag folder when `--reuse-existing-dir` is set.
 - Extracted video frames are namespaced by video SHA-256 so different `timelapse.webm` files cannot overwrite each other.
 - Future-risk manifests remain unverified until independent post-window evidence exists.
@@ -141,3 +142,11 @@ The Hub card keeps schemas separate:
 | `temporal_metadata` | `temporal_sequences.jsonl` |
 | `review_queue` | `review_queue.jsonl` |
 | `mission_metadata` | `mission_metadata.jsonl` |
+
+## Refresh Cadence
+
+- Use a dated local refresh label such as `orbit-satdata-YYYY-MM-DD`.
+- Reuse existing image hashes and upload only changed configs/assets unless a schema changes.
+- Keep metadata-only missions in `mission_metadata`; do not force invalid WebMs into image configs.
+- Record counts, tagger source, skipped assets, failures, and Hub commit hash in this tutorial, `source/backend/data/README.md`, and `summary_bank.json`.
+- Keep direct Sentinel/NASA/GEE refreshes optional. The hackathon path remains DPhi SimSat-first plus seeded replay data.

@@ -17,6 +17,18 @@ def _webm_data_url() -> str:
     return "data:video/webm;base64," + "AAECAwQ="
 
 
+def _svg_data_url() -> str:
+    svg = (
+        '<svg width="192" height="192" xmlns="http://www.w3.org/2000/svg">'
+        '<rect width="100%" height="100%" fill="rgb(30,90,45)"/>'
+        '<text x="10" y="20">OFFLINE CHIP</text>'
+        "</svg>"
+    )
+    import base64
+
+    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode("utf-8")).decode("ascii")
+
+
 def test_write_dataset_export_writes_manifest_records_and_assets(tmp_path, monkeypatch):
     db_path = tmp_path / "alerts.sqlite"
     bus_path = tmp_path / "agent_bus.sqlite"
@@ -79,6 +91,8 @@ def test_write_dataset_export_writes_manifest_records_and_assets(tmp_path, monke
     assert record["confirmation_source"] == "ground_gallery"
     assert record["temporal_use_case"]["id"] == "deforestation"
     assert record["api_prep"]["auto_build"] is True
+    assert record["training_contract"]["schema"] == "orbit_training_contract_v1"
+    assert record["training_contract"]["nm_uni_import"]["role"] == "satellite_vlm_training_bridge"
     assert record["assets"]["context_thumb"] == "context_thumb.png"
     assert record["assets"]["timelapse"] == "timelapse.webm"
 
@@ -174,6 +188,46 @@ def test_write_dataset_export_backfills_context_and_includes_ground_reject_contr
 
     assert (output_dir / "samples" / positive["sample_id"] / "context_thumb.png").exists()
     assert (output_dir / "samples" / reject["sample_id"] / "context_thumb.png").exists()
+    assert reject["training_contract"]["operator_review_status"] == "operator_reviewed"
+    assert reject["training_contract"]["target_action"] == "prune"
+
+
+def test_write_dataset_export_rasterizes_svg_context_placeholders(tmp_path, monkeypatch):
+    db_path = tmp_path / "alerts.sqlite"
+    bus_path = tmp_path / "agent_bus.sqlite"
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(db_path))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(bus_path))
+    monkeypatch.setattr(export_orbit_dataset, "resolve_context_thumb", lambda lat, lng: _svg_data_url())
+
+    init_db(reset=True)
+    init_bus(reset=True)
+    push_alert(
+        event_id="evt_svg",
+        region_id="amazonas_region_alpha",
+        cell_id="svg_cell",
+        change_score=0.51,
+        confidence=0.88,
+        priority="high",
+        reason_codes=["ndvi_drop"],
+        payload_bytes=123,
+    )
+    upsert_pin(
+        pin_type="satellite",
+        lat=-3.12,
+        lng=-60.01,
+        label="SAT svg",
+        note="Needs offline chip.",
+        cell_id="svg_cell",
+    )
+
+    output_dir = tmp_path / "export"
+    export_orbit_dataset.write_dataset_export(output_dir, limit=10, eval_ratio=0.5)
+    record = json.loads((output_dir / "samples.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    sample_dir = output_dir / "samples" / record["sample_id"]
+
+    assert record["assets"]["context_thumb"] == "context_thumb.png"
+    assert (sample_dir / "context_thumb.png").read_bytes().startswith(b"\x89PNG")
+    assert not (sample_dir / "context_thumb.svg").exists()
 
 
 def test_write_dataset_export_auto_classifies_wildfire_training_rows(tmp_path, monkeypatch):
@@ -306,6 +360,7 @@ def test_write_dataset_export_includes_persisted_monitor_reports(tmp_path, monke
     assert lifeline["candidate"]["civilian_impact"] == "public_mobility_disruption"
     assert lifeline["assets"]["baseline_frame"] == "before.png"
     assert lifeline["assets"]["current_frame"] == "after.png"
+    assert lifeline["training_contract"]["localization"]["candidate_bbox_field"] == "candidate_bbox"
 
     maritime = by_type["maritime_stac_investigation"]
     assert maritime["target_category"] == "maritime"

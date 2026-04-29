@@ -7,6 +7,7 @@ import base64
 import hashlib
 import json
 import re
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -56,10 +57,33 @@ def _decode_data_url(data_url: str) -> tuple[bytes, str]:
     return base64.b64decode(payload), suffix
 
 
+def _svg_to_png_placeholder(raw: bytes, size: int = 192) -> bytes:
+    from PIL import Image, ImageDraw
+
+    text = raw.decode("utf-8", errors="ignore")
+    match = re.search(r"fill=['\"]rgb\((\d+),(\d+),(\d+)\)['\"]", text)
+    if match:
+        color = tuple(max(0, min(int(value), 255)) for value in match.groups())
+    else:
+        digest = hashlib.sha256(raw).digest()
+        color = (digest[0] // 2, 70 + digest[1] // 4, digest[2] // 2)
+
+    img = Image.new("RGB", (size, size), color)
+    draw = ImageDraw.Draw(img)
+    draw.text((10, 12), "OFFLINE CHIP", fill=(255, 255, 255))
+    draw.rectangle((8, size - 38, size - 8, size - 8), outline=(255, 255, 255))
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 def _write_asset(sample_dir: Path, stem: str, data_url: str | None) -> str | None:
     if not data_url:
         return None
     raw, suffix = _decode_data_url(data_url)
+    if suffix == ".svg":
+        raw = _svg_to_png_placeholder(raw)
+        suffix = ".png"
     asset_path = sample_dir / f"{stem}{suffix}"
     asset_path.write_bytes(raw)
     return asset_path.name
@@ -312,6 +336,43 @@ def _build_monitor_report_record(
     return None
 
 
+def _training_contract(record: dict[str, Any]) -> dict[str, Any]:
+    label_tier = str(record.get("label_tier") or "unlabeled")
+    confirmation_source = str(record.get("confirmation_source") or "unknown")
+    target_action = str(record.get("target_action") or "review")
+    has_temporal_windows = isinstance(record.get("before_window"), dict) or isinstance(record.get("after_window"), dict)
+    has_bbox = isinstance(record.get("bbox"), list) or isinstance(record.get("candidate_bbox"), list)
+    reviewed = confirmation_source in {"ground_gallery", "ground_reject"}
+    needs_review = label_tier in {"bronze", "weak_negative", "generated_monitor", "unlabeled"} and not reviewed
+    return {
+        "schema": "orbit_training_contract_v1",
+        "supervision_tier": label_tier,
+        "operator_review_status": "operator_reviewed" if reviewed else "pending_or_generated",
+        "operator_review_required": bool(needs_review),
+        "target_action": target_action,
+        "allowed_target_actions": ["alert", "review", "prune"],
+        "localization": {
+            "bbox_field": "bbox" if isinstance(record.get("bbox"), list) else None,
+            "candidate_bbox_field": "candidate_bbox" if isinstance(record.get("candidate_bbox"), list) else None,
+            "has_localization": bool(has_bbox),
+            "needs_stronger_labels": not has_bbox,
+        },
+        "evidence_requirements": {
+            "temporal_pair_required": record.get("record_type") in {"positive", "control", "monitor_report", "seeded_cache"},
+            "has_temporal_windows": bool(has_temporal_windows),
+            "context_thumb_required_for_nm_uni": True,
+            "timelapse_optional": True,
+            "spectral_bands_required": record.get("target_category") in {"deforestation", "cryosphere", "wildfire"},
+        },
+        "nm_uni_import": {
+            "role": "satellite_vlm_training_bridge",
+            "requires_context_thumb": True,
+            "imports_context_thumb_as_image_path": True,
+            "uses_ground_truth_payload": True,
+        },
+    }
+
+
 def _build_reject_record(message: dict[str, Any], *, eval_ratio: float) -> dict[str, Any] | None:
     cell_id = str(message.get("cell_id") or "").strip()
     if not cell_id:
@@ -556,7 +617,12 @@ def build_export_records(
             records.append(record)
 
     records.sort(key=lambda item: (str(item.get("timestamp") or ""), str(item.get("sample_id") or "")), reverse=True)
-    return [enrich_temporal_record(record) for record in records[: max(1, int(limit))]]
+    enriched_records: list[dict[str, Any]] = []
+    for record in records[: max(1, int(limit))]:
+        enriched = enrich_temporal_record(record)
+        enriched["training_contract"] = _training_contract(enriched)
+        enriched_records.append(enriched)
+    return enriched_records
 
 
 def _resolve_context_thumb_data(record: dict[str, Any], gallery_item: dict[str, Any] | None) -> str | None:
@@ -738,6 +804,8 @@ def write_dataset_export(
             "Replay-cache rows can be included directly from the legacy assets/seeded_data folder for replay and timelapse training packs.",
             "Persisted maritime and lifeline monitor-report JSON files can be imported as generated monitor rows.",
             "Ground rejections are weak negatives with explicit provenance rather than operator-reviewed gold controls.",
+            "Every sample carries orbit_training_contract_v1 metadata for NM-UNI import, review gating, and localization follow-up.",
+            "SVG fallback thumbnails are rasterized to PNG during export so vision tagging cycles receive image assets.",
         ],
     }
     (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")

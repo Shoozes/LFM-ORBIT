@@ -327,6 +327,16 @@ def test_provider_status_endpoint_returns_structure():
     assert "nasa_api_direct" in data["providers"]
 
 
+def test_provider_status_keeps_simsat_as_primary_hackathon_path():
+    """SimSat must remain first in the provider chain for judge demos."""
+    response = client.get("/api/provider/status")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["fallback_order"][0] == "simsat_sentinel"
+    assert data["providers"]["sentinelhub_direct"]["description"] == "Direct Sentinel Hub access"
+
+
 def test_simsat_status_endpoint_includes_mapbox_metadata():
     """SimSat status should expose optional Mapbox readiness without leaking the token."""
     response = client.get("/api/simsat/status")
@@ -404,8 +414,10 @@ def test_lifeline_assets_endpoint_returns_seed_assets():
     assert any(asset["asset_id"] == "orbit_bridge_corridor" for asset in data["assets"])
 
 
-def test_lifeline_monitor_endpoint_downlinks_high_confidence_disruption():
+def test_lifeline_monitor_endpoint_downlinks_high_confidence_disruption(tmp_path, monkeypatch):
     """Lifeline monitor should turn valid high-confidence before/after changes into downlinks."""
+    monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(tmp_path / "runtime-data"))
+
     response = client.post(
         "/api/lifelines/monitor",
         json={
@@ -441,10 +453,14 @@ def test_lifeline_monitor_endpoint_downlinks_high_confidence_disruption():
     assert data["decision"]["action"] == "downlink_now"
     assert data["frames"]["pair_state"]["distinct_contextual_frames"] is True
     assert data["use_case"]["id"] == "civilian_lifeline_disruption"
+    assert data["persistence"]["path"].endswith(".json")
+    assert (tmp_path / "runtime-data" / "monitor-reports" / data["persistence"]["filename"]).exists()
 
 
-def test_lifeline_monitor_endpoint_holds_downlink_without_frame_evidence():
+def test_lifeline_monitor_endpoint_holds_downlink_without_frame_evidence(tmp_path, monkeypatch):
     """High-confidence candidates still need distinct before/after frame context."""
+    monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(tmp_path / "runtime-data"))
+
     response = client.post(
         "/api/lifelines/monitor",
         json={
@@ -468,6 +484,7 @@ def test_lifeline_monitor_endpoint_holds_downlink_without_frame_evidence():
     assert data["frames"]["pair_state"]["distinct_contextual_frames"] is False
     assert data["decision"]["action"] == "defer"
     assert data["decision"]["priority"] == "needs_context"
+    assert data["persistence"]["filename"].endswith(".json")
 
 
 def test_lifeline_monitor_endpoint_rejects_unknown_asset_id():
@@ -567,8 +584,10 @@ def test_ice_snow_score_endpoint_returns_multispectral_contract():
     assert "ndsi_increase" in data["reason_codes"]
 
 
-def test_maritime_monitor_endpoint_returns_offline_investigation_plan():
+def test_maritime_monitor_endpoint_returns_offline_investigation_plan(tmp_path, monkeypatch):
     """Maritime endpoint should return Orbit-native investigation planning."""
+    monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(tmp_path / "runtime-data"))
+
     response = client.post(
         "/api/maritime/monitor",
         json={
@@ -587,6 +606,7 @@ def test_maritime_monitor_endpoint_returns_offline_investigation_plan():
     assert data["stac"]["disabled"] is True
     assert len(data["investigation"]["directions"]) == 4
     assert data["orbit_integration"]["separate_streamlit_app_required"] is False
+    assert (tmp_path / "runtime-data" / "monitor-reports" / data["persistence"]["filename"]).exists()
 
 
 def test_maritime_monitor_endpoint_validates_coordinates():

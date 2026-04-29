@@ -72,7 +72,7 @@ The default viewer config is `training_assets.jsonl`, which contains single-imag
 - 74 reused existing image tags
 - 65 deterministic image fallbacks
 - 20 deterministic sequence fallbacks
-- 9 skipped SVG placeholder assets
+- 9 historical skipped SVG placeholder assets; current exporter rasterizes SVG fallback chips to PNG before future retag runs
 - 0 tagger failures
 
 Latest replay-cache additions:

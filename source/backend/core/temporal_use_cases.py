@@ -882,6 +882,7 @@ def build_training_jsonl_row(record: dict[str, Any]) -> dict[str, Any]:
         "rejection_reason": record.get("rejection_reason"),
         "assets": record.get("assets", {}),
         "api_prep": record.get("api_prep", {}),
+        "training_contract": record.get("training_contract", {}),
     }
     expected = {
         "use_case_id": decision["id"],
@@ -923,5 +924,10 @@ def build_training_jsonl_row(record: dict[str, Any]) -> dict[str, Any]:
             "target_category": expected["target_category"],
             "target_action": expected["target_action"],
             "label_tier": expected["label_tier"],
+            "training_contract_schema": (
+                record.get("training_contract", {}).get("schema")
+                if isinstance(record.get("training_contract"), dict)
+                else ""
+            ),
         },
     }
