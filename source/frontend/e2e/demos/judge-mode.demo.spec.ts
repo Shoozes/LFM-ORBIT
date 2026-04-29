@@ -9,7 +9,7 @@ test("judge mode records deterministic VLM proof", async ({ page, request }, tes
   await expect(page.getByTestId("proof-timelapse-video")).toBeVisible();
   await expect(page.getByTestId("timelapse-integrity")).toContainText("25 contextual frames");
   await expect(page.getByTestId("proof-latency")).toContainText("842 ms");
-  await expect(page.getByTestId("proof-source")).toContainText(/Seeded Replay|seeded replay/i);
+  await expect(page.getByTestId("proof-source")).toContainText(/Replay \(Sentinel Hub Cache\)|Replay \(Cached API Imagery\)/i);
   await expect(page.getByTestId("proof-raw-bytes")).toContainText("1.84 MB");
   await expect(page.getByTestId("proof-alert-bytes")).toContainText("1.24 KB");
   await expect(page.getByTestId("proof-reduction-ratio")).toContainText("1,483x");

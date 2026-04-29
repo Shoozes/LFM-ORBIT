@@ -49,6 +49,8 @@ def test_vlm_explain_caption_marks_heuristic_fallback():
     assert payload["caption"] == "Deforested clearing beside intact canopy."
     assert payload["provenance"]["heuristic_fallback"] is True
     assert payload["provenance"]["runtime_truth_mode"] == "fallback"
+    assert payload["provenance"]["imagery_origin"] == "fallback_none"
+    assert payload["provenance"]["scoring_basis"] == "fallback_none"
 
 
 def test_vlm_fetch_image_failure_returns_none_instead_of_blank_tile():

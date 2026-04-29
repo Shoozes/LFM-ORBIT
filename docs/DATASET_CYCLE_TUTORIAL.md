@@ -8,7 +8,7 @@ One cycle creates evidence like an operator would:
 
 1. Pick an interesting mission area.
 2. Fetch cloud-gated Sentinel-2 frames.
-3. Save the replay as seeded WebM plus metadata.
+3. Save the replay as a cached real API WebM plus metadata.
 4. Export Orbit records into a local dataset pack.
 5. Retag deduplicated images and temporal sequences with `qwen3.6:27b`.
 6. Upload the retagged configs to Hugging Face.
@@ -97,7 +97,7 @@ uv run --no-sync python scripts\upload_orbit_dataset_hf.py `
 | Output | Value |
 |---|---|
 | Exported Orbit samples | `56` |
-| Seeded-cache rows | `24` |
+| Replay-cache rows | `24` |
 | Records with timelapse references | `25` |
 | Deduplicated training assets | `179` |
 | Temporal sequences | `26` |
@@ -109,11 +109,11 @@ uv run --no-sync python scripts\upload_orbit_dataset_hf.py `
 | Skipped assets | `9` SVG placeholders |
 | Tagger failures | `0` |
 
-The sample count is a current runtime-cycle export, not a claim of total possible mission history. The durable seeded cache increased and now includes seven newer temporal missions.
+The sample count is a current runtime-cycle export, not a claim of total possible mission history. The durable replay cache increased and now includes seven newer temporal missions.
 
 ## Integrity Rules
 
-- Clouds and no-data are quality gates before frames enter seeded WebMs.
+- Clouds and no-data are quality gates before frames enter replay WebMs.
 - A valid timelapse needs multiple contextual satellite slices.
 - Static image recolors are invalid temporal evidence.
 - Unsupported SVG placeholders are skipped, not forced into vision tagging.

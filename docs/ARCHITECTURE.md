@@ -1,6 +1,6 @@
 # LFM Orbit Architecture
 
-Current as of **April 28, 2026**.
+Current as of **April 29, 2026**.
 
 ## System Shape
 
@@ -36,11 +36,11 @@ The backend runs two long-lived loops during app lifespan:
 14. `core/overlays/attribution.py` adds governance/boundary context when available.
 15. `core/telemetry.py` emits typed `scan_result` payloads defined in `core/contracts.py`.
 16. `core/queue.py` persists confirmed alerts for `Logs`, `Inspect`, and recent-alert APIs.
-17. `core/gallery.py` expands confirmed alerts into imagery/timelapse evidence and now reuses seeded local cache for thumbnail fallback before dropping to SVG-only offline chips.
-18. `core/replay.py` can reset runtime state and seed a completed mission directly into the same mission, queue, gallery, metrics, and dialogue stores used by live operations. It also exposes seeded-cache WebMs as Fast Replay entries and can rescan replay metadata through the current runtime/model stack.
+17. `core/gallery.py` expands confirmed alerts into imagery/timelapse evidence and now reuses local replay cache imagery for thumbnail fallback before dropping to SVG-only offline chips.
+18. `core/replay.py` can reset runtime state and load a completed mission directly into the same mission, queue, gallery, metrics, and dialogue stores used by realtime operations. It also exposes cached API WebMs as Fast Replay entries and can rescan replay metadata through the current runtime/model stack.
 19. `ValidationPanel.tsx`, `TimelapseViewer.tsx`, and `VlmPanel.tsx` expand a selected alert into imagery, analysis, exports, and timelapse context. Mission-tab timelapse output renders ahead of VLM actions so active temporal video evidence remains visible.
 20. `SettingsPanel.tsx` queries provider, SimSat, analysis, and depth status endpoints independently, with short retries so one transient miss does not force a false offline settings surface.
-21. `JudgeModePanel.tsx` turns seeded replay state into visible proof: satellite frame, bbox/evidence overlay, VLM result, latency, provenance, raw-vs-alert bytes, reduction ratio, abstain state, link outage queue, and proof JSON.
+21. `JudgeModePanel.tsx` turns replay state into visible proof: satellite frame, bbox/evidence overlay, VLM result, latency, provenance, raw-vs-alert bytes, reduction ratio, abstain state, link outage queue, and proof JSON.
 
 ## Module Map
 
@@ -93,7 +93,7 @@ The backend runs two long-lived loops during app lifespan:
 - `source/backend/core/gallery.py`
   Ground-confirmed imagery/timelapse evidence store.
 - `source/backend/core/replay.py`
-  Seeded mission replay catalog/loading path that hydrates the existing runtime tables for judge walkthroughs and fixture-driven demos, dynamically catalogs valid seeded-cache WebMs, and starts live rescans from replay metadata.
+  Replay catalog/loading path that hydrates the existing runtime tables for judge walkthroughs and fixture-driven demos, dynamically catalogs valid cached API WebMs, and starts realtime rescans from replay metadata.
 - `source/backend/core/timelapse.py`
   Temporal frame generation and video assembly; `steps` caps provider frame fetches for long windows.
 - `source/backend/core/vlm.py`
@@ -103,7 +103,7 @@ The backend runs two long-lived loops during app lifespan:
 - `source/backend/scripts/fetch_satellite_model.py`
   Fetch utility that stages a published artifact into `runtime-data/models/` and writes the local runtime manifest.
 - `source/backend/scripts/export_orbit_dataset.py`
-  Dataset exporter for recent alerts, fetched/cached API imagery, local gallery evidence, weak reject controls, cached API observations, direct seeded-cache rows, persisted maritime/lifeline monitor reports, enriched sample JSONL, and SFT-style training JSONL.
+  Dataset exporter for recent alerts, fetched/cached API imagery, local gallery evidence, weak reject controls, cached API observations, direct replay-cache rows, persisted maritime/lifeline monitor reports, enriched sample JSONL, and SFT-style training JSONL.
 - `source/backend/scripts/retag_training_assets.py`
   Standalone second-pass retagger for exported data directories. It deduplicates images/frames by SHA-256, extracts sampled timelapse frames, writes ordered temporal sequence JSONL, and can use heuristic/manual queue, Ollama vision, or OpenAI-compatible vision providers.
 - `source/backend/scripts/retag_training_assets_ui.py`
@@ -138,7 +138,7 @@ The backend runs two long-lived loops during app lifespan:
 - `source/frontend/e2e/runtime.ts`
   Shared retryable app navigation, runtime-reset, replay-load, link-readiness, basemap-readiness, and canvas-relative map context-menu helpers for deterministic demos, visual captures, and fixtures.
 - `source/frontend/e2e/app.spec.ts`
-  Main app E2E coverage, including deterministic seeded-WebM timelapse proof, settings API readiness guards, and agent-dialogue REST polling before bus screenshots.
+  Main app E2E coverage, including deterministic cached-API WebM timelapse proof, settings API readiness guards, and agent-dialogue REST polling before bus screenshots.
 - `source/frontend/e2e/tutorialHelpers.ts`
   Shared Playwright subtitle, highlight, and map-drawing helpers used by tutorial-style recording specs.
 - `source/frontend/playwright.config.ts`
@@ -164,7 +164,7 @@ The backend runs two long-lived loops during app lifespan:
 
 - Alerts are persisted in SQLite via `core/queue.py`.
 - Agent dialogue and gallery data also live in runtime SQLite tables.
-- Seeded replays do not introduce a second persistence model. They hydrate the same queue/bus/gallery/mission/metrics stores and then idle the background SAT/GND loops so the seeded state stays deterministic.
+- Replays do not introduce a second persistence model. They hydrate the same queue/bus/gallery/mission/metrics stores and then idle the background SAT/GND loops so replay state stays deterministic.
 - `boundary_context` now survives:
   telemetry -> alert persistence -> recent alerts API -> frontend normalization -> inspect panel.
 - Candidate anomalies are not surfaced as confirmed alerts until persistence/confirmation criteria are met.
@@ -177,10 +177,20 @@ The backend runs two long-lived loops during app lifespan:
 - Optional SimSat imagery provider: `simsat_mapbox` via `MAPBOX_ACCESS_TOKEN`
 - Secondary: `sentinelhub_direct`
 - Tertiary: `nasa_api_direct`
-- Final safety net: local/semi-real fallback data
-- Cold-start `.env.example` sets `DISABLE_EXTERNAL_APIS=true` so fresh installs do not depend on network credentials or live provider quota unless the operator opts in.
+- Final safety net: local deterministic fallback data
+- Cold-start `.env.example` sets `DISABLE_EXTERNAL_APIS=true` so fresh installs do not depend on network credentials or realtime provider quota unless the operator opts in.
 - Direct Sentinel Hub credentials resolve from env first, then `.tools/.secrets/sentinel.txt`, then `.tools/.secrets/sh.txt`. The seeding path never logs credential values. `sh.txt` supports key/value fields, legacy two-line secret-then-id files, three-line trial bundles, and labeled local bundles such as `API`, `CLIENTID`, and `CLIENT`.
-- Current seeded Sentinel-2 L2A demo cache includes Pakistan Manchar Lake flooding, Atacama mining, Greenland Ilulissat ice-edge, Suez maritime, Singapore Strait, Georgia wildfire candidate, Kansas crop phenology, Delhi urban expansion, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead WebMs in `source/backend/assets/seeded_data/`.
+- Current Sentinel-2 L2A replay cache includes Pakistan Manchar Lake flooding, Atacama mining, Greenland Ilulissat ice-edge, Suez maritime, Singapore Strait, Georgia wildfire candidate, Kansas crop phenology, Delhi urban expansion, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead WebMs in `source/backend/assets/seeded_data/`.
+
+### Runtime Truth and Provenance
+
+Runtime evidence now carries three separate labels:
+
+- `runtime_truth_mode`: `realtime`, `replay`, `fallback`, or `unknown`.
+- `imagery_origin`: source family such as `sentinelhub`, `simsat`, `nasa_gibs`, `gee`, `cached_api`, or `fallback_none`.
+- `scoring_basis`: `multispectral_bands`, `proxy_bands`, `visual_only`, `fallback_none`, or `unknown`.
+
+This keeps cached real API replay imagery distinct from degraded fallback behavior. It also prevents proxy scoring or VLM compatibility fallbacks from looking like realtime multispectral evidence.
 
 ### Analysis Models
 
@@ -196,14 +206,14 @@ The backend runs two long-lived loops during app lifespan:
 Current repo-wide validation results:
 
 - `uv sync --extra dev --locked` -> passing
-- `uv run --no-sync pytest -q` -> `283 passed`
+- `uv run --no-sync pytest -q` -> `289 passed`
 - `npm run lint` -> passing
 - `npm run build` -> passing, with split chunks and no large-chunk warning
 - `npx playwright test` -> `73 passed`, `1 skipped` debug-only HTML dump
 - `npm run demo:judge` -> passing with Playwright video/trace/final screenshot, `e2e/artifacts/judge-mode/evidence-frame.png`, and `e2e/artifacts/judge-mode/proof.json`
 - `npm run demo:record` -> passing for judge, payload-reduction, provenance, abstain-safety, and orbital-eclipse demo specs
 - `npm run demo:tutorial` -> passing with refreshed `docs/tutorial_video.webm`
-- Dataset export with `--include-seeded-cache` -> `56` current-cycle samples, `24` seeded-cache rows, `25` timelapse rows, `2` wildfire seeded-cache rows, and `2` volcanic surface-change rows; bounded Qwen/Ollama retagged training export -> `179` deduplicated assets, `26` temporal sequences, `40` model image calls, `6` sequence calls, `74` reused image tags, and deterministic heuristic fallback for the rest
+- Dataset export with `--include-seeded-cache` -> `56` current-cycle samples, `24` replay-cache rows, `25` timelapse rows, `2` wildfire replay-cache rows, and `2` volcanic surface-change rows; bounded Qwen/Ollama retagged training export -> `179` deduplicated assets, `26` temporal sequences, `40` model image calls, `6` sequence calls, `74` reused image tags, and deterministic heuristic fallback for the rest
 - Sentinel Hub Process API OAuth -> validated with local `sh.txt`; Hugging Face dataset upload -> published to `Shoozes/LFM-Orbit-SatData` with viewer-safe configs at data commit `5a2798e7d16cd76df08eff3725dcf3ade9340b58` and card commit `60e8ae913f61315740a640c532eb1aa9ae7cfe75`
 - `.\run.ps1 -Verify` -> passing from repo root; backend, frontend, and E2E component checks were rerun after the latest preset and screenshot updates.
 - Screenshot captures include Settings, timelapse, context-menu, agent-evaluation, monitor-preview, known-location mission presets, debug-dashboard, and VLM road-corridor proof images.
@@ -221,7 +231,7 @@ Current repo-wide validation results:
 - Tool-call parsing supports nested fenced JSON arguments for local LFM output. Inline JSON extraction remains intentionally conservative to avoid over-parsing normal prose.
 - The primary UI is desktop-operator oriented with a fixed right mission rail. The map now has a non-right-click action path, but responsive/mobile layout coverage remains follow-up work.
 - The current eval lane is replay/baseline-only. It is not yet a multi-model benchmark or a tuned-model promotion gate.
-- The runtime now supports curated replay loading plus dynamic seeded-cache Fast Replay entries with rescan. Full export/import of arbitrary completed live missions remains follow-up work.
+- The runtime now supports curated replay loading plus dynamic cached-API Fast Replay entries with rescan. Full export/import of arbitrary completed realtime missions remains follow-up work.
 - Judge Mode is intentionally app-level demo UI, not a correctness substitute. Correctness remains covered by backend tests, frontend type checks, and normal Playwright specs.
 - Satellite GGUF reasoning is only active when a manifest-resolved model artifact is installed locally.
 - The current scan grid is still the repo-local square-cell compatibility layer. A true H3 parser/generator remains the right follow-up before production geospatial scale-out.

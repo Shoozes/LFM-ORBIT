@@ -467,9 +467,22 @@ def get_runtime_mode_summary() -> dict:
     return {
         "active_provider": provider,
         "runtime_truth_mode": truth_mode,
+        "imagery_origin": imagery_origin_for_source(provider),
+        "scoring_basis": scoring_basis_for_source(provider),
         "demo_mode_enabled": False,
         "imagery_backed_scoring_enabled": is_imagery_backed_scoring_enabled(),
     }
+
+
+def normalize_runtime_truth_mode(value: str | None) -> str:
+    text = str(value or "").strip().lower()
+    if text in {"live_imagery", "live"}:
+        return "realtime"
+    if text in {"seeded_replay", "demo_synthetic"}:
+        return "replay" if text == "seeded_replay" else "fallback"
+    if text in {"realtime", "replay", "fallback", "unknown"}:
+        return text
+    return "unknown"
 
 
 def runtime_truth_mode_for_source(
@@ -488,13 +501,50 @@ def runtime_truth_mode_for_source(
     if "fallback" in source or "mock" in source or "quality_gate" in source or "error" in source:
         return "fallback"
     if source == PROVIDER_SENTINELHUB_DIRECT or "sentinelhub_direct" in source:
-        return "live_imagery"
+        return "realtime"
     if "simsat" in source or "nasa" in source or "gibs" in source:
-        return "live_imagery"
+        return "realtime"
+    if "gee" in source:
+        return "realtime"
     if "semi_real" in source:
         return "fallback"
     if demo_forced_anomaly:
         return "fallback"
+    return "unknown"
+
+
+def imagery_origin_for_source(observation_source: str | None = None) -> str:
+    source = str(observation_source or REGION.observation_mode or "").lower()
+    if "seeded" in source or "replay" in source or "cache" in source:
+        return "cached_api"
+    if "sentinelhub" in source or source == PROVIDER_SENTINELHUB_DIRECT:
+        return "sentinelhub"
+    if "simsat" in source:
+        return "simsat"
+    if "nasa_gibs" in source or "gibs" in source:
+        return "nasa_gibs"
+    if "nasa_api" in source or source == PROVIDER_NASA_DIRECT:
+        return "nasa_api"
+    if "gee" in source:
+        return "gee"
+    if "esri" in source:
+        return "esri_arcgis"
+    if "fallback" in source or "quality_gate" in source or "error" in source or "semi_real" in source:
+        return "fallback_none"
+    return "unknown"
+
+
+def scoring_basis_for_source(observation_source: str | None = None) -> str:
+    source = str(observation_source or REGION.observation_mode or "").lower()
+    truth_mode = runtime_truth_mode_for_source(source)
+    if truth_mode == "fallback":
+        return "fallback_none"
+    if "sentinelhub_direct" in source or source == PROVIDER_SENTINELHUB_DIRECT or "gee" in source:
+        return "multispectral_bands"
+    if "simsat" in source or "nasa_api" in source or source == PROVIDER_NASA_DIRECT or "semi_real" in source:
+        return "proxy_bands"
+    if "seeded" in source or "replay" in source or "cache" in source or "gibs" in source or "esri" in source:
+        return "visual_only"
     return "unknown"
 
 

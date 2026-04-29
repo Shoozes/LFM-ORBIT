@@ -473,7 +473,7 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                             rounded = [round(b, 3) for b in cell_bbox]
                             chunk_sig = hashlib.md5(str(rounded).encode()).hexdigest()[:8]
 
-                            # Check seeded cache first
+                            # Check replay cache first
                             meta_path = Path(__file__).resolve().parent.parent / "assets" / "seeded_data" / f"nasa_{chunk_sig}_meta.json"
                             if meta_path.exists():
                                 with open(meta_path, "r") as mf:

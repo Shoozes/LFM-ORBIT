@@ -295,7 +295,7 @@ test.describe("Phase 4.5 – Sidebar Tabs Navigation", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("Phase 4.75 – Seeded replay flow", () => {
-  test("seeded replay loads into inspect and historical dialogue", async ({ page, request }) => {
+  test("cached replay loads into inspect and historical dialogue", async ({ page, request }) => {
     await resetRuntimeState(request);
     await gotoApp(page);
     await waitForLinkOpen(page);
@@ -536,8 +536,9 @@ test.describe("Phase 9 - Context Module and Timelapse Validation", () => {
           frames_count: 8,
           format: "webm",
           provenance: {
-            kind: "seeded_cache",
-            label: "Seeded local WebM cache",
+            kind: "replay_cache",
+            legacy_kind: "seeded_cache",
+            label: "Cached real API timelapse",
           },
         }),
       });
@@ -557,7 +558,7 @@ test.describe("Phase 9 - Context Module and Timelapse Validation", () => {
     // Make sure Timelapse modal hooks capture sequence FFMpeg payload rendering
     await expect(page.getByText(/Orbital Timelapse/i)).toBeVisible({ timeout: 10_000 });
     await expect(page.locator("video")).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText("Seeded local WebM cache")).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText("Cached real API timelapse")).toBeVisible({ timeout: 5_000 });
     await page.waitForFunction(() => {
       const video = document.querySelector("video");
       return video instanceof HTMLVideoElement && video.readyState >= 2;

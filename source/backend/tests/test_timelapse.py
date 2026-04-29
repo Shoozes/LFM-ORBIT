@@ -103,6 +103,10 @@ def test_read_cache_reports_seeded_provenance(monkeypatch, tmp_path):
 
     assert result is not None
     assert result["source"] == "seeded_cache"
+    assert result["runtime_truth_mode"] == "replay"
+    assert result["imagery_origin"] == "cached_api"
+    assert result["scoring_basis"] == "visual_only"
     assert result["provider"] == "nasa_gibs"
-    assert result["provenance"]["kind"] == "seeded_cache"
+    assert result["provenance"]["kind"] == "replay_cache"
+    assert result["provenance"]["legacy_kind"] == "seeded_cache"
     assert result["provenance"]["cache_key"] == sig

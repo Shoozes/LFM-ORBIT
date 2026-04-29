@@ -144,7 +144,7 @@ type DemoProfile = {
 const DEMO_PROFILES: Record<DemoCase, DemoProfile> = {
   judge: {
     replayId: JUDGE_REPLAY_ID,
-    provider: "seeded replay",
+    provider: "Replay (Cached API Imagery)",
     bbox: JUDGE_BBOX,
     result: "forest boundary disturbance detected",
     mission: "Rondonia frontier canopy-loss replay",

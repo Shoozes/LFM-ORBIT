@@ -3,7 +3,13 @@ import os
 import sqlite3
 from typing import Any
 
-from core.config import REGION, runtime_truth_mode_for_source
+from core.config import (
+    REGION,
+    imagery_origin_for_source,
+    normalize_runtime_truth_mode,
+    runtime_truth_mode_for_source,
+    scoring_basis_for_source,
+)
 from core.contracts import RecentAlertsResponse
 
 DEFAULT_DB_PATH = os.path.join(os.path.dirname(__file__), "../../../runtime-data/dtn_queue.sqlite")
@@ -73,6 +79,12 @@ def _migrate_alerts_schema(connection: sqlite3.Connection):
     if "runtime_truth_mode" not in columns:
         connection.execute("ALTER TABLE alerts ADD COLUMN runtime_truth_mode TEXT DEFAULT 'unknown'")
 
+    if "imagery_origin" not in columns:
+        connection.execute("ALTER TABLE alerts ADD COLUMN imagery_origin TEXT DEFAULT 'unknown'")
+
+    if "scoring_basis" not in columns:
+        connection.execute("ALTER TABLE alerts ADD COLUMN scoring_basis TEXT DEFAULT 'unknown'")
+
     if "before_window" not in columns:
         connection.execute("ALTER TABLE alerts ADD COLUMN before_window TEXT")
 
@@ -132,6 +144,8 @@ def push_alert(
     demo_forced_anomaly: bool = False,
     observation_source: str = "unknown",
     runtime_truth_mode: str | None = None,
+    imagery_origin: str | None = None,
+    scoring_basis: str | None = None,
     before_window: dict | None = None,
     after_window: dict | None = None,
     boundary_context: list[dict] | None = None,
@@ -154,10 +168,12 @@ def push_alert(
                 demo_forced_anomaly,
                 observation_source,
                 runtime_truth_mode,
+                imagery_origin,
+                scoring_basis,
                 before_window,
                 after_window,
                 boundary_context
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event_id,
@@ -176,6 +192,8 @@ def push_alert(
                     observation_source,
                     demo_forced_anomaly=demo_forced_anomaly,
                 ),
+                imagery_origin or imagery_origin_for_source(observation_source),
+                scoring_basis or scoring_basis_for_source(observation_source),
                 json.dumps(before_window) if before_window else None,
                 json.dumps(after_window) if after_window else None,
                 json.dumps(boundary_context) if boundary_context else None,
@@ -235,6 +253,8 @@ def get_recent_alerts(limit: int = 50) -> RecentAlertsResponse:
                 demo_forced_anomaly,
                 observation_source,
                 runtime_truth_mode,
+                imagery_origin,
+                scoring_basis,
                 before_window,
                 after_window,
                 boundary_context
@@ -247,6 +267,30 @@ def get_recent_alerts(limit: int = 50) -> RecentAlertsResponse:
 
     alerts: list[dict[str, Any]] = []
     for row in rows:
+        observation_source = row["observation_source"] if "observation_source" in row.keys() else "unknown"
+        stored_truth_mode = normalize_runtime_truth_mode(
+            row["runtime_truth_mode"] if "runtime_truth_mode" in row.keys() else None
+        )
+        runtime_truth_mode = (
+            stored_truth_mode
+            if stored_truth_mode != "unknown"
+            else runtime_truth_mode_for_source(
+                observation_source,
+                demo_forced_anomaly=bool(row["demo_forced_anomaly"]),
+            )
+        )
+        stored_imagery_origin = row["imagery_origin"] if "imagery_origin" in row.keys() and row["imagery_origin"] else ""
+        stored_scoring_basis = row["scoring_basis"] if "scoring_basis" in row.keys() and row["scoring_basis"] else ""
+        imagery_origin = (
+            stored_imagery_origin
+            if stored_imagery_origin and stored_imagery_origin != "unknown"
+            else imagery_origin_for_source(observation_source)
+        )
+        scoring_basis = (
+            stored_scoring_basis
+            if stored_scoring_basis and stored_scoring_basis != "unknown"
+            else scoring_basis_for_source(observation_source)
+        )
         alerts.append(
             {
                 "event_id": row["event_id"],
@@ -260,11 +304,10 @@ def get_recent_alerts(limit: int = 50) -> RecentAlertsResponse:
                 "timestamp": row["timestamp"],
                 "downlinked": bool(row["downlinked"]),
                 "demo_forced_anomaly": bool(row["demo_forced_anomaly"]),
-                "observation_source": row["observation_source"] if "observation_source" in row.keys() else "unknown",
-                "runtime_truth_mode": row["runtime_truth_mode"] if "runtime_truth_mode" in row.keys() else runtime_truth_mode_for_source(
-                    row["observation_source"] if "observation_source" in row.keys() else "unknown",
-                    demo_forced_anomaly=bool(row["demo_forced_anomaly"]),
-                ),
+                "observation_source": observation_source,
+                "runtime_truth_mode": runtime_truth_mode,
+                "imagery_origin": imagery_origin,
+                "scoring_basis": scoring_basis,
                 "before_window": json.loads(row["before_window"]) if "before_window" in row.keys() and row["before_window"] else None,
                 "after_window": json.loads(row["after_window"]) if "after_window" in row.keys() and row["after_window"] else None,
                 "boundary_context": json.loads(row["boundary_context"]) if "boundary_context" in row.keys() and row["boundary_context"] else None,

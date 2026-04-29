@@ -61,7 +61,7 @@
   },
   "groups": {
     "docs_state_and_tracking": {
-      "note": "README is the Liquid AI x DPhi Space Hackathon-facing presentation surface with current demo screenshots; deeper current-state, architecture, demo, dataset-cycle, and backlog tracking lives in focused docs.",
+      "note": "README is now the concise, screenshot-led Liquid AI x DPhi judge-facing surface; ARCHITECTURE carries system shape; TODO is the compact active backlog/edge-case list; DATASET_CYCLE_TUTORIAL and MODEL_HANDOFF carry repeatable workflow detail without duplicating progress history.",
       "files": [
         "README.md",
         "docs/ARCHITECTURE.md",
@@ -101,7 +101,7 @@
       ]
     },
     "issue_group_error_handling_and_parser_integrity": {
-      "note": "Malformed Depth Anything image payloads fail before optional model loading, nested fenced LFM tool-call JSON parses correctly, benign Windows websocket teardown noise is filtered narrowly, Mission refresh failures leave debug diagnostics, and non-fatal fallback paths now leave traceable diagnostics.",
+      "note": "Malformed Depth Anything image payloads fail before optional model loading, nested fenced LFM tool-call JSON parses correctly, benign Windows websocket teardown noise is filtered narrowly, Mission refresh failures leave debug diagnostics, provider/QC failures cannot become positive alerts, and fallback paths leave traceable provenance.",
       "files": [
         "source/backend/api/main.py",
         "source/backend/core/config.py",
@@ -146,7 +146,7 @@
       ]
     },
     "issue_group_alert_contracts_and_persistence": {
-      "note": "Typed alert payloads, boundary-context persistence, and confirmation gating.",
+      "note": "Typed alert payloads, boundary-context persistence, confirmation gating, and durable runtime_truth_mode/imagery_origin/scoring_basis fields across telemetry, queue storage, recent-alert APIs, and frontend normalization.",
       "files": [
         "source/backend/api/main.py",
         "source/backend/core/contracts.py",
@@ -252,7 +252,7 @@
       ]
     },
     "issue_group_gallery_cache_and_offline_fallbacks": {
-      "note": "Gallery thumbnail fallbacks, seeded timelapse cache reuse, provenance labels, offline evidence regression coverage, and guards against fake still-image timelapses.",
+      "note": "Gallery thumbnail fallbacks, replay timelapse cache reuse, replay_cache provenance labels, offline evidence regression coverage, and guards against invalid still-image color-shift timelapses.",
       "files": [
         "source/backend/core/gallery.py",
         "source/backend/core/timelapse.py",
@@ -293,7 +293,7 @@
       ]
     },
     "feature_group_dataset_export_and_eval_lane": {
-      "note": "Orbit dataset export, seeded-cache export with frame-quality/rejected-window cloud metadata, bounded Qwen/Ollama asset retagging with deterministic fallback budgets, prior-tag reuse for already-tagged image hashes, frame-safe timelapse extraction namespaced by video SHA-256, optional Tkinter retag UI with HF upload controls, Hugging Face upload helper with successful publication to Shoozes/LFM-Orbit-SatData, viewer-safe dataset-card configs for mixed JSONL schemas, current cycle at 56 samples / 179 assets / 26 temporal sequences with Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead seeded missions, and eval tooling, including recent alerts, weak rejects, cached API observations, persisted monitor-report JSON imports, deduplicated image/frame training assets, temporal sequence JSONL, and training JSONL generation.",
+      "note": "Orbit dataset export, replay-cache export with frame-quality/rejected-window cloud metadata, bounded Qwen/Ollama asset retagging with deterministic fallback budgets, prior-tag reuse for already-tagged image hashes, frame-safe timelapse extraction namespaced by video SHA-256, optional Tkinter retag UI with HF upload controls, Hugging Face upload helper with successful publication to Shoozes/LFM-Orbit-SatData, viewer-safe dataset-card configs for mixed JSONL schemas, current cycle at 56 samples / 179 assets / 26 temporal sequences with Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead replay missions, and eval tooling, including recent alerts, weak rejects, cached API observations, persisted monitor-report JSON imports, deduplicated image/frame training assets, temporal sequence JSONL, and training JSONL generation.",
       "files": [
         "docs/MODEL_HANDOFF.md",
         "docs/DATASET_CYCLE_TUTORIAL.md",
@@ -343,7 +343,7 @@
       ]
     },
     "feature_group_runtime_reset_and_replay_determinism": {
-      "note": "Deterministic runtime reset, seeded replay hydration, dynamic seeded-cache Fast Replay catalog entries, rescan from saved replay metadata for current model/runtime checks, multi-mission replay packs, mission-specific replay actions, stricter observation readiness, seeded-WebM integrity checks, and replay-backed demo/test helpers including visible tutorial and judge recordings.",
+      "note": "Deterministic runtime reset, replay hydration from cached real API imagery, dynamic cached-API Fast Replay catalog entries, rescan from saved replay metadata for current model/runtime checks, multi-mission replay packs, mission-specific replay actions, stricter observation readiness, cached-WebM integrity checks, and replay-backed demo/test helpers including visible tutorial and judge recordings.",
       "files": [
         "source/backend/api/main.py",
         "source/backend/core/observation_store.py",
@@ -371,7 +371,7 @@
       ]
     },
     "feature_group_timelapse_gallery_and_vlm": {
-      "note": "Timelapse generation, provenance labels, seeded-WebM visual proof, retryable API-error rendering, gallery evidence, VLM Find/Ask/Generate controls, deterministic image-fetch fallback behavior, and judge demo flows.",
+      "note": "Timelapse generation, replay_cache provenance labels with seeded_cache legacy compatibility, cached-WebM visual proof, retryable API-error rendering, gallery evidence, VLM Find/Ask/Generate controls with structured fallback provenance, deterministic image-fetch fallback behavior, and judge demo flows.",
       "files": [
         "source/backend/core/gallery.py",
         "source/backend/core/timelapse.py",
@@ -394,7 +394,7 @@
       ]
     },
     "feature_group_provider_pipeline_and_seed_scripts": {
-      "note": "Provider resolution, offline-safe cold-start defaults, SimSat Sentinel/Mapbox routing, Sentinel Hub secret-file compatibility including current labeled sh.txt shape, fallback order, seeded caches, event-window Sentinel seeding, SCL-gated frame rejection, burn-scar visual composites, observation-record integrity, and debug diagnostics for safe fallback paths.",
+      "note": "Provider resolution, offline-safe cold-start defaults, SimSat Sentinel/Mapbox routing, Sentinel Hub secret-file compatibility including current labeled sh.txt shape, fallback order, cached real API replay assets, event-window Sentinel seeding, SCL-gated frame rejection, burn-scar visual composites, observation-record integrity, and debug diagnostics for safe fallback paths.",
       "files": [
         ".env.example",
         "source/backend/test_evalscript.py",
@@ -475,7 +475,7 @@
       ]
     },
     "qa_suite_and_demo_flows": {
-      "note": "Playwright coverage for main flows, mission/timelapse validation, normal E2E correctness, separate recorded Judge Mode demos, tutorial-style subtitles, seeded-WebM video quality checks, proof JSON artifacts, and docs video exports.",
+      "note": "Playwright coverage for main flows, mission/timelapse validation, normal E2E correctness, separate recorded Judge Mode demos, tutorial-style subtitles, cached-API WebM video quality checks, proof JSON artifacts, and docs video exports.",
       "files": [
         ".github/workflows/ci.yml",
         "source/frontend/playwright.config.ts",
@@ -532,7 +532,7 @@
       ]
     },
     "feature_group_wildfire_seed_and_future_watch": {
-      "note": "Real wildfire candidate handling and timestamped future-catch proof. Highway 82 Georgia remains candidate-quality Sentinel-2 SWIR/NIR/Red seeded evidence; the SPC Southern High Plains watch is source-backed, timestamped, and unverified until post-window FIRMS/NIFC or Sentinel evidence exists.",
+      "note": "Real wildfire candidate handling and timestamped future-catch proof. Highway 82 Georgia remains candidate-quality Sentinel-2 SWIR/NIR/Red replay evidence from cached API imagery; the SPC Southern High Plains watch is source-backed, timestamped, and unverified until post-window FIRMS/NIFC or Sentinel evidence exists.",
       "files": [
         "docs/TODO.md",
         "source/backend/data/README.md",
@@ -549,7 +549,7 @@
       ]
     },
     "feature_group_judge_demo_mode": {
-      "note": "Judge-ready deterministic demo lane with visual overlay, tutorial-style UI flow, Judge Mode proof panel, Playwright video/trace/screenshots, proof JSON export, README presentation screenshots extracted from current demo WebMs, per-demo evidence-frame screenshot/luminance guards, preloaded mission/replay starts that avoid the legacy Amazonas sweep, Rondonia replay proof, Pakistan Manchar Lake payload reduction, Atacama provenance, Greenland abstain safety, Suez maritime link outage recovery, real Sentinel-2 L2A demo frames and seeded WebMs, active-replay Judge Mode proof binding, clearer replay proof-panel playback windows, and refreshed tutorial video output covering Singapore maritime plus Atacama mining.",
+      "note": "Judge-ready deterministic demo lane with visual overlay, tutorial-style UI flow, Judge Mode proof panel, Playwright video/trace/screenshots, proof JSON export, README presentation screenshots extracted from current demo WebMs, per-demo evidence-frame screenshot/luminance guards, preloaded mission/replay starts that avoid the legacy Amazonas sweep, Rondonia replay proof, Pakistan Manchar Lake payload reduction, Atacama provenance, Greenland abstain safety, Suez maritime link outage recovery, real Sentinel-2 L2A demo frames and cached API WebMs, active-replay Judge Mode proof binding, clearer replay proof-panel playback windows, and refreshed tutorial video output covering Singapore maritime plus Atacama mining.",
       "files": [
         "README.md",
         "docs/JUDGE_DEMO.md",
@@ -584,6 +584,39 @@
         "source/backend/api/main.py",
         "source/backend/core/runtime_state.py",
         "source/backend/tests/test_seeded_timelapse_integrity.py"
+      ]
+    },
+    "issue_group_runtime_truth_provenance_and_modes": {
+      "note": "Current truth/provenance split: runtime_truth_mode distinguishes realtime, replay, fallback, and unknown; imagery_origin captures provider/source family; scoring_basis captures multispectral, proxy, visual-only, fallback-none, or unknown scoring. Replay means stored real API imagery with date/provenance; fallback means degraded runtime behavior and must not promote generated or forced positives.",
+      "files": [
+        "README.md",
+        "docs/ARCHITECTURE.md",
+        "docs/TODO.md",
+        "summary_bank.json",
+        "source/backend/api/main.py",
+        "source/backend/core/config.py",
+        "source/backend/core/contracts.py",
+        "source/backend/core/metrics.py",
+        "source/backend/core/queue.py",
+        "source/backend/core/replay.py",
+        "source/backend/core/scanner.py",
+        "source/backend/core/telemetry.py",
+        "source/backend/core/timelapse.py",
+        "source/backend/core/vlm.py",
+        "source/backend/tests/test_api.py",
+        "source/backend/tests/test_config.py",
+        "source/backend/tests/test_queue.py",
+        "source/backend/tests/test_replay.py",
+        "source/backend/tests/test_telemetry.py",
+        "source/backend/tests/test_timelapse.py",
+        "source/backend/tests/test_vlm.py",
+        "source/frontend/components/JudgeModePanel.tsx",
+        "source/frontend/components/MissionControl.tsx",
+        "source/frontend/components/TimelapseViewer.tsx",
+        "source/frontend/types/telemetry.ts",
+        "source/frontend/utils/telemetry.ts",
+        "source/frontend/e2e/app.spec.ts",
+        "source/frontend/e2e/demos/judge-mode.demo.spec.ts"
       ]
     }
   },

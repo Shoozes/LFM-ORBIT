@@ -71,7 +71,7 @@ def _load_cached_thumbnail(sig: str, size: int) -> str | None:
 
 
 def resolve_seeded_thumbnail(signature: str, size: int = _THUMBNAIL_SIZE) -> str | None:
-    """Resolve a thumbnail from the bundled seeded WebM cache when available."""
+    """Resolve a thumbnail from the bundled replay WebM cache when available."""
     return _load_cached_thumbnail(signature, size)
 
 

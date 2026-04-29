@@ -151,10 +151,12 @@ def test_health_endpoint_shows_observation_mode():
     
     assert "observation_mode" in data
     assert "runtime_truth_mode" in data
+    assert "imagery_origin" in data
+    assert "scoring_basis" in data
     # Observation mode should be a non-empty string describing the loader
     assert isinstance(data["observation_mode"], str)
     assert len(data["observation_mode"]) > 0
-    assert data["runtime_truth_mode"] in {"live_imagery", "replay", "fallback", "unknown"}
+    assert data["runtime_truth_mode"] in {"realtime", "replay", "fallback", "unknown"}
 
 
 def test_invalid_limit_returns_validation_error():

@@ -20,7 +20,7 @@ def test_rgb_only_imagery_cannot_produce_real_ndvi():
     assert "NIR and Red" in result["reason"]
 
 
-def test_missing_nir_returns_unavailable_instead_of_fake_ndvi():
+def test_missing_nir_returns_unavailable_instead_of_fabricated_ndvi():
     result = compute_ndvi_from_bands({"red": 0.18})
 
     assert result == {

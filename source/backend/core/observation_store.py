@@ -10,7 +10,7 @@ Storage layout (under assets/observation_store/):
     <chunk_sig>.json   — observation record (metadata + VLM text + frame refs)
 
 The chunk signature is the same MD5-based hash used by seed_nasa_cache so
-records share the same key space. If a seeded WebM already exists, the
+records share the same key space. If a replay WebM already exists, the
 observation record enriches it with additional agent observations over time.
 """
 

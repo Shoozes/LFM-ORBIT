@@ -88,6 +88,8 @@ class AlertRecord(TypedDict):
     downlinked: NotRequired[bool]
     observation_source: NotRequired[str]
     runtime_truth_mode: NotRequired[str]
+    imagery_origin: NotRequired[str]
+    scoring_basis: NotRequired[str]
     before_window: NotRequired[WindowObservation]
     after_window: NotRequired[WindowObservation]
     demo_forced_anomaly: NotRequired[bool]
@@ -106,6 +108,8 @@ class MetricsFlaggedExample(TypedDict):
     timestamp: str
     demo_forced_anomaly: bool
     runtime_truth_mode: NotRequired[str]
+    imagery_origin: NotRequired[str]
+    scoring_basis: NotRequired[str]
     boundary_context: NotRequired[list[BoundaryContext]]
 
 
@@ -113,6 +117,9 @@ class MetricsSummary(TypedDict):
     region_id: str
     demo_mode_enabled: bool
     demo_mode_loop_scan: bool
+    runtime_truth_mode: str
+    imagery_origin: str
+    scoring_basis: str
     total_cycles_completed: int
     total_cells_scanned: int
     total_alerts_emitted: int
@@ -151,6 +158,8 @@ class ScanResultMessage(TypedDict):
     estimated_bandwidth_saved_mb: float
     observation_source: str
     runtime_truth_mode: str
+    imagery_origin: str
+    scoring_basis: str
     before_window: WindowObservation
     after_window: WindowObservation
     heartbeat: ScanHeartbeat
@@ -174,6 +183,8 @@ class HealthResponse(TypedDict):
     total_payload_bytes: int
     demo_mode_enabled: bool
     runtime_truth_mode: str
+    imagery_origin: str
+    scoring_basis: str
 
 
 class RecentAlertsResponse(TypedDict):

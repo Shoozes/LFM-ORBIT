@@ -19,7 +19,7 @@ export function formatSourceLabel(source: string | undefined): string {
       return "SimSat Mapbox";
     case "sentinelhub_direct":
     case "sentinelhub_direct_imagery":
-      return "Sentinel Hub (Live)";
+      return "Realtime - Sentinel Hub";
     case "nasa_api_direct":
     case "nasa_api_direct_imagery":
       return "NASA Direct";
@@ -43,7 +43,7 @@ export function formatSourceLabel(source: string | undefined): string {
     case "generated_webm":
       return "Generated WebM";
     case "live_fetch":
-      return "Live Provider Fetch";
+      return "Realtime - Provider Fetch";
     case "gee":
       return "GEE Sentinel-2";
     case "Seeded Orbital Video Cache":
@@ -234,6 +234,8 @@ export function parseTelemetryMessage(raw: string): TelemetryMessage | null {
       estimated_bandwidth_saved_mb: parsed.estimated_bandwidth_saved_mb,
       observation_source: parsed.observation_source,
       runtime_truth_mode: isString(parsed.runtime_truth_mode) ? parsed.runtime_truth_mode : undefined,
+      imagery_origin: isString(parsed.imagery_origin) ? parsed.imagery_origin : undefined,
+      scoring_basis: isString(parsed.scoring_basis) ? parsed.scoring_basis : undefined,
       before_window: beforeWindow,
       after_window: afterWindow,
       heartbeat: {
@@ -265,6 +267,8 @@ export function toAlertItem(message: ScanResultMessage): AlertItem {
     payload_bytes: message.payload_bytes,
     observation_source: message.observation_source,
     runtime_truth_mode: message.runtime_truth_mode,
+    imagery_origin: message.imagery_origin,
+    scoring_basis: message.scoring_basis,
     before_window: message.before_window,
     after_window: message.after_window,
     timestamp: new Date().toISOString(),

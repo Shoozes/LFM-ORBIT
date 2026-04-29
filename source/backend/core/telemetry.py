@@ -1,4 +1,9 @@
-from core.config import REGION, runtime_truth_mode_for_source
+from core.config import (
+    REGION,
+    imagery_origin_for_source,
+    runtime_truth_mode_for_source,
+    scoring_basis_for_source,
+)
 from core.contracts import AlertRecord, GridInitMessage, HealthResponse, ScanResultMessage
 
 
@@ -49,6 +54,8 @@ def build_health_payload(counts: dict[str, int]) -> HealthResponse:
         "total_alerts": counts["total_alerts"],
         "total_payload_bytes": counts["total_payload_bytes"],
         "runtime_truth_mode": runtime_truth_mode,
+        "imagery_origin": imagery_origin_for_source(REGION.observation_mode),
+        "scoring_basis": scoring_basis_for_source(REGION.observation_mode),
         "demo_mode_enabled": False,
     }
 
@@ -74,6 +81,8 @@ def build_alert_payload(
         "runtime_truth_mode": runtime_truth_mode_for_source(
             demo_forced_anomaly=demo_forced_anomaly,
         ),
+        "imagery_origin": "unknown",
+        "scoring_basis": "unknown",
     }
     if boundary_context:
         result["boundary_context"] = boundary_context
@@ -112,6 +121,8 @@ def build_scan_result_message(
             score.get("observation_source"),
             demo_forced_anomaly=bool(alert_payload.get("demo_forced_anomaly", False)),
         ),
+        "imagery_origin": imagery_origin_for_source(score.get("observation_source")),
+        "scoring_basis": scoring_basis_for_source(score.get("observation_source")),
         "before_window": score["before_window"],
         "after_window": score["after_window"],
         "heartbeat": {

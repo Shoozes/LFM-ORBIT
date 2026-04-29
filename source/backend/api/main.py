@@ -311,8 +311,8 @@ def provider_status():
     Provider status endpoint.
 
     Returns the active provider, availability of each provider tier,
-    credential detection status, the fallback policy, and the current
-    demo/semi-real truth flags so callers can self-describe the scoring mode.
+    credential detection status, the fallback policy, and the current runtime
+    truth/origin/scoring fields so callers can self-describe the evidence mode.
     """
     client = get_simsat_client()
     sentinel_creds = resolve_sentinel_credentials()
@@ -327,6 +327,8 @@ def provider_status():
     return {
         "active_provider": REGION.observation_mode,
         "runtime_truth_mode": mode["runtime_truth_mode"],
+        "imagery_origin": mode["imagery_origin"],
+        "scoring_basis": mode["scoring_basis"],
         "demo_mode_enabled": mode["demo_mode_enabled"],
         "imagery_backed_scoring_enabled": mode["imagery_backed_scoring_enabled"],
         "providers": {
@@ -734,7 +736,7 @@ def mission_stop(request: Request = None):
         payload={
             "task": "IDLE",
             "note": (
-                "[REPLAY] Operator exited seeded replay. Resuming live sweep."
+                "[REPLAY] Operator exited replay. Resuming realtime sweep."
                 if active and active.get("mission_mode") == "replay"
                 else "[MISSION] Operator stopped mission. Resuming full-grid sweep."
             ),

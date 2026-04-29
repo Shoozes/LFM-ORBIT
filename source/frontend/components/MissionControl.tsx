@@ -635,7 +635,7 @@ export default function MissionControl({
                               ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                               : "border-cyan-200 bg-cyan-50 text-cyan-700"
                           }`}>
-                            {replay.source_kind === "seeded_cache" ? "Seeded Cache" : "Curated Replay"}
+                            {replay.source_kind === "seeded_cache" ? "Replay Cache" : "Curated Replay"}
                           </span>
                         </div>
                         <p className="mt-1 text-xs text-zinc-600 leading-snug">{replay.description}</p>

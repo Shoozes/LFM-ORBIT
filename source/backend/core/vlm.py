@@ -21,11 +21,14 @@ _ESRI_MAP = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/
 
 
 def _provenance(*, mode: str, model: str, reason: str = "") -> dict[str, str | bool]:
+    is_fallback = mode == "fallback"
     return {
-        "runtime_truth_mode": "fallback" if mode == "fallback" else "model_inference",
+        "runtime_truth_mode": "fallback" if is_fallback else "realtime",
+        "imagery_origin": "fallback_none" if is_fallback else "esri_arcgis",
+        "scoring_basis": "fallback_none" if is_fallback else "visual_only",
         "output_source": mode,
         "model": model,
-        "heuristic_fallback": mode == "fallback",
+        "heuristic_fallback": is_fallback,
         "reason": reason,
     }
 

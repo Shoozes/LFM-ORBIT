@@ -28,6 +28,8 @@ def test_queue_round_trip(tmp_path):
     assert recent["region_id"] == "amazonas_region_alpha"
     assert recent["alerts"][0]["cell_id"] == "85283473fffffff"
     assert recent["alerts"][0]["runtime_truth_mode"] == "unknown"
+    assert recent["alerts"][0]["imagery_origin"] == "unknown"
+    assert recent["alerts"][0]["scoring_basis"] == "unknown"
 
 
 def test_demo_forced_anomaly_persists(tmp_path):
@@ -68,6 +70,8 @@ def test_demo_forced_anomaly_persists(tmp_path):
 
     assert seeded["demo_forced_anomaly"] is True
     assert seeded["runtime_truth_mode"] == "fallback"
+    assert seeded["imagery_origin"] == "unknown"
+    assert seeded["scoring_basis"] == "unknown"
     assert organic["demo_forced_anomaly"] is False
 
 

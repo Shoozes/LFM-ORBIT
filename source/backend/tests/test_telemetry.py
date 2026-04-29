@@ -65,3 +65,6 @@ def test_scan_result_message_preserves_boundary_context_and_demo_flag():
 
     assert message["boundary_context"] == boundary_context
     assert message["demo_forced_anomaly"] is True
+    assert message["runtime_truth_mode"] == "fallback"
+    assert message["imagery_origin"] == "fallback_none"
+    assert message["scoring_basis"] == "fallback_none"

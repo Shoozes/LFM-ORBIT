@@ -1,8 +1,8 @@
-"""Seeded mission replay support.
+"""Mission replay support.
 
 Loads curated, local-first replay packs into the existing runtime tables so
 the standard Mission / Logs / Inspect / Agent Dialogue surfaces can walk a
-judge through a completed mission without waiting for a live scan loop.
+judge through a completed mission without waiting for a realtime scan loop.
 """
 
 from __future__ import annotations
@@ -73,7 +73,7 @@ def _seeded_meta_to_replay_spec(path: Path) -> dict[str, Any] | None:
     after_label = frame_dates[-1] if frame_dates else str(data.get("end_date") or "current")
     source = str(data.get("source") or "seeded_sentinelhub_replay")
     summary = (
-        f"Fast replay generated from seeded cache {asset_key}: {frames_count} cloud-gated frames "
+        f"Fast replay generated from replay cache {asset_key}: {frames_count} cloud-gated frames "
         f"for {target_category.replace('_', ' ')}."
     )
 
@@ -190,7 +190,7 @@ def list_seeded_replays() -> list[dict[str, Any]]:
 def _seeded_video_data_url(asset_key: str) -> str:
     asset_path = _SEEDED_DIR / f"{asset_key}.webm"
     if not asset_path.exists():
-        raise FileNotFoundError(f"Missing seeded replay asset: {asset_path.name}")
+        raise FileNotFoundError(f"Missing replay asset: {asset_path.name}")
     return "data:video/webm;base64," + base64.b64encode(asset_path.read_bytes()).decode("ascii")
 
 
@@ -248,6 +248,8 @@ def _seed_metrics(spec: dict[str, Any], alerts: list[dict[str, Any]]) -> dict[st
             "timestamp": timestamp,
             "demo_forced_anomaly": False,
             "runtime_truth_mode": "replay",
+            "imagery_origin": "cached_api",
+            "scoring_basis": "visual_only",
         }
         for alert in alerts[:5]
     ]
@@ -256,6 +258,8 @@ def _seed_metrics(spec: dict[str, Any], alerts: list[dict[str, Any]]) -> dict[st
         "demo_mode_enabled": False,
         "demo_mode_loop_scan": False,
         "runtime_truth_mode": "replay",
+        "imagery_origin": "cached_api",
+        "scoring_basis": "visual_only",
         "total_cycles_completed": 1,
         "total_cells_scanned": cells_scanned,
         "total_alerts_emitted": alerts_found,
@@ -330,6 +334,8 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
             payload_bytes=alert_payload_bytes,
             observation_source=str(alert.get("observation_source") or "replay"),
             runtime_truth_mode="replay",
+            imagery_origin="cached_api",
+            scoring_basis="visual_only",
             before_window=dict(alert.get("before_window") or {}),
             after_window=dict(alert.get("after_window") or {}),
             downlinked=True,
@@ -384,6 +390,8 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
                 "reason_codes": list(alert.get("reason_codes") or []),
                 "observation_source": str(alert.get("observation_source") or "replay"),
                 "runtime_truth_mode": "replay",
+                "imagery_origin": "cached_api",
+                "scoring_basis": "visual_only",
                 "before_window": dict(alert.get("before_window") or {}),
                 "after_window": dict(alert.get("after_window") or {}),
             },

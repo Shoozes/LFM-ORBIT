@@ -1,7 +1,10 @@
 from core.config import (
     PROVIDER_SIMSAT_MAPBOX,
     get_runtime_mode_summary,
+    imagery_origin_for_source,
     is_imagery_backed_scoring_enabled,
+    runtime_truth_mode_for_source,
+    scoring_basis_for_source,
     resolve_active_provider,
 )
 from core.depth_anything import (
@@ -17,6 +20,23 @@ def test_runtime_mode_summary_matches_imagery_backed_helper():
     summary = get_runtime_mode_summary()
 
     assert summary["imagery_backed_scoring_enabled"] is is_imagery_backed_scoring_enabled()
+    assert summary["runtime_truth_mode"] in {"realtime", "replay", "fallback", "unknown"}
+    assert isinstance(summary["imagery_origin"], str)
+    assert isinstance(summary["scoring_basis"], str)
+
+
+def test_truth_origin_and_scoring_basis_are_separate():
+    assert runtime_truth_mode_for_source("nasa_gibs") == "realtime"
+    assert imagery_origin_for_source("nasa_gibs") == "nasa_gibs"
+    assert scoring_basis_for_source("nasa_gibs") == "visual_only"
+
+    assert runtime_truth_mode_for_source("seeded_sentinelhub_replay") == "replay"
+    assert imagery_origin_for_source("seeded_sentinelhub_replay") == "cached_api"
+    assert scoring_basis_for_source("seeded_sentinelhub_replay") == "visual_only"
+
+    assert runtime_truth_mode_for_source("sentinelhub_direct_imagery") == "realtime"
+    assert imagery_origin_for_source("sentinelhub_direct_imagery") == "sentinelhub"
+    assert scoring_basis_for_source("sentinelhub_direct_imagery") == "multispectral_bands"
 
 
 def test_simsat_data_source_mapbox_selects_mapbox_provider(monkeypatch):

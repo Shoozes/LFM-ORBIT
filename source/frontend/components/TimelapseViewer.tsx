@@ -10,6 +10,7 @@ import { formatSourceLabel, getApiBaseUrl } from "../utils/telemetry";
 
 type TimelapseProvenance = {
   kind?: string;
+  legacy_kind?: string;
   label?: string;
   provider?: string;
   cache_family?: string;
@@ -22,6 +23,9 @@ type TimelapsePayload = {
   format: string;
   source?: string;
   provider?: string;
+  runtime_truth_mode?: string;
+  imagery_origin?: string;
+  scoring_basis?: string;
   provenance?: TimelapseProvenance;
   error?: string;
 };

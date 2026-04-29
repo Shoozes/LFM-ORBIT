@@ -56,7 +56,7 @@ Docs video exports:
 
 Current mission split:
 
-1. Judge Mode uses the deterministic Rondonia replay and seeded WebM evidence.
+1. Judge Mode uses the deterministic Rondonia replay and cached real API WebM evidence.
 2. Payload reduction uses a Pakistan Manchar Lake flood frame and compresses a flood alert to JSON.
 3. Provenance uses an Atacama open-pit mining frame and keeps source, capture time, bbox, prompt, and model together.
 4. Abstain safety uses the Greenland ice preset and shows no alert transmitted after the quality gate fails.
@@ -64,7 +64,7 @@ Current mission split:
 
 The tutorial walkthrough uses the app like an operator: load the Singapore maritime replay, inspect and analyze the retained alert, replace it with the Atacama mining replay, inspect that alert, then open Judge Mode on the active replay. The current recorded file is about 28 seconds and has distinct sampled frames across mission catalog, maritime evidence, Atacama evidence, and proof panel views.
 
-Replay-backed Judge Mode can now keep the active replay instead of forcing Rondonia, so mission-specific proof copy stays attached to maritime, mining, flood, wildfire, and urban replay packs. Mission-preset demos use visible Sentinel-2 L2A frames and explicitly avoid fake timelapse claims. Their real monthly WebMs are kept in `source/backend/assets/seeded_data/` for dataset export and training.
+Replay-backed Judge Mode can now keep the active replay instead of forcing Rondonia, so mission-specific proof copy stays attached to maritime, mining, flood, wildfire, and urban replay packs. Mission-preset demos use visible Sentinel-2 L2A frames and explicitly reject invalid still-image color-shift timelapses. Their real monthly WebMs are kept in the legacy `source/backend/assets/seeded_data/` cache for dataset export and training.
 
 Replay WebMs may include cloudy context frames, but the proof panel keeps playback inside a clearer evidence window for final screenshots. Cloudy/no-data frames remain quality-gated in seeded creation and do not become positive detections.
 
@@ -72,7 +72,7 @@ Each recorded demo also saves `evidence-frame.png` beside `final-screen.png` and
 
 Recorded demos preload their target mission or replay before the browser connects to telemetry. Demo config also disables the boot-time live agent pair, so recordings should not open on the legacy Amazonas sweep.
 
-Cloud policy: cloudy or no-data Sentinel windows are not allowed to become positive detections. The backend quality gate records SCL cloud/no-data ratios, seeded replay creation skips cloudy frames, and the scanner emits no-transmit quality-gate results when cloud cover blocks evidence.
+Cloud policy: cloudy or no-data Sentinel windows are not allowed to become positive detections. The backend quality gate records SCL cloud/no-data ratios, replay-cache creation skips cloudy frames, and the scanner emits no-transmit quality-gate results when cloud cover blocks evidence.
 
 Refresh the tutorial video:
 
@@ -97,7 +97,7 @@ CLIENTID <oauth-client-id>
 CLIENT <oauth-client-secret>
 ```
 
-Current seeded Sentinel-2 mission assets:
+Current cached Sentinel-2 replay assets:
 
 | Demo | Use case | WebM |
 |---|---|---|

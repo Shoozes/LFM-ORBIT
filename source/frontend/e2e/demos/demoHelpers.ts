@@ -242,7 +242,7 @@ export async function openDemo(page: Page, request: APIRequestContext, demoCase:
     await alertButton.click();
     await removeHighlight(page);
     await expect(page.getByTestId("tab-inspect")).toBeVisible({ timeout: 10_000 });
-    await showSubtitle(page, `Selected cell ${scenario.replayCellId}. The proof will use that cell's seeded WebM evidence.`, 1_700);
+    await showSubtitle(page, `Selected cell ${scenario.replayCellId}. The proof will use that cell's cached API WebM evidence.`, 1_700);
   } else if (scenario.presetId) {
     await showSubtitle(page, "Confirm the mission preset so this video covers the correct geography and task.", 1_600);
     const presetSelector = `[data-testid='mission-preset-${scenario.presetId}']`;

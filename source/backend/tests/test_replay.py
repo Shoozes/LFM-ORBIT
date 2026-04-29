@@ -80,6 +80,8 @@ def test_replay_load_seeds_runtime_surfaces(tmp_path, monkeypatch):
     metrics = read_metrics_summary()
     assert metrics["region_id"] == "replay"
     assert metrics["runtime_truth_mode"] == "replay"
+    assert metrics["imagery_origin"] == "cached_api"
+    assert metrics["scoring_basis"] == "visual_only"
     assert metrics["total_cells_scanned"] == 9
     assert metrics["total_alerts_emitted"] == 4
 
@@ -129,6 +131,8 @@ def test_each_bundled_replay_loads_runtime_surfaces(tmp_path, monkeypatch):
         metrics = read_metrics_summary()
         assert metrics["region_id"] == "replay"
         assert metrics["runtime_truth_mode"] == "replay"
+        assert metrics["imagery_origin"] == "cached_api"
+        assert metrics["scoring_basis"] == "visual_only"
         assert metrics["total_cells_scanned"] == replay["cells_scanned"]
         assert metrics["total_alerts_emitted"] == replay["alert_count"]
 
@@ -155,7 +159,7 @@ def test_replay_stop_restores_live_mode_note(tmp_path, monkeypatch):
 
     dialogue = get_recent_dialogue(limit=5)
     assert dialogue[-1]["msg_type"] == "mission"
-    assert "exited seeded replay" in dialogue[-1]["payload"]["note"].lower()
+    assert "exited replay" in dialogue[-1]["payload"]["note"].lower()
 
 
 def test_replay_load_returns_400_for_unknown_manifest(tmp_path, monkeypatch):

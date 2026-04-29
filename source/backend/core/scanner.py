@@ -6,7 +6,12 @@ from uuid import uuid4
 from fastapi import WebSocket
 
 from core.mission import get_active_mission
-from core.config import REGION, runtime_truth_mode_for_source
+from core.config import (
+    REGION,
+    imagery_origin_for_source,
+    runtime_truth_mode_for_source,
+    scoring_basis_for_source,
+)
 from core.grid import generate_scan_grid, generate_grid_for_bbox, cell_to_latlng
 from core.metrics import record_cycle_complete, record_cycle_start, record_scan_result
 from core.queue import estimate_payload_bytes, push_alert, upsert_candidate, remove_candidate
@@ -251,6 +256,8 @@ async def stream_region_scan(websocket: WebSocket):
                                 score.get("observation_source", "unknown"),
                                 demo_forced_anomaly=demo_forced_anomaly,
                             ),
+                            imagery_origin=imagery_origin_for_source(score.get("observation_source", "unknown")),
+                            scoring_basis=scoring_basis_for_source(score.get("observation_source", "unknown")),
                             before_window=score.get("before_window"),
                             after_window=score.get("after_window"),
                             boundary_context=boundary_context,
@@ -275,6 +282,8 @@ async def stream_region_scan(websocket: WebSocket):
                                 score.get("observation_source", "unknown"),
                                 demo_forced_anomaly=demo_forced_anomaly,
                             ),
+                            "imagery_origin": imagery_origin_for_source(score.get("observation_source", "unknown")),
+                            "scoring_basis": scoring_basis_for_source(score.get("observation_source", "unknown")),
                         }
                         if boundary_context:
                             flagged_example["boundary_context"] = boundary_context

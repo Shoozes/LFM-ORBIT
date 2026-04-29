@@ -37,7 +37,7 @@ test("Tutorial: Dual-Agent Architecture Demo", async ({ page, request }) => {
   await replayButton.click();
   await removeHighlight(page);
   await expect(page.getByText("REPLAY ACTIVE: rondonia_frontier_judge")).toBeVisible({ timeout: 15_000 });
-  await showSubtitle(page, "Seeded replay restores the SAT/GND exchange without waiting on live scan timing.", 1800);
+  await showSubtitle(page, "Replay restores the SAT/GND exchange without waiting on realtime scan timing.", 1800);
 
   await page.locator("[data-testid='tab-agents']").click();
   await expect(page.getByTestId("header-agent-bus")).toBeVisible();

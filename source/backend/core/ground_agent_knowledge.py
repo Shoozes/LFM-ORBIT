@@ -177,7 +177,7 @@ def get_ground_agent_reply(user_msg: str) -> str:
     if any(k in msg for k in ("settings", "gear", "provider", "config", "credential", "sentinel hub")):
         return (
             "Settings panel (⚙ icon, top-left of scanner card). Shows: "
-            "PROVIDER STATUS — which imagery source is active (SimSat > SentinelHub > semi-real fallback). "
+            "PROVIDER STATUS — which imagery source is active (SimSat > SentinelHub > local fallback). "
             "CREDENTIAL STATUS — whether Sentinel Hub OAuth2 tokens are configured. "
             "AI MODEL — default is offline_lfm_v1 (no API key needed), optional GPT-4o-mini with key. "
             "EVIDENCE EXPORT — links to download demo metrics JSON for submission."

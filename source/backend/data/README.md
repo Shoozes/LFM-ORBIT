@@ -6,7 +6,7 @@ This folder is for local data inputs that help Orbit gather, package, retag, and
 
 Orbit's data cycle is:
 
-1. The app gathers evidence during live missions, seeded replay, monitor previews, imagery fetches, VLM helper calls, and timelapse generation.
+1. The app gathers evidence during realtime missions, replay from cached real API imagery, monitor previews, imagery fetches, VLM helper calls, and timelapse generation.
 2. The backend stores alert metadata, gallery evidence, thumbnails, videos, observations, agent decisions, and monitor reports.
 3. `scripts/export_orbit_dataset.py` packages those records into an Orbit dataset export with JSONL manifests and local assets.
 4. `scripts/retag_training_assets.py` walks the export, deduplicates images and frames by SHA-256, extracts timelapse frames, preserves temporal sequence context, and retags assets with a chosen provider.
@@ -52,11 +52,11 @@ The export writes:
 - `samples/<sample_id>/sample.json`
 - local assets such as `context_thumb.png` and `timelapse.webm`
 
-Export rows include target task/category/action, temporal use-case metadata, alert scores, agent evidence, local imagery/video references, provenance, seeded-cache timelapse rows when enabled, and weak-negative reject rows when available.
+Export rows include target task/category/action, temporal use-case metadata, alert scores, agent evidence, local imagery/video references, provenance, replay-cache timelapse rows when enabled, and weak-negative reject rows when available.
 
-## Refresh Seeded Sentinel Replay Data
+## Refresh Sentinel Replay Data
 
-High-quality replay timelapses can be refreshed from Sentinel Hub and then reused by demos and dataset export through the existing `assets/seeded_data/sh_<signature>.webm` cache.
+High-quality replay timelapses can be refreshed from Sentinel Hub and then reused by demos and dataset export through the existing `assets/seeded_data/sh_<signature>.webm` cache. The folder name is legacy; the data is stored real API imagery, not generated evidence.
 
 The seeder requests Sentinel SCL quality data before each visual frame. Cloud shadow, medium/high cloud probability, cirrus, no-data, and defective pixels are quality-gated before WebM creation. Accepted frames store `frame_quality` metadata; rejected windows are stored in `_meta.json` under `rejected_windows`.
 
@@ -80,9 +80,9 @@ uv run --no-sync python scripts\seed_sentinel_cache.py `
   --skip-vlm-metadata
 ```
 
-Current high-quality demo seeds:
+Current high-quality replay assets:
 
-| Use case | Target | Seeded WebM |
+| Use case | Target | Replay WebM |
 |---|---|---|
 | `flood_extent` | Pakistan Manchar Lake flood | `assets/seeded_data/sh_24541539.webm` |
 | `mining_expansion` | Atacama open-pit mining | `assets/seeded_data/sh_fbe644a9.webm` |
@@ -100,7 +100,7 @@ Current high-quality demo seeds:
 | `volcanic_surface_change` | Kilauea summit eruption review | `assets/seeded_data/sh_07ea2b1b.webm` |
 | `flood_extent` | Lake Mead shoreline recovery review | `assets/seeded_data/sh_c8ec6b43.webm` |
 
-Each seed stores a matching `_meta.json` with bbox, frame dates, provider, use-case id, target category, and target task. These rows flow into export when `--include-seeded-cache` is set.
+Each replay asset stores a matching `_meta.json` with bbox, frame dates, provider, use-case id, target category, and target task. These rows flow into export when `--include-seeded-cache` is set.
 
 Event-specific wildfire seeds should use explicit date windows and the real Sentinel-2 SWIR/NIR/Red burn-scar composite instead of generic monthly mosaics:
 
@@ -266,7 +266,7 @@ The helper reads `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or `.tools/.secrets/hf.txt
 
 Current local packaging result after Sentinel demo seeding:
 
-- Dataset export: `56` current-cycle samples, `24` seeded-cache rows, `25` rows with timelapse references, `2` wildfire rows, and `2` volcanic surface-change rows.
+- Dataset export: `56` current-cycle samples, `24` replay-cache rows, `25` rows with timelapse references, `2` wildfire rows, and `2` volcanic surface-change rows.
 - Retag output: `179` deduplicated training assets, `26` temporal sequences, `40` bounded Qwen/Ollama image calls, `6` bounded Qwen/Ollama sequence calls, `74` reused image tags, `9` skipped SVG placeholders, and `0` tagger failures.
 - Hugging Face dataset: `Shoozes/LFM-Orbit-SatData`, latest data commit `5a2798e7d16cd76df08eff3725dcf3ade9340b58`, latest card commit `60e8ae913f61315740a640c532eb1aa9ae7cfe75`.
 - Dataset Viewer schema note: upload `source/backend/data/HF_DATASET_CARD.md` as the Hub `README.md` so single-image SFT rows, temporal SFT rows, metadata, and review records load as separate configs instead of one mixed inferred JSON split.
