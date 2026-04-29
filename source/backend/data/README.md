@@ -324,4 +324,4 @@ Use `runtime-data/` for:
 - Downloaded model artifacts.
 - Large imagery/video caches.
 
-Avoid committing large generated datasets unless the repo intentionally tracks a small seeded fixture pack.
+Avoid committing large generated datasets unless the repo intentionally tracks a small replay fixture pack.

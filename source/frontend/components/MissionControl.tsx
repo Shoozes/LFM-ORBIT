@@ -405,7 +405,7 @@ export default function MissionControl({
       } else {
         await onRefresh();
       }
-      setReplayNotice("Seeded replay loaded into Mission, Logs, Inspect, and Agent Dialogue.");
+      setReplayNotice("Cached API replay loaded into Mission, Logs, Inspect, and Agent Dialogue.");
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : "Replay failed to load.");
     } finally {

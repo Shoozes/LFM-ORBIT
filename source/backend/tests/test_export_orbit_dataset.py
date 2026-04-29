@@ -367,7 +367,7 @@ def test_write_dataset_export_can_include_seeded_cache_records(tmp_path, monkeyp
                 "lat": -10.05,
                 "lon": -63.05,
                 "location_name": "Rondonia test cell",
-                "region_note": "Seeded replay fixture",
+                "region_note": "Replay cache fixture",
                 "start_date": "2023-01",
                 "end_date": "2025-01",
                 "frames_count": 25,

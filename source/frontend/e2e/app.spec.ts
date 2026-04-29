@@ -294,7 +294,7 @@ test.describe("Phase 4.5 – Sidebar Tabs Navigation", () => {
 // Phase 4.75: Replay flow
 // ---------------------------------------------------------------------------
 
-test.describe("Phase 4.75 – Seeded replay flow", () => {
+test.describe("Phase 4.75 - Cached replay flow", () => {
   test("cached replay loads into inspect and historical dialogue", async ({ page, request }) => {
     await resetRuntimeState(request);
     await gotoApp(page);
@@ -309,7 +309,7 @@ test.describe("Phase 4.75 – Seeded replay flow", () => {
 
     await page.getByTestId("load-replay-rondonia_frontier_judge").click();
     await expect(page.getByText("REPLAY ACTIVE: rondonia_frontier_judge")).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText("Seeded Replay Evidence", { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Cached API Replay Evidence", { exact: true })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("sq_-10.0_-63.0").first()).toBeVisible({ timeout: 10_000 });
 
     await page.locator("[data-testid='tab-agents']").click();
@@ -577,7 +577,7 @@ test.describe("Phase 9 - Context Module and Timelapse Validation", () => {
           video_b64: "",
           frames_count: 0,
           format: "none",
-          error: "Synthetic timelapse failure.",
+          error: "Mock timelapse failure.",
         }),
       });
     });
@@ -589,7 +589,7 @@ test.describe("Phase 9 - Context Module and Timelapse Validation", () => {
     await openMapContextMenu(page);
     await page.getByText("▷ Generate Temporal Timelapse").click();
 
-    await expect(page.getByText("Synthetic timelapse failure.")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Mock timelapse failure.")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole("button", { name: "Retry Request" })).toBeVisible();
   });
 

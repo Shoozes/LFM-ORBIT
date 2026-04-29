@@ -46,6 +46,13 @@ type JudgeProof = {
   mission: string;
   source_capture_time: string;
   prompt: string;
+  payload_accounting: {
+    raw_payload_basis: string;
+    alert_payload_basis: string;
+    counted_alert_fields: string[];
+    excluded_from_alert_payload_bytes: string[];
+    note: string;
+  };
   output_json: Record<string, unknown>;
   artifacts: {
     screenshot: string;
@@ -74,6 +81,25 @@ const ALERT_JSON_BYTES = 1_240;
 const SEEDED_LATENCY_MS = 842;
 const FALLBACK_CAPTURE_TIME = "2025-01-15";
 const JUDGE_PROMPT = "Find fresh clearing and road-edge canopy loss.";
+const COUNTED_ALERT_FIELDS = [
+  "status",
+  "result",
+  "confidence",
+  "action",
+  "cell_id",
+  "reason_codes",
+  "use_case_id",
+  "grounding",
+  "vqa",
+  "caption",
+];
+const EXCLUDED_PAYLOAD_FIELDS = [
+  "proof wrapper",
+  "provider/source display fields",
+  "bbox and prompt audit fields",
+  "screenshot/video/trace artifact references",
+  "payload_accounting metadata",
+];
 const DEMO_TITLES: Record<DemoCase, string> = {
   judge: "Judge walkthrough proof",
   payload: "Pakistan flood payload reduction proof",
@@ -247,6 +273,26 @@ function formatRatio(ratio: number | null): string {
   return `${Math.floor(ratio).toLocaleString()}x`;
 }
 
+function buildPayloadAccounting(isAbstain: boolean): JudgeProof["payload_accounting"] {
+  if (isAbstain) {
+    return {
+      raw_payload_basis: "candidate satellite frame bytes before edge triage",
+      alert_payload_basis: "no compact alert JSON was transmitted after the quality gate abstained",
+      counted_alert_fields: [],
+      excluded_from_alert_payload_bytes: EXCLUDED_PAYLOAD_FIELDS,
+      note: "alert_payload_bytes is zero for abstain proofs because no downlink alert is sent.",
+    };
+  }
+
+  return {
+    raw_payload_basis: "representative encoded satellite frame retained locally",
+    alert_payload_basis: "compact downlink alert JSON only",
+    counted_alert_fields: COUNTED_ALERT_FIELDS,
+    excluded_from_alert_payload_bytes: EXCLUDED_PAYLOAD_FIELDS,
+    note: "alert_payload_bytes intentionally excludes the larger proof artifact envelope, screenshots, video, trace, and audit-only display metadata.",
+  };
+}
+
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T | null> {
   try {
     const response = await fetch(url, init);
@@ -282,6 +328,7 @@ function buildFallbackProof(demoCase: DemoCase): JudgeProof {
     mission: profile.mission,
     source_capture_time: profile.captureTime,
     prompt: profile.prompt,
+    payload_accounting: buildPayloadAccounting(isAbstain),
     output_json: isAbstain
       ? {
           status: "abstained",
@@ -515,6 +562,7 @@ export default function JudgeModePanel({
       mission: usesReplayEvidence ? mission?.task_text ?? profile.mission : profile.mission,
       source_capture_time: captureTime,
       prompt,
+      payload_accounting: buildPayloadAccounting(isAbstain),
       output_json: outputJson,
       artifacts: {
         screenshot: "final-screen.png",
@@ -769,7 +817,7 @@ export default function JudgeModePanel({
               className="absolute right-4 top-4 rounded border border-zinc-900/40 bg-zinc-950/85 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-100"
             >
               {timelapseSource
-                ? "Seeded WebM evidence: 25 contextual frames"
+                ? "Replay WebM evidence: 25 contextual frames"
                 : proof.abstained
                   ? "Static local frame: no alert transmitted"
                   : demoCase === "eclipse"
@@ -814,6 +862,7 @@ export default function JudgeModePanel({
             <ProofRow label="Confidence" value={proof.abstained ? "low" : proof.confidence.toFixed(2)} />
             <ProofRow label="Raw payload" value={`Raw frame: ${formatBytes(proof.raw_payload_bytes)}`} testId="proof-raw-bytes" />
             <ProofRow label="Alert payload" value={`Alert JSON: ${formatBytes(proof.alert_payload_bytes)}`} testId="proof-alert-bytes" />
+            <ProofRow label="Payload basis" value={proof.payload_accounting.alert_payload_basis} testId="proof-payload-accounting" />
             <ProofRow label="Reduction ratio" value={formatRatio(proof.payload_reduction_ratio)} testId="proof-reduction-ratio" />
             <ProofRow label="Abstain status" value={proof.abstained ? "status: abstained" : "status: transmitted"} />
           </div>

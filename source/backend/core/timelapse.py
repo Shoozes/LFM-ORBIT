@@ -8,7 +8,7 @@ Provider priority (auto-selected, most accurate first):
 
 Each provider returns one frame per calendar month.
 All frames are 1280x960, with a burned-in bottom HUD (date + source).
-Seeded WebM cache is checked before any network call and written after live fetches.
+Replay WebM cache is checked before any network call and written after realtime fetches.
 """
 
 import base64

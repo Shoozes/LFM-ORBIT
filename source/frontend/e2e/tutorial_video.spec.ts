@@ -20,7 +20,7 @@ test("Tutorial: mission replay workflow across maritime and mining evidence", as
   await resetRuntimeState(request);
   await gotoApp(page, "/?demo=1");
   await waitForLinkOpen(page);
-  await showSubtitle(page, "LFM Orbit opens in mission control. The operator starts from real seeded satellite replays.", 1800);
+  await showSubtitle(page, "LFM Orbit opens in mission control. The operator starts from cached real satellite replays.", 1800);
   await showSubtitle(page, "This walkthrough uses different mission areas so the video does not look like one static location.", 1800);
 
   await showSubtitle(page, "First, open the mission catalog and load the Singapore Strait maritime replay.", 1700);
@@ -41,7 +41,7 @@ test("Tutorial: mission replay workflow across maritime and mining evidence", as
   await showSubtitle(page, "The alert log names the retained cell and keeps the cloudy rejected windows in the evidence trail.", 1900);
 
   await page.getByTestId("alert-button").filter({ hasText: "maritime_singapore_strait" }).click();
-  await expect(page.getByText("Seeded Replay Evidence", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Cached API Replay Evidence", { exact: true })).toBeVisible({ timeout: 15_000 });
   await showSubtitle(page, "Inspect shows the evidence frame, reason codes, and replay provenance a judge can verify.", 1900);
 
   await moveMouseToHighlight(page, "[data-testid='analyze-button']");
@@ -63,7 +63,7 @@ test("Tutorial: mission replay workflow across maritime and mining evidence", as
   await page.locator("[data-testid='tab-logs']").click();
   await expect(page.getByTestId("alert-button").filter({ hasText: "mining_atacama_open_pit" })).toBeVisible({ timeout: 15_000 });
   await page.getByTestId("alert-button").filter({ hasText: "mining_atacama_open_pit" }).click();
-  await expect(page.getByText("Seeded Replay Evidence", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Cached API Replay Evidence", { exact: true })).toBeVisible({ timeout: 15_000 });
   await showSubtitle(page, "Different mission, different geography, different evidence category. Same operator flow.", 1900);
 
   await showSubtitle(page, "Open Judge Mode to export the proof screen with payload, latency, model, and provenance fields.", 1900);

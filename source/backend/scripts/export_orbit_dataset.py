@@ -729,7 +729,7 @@ def write_dataset_export(
             "Every export row attempts to materialize a local context thumbnail from gallery evidence or persisted map-pin coordinates.",
             "Each row is auto-classified against the temporal use-case catalog and mirrored into chat-style training JSONL.",
             "API observation rows can be included from the local observation store for near-autonomous data-prep refinement.",
-            "Seeded cache rows can be included directly from assets/seeded_data for replay and timelapse training packs.",
+            "Replay-cache rows can be included directly from the legacy assets/seeded_data folder for replay and timelapse training packs.",
             "Persisted maritime and lifeline monitor-report JSON files can be imported as generated monitor rows.",
             "Ground rejections are weak negatives with explicit provenance rather than operator-reviewed gold controls.",
         ],
@@ -781,7 +781,7 @@ def main() -> int:
     )
     print(
         "[Orbit] Exported {records} samples to {path} "
-        "({positive_records} positives, {control_records} controls, {api_observation_records} api observations, {seeded_cache_records} seeded cache, {monitor_report_records} monitor reports, {train_records} train / {eval_records} eval, {records_with_context_thumb} with context)".format(
+        "({positive_records} positives, {control_records} controls, {api_observation_records} api observations, {seeded_cache_records} replay cache, {monitor_report_records} monitor reports, {train_records} train / {eval_records} eval, {records_with_context_thumb} with context)".format(
             path=args.output_dir,
             **manifest,
         )

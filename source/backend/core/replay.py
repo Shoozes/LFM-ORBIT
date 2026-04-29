@@ -64,7 +64,7 @@ def _seeded_meta_to_replay_spec(path: Path) -> dict[str, Any] | None:
         return None
     lat = float(data.get("lat") or (float(bbox[1]) + float(bbox[3])) / 2.0)
     lon = float(data.get("lon") or (float(bbox[0]) + float(bbox[2])) / 2.0)
-    location = str(data.get("location_name") or f"Seeded cache {signature}")
+    location = str(data.get("location_name") or f"Replay cache {signature}")
     target_task = str(data.get("target_task") or "temporal_change_review")
     target_category = str(data.get("target_category") or data.get("use_case_id") or "temporal_change")
     use_case_id = str(data.get("use_case_id") or target_category or "temporal_change_generic")
@@ -109,7 +109,7 @@ def _seeded_meta_to_replay_spec(path: Path) -> dict[str, Any] | None:
                 "after_window": {"label": after_label},
                 "timelapse_analysis": str(data.get("vlm_explanation") or summary),
                 "analysis_summary": summary,
-                "satellite_note": f"Seeded cache replay restored from {source}.",
+                "satellite_note": f"Replay cache restored from {source}.",
                 "ground_note": "Ground review can inspect the cached timelapse immediately, or rescan the same bbox with the current runtime model.",
                 "findings": [
                     f"{frames_count} accepted frames",
@@ -308,7 +308,7 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
             "task": mission["task_text"],
             "bbox": mission.get("bbox"),
             "replay_id": replay_id,
-            "note": f"[REPLAY #{mission_id}] Loaded seeded mission replay: {spec.get('title', replay_id)}",
+            "note": f"[REPLAY #{mission_id}] Loaded cached API replay: {spec.get('title', replay_id)}",
         },
     )
     post_message(
@@ -317,7 +317,7 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
         msg_type="status",
         payload={
             "replay_id": replay_id,
-            "note": "Replay mode loaded. Live scan loops are idled so the operator can inspect a completed mission without runtime drift.",
+            "note": "Replay mode loaded. Realtime scan loops are idled so the operator can inspect a completed mission without runtime drift.",
         },
     )
 

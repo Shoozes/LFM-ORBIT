@@ -31,6 +31,8 @@ source/frontend/e2e/artifacts/judge-mode/proof.json
 docs/judge-mode-demo.webm
 ```
 
+Payload accounting: `raw_payload_bytes` represents the local satellite frame payload. `alert_payload_bytes` represents the compact alert JSON that would be downlinked. The larger proof artifact envelope, screenshots, video, trace, and UI-only audit fields are intentionally excluded and are listed in `proof.json` under `payload_accounting.excluded_from_alert_payload_bytes`.
+
 Use all recorded demos:
 
 ```bash

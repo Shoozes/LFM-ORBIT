@@ -15,6 +15,7 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 - NDVI has an explicit spectral-band contract: RGB-only, missing, or invalid band data returns unavailable/abstain instead of fabricated NDVI.
 - Cloud and no-data coverage are hard quality gates: Sentinel SCL cloud/shadow/cirrus classes are tracked, cloudy cached frames are skipped, and cloud-blocked scoring windows return no-transmit quality-gate results.
 - VLM responses now carry structured provenance with output source, model, fallback reason, runtime truth mode, imagery origin, and scoring basis.
+- Judge Mode proof JSON now includes `payload_accounting` so byte-reduction claims state which fields are counted and which proof artifacts are excluded.
 - Local control endpoints are guarded for localhost use, and default CORS is a localhost allowlist unless overridden.
 - Dataset export and retagging can carry cached real Sentinel-2 timelapses into local ImageFolder-style training data; the current bounded Qwen/Ollama cycle is published to `Shoozes/LFM-Orbit-SatData`.
 
@@ -26,6 +27,8 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 - [x] Changed cached timelapse provenance to `kind=replay_cache`, `label=Cached real API timelapse`, and `legacy_kind=seeded_cache`.
 - [x] Ensured provider failures and quality-gate failures produce zero-score/zero-confidence fallback or no-transmit results instead of forced positive alerts.
 - [x] Updated frontend labels to distinguish realtime provider fetches, replay caches, cached API imagery, and fallback/proxy paths.
+- [x] Added explicit Judge Mode payload-accounting metadata and proof assertions so `alert_payload_bytes` is scoped to compact downlink JSON, not the larger proof artifact envelope.
+- [x] Cleaned stale public-facing replay wording in Inspect, Alerts, Mission replay notices, tutorial subtitles, dataset-card notes, and replay/timelapse runtime dialogue.
 - [x] Re-scanned repo-local TODO/FIXME/stub/incomplete markers; remaining hits are intentional UI placeholders, test fixtures, compatibility labels, optional fallback paths, or backlog items tracked here.
 - [x] Consolidated progress tracking so `README.md` stays judge-facing, `docs/ARCHITECTURE.md` stays system-facing, `docs/DATASET_CYCLE_TUTORIAL.md` stays workflow-facing, and this file stays backlog-facing.
 
@@ -63,6 +66,7 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 - Cached Sentinel replay/training frames must carry frame-quality metadata and reject cloudy frames before WebM creation.
 - Timelapse evidence must contain multiple contextual satellite imagery slices; single still-image color shifts are invalid temporal evidence.
 - Link-offline mode must queue compact JSON alerts locally and flush only after link recovery.
+- Payload-reduction proof must keep `payload_accounting` explicit so screenshots, videos, traces, and UI-only audit fields are not confused with downlink alert bytes.
 - Demo and test runs should reset runtime state and avoid stale local server reuse unless explicitly requested.
 - Recorded demos must preload their intended mission or replay before opening the browser; a generic default scan at video start is a regression.
 - Map-action tests should use app readiness signals and shared helpers before touching the canvas; fixed sleeps are only acceptable for intentional visual/video pacing.
@@ -79,6 +83,6 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 - Frontend contract guard: `npm run lint` and `npm run build` from `source/frontend`.
 - Judge acceptance path: `npm run demo:judge` from `source/frontend`.
 - Full local validation remains `.\run.ps1 -Verify` from repo root.
-- Latest integrity validation: backend `289 passed`; frontend `npm run lint` passed; frontend `npm run build` passed; `summary_bank.json` parsed; `uvx ruff check source/backend --select E9` passed; `git diff --check` reported only CRLF normalization warnings.
+- Latest integrity validation: backend `289 passed`; frontend `npm run lint` passed; frontend `npm run build` passed; focused Playwright replay/timelapse specs passed `5`; QA verification passed `8`; `npm run demo:judge` passed; `npm run demo:tutorial` passed and refreshed `docs/tutorial_video.webm`; `summary_bank.json` parsed; `uvx ruff check source/backend --select E9` passed; `git diff --check` reported only CRLF normalization warnings.
 - Latest dataset-cycle validation: dataset export produced `56` current-cycle samples, `24` replay-cache rows, and `25` timelapse rows; bounded Qwen retag produced `179` assets and `26` temporal sequences with `74` reused image tags, `9` SVG placeholder skips, and zero tagger failures.
 - Hugging Face remote config verification: `default=179`, `temporal_sft=26`, `asset_metadata=179`, `retagged_assets=179`, `temporal_metadata=26`, `review_queue=179`.

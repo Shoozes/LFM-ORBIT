@@ -77,7 +77,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
       await route.fulfill({
         status: 503,
         contentType: "application/json",
-        body: JSON.stringify({ error: "Synthetic assistant outage" }),
+        body: JSON.stringify({ error: "Mock assistant outage" }),
       });
     });
 
@@ -88,7 +88,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await page.getByRole("button", { name: "Send" }).click();
 
     await expect(page.getByText("Start fallback analysis")).toBeVisible();
-    await expect(page.getByText("[Link Error: Synthetic assistant outage]")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("[Link Error: Mock assistant outage]")).toBeVisible({ timeout: 10_000 });
   });
 
   test("verify Agent Dialogue surfaces bus failures", async ({ page }) => {
@@ -96,14 +96,14 @@ test.describe("QA Verification — Single Page Architecture", () => {
       await route.fulfill({
         status: 503,
         contentType: "application/json",
-        body: JSON.stringify({ error: "Synthetic stats outage" }),
+        body: JSON.stringify({ error: "Mock stats outage" }),
       });
     });
     await page.route("**/api/agent/bus/inject", async (route) => {
       await route.fulfill({
         status: 503,
         contentType: "application/json",
-        body: JSON.stringify({ error: "Synthetic bus outage" }),
+        body: JSON.stringify({ error: "Mock bus outage" }),
       });
     });
 
@@ -114,7 +114,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await injectInput.fill("Check sensor handoff");
     await page.getByRole("button", { name: "Inject" }).click();
 
-    await expect(page.getByText("Synthetic bus outage")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Mock bus outage")).toBeVisible({ timeout: 10_000 });
   });
 
   test("verify map UI elements load and LINK OPEN has tooltip", async ({ page }) => {

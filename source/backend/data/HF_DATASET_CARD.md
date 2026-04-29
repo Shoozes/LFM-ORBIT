@@ -57,7 +57,7 @@ The default viewer config is `training_assets.jsonl`, which contains single-imag
 ## Current Export
 
 - 56 exported Orbit samples in the current runtime cycle
-- 24 seeded-cache rows
+- 24 replay-cache rows
 - 25 records with timelapse references
 - 179 deduplicated image/frame assets
 - 26 temporal sequences
@@ -69,7 +69,7 @@ The default viewer config is `training_assets.jsonl`, which contains single-imag
 - 9 skipped SVG placeholder assets
 - 0 tagger failures
 
-Latest seeded additions:
+Latest replay-cache additions:
 
 - Mauna Loa lava-flow surface-change review, `volcanic_surface_change`, Sentinel-2 L2A SWIR/NIR/Red.
 - Lake Urmia water persistence review, `flood_extent`, Sentinel-2 L2A true color.

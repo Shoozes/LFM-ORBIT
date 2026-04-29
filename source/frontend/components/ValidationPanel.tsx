@@ -422,10 +422,10 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenTimelapse
 
         {isReplayMission && (
           <div className="mb-3 rounded border border-cyan-200 bg-cyan-50 p-3 text-xs text-cyan-800 font-medium">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-700 mb-1">Seeded Replay Evidence</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-700 mb-1">Cached API Replay Evidence</p>
             <p>
               Historical downlinks, timelapse evidence, and agent reasoning were restored from replay
-              {mission?.replay_id ? ` ${mission.replay_id}` : ""} so this cell can be inspected without waiting on a live pass.
+              {mission?.replay_id ? ` ${mission.replay_id}` : ""} so this cell can be inspected without waiting on a realtime pass.
             </p>
           </div>
         )}

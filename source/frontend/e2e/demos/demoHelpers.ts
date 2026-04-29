@@ -21,6 +21,13 @@ export type ProofJson = {
   confidence: number;
   abstained: boolean;
   result: string;
+  payload_accounting: {
+    raw_payload_basis: string;
+    alert_payload_basis: string;
+    counted_alert_fields: string[];
+    excluded_from_alert_payload_bytes: string[];
+    note: string;
+  };
   output_json: Record<string, unknown>;
   artifacts: {
     screenshot: string;

@@ -234,7 +234,7 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                         "replay_id": mission.get("replay_id"),
                         "note": (
                             f"[REPLAY #{mission_id}] Satellite loop idled. "
-                            "Serving the seeded mission state until the operator exits replay mode."
+                            "Serving the cached replay mission state until the operator exits replay mode."
                         ),
                     },
                 )

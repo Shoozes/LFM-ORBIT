@@ -61,7 +61,7 @@ export default function AlertsLogs({
             <h2 className="text-xs uppercase tracking-widest font-semibold text-zinc-900">Alerts & Logs</h2>
             <p className="text-xs text-zinc-500 mt-1">
               {isReplayMission
-                ? "Seeded replay evidence restored into the standard alert surfaces."
+                ? "Cached API replay evidence restored into the standard alert surfaces."
                 : "Historical downlinked evidence and recent organic alerts."}
             </p>
           </div>
@@ -160,7 +160,7 @@ export default function AlertsLogs({
                       </div>
                     </div>
                     <p className="text-zinc-500 text-xs italic">
-                      {isReplayMission ? "Seeded replay example." : "Organic anomaly log."}
+                      {isReplayMission ? "Cached API replay example." : "Organic anomaly log."}
                     </p>
                   </div>
                 ))
@@ -234,7 +234,7 @@ export default function AlertsLogs({
                     <div className="flex flex-wrap gap-2">
                       {isReplayMission && (
                         <span className="border border-cyan-200 bg-cyan-50 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider text-cyan-700">
-                          Seeded Replay
+                          Replay Cache
                         </span>
                       )}
                       {alert.reason_codes.map((code: string) => (

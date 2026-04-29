@@ -20,6 +20,8 @@ npm run demo:judge
 
 That command launches the app, loads a deterministic replay from cached real API imagery, runs the VLM proof flow, and writes screenshot, video, trace, and `proof.json` artifacts.
 
+The proof JSON includes `payload_accounting` so `alert_payload_bytes` is clearly scoped to compact downlink alert JSON, not the larger screenshot/video/trace proof envelope.
+
 | Artifact | Path |
 |---|---|
 | Demo video | `docs/judge-mode-demo.webm` |
