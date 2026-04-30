@@ -28,7 +28,7 @@ Full repo verification:
 ./run.sh --verify
 ```
 
-## What Judges Should See First
+## Highlights
 
 - DPhi SimSat is the primary runtime lane: `provider=simsat_sentinel`, `runtime_truth_mode=realtime`, `imagery_origin=simsat`, `scoring_basis=proxy_bands`.
 - Agent 1 prunes scan cells before downlink.
