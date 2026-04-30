@@ -8,7 +8,7 @@ A 1-2 KB alert with bbox, confidence, provenance, model output, and payload acco
 
 ![Onboard scan hero](docs/05-mission-control-scanning.png)
 
-## Run The Judge Proof
+## Playwright Replay
 
 ```bash
 cd source/frontend
