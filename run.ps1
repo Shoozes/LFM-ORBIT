@@ -12,10 +12,18 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = $PSScriptRoot
 $BackendDir = Join-Path $RepoRoot "source\backend"
 $FrontendDir = Join-Path $RepoRoot "source\frontend"
+$BackendVenvDir = $env:UV_PROJECT_ENVIRONMENT
+if (-not $BackendVenvDir) {
+    $BackendVenvDir = Join-Path $BackendDir ".venv-windows"
+    [Environment]::SetEnvironmentVariable("UV_PROJECT_ENVIRONMENT", $BackendVenvDir, "Process")
+}
 $RuntimeDir = Join-Path $RepoRoot "runtime-data"
 $LegacyBackendRuntimeDir = Join-Path $BackendDir "runtime-data"
 $ModelDir = Join-Path $RuntimeDir "models\lfm2.5-vlm-450m"
 $ModelFile = Join-Path $ModelDir "LFM2.5-VL-450M-Q4_0.gguf"
+$ModelManifest = Join-Path $ModelDir "model_manifest.json"
+$DefaultModelRepoId = "Shoozes/lfm2.5-450m-vl-orbit-satellite"
+$DefaultModelRevision = "main"
 $SimSatDir = Join-Path $BackendDir "SimSat-main"
 
 Set-Location -LiteralPath $RepoRoot
@@ -54,6 +62,7 @@ function Import-DotEnv {
 }
 
 Import-DotEnv
+$BackendVenvDir = $env:UV_PROJECT_ENVIRONMENT
 
 function Require-Command {
     param(
@@ -78,7 +87,7 @@ function Show-Usage {
     Write-Host "  .\run.ps1 -Clean          Clear mutable runtime stores for a cold start"
     Write-Host "  .\run.ps1 -Verify         Install deps and run backend, frontend, and E2E checks"
     Write-Host "  .\run.ps1 -Install -FetchModel"
-    Write-Host "                            Also fetch the optional GGUF model before startup"
+    Write-Host "                            Also fetch the trained Orbit GGUF bundle before startup"
 }
 
 function Write-SimSatStatus {
@@ -93,9 +102,29 @@ function Write-SimSatStatus {
 function Install-BackendDeps {
     Require-Command -Name "uv" -Hint "Install uv from https://docs.astral.sh/uv/ to honor source/backend/uv.lock."
     Write-Host "[*] Syncing backend dependencies from uv.lock..." -ForegroundColor Cyan
+
+    $syncArgs = @("sync", "--extra", "dev", "--locked")
+    $installModelRuntime = $FetchModel -or (Test-Path $ModelFile) -or ($env:LFM_ORBIT_INSTALL_MODEL_RUNTIME -match "^(1|true|yes|on)$")
+    if ($installModelRuntime) {
+        $syncArgs += @("--extra", "model")
+        Write-Host "[i] Attempting optional llama-cpp model runtime install." -ForegroundColor Gray
+    }
+
     Push-Location $BackendDir
     try {
-        uv sync --extra dev --locked
+        & uv @syncArgs
+        $syncExit = $LASTEXITCODE
+        if ($syncExit -ne 0) {
+            if ($installModelRuntime) {
+                Write-Host "[!] Optional llama-cpp model runtime failed to install. Retrying core backend install without model runtime." -ForegroundColor Yellow
+                uv sync --extra dev --locked
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Backend dependency sync failed with exit code $LASTEXITCODE."
+                }
+            } else {
+                throw "Backend dependency sync failed with exit code $syncExit."
+            }
+        }
     } finally {
         Pop-Location
     }
@@ -120,43 +149,87 @@ function Ensure-OptionalModel {
 
     Require-Command -Name "python" -Hint "Install Python 3.12 to fetch the optional GGUF model."
 
-    $modelUrl = $env:LFM_MODEL_URL
-    if (-not $modelUrl) {
-        $modelUrl = "https://huggingface.co/LiquidAI/LFM2.5-VL-450M-GGUF/resolve/main/LFM2.5-VL-450M-Q4_0.gguf?download=true"
-    }
     $minSizeBytes = 1MB
 
     New-Item -ItemType Directory -Force -Path $ModelDir | Out-Null
 
-    $needsDownload = $false
-    if (Test-Path $ModelFile) {
-        $fileSize = (Get-Item $ModelFile).Length
-        if ($fileSize -ge $minSizeBytes) {
-            Write-Host "    Optional GGUF model already present ($([Math]::Round($fileSize / 1MB, 1)) MB)." -ForegroundColor Gray
+    if ($env:LFM_MODEL_URL) {
+        $modelUrl = $env:LFM_MODEL_URL
+        $needsDownload = $false
+        if (Test-Path $ModelFile) {
+            $fileSize = (Get-Item $ModelFile).Length
+            if ($fileSize -ge $minSizeBytes) {
+                Write-Host "    Optional GGUF model already present ($([Math]::Round($fileSize / 1MB, 1)) MB)." -ForegroundColor Gray
+            } else {
+                Write-Host "    Existing GGUF file is incomplete ($fileSize bytes). Re-downloading..." -ForegroundColor Yellow
+                $needsDownload = $true
+            }
         } else {
-            Write-Host "    Existing GGUF file is incomplete ($fileSize bytes). Re-downloading..." -ForegroundColor Yellow
             $needsDownload = $true
         }
+
+        if (-not $needsDownload) {
+            return
+        }
+
+        Write-Host "[*] Fetching optional GGUF model from LFM_MODEL_URL..." -ForegroundColor Cyan
+        Write-Host "    Source: $modelUrl" -ForegroundColor Gray
+        Write-Host "    Target: $ModelFile" -ForegroundColor Gray
+
+        python -c "import urllib.request, sys; print('Downloading optional model...', flush=True); urllib.request.urlretrieve(sys.argv[1], sys.argv[2])" $modelUrl $ModelFile
     } else {
-        $needsDownload = $true
+        $modelRepoId = $env:LFM_MODEL_REPO_ID
+        if (-not $modelRepoId) { $modelRepoId = $env:CANOPY_SENTINEL_MODEL_REPO_ID }
+        if (-not $modelRepoId) { $modelRepoId = $DefaultModelRepoId }
+
+        $modelRevision = $env:LFM_MODEL_REVISION
+        if (-not $modelRevision) { $modelRevision = $env:CANOPY_SENTINEL_MODEL_REVISION }
+        if (-not $modelRevision) { $modelRevision = $DefaultModelRevision }
+
+        $installedRepoId = ""
+        $installedRevision = ""
+        if (Test-Path $ModelManifest) {
+            try {
+                $manifest = Get-Content -LiteralPath $ModelManifest -Raw -Encoding UTF8 | ConvertFrom-Json
+                if ($manifest.source -and $manifest.source.repo_id) { $installedRepoId = [string]$manifest.source.repo_id }
+                elseif ($manifest.repo_id) { $installedRepoId = [string]$manifest.repo_id }
+                if ($manifest.source -and $manifest.source.revision) { $installedRevision = [string]$manifest.source.revision }
+                elseif ($manifest.revision) { $installedRevision = [string]$manifest.revision }
+            } catch {
+                Write-Host "    Existing model manifest is unreadable. Refreshing model handoff." -ForegroundColor Yellow
+            }
+        }
+
+        if (Test-Path $ModelFile) {
+            $fileSize = (Get-Item $ModelFile).Length
+            if ($fileSize -ge $minSizeBytes -and $installedRepoId -eq $modelRepoId -and $installedRevision -eq $modelRevision) {
+                Write-Host "    Trained Orbit GGUF already present from $modelRepoId@$modelRevision ($([Math]::Round($fileSize / 1MB, 1)) MB)." -ForegroundColor Gray
+                return
+            }
+            Write-Host "    Existing GGUF is missing or does not match the trained Orbit handoff. Refreshing..." -ForegroundColor Yellow
+        }
+
+        Write-Host "[*] Fetching trained Orbit GGUF bundle..." -ForegroundColor Cyan
+        Write-Host "    Repo: $modelRepoId@$modelRevision" -ForegroundColor Gray
+        Write-Host "    Target: $ModelDir" -ForegroundColor Gray
+        Push-Location $BackendDir
+        try {
+            python scripts\fetch_satellite_model.py --repo-id $modelRepoId --revision $modelRevision --force
+        } finally {
+            Pop-Location
+        }
     }
 
-    if (-not $needsDownload) {
-        return
+    if (-not (Test-Path $ModelFile)) {
+        throw "Expected GGUF file was not written: $ModelFile"
     }
-
-    Write-Host "[*] Fetching optional GGUF model..." -ForegroundColor Cyan
-    Write-Host "    Source: $modelUrl" -ForegroundColor Gray
-    Write-Host "    Target: $ModelFile" -ForegroundColor Gray
-
-    python -c "import urllib.request, sys; print('Downloading optional model...', flush=True); urllib.request.urlretrieve(sys.argv[1], sys.argv[2])" $modelUrl $ModelFile
 
     $fileSize = (Get-Item $ModelFile).Length
     if ($fileSize -lt $minSizeBytes) {
-        throw "Downloaded GGUF file is too small ($fileSize bytes). Remove it and retry with a valid LFM_MODEL_URL."
+        throw "Downloaded GGUF file is too small ($fileSize bytes). Remove it and retry with a valid model repo or LFM_MODEL_URL."
     }
 
-    Write-Host "[+] Optional GGUF model ready ($([Math]::Round($fileSize / 1MB, 1)) MB)." -ForegroundColor Green
+    Write-Host "[+] Optional trained GGUF model ready ($([Math]::Round($fileSize / 1MB, 1)) MB)." -ForegroundColor Green
 }
 
 function Install-Deps {
@@ -209,7 +282,7 @@ function Run-Verify {
 
 function Start-BackendProcess {
     $uvCommand = Get-Command "uv" -ErrorAction SilentlyContinue
-    $venvPython = Join-Path $BackendDir ".venv\Scripts\python.exe"
+    $venvPython = Join-Path $BackendVenvDir "Scripts\python.exe"
 
     if ($uvCommand) {
         return Start-Process -FilePath $uvCommand.Source -ArgumentList "run", "--no-sync", "uvicorn", "api.main:app", "--host", "127.0.0.1", "--port", "8000" -WorkingDirectory $BackendDir -WindowStyle Hidden -PassThru

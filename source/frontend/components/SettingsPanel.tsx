@@ -409,7 +409,7 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
               <div>
                 <p className="text-xs uppercase tracking-wider font-semibold text-zinc-500">Depth Anything V3</p>
                 <p className="mt-1 text-[11px] text-zinc-500">
-                  Optional depth-geometry lane for image-conditioned validation.
+                  Optional depth-geometry lane for evidence validation.
                 </p>
               </div>
               <label className="flex cursor-pointer items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-zinc-600">

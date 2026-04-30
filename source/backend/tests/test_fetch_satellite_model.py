@@ -1,4 +1,5 @@
 import json
+import sys
 from argparse import Namespace
 
 from scripts import fetch_satellite_model
@@ -68,6 +69,37 @@ def test_copy_local_bundle_metadata_preserves_provenance_files(tmp_path):
     assert copied["training_result_manifest"] == target_dir / "training_result_manifest.json"
     assert copied["readme"] == target_dir / "README.md"
     assert json.loads((target_dir / "source_handoff.json").read_text(encoding="utf-8"))["repo_id"] == "jc816/lfm-orbit-satellite"
+
+
+def test_main_defaults_to_published_orbit_handoff_repo(tmp_path, monkeypatch, capsys):
+    runtime_dir = tmp_path / "runtime-data"
+    monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(runtime_dir))
+    monkeypatch.delenv("LFM_MODEL_REPO_ID", raising=False)
+    monkeypatch.delenv("CANOPY_SENTINEL_MODEL_REPO_ID", raising=False)
+    monkeypatch.setattr(sys, "argv", ["fetch_satellite_model.py", "--dry-run"])
+
+    handoff_payload = {
+        "repo_id": "Shoozes/lfm2.5-450m-vl-orbit-satellite",
+        "revision": "main",
+        "model_subdir": "lfm2.5-vlm-450m",
+        "model_filename": "LFM2.5-VL-450M-Q4_0.gguf",
+        "base_model": "LiquidAI/LFM2.5-VL-450M",
+        "quantization": "q4_0",
+        "task": "orbit-satellite-triage",
+        "training_result_manifest": "training_result_manifest.json",
+    }
+    monkeypatch.setattr(
+        fetch_satellite_model,
+        "_try_load_remote_handoff_manifest",
+        lambda repo_id, revision, filename, token: handoff_payload,
+    )
+
+    exit_code = fetch_satellite_model.main()
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "Shoozes/lfm2.5-450m-vl-orbit-satellite@main" in output
+    assert "LFM2.5-VL-450M-Q4_0.gguf" in output
 
 
 def test_main_prefers_remote_handoff_manifest_and_preserves_repo_metadata(tmp_path, monkeypatch):

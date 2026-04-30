@@ -21,7 +21,6 @@ dependencies = [
     "av>=17.0.0",
     "sentinelhub>=3.11.5",
     "s2cloudless>=1.7.3",
-    "llama-cpp-python>=0.3.20",
     "geopandas>=1.0.0",
 ]
 
@@ -29,6 +28,9 @@ dependencies = [
 dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
+]
+model = [
+    "llama-cpp-python>=0.3.20",
 ]
 
 [tool.setuptools]

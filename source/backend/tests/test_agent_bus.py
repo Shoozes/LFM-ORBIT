@@ -139,6 +139,18 @@ def test_get_bus_stats_counts():
     assert stats["unread_messages"] == 2  # 1 sat read, 1 sat + 1 gnd still unread
 
 
+def test_mark_message_ids_read_only_touches_selected_ids():
+    from core.agent_bus import count_unread_message_ids, mark_message_ids_read, post_message
+
+    selected = post_message("satellite", "ground", "flag", {"note": "selected"})
+    other = post_message("satellite", "ground", "flag", {"note": "other"})
+
+    assert count_unread_message_ids([selected, other]) == 2
+    assert mark_message_ids_read([selected]) == 1
+    assert count_unread_message_ids([selected, other]) == 1
+    assert count_unread_message_ids([other]) == 1
+
+
 # ---------------------------------------------------------------------------
 # Map pin CRUD
 # ---------------------------------------------------------------------------

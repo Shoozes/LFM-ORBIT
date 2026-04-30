@@ -1,5 +1,7 @@
 steps:
   - name: Install backend dependencies
+    env:
+      UV_PROJECT_ENVIRONMENT: .venv-linux
     run: |
       python -m pip install uv
       cd source/backend

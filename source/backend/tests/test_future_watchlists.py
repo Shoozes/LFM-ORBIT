@@ -12,7 +12,7 @@ def _parse_utc(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
 
 
-def test_future_wildfire_watchlist_is_timestamped_and_unverified():
+def test_future_wildfire_watchlist_is_timestamped_and_conservatively_verified():
     path = WATCHLIST_ROOT / "wildfire_spc_day2_southern_high_plains_2026-04-28.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
 
@@ -23,9 +23,12 @@ def test_future_wildfire_watchlist_is_timestamped_and_unverified():
     verify_after = _parse_utc(payload["verification_plan"]["verify_after_utc"])
 
     assert payload["schema"] == "orbit_future_watch_v1"
-    assert payload["status"] == "watch_only_unverified"
-    assert "not an ignition prediction" in payload["claim_boundary"]
+    assert payload["status"] == "incident_report_verified_candidate"
+    assert "satellite burn-scar confirmation is still a separate evidence step" in payload["claim_boundary"]
     assert issued_at <= created_at < valid_from < valid_to < verify_after
     assert payload["hazard"] == "critical_fire_weather"
     assert len(payload["bbox"]) == 4
     assert payload["sources"][0]["url"].startswith("https://www.spc.noaa.gov/")
+    assert payload["verification_result"]["status"] == "incident_report_verified_candidate"
+    assert payload["verification_result"]["incident"]["name"] == "Sparks Fire"
+    assert any("nmfireinfo.com/2026/04/29" in source["url"] for source in payload["sources"])

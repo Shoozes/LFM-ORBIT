@@ -146,9 +146,9 @@ const MISSION_LOCATION_PRESETS: MissionPreset[] = [
   {
     id: "wildfire_future_spc_high_plains",
     label: "Fire Watch",
-    place: "SPC D2 High Plains",
+    place: "SPC -> Sparks Fire",
     useCaseId: "wildfire",
-    taskText: "Watch the SPC Day 2 critical fire-weather corridor across eastern New Mexico and western Texas for new smoke plume, active-fire, or burn-scar evidence after the valid window.",
+    taskText: "Review the SPC Day 2 critical fire-weather corridor and the incident-reported Sparks Fire in Quay County for post-event smoke plume, active-fire, or burn-scar evidence. Keep the result as candidate evidence until satellite frames support it.",
     bbox: [-104.9, 31.0, -101.1, 35.5],
     startDate: "2026-04-28",
     endDate: "2026-04-29",

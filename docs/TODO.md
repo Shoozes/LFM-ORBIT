@@ -1,6 +1,6 @@
 # TODO
 
-Updated **April 29, 2026**.
+Updated **April 30, 2026**.
 
 This is the canonical backlog and integrity note. Keep detailed history in `summary_bank.json` and focused docs; keep this file oriented around current state, active gaps, and edge cases.
 
@@ -8,23 +8,25 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 
 - LFM Orbit is a demo-ready, local-first mission-control prototype, not an unattended production deployment.
 - The hackathon runtime is built around DPhi Space SimSat (`simsat_sentinel`). Direct Sentinel Hub, NASA, and GEE-style providers are optional development/replay support and must not become judge-path dependencies.
-- Mission Control can run realtime provider/API scans, replay cached real API imagery, monitor previews, VLM helper calls, timelapse generation, and dataset export paths.
+- Mission Control can run realtime provider/API scans, replay cached real API imagery, monitor previews, optional visual evidence helper calls, timelapse generation, and dataset export paths.
 - Runtime evidence surfaces expose three separate fields: `runtime_truth_mode` (`realtime`, `replay`, `fallback`), `imagery_origin` (`sentinelhub`, `simsat`, `nasa_gibs`, `gee`, `cached_api`, etc.), and `scoring_basis` (`multispectral_bands`, `proxy_bands`, `visual_only`, `fallback_none`).
 - Replay-cache entries are stored real API imagery with preserved date/provenance for deterministic review and cost control. They are not generated evidence.
 - The first `ice_snow_extent` lane scores cached Sentinel-2 L2A replay metadata with NDSI, SCL cloud rejection, snow/ice SCL support, water/ice ambiguity flags, and multi-frame persistence.
-- Fallback means degraded runtime behavior: provider error, quality gate, heuristic proxy, or VLM compatibility fallback. Fallback paths must not masquerade as realtime imagery or high-confidence model output.
+- Fallback means degraded runtime behavior: provider error, quality gate, heuristic proxy, or visual-helper compatibility fallback. Fallback paths must not masquerade as realtime imagery or high-confidence model output.
 - Fast Replay can load curated replay packs and structurally valid cached API WebMs, then rescan saved metadata through the current runtime/model stack.
 - Fast Replay excludes cached WebMs that fail structural timelapse-integrity checks, so static or color-shift-only videos are not presented as temporal proof.
 - NDVI and NDSI have explicit spectral-band contracts: RGB-only, missing, or invalid band data returns unavailable/abstain instead of fabricated indices.
 - Cloud and no-data coverage are hard quality gates: SCL metadata is used when available, cloudy cached frames are skipped, and cloud-blocked scoring windows return no-transmit quality-gate results.
-- VLM responses now carry structured provenance with output source, model, fallback reason, runtime truth mode, imagery origin, and scoring basis.
+- Optional visual evidence responses carry structured provenance with output source, model, fallback reason, runtime truth mode, imagery origin, and scoring basis.
+- Visual evidence search supports operator target presets for homes, boats, possible flaring, and dark smoke while keeping fallback answers cautious and candidate-oriented.
+- The NM-UNI trained GGUF handoff bundle is published at `Shoozes/lfm2.5-450m-vl-orbit-satellite`; launchers pull it with `-FetchModel` / `--fetch-model` and preserve the source/training manifests locally.
 - Judge Mode proof JSON now includes `payload_accounting` so byte-reduction claims state which fields are counted and which proof artifacts are excluded.
 - Local control endpoints are guarded for localhost use, and default CORS is a localhost allowlist unless overridden.
 - Dataset export and retagging can carry cached replay timelapses into local ImageFolder-style training data; the current bounded Qwen/Ollama cycle is published to `Shoozes/LFM-Orbit-SatData`.
 
 ## Recent Integrity Pass
 
-- [x] Split runtime metadata into `runtime_truth_mode`, `imagery_origin`, and `scoring_basis` across provider status, health, telemetry, metrics, recent alerts, replay, timelapse, VLM provenance, and frontend normalization.
+- [x] Split runtime metadata into `runtime_truth_mode`, `imagery_origin`, and `scoring_basis` across provider status, health, telemetry, metrics, recent alerts, replay, timelapse, visual-helper provenance, and frontend normalization.
 - [x] Standardized the primary active-provider truth label as `realtime` while preserving backward compatibility for old stored rows and source labels.
 - [x] Kept replay/cached API evidence labeled as `replay` with `imagery_origin=cached_api`; visual replay defaults to `scoring_basis=visual_only`, while band-derived replay manifests can explicitly use `scoring_basis=multispectral_bands`.
 - [x] Changed cached timelapse provenance to `kind=replay_cache`, `label=Cached real API timelapse`, and `legacy_kind=seeded_cache`.
@@ -45,20 +47,39 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 - [x] Added `scripts/smoke_satellite_model.py` for manifest-resolved GGUF smoke checks when an NM-UNI handoff bundle is actually installed.
 - [x] Added backend smoke coverage that keeps `simsat_sentinel` first in the provider fallback chain.
 - [x] Deprecated user-facing use of `demo_mode_enabled`: current matches are backend metrics/contracts/types compatibility fields, not data-source labels shown as evidence.
+- [x] Reframed judge-facing README hierarchy around onboard bandwidth triage, proof cards, SimSat-first runtime positioning, explicit limitations, and `npm ci` judge commands.
+- [x] Added Ground Agent action chat for local tool calls: list/load/rescan replay, start mission pack, infer mission pack from current context, and toggle SAT/GND link state.
+- [x] Added backend-derived orbital-eclipse queue proof using unread `agent_bus` messages, with `link_state_before`, `queued_alerts_before_restore`, `link_state_after`, `flushed_alerts`, and `queue_source` exported in proof JSON.
+- [x] Replaced judge-facing direct VLM wording with Liquid evidence-packet reasoning unless a manifest-resolved multimodal bundle is installed.
+- [x] Neutralized maritime wording away from illegal-fishing claims toward dark-vessel and vessel-queue triage.
+- [x] Removed remaining judge-facing VLM label residue in the app shell and tests, tightened visual evidence API error surfacing, and replaced loose frontend `any` casts around map cell IDs, alert rows, and metrics examples.
+- [x] Refreshed `summary_bank.json` context groups for SimSat-first judge proof, backend-derived DTN queue proof, Ground Agent local action chat, and frontend integrity polish.
+- [x] Wired the published NM-UNI trained Orbit GGUF repo (`Shoozes/lfm2.5-450m-vl-orbit-satellite`) into the default model fetch path, launchers, docs, and tests.
+- [x] Added repo-level `.gitattributes` line-ending and binary-artifact guardrails so Bash and PowerShell entrypoints stay reproducible across Linux and Windows checkouts.
+- [x] Added visual evidence target presets and deterministic fallback boxes for operator searches such as homes, boats, possible flaring, and dark smoke, with Playwright coverage for the preset path.
+- [x] Split launcher-managed backend virtualenvs by platform (`.venv-windows`, `.venv-linux`, `.venv-macos`) so Windows, WSL, Linux, and CI installs do not fight over one `.venv`.
+- [x] Moved `llama-cpp-python` behind the optional `model` extra; `-FetchModel` / `--fetch-model` installs it when supported and falls back to a bootable core backend when local compiler support is missing.
+- [x] Condensed `README.md` into a screenshot-led judge surface with proof gallery, validation snapshot, runtime limits, and links out to deeper docs instead of repeating progress history.
+- [x] Completed the due SPC Southern High Plains watch check: NM Fire Info independently reported the Sparks Fire in Quay County inside the watch bbox. The manifest is promoted only to `incident_report_verified_candidate`; satellite burn-scar confirmation remains a separate evidence step.
 
 ## Active Backlog
 
 - No unblocked hackathon-path backlog remains in this file. The current judge path is DPhi SimSat-first, replay-safe, dataset-exportable, and locally verifiable.
 
+## Scope Lock
+
+- Allowed before handoff: stability fixes, broken import/export fixes, reproducibility fixes, small UI polish, and sharper SAT/GND/CV/LFM response wording that keeps evidence boundaries honest.
+- Not allowed before handoff: new provider integrations, new mission categories, new dashboards, new external services, or claims that require unbuilt image-conditioned multimodal runtime paths.
+
 ## Blocked External Artifact Lane
 
-- [ ] After NM-UNI exports a real Orbit bundle, fetch it with `scripts/fetch_satellite_model.py`, then run `python scripts\smoke_satellite_model.py --require-present` from `source/backend`.
 - [ ] Add a production image-conditioned satellite inference adapter that consumes the fetched `GGUF + mmproj` artifacts. This should extend the manifest contract instead of adding hardcoded model paths.
-- [ ] Replace VLM VQA/caption compatibility fallbacks with explicitly supported on-device implementations once the selected local runtime and model family are fixed.
+- [ ] Replace visual VQA/caption compatibility fallbacks with explicitly supported on-device implementations once the selected local runtime and model family are fixed.
+- [ ] Attach a held-out base-vs-tuned evaluation report before claiming measured model lift; the current `training_result_manifest.json` has `eval_rows=0`.
 
-## Time-Gated Watch
+## Verified Watch Follow-Up
 
-- [ ] After `2026-04-29T18:00:00Z`, verify the SPC Southern High Plains fire-weather watch against FIRMS/NIFC and only promote it from `watch_only_unverified` if independent detections or incident reports exist inside the bbox.
+- [ ] Seed and review post-event satellite evidence for the Sparks Fire before claiming satellite-confirmed smoke, active-fire, or burn-scar detection.
 
 ## Parked Post-Hackathon Ideas
 
@@ -72,7 +93,7 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 
 - Replayed cached API imagery must be labeled as `runtime_truth_mode=replay`, not as a run-context or fallback label.
 - Realtime provider paths must include the provider/API family through `imagery_origin`; avoid vague standalone "live" labels in evidence surfaces.
-- Fallback paths must carry fallback provenance and must not produce high-confidence positive alerts from provider errors, quality-gate failures, or heuristic-only VLM output.
+- Fallback paths must carry fallback provenance and must not produce high-confidence positive alerts from provider errors, quality-gate failures, or heuristic-only visual-helper output.
 - Empty or malformed provider credentials must report unavailable status without switching to external calls unexpectedly.
 - Cloudy, stale, missing, RGB-only, or non-numeric spectral inputs must abstain rather than fabricate spectral indices.
 - Quality-gated cloud/no-data failures must not emit `suspected_canopy_loss`, even when raw band deltas look large.
@@ -87,8 +108,8 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 - Map-action tests should use app readiness signals and shared helpers before touching the canvas; fixed sleeps are only acceptable for intentional visual/video pacing.
 - Opt-in debug tests should write extra diagnostics to artifacts rather than polluting normal test output.
 - Benign browser disconnect noise should stay out of demo logs; real websocket and backend exceptions should still be logged.
-- Future-watch manifests must stay timestamped, source-backed, and unverified until post-window evidence exists; do not turn risk outlooks into claimed detections.
-- Operator-visible errors should remain visible for mission validation, VLM actions, Ground Agent chat, agent-bus injection, timelapse generation, map-pin sync, and settings status.
+- Watch manifests must stay timestamped and source-backed; incident-report candidates are not satellite-confirmed detections until post-event imagery is seeded and reviewed.
+- Operator-visible errors should remain visible for mission validation, visual evidence actions, Ground Agent chat, agent-bus injection, timelapse generation, map-pin sync, and settings status.
 - Periodic mission refresh failures should leave debug diagnostics so stale mission state can be investigated during local demo runs.
 
 ## Verification Notes
@@ -98,7 +119,8 @@ This is the canonical backlog and integrity note. Keep detailed history in `summ
 - Frontend contract guard: `npm run lint` and `npm run build` from `source/frontend`.
 - Judge acceptance path: `npm run demo:judge` from `source/frontend`.
 - Full local validation remains `.\run.ps1 -Verify` from repo root.
-- Latest integrity validation: cold-start `.\run.ps1 -Verify` passed with backend `305 passed`, frontend lint/build passing, and normal Playwright E2E `73 passed`, `1 skipped`; focused replay/export/timelapse checks passed `14`; Ice/Snow preset Playwright check passed `1`; focused Playwright replay/timelapse specs passed `5`; QA verification passed `8`; `npm run demo:judge` passed; `npm run demo:tutorial` passed and refreshed `docs/tutorial_video.webm`; `summary_bank.json` parsed; `uvx ruff check source/backend --select E9` passed; `git diff --check` reported only CRLF normalization warnings.
-- Latest dataset-cycle validation: dataset export produced `56` current-cycle samples, `24` replay-cache rows, and `25` timelapse rows; bounded Qwen retag produced `179` assets and `26` temporal sequences with `74` reused image tags, `9` historical SVG placeholder skips, and zero tagger failures. New exports rasterize SVG fallbacks to PNG before retagging.
-- Hugging Face remote config verification: `default=179`, `temporal_sft=26`, `asset_metadata=179`, `retagged_assets=179`, `temporal_metadata=26`, `review_queue=179`, `mission_metadata=1`; latest data/card commit `1ebd19065e8a8124372425c4c0df9c0332275c9c`.
-- Latest focused backend validation after backlog closure: `python -m pytest source/backend/tests/test_api.py source/backend/tests/test_replay.py -q` -> `55 passed`; `python -m pytest source/backend/tests/test_export_orbit_dataset.py source/backend/tests/test_evaluate_model.py source/backend/tests/test_model_manifest.py source/backend/tests/test_import_contracts.py -q` -> `17 passed`.
+- Current closeout validation on April 30, 2026: backend guard now passes `317` tests after the SAT/GND candidate-evidence response regression was added; `.\run.ps1 -Verify` passed with frontend lint/build passing and Playwright E2E `73 passed`, `1 skipped`. The run also refreshed `docs/tutorial_video.webm`.
+- Current model-pull validation: default `fetch_satellite_model.py --dry-run` resolves `Shoozes/lfm2.5-450m-vl-orbit-satellite@main`; actual fetch wrote the ignored local GGUF plus `model_manifest.json`, `source_handoff.json`, `training_result_manifest.json`, and README; Windows `.\run.ps1 -InstallOnly -FetchModel` installs the optional `model` extra and passes; WSL/Linux `bash run.sh --install-only --fetch-model` skips the optional `llama-cpp` build when no compiler exists and still completes the core install/model manifest check; `scripts\smoke_satellite_model.py --require-present --max-tokens 8` passed with `loaded=true`.
+- Focused proof validation from this pass: backend API/agent-bus/import-contract checks passed `72`; visual evidence + QA Playwright checks passed `9`; orbital-eclipse recorded proof passed `1` and refreshed `docs/orbital-eclipse-demo.webm`, `docs/readme-orbital-eclipse.png`, and `source/frontend/e2e/artifacts/orbital-eclipse/proof.json`.
+- Repo integrity checks from this pass: `summary_bank.json` parsed and all referenced files exist; stale public overclaim scans found no direct-frame Liquid claims, illegal-activity overclaims, stale visual-helper labels, or judge-path package-command drift; `git diff --check` is clean after line-ending normalization.
+- Dataset/Hugging Face validation: dataset export produced `56` current-cycle samples, `24` replay-cache rows, and `25` timelapse rows; bounded Qwen retag produced `179` assets and `26` temporal sequences with `74` reused image tags, `9` historical SVG placeholder skips, and zero tagger failures. Hugging Face configs remain `default=179`, `temporal_sft=26`, `asset_metadata=179`, `retagged_assets=179`, `temporal_metadata=26`, `review_queue=179`, `mission_metadata=1`; latest data/card commit `1ebd19065e8a8124372425c4c0df9c0332275c9c`.

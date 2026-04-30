@@ -26,7 +26,7 @@ type MapVisualizerProps = {
   onMenuAssignBBox?: (bbox: number[]) => void;
   onMenuAgentVideoEval?: (bbox: number[]) => void;
   onMenuGenerateTimelapse?: (bbox: number[]) => void;
-  /** Active bounding boxes provided by VLM Panel */
+  /** Active bounding boxes provided by optional visual evidence tools */
   vlmBoxes?: VlmBox[];
 };
 
@@ -127,10 +127,16 @@ function getTargetCellIdAtPoint(map: MaplibreMap, point: PointLike): string | nu
   if (!map.getLayer("scan-grid-fill")) return null;
   try {
     const features = map.queryRenderedFeatures(point, { layers: ["scan-grid-fill"] });
-    return typeof features[0]?.properties?.cell_id === "string" ? features[0].properties.cell_id : null;
+    return getCellIdFromProperties(features[0]?.properties);
   } catch {
     return null;
   }
+}
+
+function getCellIdFromProperties(properties: unknown): string | null {
+  if (!properties || typeof properties !== "object") return null;
+  const value = (properties as { cell_id?: unknown }).cell_id;
+  return typeof value === "string" || typeof value === "number" ? String(value) : null;
 }
 
 // ── Marker builders ──────────────────────────────────────────────────────────
@@ -618,12 +624,14 @@ export default function MapVisualizer({
     for (const f of geoJsonGrid.features) {
        if (f.geometry.type === "Polygon") {
           const coords = f.geometry.coordinates[0];
+          const cellId = getCellIdFromProperties(f.properties);
+          if (!cellId) continue;
           let sumLng = 0; let sumLat = 0;
           for (const c of coords) {
              sumLng += c[0]; sumLat += c[1];
           }
           if (coords.length > 0) {
-             centroids[(f.properties as any).cell_id] = [sumLng / coords.length, sumLat / coords.length];
+             centroids[cellId] = [sumLng / coords.length, sumLat / coords.length];
           }
        }
     }
@@ -777,7 +785,7 @@ export default function MapVisualizer({
     }
   }, [pins, mapReady, removePin]);
 
-  // Sync VLM GeoJSON boxes
+  // Sync optional visual evidence boxes
   const vlmGeoJson = useMemo(() => {
     const features: GeoJSON.Feature[] = [];
     if (!drawnBbox || vlmBoxes.length === 0) {

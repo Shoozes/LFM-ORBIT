@@ -48,9 +48,10 @@ def _build_flag_message(
         "observation_source": score.get("observation_source", "semi_real_loader_v1"),
         "before_window": score.get("before_window", {}),
         "after_window": score.get("after_window", {}),
+        "review_boundary": "candidate_evidence_packet",
         "note": (
-            f"Orbital triage complete. Downlinking cell index only "
-            f"(~15 bytes vs ~5MB raw frame). Requesting ground validation."
+            "Orbital triage complete. Downlinking a compact candidate evidence packet "
+            "instead of raw imagery. Requesting ground validation."
         ),
     }
     if mission_id is not None:

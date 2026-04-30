@@ -180,7 +180,7 @@ _TEMPORAL_USE_CASES: list[dict[str, Any]] = [
             "queueing",
             "grounding",
             "grounded",
-            "illegal fishing",
+            "dark-vessel triage",
             "shipping lane",
             "offshore",
         ],

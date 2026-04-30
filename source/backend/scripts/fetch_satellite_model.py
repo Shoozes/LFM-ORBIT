@@ -2,8 +2,7 @@
 
 Examples:
     python source/backend/scripts/fetch_satellite_model.py ^
-        --repo-id your-org/lfm-orbit-satellite ^
-        --model-filename LFM2.5-VL-450M-Q4_0.gguf
+        --repo-id Shoozes/lfm2.5-450m-vl-orbit-satellite
 
     python source/backend/scripts/fetch_satellite_model.py ^
         --source-manifest C:\\path\\to\\model-bundle\\orbit_model_handoff.json
@@ -25,6 +24,7 @@ from typing import Any
 
 from core.model_manifest import (
     DEFAULT_MODEL_FILENAME,
+    DEFAULT_MODEL_REPO_ID,
     DEFAULT_MODEL_SUBDIR,
     DEFAULT_README_FILENAME,
     DEFAULT_REVISION,
@@ -295,8 +295,16 @@ def _parse_args() -> argparse.Namespace:
         default=DEFAULT_HANDOFF_MANIFEST_FILENAME,
         help="Repo-relative handoff manifest to try first when --repo-id is provided (default: orbit_model_handoff.json).",
     )
-    parser.add_argument("--repo-id", default=None, help="Hugging Face model repo ID.")
-    parser.add_argument("--revision", default=None, help="Repo revision, tag, or branch.")
+    parser.add_argument(
+        "--repo-id",
+        default=os.getenv("LFM_MODEL_REPO_ID") or os.getenv("CANOPY_SENTINEL_MODEL_REPO_ID") or DEFAULT_MODEL_REPO_ID,
+        help=f"Hugging Face model repo ID (default: {DEFAULT_MODEL_REPO_ID}).",
+    )
+    parser.add_argument(
+        "--revision",
+        default=os.getenv("LFM_MODEL_REVISION") or os.getenv("CANOPY_SENTINEL_MODEL_REVISION"),
+        help="Repo revision, tag, or branch.",
+    )
     parser.add_argument("--model-filename", default=None, help="Primary GGUF filename.")
     parser.add_argument("--mmproj-filename", default=None, help="Optional mmproj filename.")
     parser.add_argument("--model-subdir", default=None, help="Runtime model subdirectory under runtime-data/models.")

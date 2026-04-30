@@ -17,6 +17,15 @@ def test_vlm_fallback_does_not_fabricate_aircraft_boxes():
         assert vlm.run_vlm_grounding([-60.5, -3.5, -60.4, -3.4], "Find airplanes") == []
 
 
+def test_vlm_fallback_supports_operator_target_search_labels():
+    with patch("core.vlm._load_pipeline", return_value=None):
+        vlm._grounding_pipeline = None
+        assert vlm.run_vlm_grounding([-60.5, -3.5, -60.4, -3.4], "Find homes")[0]["label"] == "homes"
+        assert vlm.run_vlm_grounding([-60.5, -3.5, -60.4, -3.4], "Find boats")[0]["label"] == "boats"
+        assert vlm.run_vlm_grounding([-60.5, -3.5, -60.4, -3.4], "Find possible flaring")[0]["label"] == "possible flaring"
+        assert vlm.run_vlm_grounding([-60.5, -3.5, -60.4, -3.4], "Find dark smoke")[0]["label"] == "dark smoke"
+
+
 def test_vlm_vqa_uses_fallback_when_transformers_unavailable():
     with patch("core.vlm._load_pipeline", return_value=None):
         vlm._vqa_pipeline = None
@@ -32,6 +41,15 @@ def test_vlm_vqa_fallback_uses_bbox_context():
         assert (
             vlm.run_vlm_vqa([-81.62, 28.33, -81.48, 28.44], "What land cover is visible?")
             == "Urban road corridor, water bodies, and managed vegetation."
+        )
+
+
+def test_vlm_vqa_fallback_marks_sensitive_targets_as_candidates():
+    with patch("core.vlm._load_pipeline", return_value=None):
+        vlm._vqa_pipeline = None
+        assert "candidate evidence" in vlm.run_vlm_vqa(
+            [-60.5, -3.5, -60.4, -3.4],
+            "Is there dark smoke or possible flaring?",
         )
 
 

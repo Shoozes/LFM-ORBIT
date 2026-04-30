@@ -38,9 +38,10 @@ The backend runs two long-lived loops during app lifespan:
 16. `core/queue.py` persists confirmed alerts for `Logs`, `Inspect`, and recent-alert APIs.
 17. `core/gallery.py` expands confirmed alerts into imagery/timelapse evidence and now reuses local replay cache imagery for thumbnail fallback before dropping to offline chips; dataset export rasterizes SVG fallbacks to PNG.
 18. `core/replay.py` can reset runtime state and load a completed mission directly into the same mission, queue, gallery, metrics, and dialogue stores used by realtime operations. It also exposes cached API WebMs as Fast Replay entries and can rescan replay metadata through the current runtime/model stack.
-19. `ValidationPanel.tsx`, `TimelapseViewer.tsx`, and `VlmPanel.tsx` expand a selected alert into imagery, analysis, exports, and timelapse context. Mission-tab timelapse output renders ahead of VLM actions so active temporal video evidence remains visible.
+19. `ValidationPanel.tsx`, `TimelapseViewer.tsx`, and `VlmPanel.tsx` expand a selected alert into imagery, analysis, exports, and timelapse context. Mission-tab timelapse output renders ahead of optional visual-evidence actions so active temporal video evidence remains visible.
 20. `SettingsPanel.tsx` queries provider, SimSat, analysis, and depth status endpoints independently, with short retries so one transient miss does not force a false offline settings surface.
-21. `JudgeModePanel.tsx` turns replay state into visible proof: satellite frame, bbox/evidence overlay, VLM result, latency, provenance, raw-vs-alert bytes, reduction ratio, abstain state, link outage queue, and proof JSON.
+21. `GroundAgent.tsx` and `/api/agent/chat` provide a local action chat for listing/loading/rescanning replays, launching mission packs, and toggling the SAT/GND link.
+22. `JudgeModePanel.tsx` turns replay state into visible proof: satellite frame, bbox/evidence overlay, evidence result, latency, provenance, raw-vs-alert bytes, reduction ratio, abstain state, backend-derived link outage queue, and proof JSON.
 
 ## Module Map
 
@@ -91,7 +92,7 @@ The backend runs two long-lived loops during app lifespan:
 - `source/backend/core/runtime_state.py`
   Deterministic runtime initialization/reset helper used by app boot, replay loading, and automated validation.
 - `source/backend/core/agent_bus.py`
-  SAT/GND/operator message queue, pins, and replay-safe read-state helpers.
+  SAT/GND/operator message queue, pins, replay-safe read-state helpers, and targeted message-id read marking for DTN proof flushes.
 - `source/backend/core/gallery.py`
   Ground-confirmed imagery/timelapse evidence store.
 - `source/backend/core/replay.py`
@@ -134,7 +135,7 @@ The backend runs two long-lived loops during app lifespan:
 - `source/frontend/hooks/useTelemetry.ts`
   Grid, alerts, selected cell, mission completion, websocket lifecycle.
 - `source/frontend/components/MapVisualizer.tsx`
-  MapLibre basemap, scan grid, pins, bbox preview, context menu, VLM boxes, safe marker-label rendering, and map-pin sync failure visibility.
+  MapLibre basemap, scan grid, pins, bbox preview, context menu, visual evidence boxes, safe marker-label rendering, and map-pin sync failure visibility.
 - `source/frontend/utils/depthMapStats.ts`
   WebGL shader texture reducer for depth-map summaries with CPU fallback.
 - `source/frontend/components/MissionControl.tsx`
@@ -160,7 +161,7 @@ The backend runs two long-lived loops during app lifespan:
 - `source/frontend/components/AgentDialogue.tsx`
   Live SAT/GND bus stream and operator injection, including inline bus stats and injection failure visibility.
 - `source/frontend/components/GroundAgent.tsx`
-  Ground assistant chat surface with inline backend-error payloads, timeout labeling, and guarded send state.
+  Ground assistant chat surface with inline backend-error payloads, timeout labeling, guarded send state, and local action results for replay, mission-pack, and link-control tool calls.
 - `source/frontend/components/VlmPanel.tsx`
   Grounding, VQA, and caption actions for the selected bbox, with explicit action controls and inline API-error handling.
 - `source/frontend/components/TimelapseViewer.tsx`
@@ -197,7 +198,7 @@ Runtime evidence now carries three separate labels:
 - `imagery_origin`: source family such as `sentinelhub`, `simsat`, `nasa_gibs`, `gee`, `cached_api`, or `fallback_none`.
 - `scoring_basis`: `multispectral_bands`, `proxy_bands`, `visual_only`, `fallback_none`, or `unknown`.
 
-This keeps cached real API replay imagery distinct from degraded fallback behavior. It also prevents proxy scoring or VLM compatibility fallbacks from looking like realtime multispectral evidence.
+This keeps cached real API replay imagery distinct from degraded fallback behavior. It also prevents proxy scoring or optional visual-helper compatibility fallbacks from looking like realtime multispectral evidence.
 
 Cached replay imagery can still carry `scoring_basis=multispectral_bands` when the replay manifest includes precomputed band-derived metadata, as in the `ice_snow_extent` lane. In that case `runtime_truth_mode=replay` and `imagery_origin=cached_api` remain unchanged.
 
@@ -206,17 +207,18 @@ Cached replay imagery can still carry `scoring_basis=multispectral_bands` when t
 - Guaranteed available: `offline_lfm_v1`
 - Optional manifest-resolved local GGUF: `runtime-data/models/lfm2.5-vlm-450m/model_manifest.json`
 - Default GGUF target artifact: `runtime-data/models/lfm2.5-vlm-450m/LFM2.5-VL-450M-Q4_0.gguf`
-- Optional remote handoff path: `source/backend/scripts/fetch_satellite_model.py` can fetch a published Hugging Face artifact and write the local runtime manifest
+- Default trained GGUF source: `Shoozes/lfm2.5-450m-vl-orbit-satellite`, generated by NM-UNI from `C:\DevStuff\NM-UNI-main`
+- Optional remote handoff path: `source/backend/scripts/fetch_satellite_model.py` fetches the published Hugging Face artifact, preserves `orbit_model_handoff.json` / `training_result_manifest.json`, and writes the local runtime manifest
 - Optional NM-UNI handoff producer: `C:\DevStuff\NM-UNI-main`, which imports Orbit exports, prepares training/quantization, stages `orbit_model_handoff.json`, and can publish model bundles for Orbit to fetch
-- Optional VLM actions: safe offline fallback responses when compatible transformers paths are unavailable
+- Optional visual evidence actions: safe offline fallback responses when compatible transformers paths are unavailable
 - Optional Depth Anything V3: disabled by default through `DEPTH_ANYTHING_V3_ENABLED=false`; when enabled, `/api/depth/status` reports package/model/device readiness, and malformed image payloads are rejected before optional model loading.
 
 ## Verification State
 
 Current repo-wide validation results:
 
-- `uv sync --extra dev --locked` -> passing
-- `uv run --no-sync pytest -q` -> `305 passed`
+- `uv sync --extra dev --locked` -> passing; `--extra model` is optional and installed by `-FetchModel` / `--fetch-model` when the host can build or install `llama-cpp-python`
+- `uv run --no-sync pytest -q` -> `317 passed`
 - `npm run lint` -> passing
 - `npm run build` -> passing, with split chunks and no large-chunk warning
 - `npx playwright test` -> `73 passed`, `1 skipped` debug-only HTML dump
@@ -225,8 +227,9 @@ Current repo-wide validation results:
 - `npm run demo:tutorial` -> passing with refreshed `docs/tutorial_video.webm`
 - Dataset export with `--include-seeded-cache` -> `56` current-cycle samples, `24` replay-cache rows, `25` timelapse rows, `2` wildfire replay-cache rows, and `2` volcanic surface-change rows; bounded Qwen/Ollama retagged training export -> `179` deduplicated assets, `26` temporal sequences, `40` model image calls, `6` sequence calls, `74` reused image tags, and deterministic heuristic fallback for the rest
 - Optional Sentinel Hub Process API OAuth -> validated locally for replay-cache development only; Hugging Face dataset upload -> published to `Shoozes/LFM-Orbit-SatData` with viewer-safe configs at commit `1ebd19065e8a8124372425c4c0df9c0332275c9c`
-- `.\run.ps1 -Verify` -> passing from repo root; backend, frontend, and E2E component checks were rerun after the latest preset and screenshot updates.
-- Screenshot captures include Settings, timelapse, context-menu, agent-evaluation, monitor-preview, known-location mission presets, debug-dashboard, and VLM road-corridor proof images.
+- `.\run.ps1 -Verify` -> passing from repo root; backend `317 passed`, frontend lint/build passed, and Playwright `73 passed`, `1 skipped`.
+- `python scripts\smoke_satellite_model.py --require-present --max-tokens 8` -> passing with the downloaded `Shoozes/lfm2.5-450m-vl-orbit-satellite` GGUF bundle.
+- Screenshot captures include Settings, timelapse, context-menu, agent-evaluation, monitor-preview, known-location mission presets, debug-dashboard, and visual evidence road-corridor proof images.
 - `.github/workflows/ci.yml` runs the same backend, frontend, and Playwright checks in GitHub Actions using the repo-pinned Node version from `.nvmrc`.
 - Repo-root launchers expose the same full local check through `.\run.ps1 -Verify` or `./run.sh --verify`.
 - A copied `.env.example` has been smoke-tested with `.\run.ps1 -InstallOnly` and a bounded `.\run.ps1 -Run` startup check against backend health plus the Vite index.
@@ -236,7 +239,8 @@ Current repo-wide validation results:
 ## Known Constraints
 
 - The satellite path is still metadata-conditioned GGUF reasoning over scored signals. Production image-conditioned `mmproj` inference is not wired into runtime yet.
-- The optional VLM grounding path works with available dependencies, but VQA/caption currently rely on compatibility fallbacks unless a matching local transformer setup is added.
+- The trained Orbit GGUF fills the model-handoff/training artifact requirement, but the uploaded bundle has no `mmproj` file, so it should not be described as direct image-conditioned runtime inference.
+- The optional visual evidence grounding path works with available dependencies, but VQA/caption currently rely on compatibility fallbacks unless a matching local transformer setup is added.
 - Depth Anything V3 is integrated as an optional adapter and Settings toggle, but depth statistics are not yet part of the live alert scoring or promotion gate.
 - Tool-call parsing supports nested fenced JSON arguments for local LFM output. Inline JSON extraction remains intentionally conservative to avoid over-parsing normal prose.
 - The primary UI is desktop-operator oriented with a fixed right mission rail. The map now has a non-right-click action path, but responsive/mobile layout coverage remains follow-up work.

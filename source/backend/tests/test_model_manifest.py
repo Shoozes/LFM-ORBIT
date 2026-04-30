@@ -2,8 +2,9 @@ from core import model_manifest
 from scripts import smoke_satellite_model
 
 
-def test_resolve_satellite_model_artifact_defaults(monkeypatch):
-    monkeypatch.delenv("CANOPY_SENTINEL_RUNTIME_DIR", raising=False)
+def test_resolve_satellite_model_artifact_defaults(monkeypatch, tmp_path):
+    runtime_dir = tmp_path / "runtime-data"
+    monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(runtime_dir))
     monkeypatch.delenv("CANOPY_SENTINEL_MODEL_MANIFEST", raising=False)
     monkeypatch.delenv("CANOPY_SENTINEL_MODEL_SUBDIR", raising=False)
     monkeypatch.delenv("CANOPY_SENTINEL_MODEL_FILENAME", raising=False)
@@ -32,6 +33,11 @@ def test_resolve_satellite_model_artifact_reads_manifest(monkeypatch, tmp_path):
 {
   "repo_id": "example/orbit-satellite",
   "revision": "release-1",
+  "source": {
+    "kind": "huggingface",
+    "repo_id": "example/orbit-satellite",
+    "revision": "release-1"
+  },
   "model_subdir": "nm-uni-orbit",
   "model_filename": "nm-uni-orbit-q4.gguf",
   "mmproj_filename": "nm-uni-orbit-mmproj.gguf",
@@ -51,6 +57,7 @@ def test_resolve_satellite_model_artifact_reads_manifest(monkeypatch, tmp_path):
 
     assert artifact.repo_id == "example/orbit-satellite"
     assert artifact.revision == "release-1"
+    assert artifact.source == "huggingface"
     assert artifact.model_dir == model_dir
     assert artifact.model_path == model_dir / "nm-uni-orbit-q4.gguf"
     assert artifact.mmproj_path == model_dir / "nm-uni-orbit-mmproj.gguf"

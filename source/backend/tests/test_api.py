@@ -358,6 +358,91 @@ def test_simsat_status_tolerates_invalid_timeout_env(monkeypatch):
     assert response.json()["timeout_seconds"] == 30.0
 
 
+def test_link_dtn_proof_uses_agent_bus_queue(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    import api.main as main
+    from core.agent_bus import get_bus_stats, init_bus
+    from core.link_state import set_link_state
+
+    main._DTN_PROOF_MESSAGE_IDS = []
+    init_bus(reset=True)
+    set_link_state(True)
+
+    offline = client.post("/api/link/dtn-proof", json={"phase": "offline", "count": 4})
+
+    assert offline.status_code == 200
+    offline_payload = offline.json()
+    assert offline_payload["link_state_before"] == "offline"
+    assert offline_payload["queued_alerts_before_restore"] == 4
+    assert offline_payload["queue_source"] == "agent_bus_unread_messages"
+    assert get_bus_stats()["unread_messages"] >= 4
+
+    restored = client.post("/api/link/dtn-proof", json={"phase": "restore"})
+
+    assert restored.status_code == 200
+    restored_payload = restored.json()
+    assert restored_payload["link_state_before"] == "offline"
+    assert restored_payload["link_state_after"] == "restored"
+    assert restored_payload["flushed_alerts"] == 4
+    assert restored_payload["queued_alerts_after_restore"] == 0
+    set_link_state(True)
+
+
+def test_ground_agent_chat_lists_replay_tools():
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "list replays"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "reply" in payload
+    assert payload["actions"][0]["name"] == "list_replays"
+    assert payload["actions"][0]["status"] == "ok"
+    assert payload["actions"][0]["result"]["replays"]
+
+
+def test_ground_agent_chat_launches_context_mission_pack(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.mission import init_missions, start_mission
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+    start_mission(
+        "Review maritime vessel queueing near the Suez channel.",
+        bbox=[32.5, 29.88, 32.58, 29.96],
+        start_date="2025-03-01",
+        end_date="2025-12-15",
+        use_case_id="maritime_activity",
+    )
+
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "run mission pack based on context"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"][0]["name"] == "start_mission_pack"
+    assert payload["actions"][0]["status"] == "ok"
+    assert payload["actions"][0]["result"]["pack_id"] == "maritime_suez"
+
+
+def test_ground_agent_chat_cautions_visual_evidence_candidates():
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "Can CV find boats or dark smoke in the bbox?"}]},
+    )
+
+    assert response.status_code == 200
+    reply = response.json()["reply"].lower()
+    assert "candidate evidence" in reply
+    assert "fallback vision never confirms" in reply
+
+
 def test_temporal_use_cases_endpoint_returns_examples():
     """Temporal use-case endpoint should expose examples for scan setup and dataset prep."""
     response = client.get("/api/temporal/use-cases")

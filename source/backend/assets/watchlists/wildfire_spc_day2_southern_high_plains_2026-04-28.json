@@ -6,8 +6,8 @@
   "valid_from_utc": "2026-04-28T12:00:00Z",
   "valid_to_utc": "2026-04-29T12:00:00Z",
   "hazard": "critical_fire_weather",
-  "status": "watch_only_unverified",
-  "claim_boundary": "This is a timestamped risk watch for wildfire spread potential, not an ignition prediction or confirmed event.",
+  "status": "incident_report_verified_candidate",
+  "claim_boundary": "This began as a timestamped risk watch for wildfire spread potential. It is now verified only as an incident-report candidate; satellite burn-scar confirmation is still a separate evidence step.",
   "risk_area_label": "Southern High Plains: eastern New Mexico into western Texas",
   "mission_preset_id": "wildfire_future_spc_high_plains",
   "bbox": [-104.9, 31.0, -101.1, 35.5],
@@ -29,11 +29,34 @@
       "Retag candidate frames with the local Ollama Qwen vision model and mark the row verified only if visual evidence supports it."
     ]
   },
+  "verification_result": {
+    "checked_at_utc": "2026-04-30T03:50:55Z",
+    "status": "incident_report_verified_candidate",
+    "summary": "NM Fire Info reported the Sparks Fire in Quay County, New Mexico after the SPC watch was created and during the watch window. Quay County falls inside the watch bbox. Treat this as incident-report validation only until post-event satellite evidence is seeded and reviewed.",
+    "incident": {
+      "name": "Sparks Fire",
+      "location": "HWY 156 mile marker 41, Quay County, New Mexico",
+      "reported_start": "2026-04-28T15:20:00-06:00",
+      "reported_acres": 10000,
+      "containment": "0% contained on 2026-04-29",
+      "source_type": "state fire information incident report"
+    }
+  },
   "sources": [
     {
       "name": "NOAA SPC Day 2 Fire Weather Outlook",
       "url": "https://www.spc.noaa.gov/products/fire_wx/fwdy2.html",
       "accessed_at_utc": "2026-04-28T03:25:10Z"
+    },
+    {
+      "name": "NM Fire Info: Sparks Fire Quay County Wildfire Notification",
+      "url": "https://nmfireinfo.com/2026/04/28/sparks-fire-quay-county-wildfire-notification/",
+      "accessed_at_utc": "2026-04-30T03:50:55Z"
+    },
+    {
+      "name": "NM Fire Info: Sparks Fire Quay County Update 4/29/26",
+      "url": "https://nmfireinfo.com/2026/04/29/sparks-fire-quay-county-update-4-29-26/",
+      "accessed_at_utc": "2026-04-30T03:50:55Z"
     }
   ]
 }

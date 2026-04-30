@@ -176,7 +176,7 @@ test.describe("Monitor Feature Visual Proof", () => {
     await page.locator("[data-testid='tab-mission']").click();
 
     await page.locator("[data-testid='mission-preset-wildfire_future_spc_high_plains']").click();
-    await expect(page.locator("[data-testid='selected-mission-preset']")).toContainText("SPC D2 High Plains");
+    await expect(page.locator("[data-testid='selected-mission-preset']")).toContainText("SPC -> Sparks Fire");
     await expect(page.locator("textarea")).toHaveValue(/SPC Day 2 critical fire-weather/);
     await expect(page.locator("[data-testid='bbox-badge']")).toContainText("-104.90", { timeout: 10_000 });
     await page.locator("[data-testid='selected-mission-preset']").scrollIntoViewIfNeeded();

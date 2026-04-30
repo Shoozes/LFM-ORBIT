@@ -6,7 +6,7 @@ This folder is for local data inputs that help Orbit gather, package, retag, and
 
 Orbit's data cycle is:
 
-1. The app gathers evidence during realtime missions, replay from cached real API imagery, monitor previews, imagery fetches, VLM helper calls, and timelapse generation.
+1. The app gathers evidence during realtime missions, replay from cached real API imagery, monitor previews, imagery fetches, optional visual evidence helper calls, and timelapse generation.
 2. The backend stores alert metadata, gallery evidence, thumbnails, videos, observations, agent decisions, and monitor reports.
 3. `scripts/export_orbit_dataset.py` packages those records into an Orbit dataset export with JSONL manifests and local assets.
 4. `scripts/retag_training_assets.py` walks the export, deduplicates images and frames by SHA-256, extracts timelapse frames, preserves temporal sequence context, and retags assets with a chosen provider.
@@ -125,17 +125,17 @@ uv run --no-sync python scripts\seed_sentinel_cache.py `
 
 Treat this as candidate evidence until the contact sheet is visually reviewed; cloud, smoke, or missing-scene artifacts should not replace a clearer demo. If too many windows are rejected, widen the date window or pick another clear acquisition instead of forcing a cloudy timelapse.
 
-## Future Risk Watch Manifests
+## Risk Watch Manifests
 
-Timestamped watch manifests live under `source/backend/assets/watchlists/`. They are not labels and they are not predictions that an ignition will occur. They record an official risk outlook before the outcome is known so a later verification pass can prove whether Orbit caught something after the valid window.
+Timestamped watch manifests live under `source/backend/assets/watchlists/`. They are not labels and they are not predictions that an ignition will occur. They record an official risk outlook before the outcome is known so a later verification pass can prove whether an incident source or satellite evidence appeared after the valid window.
 
-Current future watch:
+Current watch:
 
-| Watch | Valid window | Proof file |
-|---|---|---|
-| SPC Day 2 critical fire-weather corridor, eastern New Mexico into western Texas | `2026-04-28T12:00:00Z` to `2026-04-29T12:00:00Z` | `assets/watchlists/wildfire_spc_day2_southern_high_plains_2026-04-28.json` |
+| Watch | Valid window | Status | Proof file |
+|---|---|---|---|
+| SPC Day 2 critical fire-weather corridor, eastern New Mexico into western Texas | `2026-04-28T12:00:00Z` to `2026-04-29T12:00:00Z` | `incident_report_verified_candidate` via NM Fire Info Sparks Fire report; satellite confirmation still pending | `assets/watchlists/wildfire_spc_day2_southern_high_plains_2026-04-28.json` |
 
-After the watch window closes, verify against FIRMS/NIFC first. Only seed Sentinel-2 post-event imagery if an independent active-fire or incident source exists inside the bbox.
+Only seed Sentinel-2 post-event imagery after an independent active-fire or incident source exists inside the bbox. The Sparks Fire report clears that source gate, but it is not yet a satellite-confirmed burn-scar row.
 
 ## Retag Assets
 
@@ -151,7 +151,7 @@ uv run --no-sync python scripts\retag_training_assets.py `
   --max-provider-sequences 0
 ```
 
-`--max-provider-assets` keeps local VLM retagging bounded for show-ready runs. `--max-provider-sequences 0` keeps temporal sequence rows heuristic by default because multi-image local VLM calls are slower; set a positive number when you intentionally want sequence-level model calls.
+`--max-provider-assets` keeps local visual-model retagging bounded for show-ready runs. `--max-provider-sequences 0` keeps temporal sequence rows heuristic by default because multi-image local visual-model calls are slower; set a positive number when you intentionally want sequence-level model calls.
 
 Use `--reuse-existing-dir <previous-retagged-folder>` to avoid sending already-tagged image hashes back through Qwen/Ollama. Use `--no-reuse-existing-sequences` when sequence-level prompts changed and should be regenerated while still reusing image-level tags.
 

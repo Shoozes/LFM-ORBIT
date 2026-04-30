@@ -10,9 +10,73 @@ type VlmPanelProps = {
   onBoxesUpdate: (boxes: VlmBox[]) => void;
 };
 
+type GroundingResponse = {
+  results?: unknown;
+};
+
+type VqaResponse = {
+  answer?: unknown;
+};
+
+type CaptionResponse = {
+  caption?: unknown;
+};
+
 function getErrorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
 }
+
+async function readApiError(response: Response, fallback: string): Promise<string> {
+  try {
+    const payload = await response.json() as { error?: unknown; detail?: unknown };
+    if (typeof payload.error === "string" && payload.error.trim()) return payload.error;
+    if (typeof payload.detail === "string" && payload.detail.trim()) return payload.detail;
+  } catch {
+    return fallback;
+  }
+  return fallback;
+}
+
+async function postJson<TResponse>(
+  url: string,
+  payload: unknown,
+  fallbackError: string,
+): Promise<TResponse> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(await readApiError(response, `${fallbackError} with HTTP ${response.status}.`));
+  }
+  return await response.json() as TResponse;
+}
+
+function isVlmBox(value: unknown): value is VlmBox {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { label?: unknown; bbox?: unknown };
+  return (
+    typeof candidate.label === "string" &&
+    Array.isArray(candidate.bbox) &&
+    candidate.bbox.length === 4 &&
+    candidate.bbox.every((entry) => typeof entry === "number" && Number.isFinite(entry))
+  );
+}
+
+function normalizeBoxes(value: unknown): VlmBox[] {
+  return Array.isArray(value) ? value.filter(isVlmBox) : [];
+}
+
+const TARGET_PRESETS = [
+  "homes",
+  "boats",
+  "possible flaring",
+  "dark smoke",
+  "clearing",
+  "road",
+  "river",
+];
 
 export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }: VlmPanelProps) {
   const [groundingPrompt, setGroundingPrompt] = useState("");
@@ -33,19 +97,20 @@ export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }:
 
   if (!isOpen) return null;
 
-  async function handleGrounding() {
-    if (!activeBbox || !groundingPrompt) return;
+  async function submitGrounding(rawPrompt: string) {
+    const prompt = rawPrompt.trim();
+    if (!activeBbox || !prompt) return;
     setLoadingGrounding(true);
     setGroundingError(null);
     try {
-      const res = await fetch(`${apiBaseUrl}/api/vlm/grounding`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bbox: activeBbox, prompt: groundingPrompt })
-      });
-      if (!res.ok) throw new Error(`Grounding failed with HTTP ${res.status}.`);
-      const data = await res.json();
-      setGroundingResults(data.results);
-      onBoxesUpdate(data.results);
+      const data = await postJson<GroundingResponse>(
+        `${apiBaseUrl}/api/vlm/grounding`,
+        { bbox: activeBbox, prompt },
+        "Grounding failed",
+      );
+      const results = normalizeBoxes(data.results);
+      setGroundingResults(results);
+      onBoxesUpdate(results);
     } catch (err) {
       setGroundingError(getErrorMessage(err, "Grounding failed."));
     } finally {
@@ -53,18 +118,27 @@ export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }:
     }
   }
 
+  async function handleGrounding() {
+    await submitGrounding(groundingPrompt);
+  }
+
+  async function runGroundingPrompt(prompt: string) {
+    setGroundingPrompt(prompt);
+    await submitGrounding(prompt);
+  }
+
   async function handleVqa() {
-    if (!activeBbox || !vqaQuestion) return;
+    const question = vqaQuestion.trim();
+    if (!activeBbox || !question) return;
     setLoadingVqa(true);
     setVqaError(null);
     try {
-      const res = await fetch(`${apiBaseUrl}/api/vlm/vqa`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bbox: activeBbox, question: vqaQuestion })
-      });
-      if (!res.ok) throw new Error(`Visual Q&A failed with HTTP ${res.status}.`);
-      const data = await res.json();
-      setVqaAnswer(data.answer);
+      const data = await postJson<VqaResponse>(
+        `${apiBaseUrl}/api/vlm/vqa`,
+        { bbox: activeBbox, question },
+        "Visual Q&A failed",
+      );
+      setVqaAnswer(typeof data.answer === "string" ? data.answer : "No answer returned.");
     } catch (err) {
       setVqaError(getErrorMessage(err, "Visual Q&A failed."));
     } finally {
@@ -77,13 +151,12 @@ export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }:
     setLoadingCaption(true);
     setCaptionError(null);
     try {
-      const res = await fetch(`${apiBaseUrl}/api/vlm/caption`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bbox: activeBbox })
-      });
-      if (!res.ok) throw new Error(`Captioning failed with HTTP ${res.status}.`);
-      const data = await res.json();
-      setCaption(data.caption);
+      const data = await postJson<CaptionResponse>(
+        `${apiBaseUrl}/api/vlm/caption`,
+        { bbox: activeBbox },
+        "Captioning failed",
+      );
+      setCaption(typeof data.caption === "string" ? data.caption : "No caption returned.");
     } catch (err) {
       setCaptionError(getErrorMessage(err, "Captioning failed."));
     } finally {
@@ -96,7 +169,7 @@ export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }:
       {/* Header */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-900">VLM Vision</span>
+          <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-900">Visual Evidence Tools</span>
         </div>
         <button 
            onClick={() => {
@@ -109,7 +182,7 @@ export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }:
 
       {!activeBbox ? (
          <div className="rounded border border-zinc-200 bg-zinc-50 p-4 text-xs text-zinc-500 font-medium text-center">
-           Select an area on the map using the Draw Area tool to enable Vision Language Models.
+           Select an area on the map using the Draw Area tool to enable optional visual evidence checks.
          </div>
       ) : (
         <>
@@ -122,7 +195,7 @@ export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }:
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Find: clearing, road, river"
+                  placeholder="Find: homes, boats, possible flaring, dark smoke"
                   value={groundingPrompt}
                   onChange={e => setGroundingPrompt(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleGrounding()}
@@ -137,6 +210,20 @@ export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }:
                   Find
                 </button>
               </div>
+              <div className="flex flex-wrap gap-1.5">
+                {TARGET_PRESETS.map((target) => (
+                  <button
+                    key={target}
+                    type="button"
+                    data-testid={`vlm-target-${target.replace(/\s+/g, "-")}`}
+                    onClick={() => void runGroundingPrompt(`Find ${target}`)}
+                    disabled={loadingGrounding}
+                    className="rounded border border-zinc-200 bg-white px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-zinc-500 hover:border-zinc-300 hover:text-zinc-800 disabled:opacity-50"
+                  >
+                    {target}
+                  </button>
+                ))}
+              </div>
               {loadingGrounding ? (
                  <p className="text-[10px] animate-pulse text-zinc-400 mt-1 uppercase font-semibold">Searching region...</p>
               ) : groundingError ? (
@@ -148,7 +235,7 @@ export default function VlmPanel({ isOpen, onClose, activeBbox, onBoxesUpdate }:
                     ) : (
                       <div className="flex flex-wrap gap-2">
                         {groundingResults.map((r, idx) => (
-                           <div key={idx} className="bg-white border border-zinc-200 rounded px-2 py-1 flex items-center gap-2">
+                           <div key={idx} data-testid="vlm-grounding-result" className="bg-white border border-zinc-200 rounded px-2 py-1 flex items-center gap-2">
                               <span className="text-[10px] font-bold text-zinc-900">{r.label}</span>
                               <span className="text-[9px] text-zinc-400">[{r.bbox.map(b => b.toFixed(2)).join(", ")}]</span>
                            </div>

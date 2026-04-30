@@ -700,7 +700,7 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenTimelapse
           <div className="rounded border border-zinc-200 bg-white p-4 text-xs shadow-sm mt-4">
                <p className="text-zinc-500 font-semibold tracking-wider uppercase text-[10px] mb-3">Model Training Export</p>
                <p className="text-zinc-600 mb-4 leading-relaxed">
-                 Export the metadata, temporal visual sequences, and VLM rankings as a standardized dataset tuple for downstream model fine-tuning.
+                 Export the metadata, temporal visual sequences, and evidence rankings as a standardized dataset tuple for downstream model fine-tuning.
                </p>
                <div className="flex gap-2">
                  <button

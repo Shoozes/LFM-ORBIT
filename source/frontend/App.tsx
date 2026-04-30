@@ -36,7 +36,7 @@ const DEMO_STEPS_BY_CASE: Record<DemoCase, string[]> = {
     "Step 1: Replay loaded",
     "Step 2: BBox selected",
     "Step 3: Edge triage passed",
-    "Step 4: VLM invoked",
+    "Step 4: Evidence reviewed",
     "Step 5: Alert compressed",
     "Step 6: Downlink packet ready",
   ],
@@ -44,7 +44,7 @@ const DEMO_STEPS_BY_CASE: Record<DemoCase, string[]> = {
     "Step 1: Flood mission loaded",
     "Step 2: Floodplain bbox selected",
     "Step 3: Raw frame measured",
-    "Step 4: VLM invoked",
+    "Step 4: Evidence reviewed",
     "Step 5: JSON compressed",
     "Step 6: Downlink savings shown",
   ],
@@ -52,7 +52,7 @@ const DEMO_STEPS_BY_CASE: Record<DemoCase, string[]> = {
     "Step 1: Mining mission loaded",
     "Step 2: Mine bbox selected",
     "Step 3: Source resolved",
-    "Step 4: Model invoked",
+    "Step 4: Evidence reviewed",
     "Step 5: Prompt captured",
     "Step 6: Audit JSON ready",
   ],
@@ -60,7 +60,7 @@ const DEMO_STEPS_BY_CASE: Record<DemoCase, string[]> = {
     "Step 1: Ice mission loaded",
     "Step 2: BBox selected",
     "Step 3: Quality gate failed",
-    "Step 4: VLM abstained",
+    "Step 4: Review abstained",
     "Step 5: Alert blocked",
     "Step 6: No downlink sent",
   ],
@@ -153,6 +153,11 @@ async function postAgentBusMessage(
   }
 }
 
+function getCellIdFromProperties(properties: unknown): string | null {
+  if (!properties || typeof properties !== "object") return null;
+  const value = (properties as { cell_id?: unknown }).cell_id;
+  return typeof value === "string" || typeof value === "number" ? String(value) : null;
+}
 
 export default function App() {
   const demoQuery = useMemo(readDemoQuery, []);
@@ -246,7 +251,7 @@ export default function App() {
 
   const handleOpenTimelapseForCell = (cellId: string) => {
     if (!geoJsonGrid) return;
-    const feature = geoJsonGrid.features.find(f => (f.properties as any)?.cell_id === cellId);
+    const feature = geoJsonGrid.features.find((f) => getCellIdFromProperties(f.properties) === cellId);
     if (!feature || feature.geometry.type !== "Polygon") return;
     const coords = feature.geometry.coordinates[0];
     const lngs = coords.map(c => c[0]);
@@ -557,7 +562,7 @@ export default function App() {
                 )}
                 {drawnBbox && showBboxTools && (
                   <div>
-                    <Suspense fallback={<LoadingPanel label="VLM" />}>
+                    <Suspense fallback={<LoadingPanel label="Evidence Tools" />}>
                       <VlmPanel
                         isOpen={true}
                         onClose={() => { setDrawnBbox(null); setVlmBoxes([]); setShowBboxTools(false); }}
@@ -598,7 +603,14 @@ export default function App() {
                   <h2 className="text-zinc-500 font-bold tracking-widest uppercase p-4 pb-0 text-xs shrink-0">Ground Agent Assistant</h2>
                   <div className="flex-1 overflow-hidden">
                     <Suspense fallback={<LoadingPanel label="Ground Agent" />}>
-                      <GroundAgent />
+                      <GroundAgent
+                        onActionComplete={async () => {
+                          await Promise.all([
+                            refreshTelemetry({ replaceAlerts: true }),
+                            fetchMission(),
+                          ]);
+                        }}
+                      />
                     </Suspense>
                   </div>
                </div>

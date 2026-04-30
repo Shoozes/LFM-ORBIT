@@ -27,6 +27,8 @@ def test_build_flag_message_structure():
     assert "event_id" in payload
     assert payload["event_id"].startswith("sat_")
     assert "note" in payload
+    assert payload["review_boundary"] == "candidate_evidence_packet"
+    assert "compact candidate evidence packet" in payload["note"]
 
 
 def test_build_flag_message_event_id_unique():

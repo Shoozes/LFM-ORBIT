@@ -5,6 +5,7 @@ SimSat-main/
 # Python environment and cache
 .venv/
 source/backend/.venv/
+source/backend/.venv-*/
 __pycache__/
 *.pyc
 *.pyo

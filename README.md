@@ -1,16 +1,12 @@
 # LFM-ORBIT
 
-**Local-first satellite mission control for the Liquid AI x DPhi Space Hackathon: Hack #05, AI in Space.**
+Satellites capture more imagery than they can downlink. LFM-ORBIT runs onboard triage: a satellite pruner scans each pass, rejects low-value frames, wakes local Liquid evidence reasoning only for anomalies, and transmits compact proof JSON instead of raw imagery.
 
-LFM-ORBIT turns satellite imagery into compact, evidence-backed orbital alerts. The satellite-side agent scans large areas, filters noisy scenes, invokes a local Liquid VLM path for the important frame, and downlinks compact proof JSON instead of raw imagery.
+A 1-2 KB alert with bbox, confidence, provenance, model output, and payload accounting can move during a narrow contact window. Raw imagery can wait, or never be sent.
 
-This is a demo-ready research prototype, not an unattended production deployment. Evidence surfaces keep `runtime_truth_mode`, `imagery_origin`, and `scoring_basis` separate so realtime imagery, cached API replay, and fallback paths are never confused.
+[Hackathon event](https://luma.com/n9cw58h0) | [Judge demo guide](docs/JUDGE_DEMO.md) | [Architecture](docs/ARCHITECTURE.md) | [Model handoff](docs/MODEL_HANDOFF.md)
 
-The hackathon runtime is built around DPhi Space SimSat. Direct Sentinel Hub, NASA, and GEE-style paths are optional development/replay support; judges do not need Sentinel Hub credentials to run the proof.
-
-[Hackathon event](https://luma.com/n9cw58h0) | [Judging criteria](docs/Liquid_AI_x_DPhi_Space_Judging_Criteria.md) | [Judge demo guide](docs/JUDGE_DEMO.md)
-
-![LFM-ORBIT Judge Mode proof surface](docs/readme-judge-mode.png)
+![Onboard scan hero](docs/05-mission-control-scanning.png)
 
 ## Run The Judge Proof
 
@@ -20,96 +16,105 @@ npm ci
 npm run demo:judge
 ```
 
-This starts the app, loads a deterministic replay from cached real API imagery, runs the proof flow, and writes video, screenshot, trace, and `proof.json` artifacts. The proof uses saved replay assets, so the judge path does not need fresh provider API calls.
+The proof loads deterministic replay evidence, runs the UI flow, and writes video, screenshot, trace, and `proof.json` artifacts. No Sentinel Hub credentials are needed for the judge path.
 
-| Artifact | Path |
-|---|---|
-| Demo video | `docs/judge-mode-demo.webm` |
-| Tutorial video | `docs/tutorial_video.webm` |
-| Screenshot | `source/frontend/e2e/artifacts/judge-mode/final-screen.png` |
-| Evidence frame | `source/frontend/e2e/artifacts/judge-mode/evidence-frame.png` |
-| Proof JSON | `source/frontend/e2e/artifacts/judge-mode/proof.json` |
+Full repo verification:
 
-Run every recorded proof from `source/frontend`:
-
-```bash
-npm run demo:record
+```powershell
+.\run.ps1 -Verify
 ```
 
-## Screenshots
+```bash
+./run.sh --verify
+```
 
-<table>
-  <tr>
-    <td width="50%"><img src="docs/readme-payload-reduction.png" alt="Payload reduction proof with satellite frame, bbox, raw bytes, alert JSON bytes, and downlink reduction" /></td>
-    <td width="50%"><img src="docs/readme-provenance.png" alt="Atacama provenance proof with provider, capture time, bbox, prompt, model, and output JSON" /></td>
-  </tr>
-  <tr>
-    <td><strong>Payload reduction</strong><br />Raw imagery stays local; only compact alert JSON is downlinked.</td>
-    <td><strong>Provenance chain</strong><br />Provider, capture time, bbox, prompt, model, confidence, and JSON stay attached.</td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/readme-orbital-eclipse.png" alt="Orbital eclipse proof with maritime satellite frame, offline link state, queued alerts, and restore flow" /></td>
-    <td width="50%"><img src="docs/readme-visual-grid.png" alt="Four-panel visual grid of Judge Mode, payload reduction, provenance, and orbital eclipse demos" /></td>
-  </tr>
-  <tr>
-    <td><strong>Delay-tolerant downlink</strong><br />Alerts queue while the link is offline, then flush after restore.</td>
-    <td><strong>Replay proof pack</strong><br />Recorded app flows with real satellite evidence, not static mockups.</td>
-  </tr>
-</table>
+## What Judges Should See First
 
-## What Judges Should Notice
+- DPhi SimSat is the primary runtime lane: `provider=simsat_sentinel`, `runtime_truth_mode=realtime`, `imagery_origin=simsat`, `scoring_basis=proxy_bands`.
+- Agent 1 prunes scan cells before downlink.
+- Agent 2 reviews retained evidence packets: bbox, source, temporal/proxy scores, confidence, and visual evidence references.
+- Link outages queue compact JSON alerts in the backend agent bus and flush after restore.
+- The Ground Agent chat can take local actions: load/rescan replay, start mission packs from context, and toggle the SAT/GND link simulator.
 
-| Area | What is shown |
+## Proof Gallery
+
+### 01. Scan And Prune
+
+![DPhi SimSat runtime lane](docs/04-settings-provider-model.png)
+
+The satellite-side pruner scans the mission bbox, rejects low-value cells, and promotes only retained evidence packets for review.
+
+### 02. Payload Reduction
+
+![Payload reduction proof](docs/readme-payload-reduction.png)
+
+Judge proof: `1.84 MB` raw frame -> `1.24 KB` alert JSON, a `1,483x` reduction. Raw imagery stays onboard; compact proof moves.
+
+### 03. Orbital Eclipse Queue
+
+![Orbital eclipse proof](docs/readme-orbital-eclipse.png)
+
+During link loss, alerts queue locally and flush after contact returns. Proof JSON exposes `link_state_before`, `queued_alerts_before_restore`, `flushed_alerts`, and `queue_source=agent_bus_unread_messages`.
+
+### 04. Provenance And Audit
+
+![Provenance proof](docs/readme-provenance.png)
+
+Every alert keeps provider, capture time, bbox, evidence path, confidence, prompt/model metadata, and payload accounting attached.
+
+### 05. Abstain Safety
+
+![Greenland ice quality gate](docs/10-greenland-ice-preview.png)
+
+Bad imagery does not become a confident answer. Cloud/no-data gates, spectral contracts, and replay integrity checks can withhold transmission.
+
+## Architecture In 60 Seconds
+
+```mermaid
+flowchart LR
+  A[DPhi SimSat imagery] --> B[Scene QC]
+  B --> C[Agent 1: scan + prune]
+  C -->|discard noise/cloud/empty cells| D[No downlink]
+  C -->|candidate anomaly| E[Evidence packet]
+  E --> F[Agent 2: Liquid evidence reasoning]
+  F --> G[Compact proof JSON]
+  G -->|link online| H[Ground Validator]
+  G -->|link offline| Q[DTN queue]
+  Q -->|restore| H
+  H --> I[Audit UI + dataset export]
+```
+
+Current runtime: SimSat-first imagery lane, deterministic replay fixtures for judging, and Liquid evidence-packet reasoning when a manifest-resolved local model runtime is available. Production image-conditioned `mmproj` inference is not claimed.
+
+## Validation Snapshot
+
+| Check | Current State |
 |---|---|
-| Space constraint | The edge agent compresses a raw satellite frame into a small alert payload before downlink. |
-| Hackathon provider path | DPhi SimSat is the primary runtime lane; cached replay fixtures make the proof deterministic without external credentials. |
-| Agent loop | Satellite Pruner Agent and Ground Validator Agent exchange visible SAT/GND mission context. |
-| Evidence contract | Every alert separates truth mode, imagery origin, and scoring basis. |
-| Show path | One command records a reproducible proof with video, screenshots, trace, and JSON. |
-
-## Product Surface
-
-- Mission Control map with bbox selection, Fast Replay load/rescan, and mission presets.
-- SAT/GND agent dialogue with compact orbital telemetry and ground validation.
-- Evidence gallery with imagery, timelapse, provenance, alert analysis, and VLM tools.
-- Judge Mode proof panel with stable artifact export.
-- Delay-tolerant link outage simulator.
-- Dataset export, Qwen/Ollama retagging, replay-cache packaging, snapshot export/import, NM-UNI model handoff, and Hugging Face upload tooling.
-
-Current proof missions include deforestation, flood extent, mining expansion, maritime activity, wildfire candidates, urban expansion, volcano/lake events, and the new Greenland ice/snow extent lane.
-
-## Ice/Snow Extent
-
-The cryosphere lane is long-window ice and snow extent monitoring, not a visual-only ice-growth claim. It uses cached Sentinel-2 L2A replay metadata with:
-
-- NDSI from Green and SWIR1 bands.
-- SCL cloud, shadow, no-data, and snow/ice support.
-- NDWI/SWIR water-ice ambiguity flags.
-- Multi-frame persistence before any extent-change review label.
-- Static-video rejection so color-shift-only clips are not treated as timelapse proof.
-
-## Evidence Modes
-
-| Field | Purpose |
-|---|---|
-| `runtime_truth_mode` | `realtime`, `replay`, `fallback`, or `unknown`. |
-| `imagery_origin` | Provider/source family such as `sentinelhub`, `simsat`, `nasa_gibs`, `gee`, or `cached_api`. |
-| `scoring_basis` | `multispectral_bands`, `proxy_bands`, `visual_only`, `fallback_none`, or `unknown`. |
-
-Replay means stored real API imagery with preserved date/provenance for deterministic review and cost control. Fallback means degraded runtime behavior and must not be presented as realtime evidence.
-
-## Validation
-
-| Check | Result |
-|---|---|
-| Cold-start verification | `.\run.ps1 -Verify` passing |
-| Backend tests | `305 passed` |
-| Frontend lint/build | passing |
-| Normal Playwright E2E | `73 passed`, `1 skipped` |
-| Recorded demo suite | `5 passed` |
+| Root verify | `.\run.ps1 -Verify` passing |
+| Backend tests | `317 passed` |
+| Frontend | typecheck + build passing |
+| Playwright E2E | `73 passed`, `1 skipped` |
+| Recorded demos | judge, payload, provenance, abstain, eclipse |
 | Dataset export | `56` samples, `24` replay-cache rows |
-| Retagged training export | `179` assets, `26` temporal sequences |
-| Hugging Face dataset | [Shoozes/LFM-Orbit-SatData](https://huggingface.co/datasets/Shoozes/LFM-Orbit-SatData), including `mission_metadata=1` |
+| Retagged training set | `179` assets, `26` temporal sequences |
+| Dataset | [Shoozes/LFM-Orbit-SatData](https://huggingface.co/datasets/Shoozes/LFM-Orbit-SatData) |
+| Trained model | [Shoozes/lfm2.5-450m-vl-orbit-satellite](https://huggingface.co/Shoozes/lfm2.5-450m-vl-orbit-satellite) |
+
+## Model And Dataset Handoff
+
+Pull the trained Orbit GGUF bundle into `runtime-data/models/lfm2.5-vlm-450m/`:
+
+```powershell
+.\run.ps1 -Install -FetchModel
+```
+
+```bash
+./run.sh --install --fetch-model
+```
+
+This writes `model_manifest.json`, preserves `orbit_model_handoff.json` as `source_handoff.json`, and stores `training_result_manifest.json`. The launchers install the optional `llama-cpp-python` runtime when supported; Linux/WSL hosts without compiler support still complete the core install and boot safely.
+
+Dataset export, retagging, and Hugging Face upload details live in [docs/DATASET_CYCLE_TUTORIAL.md](docs/DATASET_CYCLE_TUTORIAL.md).
 
 ## Run Locally
 
@@ -118,18 +123,22 @@ Replay means stored real API imagery with preserved date/provenance for determin
 .\run.ps1 -Run
 ```
 
-The app starts at `http://127.0.0.1:5173`; the API starts at `http://127.0.0.1:8000`.
-
-Useful checks:
-
-```powershell
-.\run.ps1 -Verify
-```
-
 ```bash
+./run.sh --install
 ./run.sh --run
-./run.sh --verify
 ```
+
+App: `http://127.0.0.1:5173`
+
+API: `http://127.0.0.1:8000`
+
+## Limits
+
+- This is a demo-ready research prototype, not unattended production autonomy.
+- Scope is locked to stability fixes, small visual polish, and sharper SAT/GND/CV/LFM response wording.
+- DPhi SimSat scoring is truthfully labeled `proxy_bands`.
+- Multispectral claims are limited to direct/replay metadata lanes such as ice/snow NDSI with SCL rejection and persistence.
+- Fallback paths must stay labeled as fallback and must not become high-confidence detections.
 
 ## Docs
 
@@ -138,5 +147,5 @@ Useful checks:
 | [docs/JUDGE_DEMO.md](docs/JUDGE_DEMO.md) | Demo commands, artifacts, and replay assets |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Runtime map and design notes |
 | [docs/TODO.md](docs/TODO.md) | Active backlog and edge-case watchlist |
-| [docs/DATASET_CYCLE_TUTORIAL.md](docs/DATASET_CYCLE_TUTORIAL.md) | Seed, export, Qwen retag, and Hugging Face cycle |
+| [docs/DATASET_CYCLE_TUTORIAL.md](docs/DATASET_CYCLE_TUTORIAL.md) | Seed, export, retag, and Hugging Face cycle |
 | [docs/MODEL_HANDOFF.md](docs/MODEL_HANDOFF.md) | Model bundle and dataset handoff contract |

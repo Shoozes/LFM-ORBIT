@@ -62,6 +62,16 @@ type JudgeProof = {
   };
 };
 
+type DtnProof = {
+  link_state_before: string;
+  link_state_after: string;
+  queued_alerts_before_restore: number;
+  queued_alerts_after_restore: number;
+  flushed_alerts: number;
+  queue_source: string;
+  proof_message_ids?: number[];
+};
+
 type JudgeModePanelProps = {
   apiBaseUrl: string;
   demoCase: DemoCase;
@@ -74,7 +84,7 @@ type JudgeModePanelProps = {
 };
 
 const JUDGE_REPLAY_ID = "rondonia_frontier_judge";
-const JUDGE_MODEL = "LFM2.5-VL-450M";
+const JUDGE_MODEL = "Liquid evidence reviewer (LFM2.5-VL-450M handoff-ready)";
 const JUDGE_BBOX = [-63.15, -10.15, -62.85, -9.85];
 const RAW_FRAME_BYTES = 1_840_000;
 const ALERT_JSON_BYTES = 1_240;
@@ -112,12 +122,12 @@ const DEMO_STORY_LINES: Record<DemoCase, string[]> = {
   judge: [
     "Satellite saw too much data.",
     "Edge triage ignored noise.",
-    "Liquid VLM checked the important frame.",
+    "Liquid reasoning checked the retained evidence packet.",
     "Compact evidence JSON was downlinked.",
   ],
   payload: [
     "The Manchar Lake flood frame stayed local.",
-    "Only the overflow bbox reached the VLM.",
+    "Only the overflow bbox reached the evidence reviewer.",
     "The result became compact flood JSON.",
     "The downlink sent kilobytes, not megabytes.",
   ],
@@ -130,7 +140,7 @@ const DEMO_STORY_LINES: Record<DemoCase, string[]> = {
   abstain: [
     "The ice mission bbox was selected.",
     "Imagery quality was insufficient.",
-    "The VLM did not invent an answer.",
+    "The reviewer did not invent an answer.",
     "No alert packet was transmitted.",
   ],
   eclipse: [
@@ -372,6 +382,12 @@ function ProofRow({
   );
 }
 
+function proofString(value: unknown, fallback = "unknown"): string {
+  if (typeof value === "string" && value.trim()) return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value.toLocaleString();
+  return fallback;
+}
+
 export default function JudgeModePanel({
   apiBaseUrl,
   demoCase,
@@ -397,6 +413,7 @@ export default function JudgeModePanel({
   const [queueCount, setQueueCount] = useState(0);
   const [flushedQueueCount, setFlushedQueueCount] = useState(0);
   const [linkStatus, setLinkStatus] = useState("LINK OPEN");
+  const [dtnProof, setDtnProof] = useState<DtnProof | null>(null);
 
   useEffect(() => {
     setRecentAlerts(alerts);
@@ -538,9 +555,12 @@ export default function JudgeModePanel({
           caption,
           ...(demoCase === "eclipse"
             ? {
-                link_status: linkStatus,
-                queued_alerts: queueCount,
-                flushed_alerts: flushedQueueCount,
+                link_state_before: dtnProof?.link_state_before ?? (linkOffline ? "offline" : "online"),
+                queued_alerts_before_restore: dtnProof?.queued_alerts_before_restore ?? queueCount,
+                link_state_after: dtnProof?.link_state_after ?? linkStatus.toLowerCase().replace("link ", ""),
+                queued_alerts_after_restore: dtnProof?.queued_alerts_after_restore ?? queueCount,
+                flushed_alerts: dtnProof?.flushed_alerts ?? flushedQueueCount,
+                queue_source: dtnProof?.queue_source ?? "agent_bus_unread_messages",
                 action: "queue_compact_json_until_link_restored",
               }
             : {}),
@@ -571,39 +591,33 @@ export default function JudgeModePanel({
         trace: "Playwright report trace.zip",
       },
     });
-  }, [activeAlert, caption, demoCase, flushedQueueCount, groundingResults, linkStatus, mission, queueCount, usesReplayEvidence, vqaAnswer]);
-
-  useEffect(() => {
-    if (!linkOffline) return;
-    const timer = window.setInterval(() => {
-      setQueueCount((current) => Math.min(current + 1, 4));
-    }, 450);
-    return () => window.clearInterval(timer);
-  }, [linkOffline]);
+  }, [activeAlert, caption, demoCase, dtnProof, flushedQueueCount, groundingResults, linkOffline, linkStatus, mission, queueCount, usesReplayEvidence, vqaAnswer]);
 
   const toggleOrbitalEclipse = async () => {
     if (!linkOffline) {
-      setLinkOffline(true);
-      setLinkStatus("LINK OFFLINE");
-      setQueueCount(0);
-      await fetchJson(`${apiBaseUrl}/api/link/state`, {
+      const payload = await fetchJson<DtnProof>(`${apiBaseUrl}/api/link/dtn-proof`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ connected: false }),
+        body: JSON.stringify({ phase: "offline", count: 4 }),
       });
+      setDtnProof(payload);
+      setLinkOffline(true);
+      setLinkStatus("LINK OFFLINE");
+      setQueueCount(payload?.queued_alerts_before_restore ?? 4);
+      setFlushedQueueCount(0);
       return;
     }
 
-    const flushed = queueCount;
-    setFlushedQueueCount(flushed);
-    setQueueCount(0);
-    setLinkOffline(false);
-    setLinkStatus("LINK RESTORED");
-    await fetchJson(`${apiBaseUrl}/api/link/state`, {
+    const payload = await fetchJson<DtnProof>(`${apiBaseUrl}/api/link/dtn-proof`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ connected: true }),
+      body: JSON.stringify({ phase: "restore" }),
     });
+    setDtnProof(payload);
+    setFlushedQueueCount(payload?.flushed_alerts ?? queueCount);
+    setQueueCount(payload?.queued_alerts_after_restore ?? 0);
+    setLinkOffline(false);
+    setLinkStatus("LINK RESTORED");
   };
 
   const proofJson = useMemo(() => JSON.stringify(proof, null, 2), [proof]);
@@ -827,7 +841,7 @@ export default function JudgeModePanel({
           </div>
           <div className="mt-3 grid grid-cols-3 gap-3">
             <div className="rounded border border-zinc-800 bg-zinc-950 p-3">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">VLM result</p>
+              <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">Evidence result</p>
               <p className="mt-1 text-xs font-semibold text-white">{proof.result}</p>
             </div>
             <div className="rounded border border-zinc-800 bg-zinc-950 p-3">
@@ -872,6 +886,19 @@ export default function JudgeModePanel({
               <p>Raw frame: {formatBytes(RAW_FRAME_BYTES)}</p>
               <p>Alert JSON: {formatBytes(ALERT_JSON_BYTES)}</p>
               <p>Downlink reduction: {formatRatio(proof.payload_reduction_ratio)}</p>
+            </div>
+          )}
+
+          {demoCase === "eclipse" && (
+            <div
+              data-testid="dtn-proof-summary"
+              className="mt-3 rounded border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-semibold text-amber-100"
+            >
+              <p>queue_source: {proofString(proof.output_json.queue_source)}</p>
+              <p>link_state_before: {proofString(proof.output_json.link_state_before)}</p>
+              <p>queued_alerts_before_restore: {proofString(proof.output_json.queued_alerts_before_restore)}</p>
+              <p>link_state_after: {proofString(proof.output_json.link_state_after)}</p>
+              <p>flushed_alerts: {proofString(proof.output_json.flushed_alerts)}</p>
             </div>
           )}
 

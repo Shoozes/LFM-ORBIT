@@ -22,7 +22,16 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from core.analyzer import analyze_alert
-from core.agent_bus import get_bus_stats, get_recent_dialogue, list_pins, delete_pin, upsert_pin, post_message as bus_post
+from core.agent_bus import (
+    count_unread_message_ids,
+    get_bus_stats,
+    get_recent_dialogue,
+    list_pins,
+    delete_pin,
+    mark_message_ids_read,
+    upsert_pin,
+    post_message as bus_post,
+)
 from core.config import (
     PROVIDER_FALLBACK_ORDER,
     PROVIDER_NASA_DIRECT,
@@ -254,6 +263,49 @@ class LinkStateBody(BaseModel):
     connected: bool
 
 
+class DtnProofBody(BaseModel):
+    phase: str = Field(default="offline", pattern="^(offline|restore)$")
+    count: int = Field(default=4, ge=1, le=12)
+
+
+_DTN_PROOF_MESSAGE_IDS: list[int] = []
+
+
+def _seed_dtn_proof_alerts(count: int) -> int:
+    """Insert compact proof alerts into the real agent bus while the link is offline."""
+    global _DTN_PROOF_MESSAGE_IDS
+    unread_existing = count_unread_message_ids(_DTN_PROOF_MESSAGE_IDS)
+    if unread_existing == 0:
+        _DTN_PROOF_MESSAGE_IDS = []
+    if unread_existing >= count:
+        return unread_existing
+
+    needed = count - unread_existing
+    start_index = len(_DTN_PROOF_MESSAGE_IDS) + 1
+    for offset in range(needed):
+        index = start_index + offset
+        message_id = bus_post(
+            sender="satellite",
+            recipient="ground",
+            msg_type="flag",
+            cell_id=f"dtn_proof_cell_{index}",
+            payload={
+                "event_id": f"dtn_proof_{index}",
+                "status": "queued_compact_alert",
+                "runtime_truth_mode": "realtime",
+                "imagery_origin": "simsat",
+                "scoring_basis": "proxy_bands",
+                "change_score": 0.72,
+                "confidence": 0.81,
+                "payload_bytes": 1240,
+                "reason_codes": ["link_offline", "queue_local", "compact_json"],
+                "note": "DTN proof alert queued in agent_bus while the downlink is offline.",
+            },
+        )
+        _DTN_PROOF_MESSAGE_IDS.append(int(message_id))
+    return count_unread_message_ids(_DTN_PROOF_MESSAGE_IDS)
+
+
 @app.get("/api/link/status")
 def link_status():
     """Return local SAT-to-ground downlink state for replay exercises."""
@@ -281,6 +333,59 @@ def update_link_state(body: LinkStateBody, request: Request = None):
         },
     )
     return link_status()
+
+
+@app.post("/api/link/dtn-proof")
+def link_dtn_proof(body: DtnProofBody, request: Request = None):
+    """Create backend-derived DTN queue proof using unread agent-bus messages."""
+    _require_local_request(request)
+    if body.phase == "offline":
+        set_link_state(False)
+        queued = _seed_dtn_proof_alerts(body.count)
+        bus_post(
+            sender="operator",
+            recipient="broadcast",
+            msg_type="status",
+            payload={
+                "connected": False,
+                "note": f"LINK OFFLINE. {queued} compact alerts queued in agent_bus.",
+                "queue_source": "agent_bus_unread_messages",
+            },
+        )
+        return {
+            "link_state_before": "offline",
+            "link_state_after": "offline",
+            "queued_alerts_before_restore": queued,
+            "queued_alerts_after_restore": queued,
+            "flushed_alerts": 0,
+            "queue_source": "agent_bus_unread_messages",
+            "proof_message_ids": list(_DTN_PROOF_MESSAGE_IDS),
+        }
+
+    link_state_before = "offline" if not is_link_connected() else "online"
+    queued_before_restore = count_unread_message_ids(_DTN_PROOF_MESSAGE_IDS)
+    flushed = mark_message_ids_read(_DTN_PROOF_MESSAGE_IDS)
+    set_link_state(True)
+    bus_post(
+        sender="operator",
+        recipient="broadcast",
+        msg_type="status",
+        payload={
+            "connected": True,
+            "note": f"LINK RESTORED. Flushed {flushed} compact alerts from agent_bus.",
+            "queue_source": "agent_bus_unread_messages",
+            "flushed_alerts": flushed,
+        },
+    )
+    return {
+        "link_state_before": link_state_before,
+        "link_state_after": "restored",
+        "queued_alerts_before_restore": queued_before_restore,
+        "queued_alerts_after_restore": count_unread_message_ids(_DTN_PROOF_MESSAGE_IDS),
+        "flushed_alerts": flushed,
+        "queue_source": "agent_bus_unread_messages",
+        "proof_message_ids": list(_DTN_PROOF_MESSAGE_IDS),
+    }
 
 
 
@@ -1035,7 +1140,7 @@ def depth_estimate(body: DepthEstimateBody):
         return JSONResponse(status_code=409, content={"error": str(exc), "status": get_depth_anything_status()})
 
 # ---------------------------------------------------------------------------
-# Ground Agent Chat endpoint  (LFM-native — no external API key required)
+# Ground Agent Chat endpoint (local - no external API key required)
 # ---------------------------------------------------------------------------
 
 class ChatMessage(BaseModel):
@@ -1048,17 +1153,17 @@ class ChatRequest(BaseModel):
 
 
 @app.post("/api/agent/chat")
-def ground_agent_chat(request: ChatRequest):
+def ground_agent_chat(request: ChatRequest, http_request: Request = None):
     """
     Ground Station Chat Agent.
-    LFM-native intent classifier — reads live metrics and DB state.
-    No external API key required.
+    Local intent classifier and small action controller. No external API key required.
     """
+    _require_local_request(http_request)
     if not request.messages:
-        return {"reply": "No message received."}
+        return {"reply": "No message received.", "actions": []}
     last_msg = request.messages[-1].content
-    from core.ground_agent_knowledge import get_ground_agent_reply
-    return {"reply": get_ground_agent_reply(last_msg)}
+    from core.ground_agent_knowledge import execute_ground_agent_chat
+    return execute_ground_agent_chat(last_msg)
 
 
 # ---------------------------------------------------------------------------

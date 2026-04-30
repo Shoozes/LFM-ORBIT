@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { openDemo, saveProofArtifacts } from "./demoHelpers";
 
-test("judge mode records deterministic VLM proof", async ({ page, request }, testInfo) => {
+test("judge mode records deterministic evidence proof", async ({ page, request }, testInfo) => {
   await openDemo(page, request, "judge");
 
   await expect(page.getByTestId("demo-title")).toContainText("Judge walkthrough proof");

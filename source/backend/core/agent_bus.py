@@ -211,6 +211,43 @@ def mark_messages_read(
         return int(cursor.rowcount or 0)
 
 
+def count_unread_message_ids(ids: list[int]) -> int:
+    """Return how many of the given bus message ids are still unread."""
+    init_bus()
+    safe_ids = [int(message_id) for message_id in ids if int(message_id) > 0]
+    if not safe_ids:
+        return 0
+
+    placeholders = ",".join("?" * len(safe_ids))
+    with _connect() as conn:
+        row = conn.execute(
+            f"""
+            SELECT COUNT(*) AS unread_count
+            FROM agent_messages
+            WHERE id IN ({placeholders}) AND read = 0
+            """,
+            safe_ids,
+        ).fetchone()
+    return int(row["unread_count"] or 0)
+
+
+def mark_message_ids_read(ids: list[int]) -> int:
+    """Mark a specific set of messages read without touching unrelated queue items."""
+    init_bus()
+    safe_ids = [int(message_id) for message_id in ids if int(message_id) > 0]
+    if not safe_ids:
+        return 0
+
+    placeholders = ",".join("?" * len(safe_ids))
+    with _connect() as conn:
+        cursor = conn.execute(
+            f"UPDATE agent_messages SET read = 1 WHERE id IN ({placeholders}) AND read = 0",
+            safe_ids,
+        )
+        conn.commit()
+        return int(cursor.rowcount or 0)
+
+
 def get_recent_messages(
     *,
     limit: int = 60,

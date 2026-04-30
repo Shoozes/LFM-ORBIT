@@ -1,6 +1,6 @@
 import { formatSourceLabel, formatReasonCode } from "../utils/telemetry";
 import type { Mission } from "../types/mission";
-import type { AlertItem, ApiHealth, ApiMetricsSummary, ScanHeartbeat } from "../types/telemetry";
+import type { AlertItem, ApiHealth, ApiMetricsSummary, MetricsFlaggedExample, ScanHeartbeat } from "../types/telemetry";
 
 type AlertsLogsProps = {
   isOpen: boolean;
@@ -28,6 +28,11 @@ function formatMetricPercent(value: number | undefined): string {
 
 function formatMetricLabel(value: string): string {
   return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatNumber(value: number | undefined, digits: number): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return (0).toFixed(digits);
+  return value.toFixed(digits);
 }
 
 export default function AlertsLogs({
@@ -135,7 +140,7 @@ export default function AlertsLogs({
                   No flagged examples logged yet.
                 </div>
               ) : (
-                metricsSummary?.flagged_examples.map((example: any) => (
+                metricsSummary?.flagged_examples.map((example: MetricsFlaggedExample) => (
                   <div
                     key={`${example.event_id}-${example.cycle_index}`}
                     className="rounded border border-zinc-200 bg-white p-4 hover:border-zinc-300 transition shadow-sm"
@@ -152,7 +157,7 @@ export default function AlertsLogs({
                     <div className="grid grid-cols-2 gap-2 mb-3 bg-zinc-50 border border-zinc-100 rounded p-2.5 text-xs">
                       <div>
                         <span className="text-zinc-500 font-semibold">Score:</span>{" "}
-                        <span className="text-zinc-900 font-bold">{example.change_score.toFixed(3)}</span>
+                        <span className="text-zinc-900 font-bold">{formatNumber(example.change_score, 3)}</span>
                       </div>
                       <div>
                         <span className="text-zinc-500 font-semibold">Payload:</span>{" "}
@@ -183,7 +188,7 @@ export default function AlertsLogs({
                   No alerts downlinked yet.
                 </div>
               ) : (
-                alerts.map((alert: any) => (
+                alerts.map((alert: AlertItem) => (
                   <button
                     key={alert.event_id}
                     type="button"
@@ -211,11 +216,11 @@ export default function AlertsLogs({
                     <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-xs mb-3 bg-zinc-50 border border-zinc-100 p-3 rounded">
                       <div className="flex justify-between">
                         <span className="text-zinc-500 font-semibold">Change</span>
-                        <span className="text-zinc-900 font-bold">{alert.change_score.toFixed(3)}</span>
+                        <span className="text-zinc-900 font-bold">{formatNumber(alert.change_score, 3)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-zinc-500 font-semibold">Conf</span>
-                        <span className="text-zinc-900 font-medium">{alert.confidence.toFixed(3)}</span>
+                        <span className="text-zinc-900 font-medium">{formatNumber(alert.confidence, 3)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-zinc-500 font-semibold">Bytes</span>

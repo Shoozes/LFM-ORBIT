@@ -19,8 +19,12 @@
       ".secrets",
       ".tools",
       ".venv",
+      ".venv-linux",
+      ".venv-macos",
+      ".venv-windows",
       ".vscode",
       "AGENTS.md",
+      "Liquid_AI_x_DPhi_Space_Judging_Criteria.md",
       "SimSat-main",
       "Thumbs.db",
       "__pycache__",
@@ -61,21 +65,21 @@
   },
   "groups": {
     "docs_state_and_tracking": {
-      "note": "README is now the concise, screenshot-led Liquid AI x DPhi judge-facing surface; ARCHITECTURE carries system shape; TODO is the compact active backlog/edge-case list; DATASET_CYCLE_TUTORIAL and MODEL_HANDOFF carry repeatable workflow detail without duplicating progress history.",
+      "note": "README is now the compact, screenshot-led judge surface: pitch, proof gallery, validation snapshot, model handoff, runtime limits, explicit scope lock, and docs links. ARCHITECTURE carries system shape; TODO is the compact active backlog/edge-case list; DATASET_CYCLE_TUTORIAL and MODEL_HANDOFF carry repeatable workflow detail without duplicating progress history.",
       "files": [
         "README.md",
         "docs/ARCHITECTURE.md",
-        "docs/TODO.md",
-        "summary_bank.json",
+        "docs/DATASET_CYCLE_TUTORIAL.md",
         "docs/JUDGE_DEMO.md",
-        "docs/DATASET_CYCLE_TUTORIAL.md"
+        "docs/TODO.md",
+        "summary_bank.json"
       ]
     },
     "docs_model_runtime_and_handoff": {
-      "note": "Supplemental model and fine-tuning handoff docs. README remains judge-facing; ARCHITECTURE, TODO, and handoff docs carry implementation detail. NM-UNI is the external dataset-import, training, GGUF quantization, model-bundle staging, and optional Hugging Face model-publish lane; Orbit consumes the resulting orbit_model_handoff.json.",
+      "note": "Supplemental model and fine-tuning handoff docs. README remains judge-facing; ARCHITECTURE, TODO, and handoff docs carry implementation detail. NM-UNI is the external dataset-import, training, GGUF quantization, model-bundle staging, and Hugging Face model-publish lane; Orbit now defaults to the published Shoozes/lfm2.5-450m-vl-orbit-satellite handoff.",
       "files": [
-        "docs/MODEL_HANDOFF.md",
-        "docs/FINE_TUNING_PLAN.md"
+        "docs/FINE_TUNING_PLAN.md",
+        "docs/MODEL_HANDOFF.md"
       ]
     },
     "issue_group_import_contracts_and_env_resilience": {
@@ -84,21 +88,21 @@
         ".env.example",
         "run.ps1",
         "run.sh",
-        "source/backend/satellite_debug.py",
-        "source/backend/start_edge.py",
-        "source/backend/test_evalscript.py",
-        "source/backend/test_wms.py",
+        "source/backend/core/config.py",
         "source/backend/core/simsat_client.py",
+        "source/backend/satellite_debug.py",
         "source/backend/scripts/gee_auth.py",
         "source/backend/scripts/seed_nasa_cache.py",
         "source/backend/scripts/seed_sentinel_cache.py",
         "source/backend/scripts/smoke_satellite_model.py",
+        "source/backend/start_edge.py",
+        "source/backend/test_evalscript.py",
+        "source/backend/test_wms.py",
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_import_contracts.py",
         "source/backend/tests/test_satellite_debug.py",
-        "source/backend/tests/test_simsat_client.py",
-        "source/backend/core/config.py",
-        "source/backend/tests/test_sentinel_credentials.py"
+        "source/backend/tests/test_sentinel_credentials.py",
+        "source/backend/tests/test_simsat_client.py"
       ]
     },
     "issue_group_error_handling_and_parser_integrity": {
@@ -111,39 +115,39 @@
         "source/backend/core/observability.py",
         "source/backend/core/observation_store.py",
         "source/backend/core/timelapse.py",
-        "source/frontend/App.tsx",
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_depth_anything.py",
         "source/backend/tests/test_inference.py",
-        "source/backend/tests/test_observation_store.py"
+        "source/backend/tests/test_observation_store.py",
+        "source/frontend/App.tsx"
       ]
     },
     "issue_group_e2e_state_isolation_and_run_conditions": {
       "note": "Playwright state reset, replay determinism, shared retryable app navigation, readiness-gated map actions, artifact-based HTML dumps, normal-test/demo-test separation, cached-API WebM proof recording, proof-frame luminance guards, and explicit opt-in server reuse to avoid stale local runtime leakage.",
       "files": [
-        "source/frontend/playwright.config.ts",
+        "source/backend/api/main.py",
+        "source/backend/core/runtime_state.py",
         "source/frontend/e2e/app.spec.ts",
+        "source/frontend/e2e/demos/demoHelpers.ts",
+        "source/frontend/e2e/demos/judge-mode.demo.spec.ts",
         "source/frontend/e2e/runtime.ts",
         "source/frontend/e2e/test_page_html.spec.ts",
-        "source/backend/core/runtime_state.py",
-        "source/backend/api/main.py",
-        "source/frontend/playwright.demo.config.ts",
-        "source/frontend/e2e/demos/demoHelpers.ts",
-        "source/frontend/e2e/demos/judge-mode.demo.spec.ts"
+        "source/frontend/playwright.config.ts",
+        "source/frontend/playwright.demo.config.ts"
       ]
     },
     "issue_group_context_menu_vlm_and_visual_polish": {
-      "note": "Map context-menu stability, keyboard/touch map actions with click propagation guarded, marker-interception-resistant visual tests with button fallback, visible map-pin sync failures, non-overlapping map-pin feedback toasts, safe marker-label rendering, compact Mission composition, timelapse-before-VLM proof ordering, VLM inline errors, map-driven agent-evaluation non-OK response handling, and opt-in debug HTML output hygiene.",
+      "note": "Map context-menu stability, keyboard/touch map actions with click propagation guarded, marker-interception-resistant visual tests with button fallback, visible map-pin sync failures, non-overlapping map-pin feedback toasts, safe marker-label rendering, compact Mission composition, timelapse-before-visual-evidence proof ordering, visual evidence inline errors, operator target presets for homes/boats/flaring/smoke, map-driven agent-evaluation non-OK response handling, and opt-in debug HTML output hygiene.",
       "files": [
         "source/frontend/App.tsx",
         "source/frontend/components/MapVisualizer.tsx",
         "source/frontend/components/VlmPanel.tsx",
-        "source/frontend/hooks/useMapPins.ts",
         "source/frontend/e2e/app.spec.ts",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/runtime.ts",
         "source/frontend/e2e/test_page_html.spec.ts",
-        "source/frontend/e2e/vlm.spec.ts"
+        "source/frontend/e2e/vlm.spec.ts",
+        "source/frontend/hooks/useMapPins.ts"
       ]
     },
     "issue_group_alert_contracts_and_persistence": {
@@ -181,11 +185,11 @@
     "issue_group_lifeline_frame_gate_and_eval_validation": {
       "note": "Before/after lifeline edge-case handling: downlink escalation now requires distinct frame evidence, and empty eval payloads fail API validation.",
       "files": [
-        "source/backend/core/lifeline_monitoring.py",
+        "docs/TODO.md",
         "source/backend/api/main.py",
-        "source/backend/tests/test_lifeline_monitoring.py",
+        "source/backend/core/lifeline_monitoring.py",
         "source/backend/tests/test_api.py",
-        "docs/TODO.md"
+        "source/backend/tests/test_lifeline_monitoring.py"
       ]
     },
     "issue_group_frontend_state_and_routing": {
@@ -196,14 +200,14 @@
         "source/frontend/components/GroundAgent.tsx",
         "source/frontend/components/MissionControl.tsx",
         "source/frontend/components/SettingsPanel.tsx",
-        "source/frontend/hooks/useTelemetry.ts",
-        "source/frontend/types/telemetry.ts",
-        "source/frontend/utils/telemetry.ts",
+        "source/frontend/components/ValidationPanel.tsx",
         "source/frontend/e2e/app.spec.ts",
         "source/frontend/e2e/capture_screenshots.spec.ts",
         "source/frontend/e2e/qa_verification.spec.ts",
-        "source/frontend/components/ValidationPanel.tsx",
-        "source/frontend/e2e/tutorial_video.spec.ts"
+        "source/frontend/e2e/tutorial_video.spec.ts",
+        "source/frontend/hooks/useTelemetry.ts",
+        "source/frontend/types/telemetry.ts",
+        "source/frontend/utils/telemetry.ts"
       ]
     },
     "feature_group_monitor_preview_ui_and_visual_proof": {
@@ -212,11 +216,11 @@
         "README.md",
         "docs/ARCHITECTURE.md",
         "docs/TODO.md",
-        "source/frontend/components/MissionControl.tsx",
-        "source/frontend/e2e/monitor_features.spec.ts",
         "source/backend/api/main.py",
         "source/backend/core/lifeline_monitoring.py",
-        "source/backend/core/maritime_monitoring.py"
+        "source/backend/core/maritime_monitoring.py",
+        "source/frontend/components/MissionControl.tsx",
+        "source/frontend/e2e/monitor_features.spec.ts"
       ]
     },
     "feature_group_scene_qc_and_observability": {
@@ -227,8 +231,8 @@
         "source/backend/core/indices.py",
         "source/backend/core/metrics.py",
         "source/backend/core/observability.py",
-        "source/backend/core/scene_qc.py",
         "source/backend/core/scanner.py",
+        "source/backend/core/scene_qc.py",
         "source/backend/core/scorer.py",
         "source/backend/core/telemetry.py",
         "source/backend/scripts/decision_gate.py",
@@ -260,13 +264,13 @@
         "source/backend/core/gallery.py",
         "source/backend/core/timelapse.py",
         "source/backend/tests/test_gallery.py",
+        "source/backend/tests/test_seeded_timelapse_integrity.py",
         "source/backend/tests/test_timelapse.py",
-        "source/frontend/components/ValidationPanel.tsx",
-        "source/backend/tests/test_seeded_timelapse_integrity.py"
+        "source/frontend/components/ValidationPanel.tsx"
       ]
     },
     "feature_group_agents_and_mission_runtime": {
-      "note": "Mission lifecycle, SAT/GND message flow, operator-visible Agent Dialogue bus errors, Ground Agent assistant error payloads, and agent runtime behaviors.",
+      "note": "Mission lifecycle, SAT/GND message flow, backend-derived DTN queue state, operator-visible Agent Dialogue bus errors, Ground Agent assistant error payloads, local action chat, candidate-evidence wording, and agent runtime behaviors.",
       "files": [
         "source/backend/core/agent_bus.py",
         "source/backend/core/ground_agent.py",
@@ -283,15 +287,39 @@
         "source/frontend/components/GroundAgent.tsx"
       ]
     },
-    "feature_group_model_runtime_and_handoff": {
-      "note": "Manifest-based satellite artifact resolution, runtime status exposure, nested fenced JSON tool-call parsing, model fetch handoff tooling, and an optional model-present smoke script for fetched NM-UNI GGUF bundles.",
+    "feature_group_ground_agent_action_chat": {
+      "note": "Local-only Ground Agent tool calls for listing/loading/rescanning replays, starting mission packs from explicit or current context, toggling link state, surfacing structured action chips, and refreshing mission/telemetry after actions.",
       "files": [
+        "source/backend/api/main.py",
+        "source/backend/core/ground_agent_knowledge.py",
+        "source/backend/core/link_state.py",
+        "source/backend/core/mission.py",
+        "source/backend/core/replay.py",
+        "source/backend/core/temporal_use_cases.py",
+        "source/backend/tests/test_api.py",
+        "source/frontend/App.tsx",
+        "source/frontend/components/GroundAgent.tsx",
+        "source/frontend/e2e/qa_verification.spec.ts"
+      ]
+    },
+    "feature_group_model_runtime_and_handoff": {
+      "note": "Manifest-based satellite artifact resolution, runtime status exposure, nested fenced JSON tool-call parsing, default NM-UNI trained Orbit GGUF pull from Shoozes/lfm2.5-450m-vl-orbit-satellite, model fetch handoff tooling, launcher FetchModel integration, and an optional model-present smoke script for fetched NM-UNI GGUF bundles.",
+      "files": [
+        ".env.example",
+        "README.md",
+        "docs/ARCHITECTURE.md",
+        "docs/FINE_TUNING_PLAN.md",
+        "docs/MODEL_HANDOFF.md",
+        "docs/TODO.md",
+        "run.ps1",
+        "run.sh",
         "source/backend/api/main.py",
         "source/backend/core/inference.py",
         "source/backend/core/model_manifest.py",
         "source/backend/scripts/fetch_satellite_model.py",
         "source/backend/scripts/smoke_satellite_model.py",
         "source/backend/tests/test_api.py",
+        "source/backend/tests/test_fetch_satellite_model.py",
         "source/backend/tests/test_inference.py",
         "source/backend/tests/test_model_manifest.py"
       ]
@@ -299,50 +327,50 @@
     "feature_group_dataset_export_and_eval_lane": {
       "note": "Orbit dataset export, replay-cache export with frame-quality/rejected-window cloud metadata, evidence-mode fields for runtime truth, imagery origin, and scoring basis, orbit_training_contract_v1 metadata for NM-UNI import/review/localization, SVG fallback rasterization to PNG before retagging, bounded Qwen/Ollama asset retagging with deterministic fallback budgets, prior-tag reuse for already-tagged image hashes, frame-safe timelapse extraction namespaced by video SHA-256, optional Tkinter retag UI with HF upload controls, Hugging Face upload helper with successful publication to Shoozes/LFM-Orbit-SatData, viewer-safe dataset-card configs with replay-cache wording for mixed JSONL schemas, current cycle at 56 samples / 179 assets / 26 temporal sequences plus mission_metadata=1 for metadata-only Greenland ice/snow extent, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead replay missions, ice/snow seeded-cache provenance fixtures, and eval tooling now including orbit_eval_v2 baseline-vs-candidate comparison and promotion.json artifacts.",
       "files": [
-        "docs/MODEL_HANDOFF.md",
         "docs/DATASET_CYCLE_TUTORIAL.md",
-        "source/backend/data/HF_DATASET_CARD.md",
+        "docs/MODEL_HANDOFF.md",
         "docs/retag-training-assets-ui.png",
-        "source/backend/data/README.md",
-        "source/backend/scripts/export_orbit_dataset.py",
-        "source/backend/scripts/retag_training_assets.py",
-        "source/backend/scripts/retag_training_assets_ui.py",
-        "source/backend/scripts/upload_orbit_dataset_hf.py",
-        "source/backend/scripts/evaluate_model.py",
-        "source/backend/core/monitor_reports.py",
-        "source/backend/assets/seeded_data/sh_8342a218.webm",
-        "source/backend/assets/seeded_data/sh_8342a218_meta.json",
-        "source/backend/assets/seeded_data/sh_f03170dc.webm",
-        "source/backend/assets/seeded_data/sh_f03170dc_meta.json",
-        "source/backend/assets/seeded_data/sh_99548137.webm",
-        "source/backend/assets/seeded_data/sh_99548137_meta.json",
-        "source/backend/assets/seeded_data/sh_53c969f1.webm",
-        "source/backend/assets/seeded_data/sh_53c969f1_meta.json",
+        "source/backend/assets/seeded_data/sh_07ea2b1b.webm",
+        "source/backend/assets/seeded_data/sh_07ea2b1b_meta.json",
         "source/backend/assets/seeded_data/sh_3ceea0a9.webm",
         "source/backend/assets/seeded_data/sh_3ceea0a9_meta.json",
+        "source/backend/assets/seeded_data/sh_53c969f1.webm",
+        "source/backend/assets/seeded_data/sh_53c969f1_meta.json",
         "source/backend/assets/seeded_data/sh_73634fe8.webm",
         "source/backend/assets/seeded_data/sh_73634fe8_meta.json",
+        "source/backend/assets/seeded_data/sh_8342a218.webm",
+        "source/backend/assets/seeded_data/sh_8342a218_meta.json",
+        "source/backend/assets/seeded_data/sh_99548137.webm",
+        "source/backend/assets/seeded_data/sh_99548137_meta.json",
         "source/backend/assets/seeded_data/sh_a7815591.webm",
         "source/backend/assets/seeded_data/sh_a7815591_meta.json",
         "source/backend/assets/seeded_data/sh_b9993f84.webm",
         "source/backend/assets/seeded_data/sh_b9993f84_meta.json",
-        "source/backend/assets/seeded_data/sh_07ea2b1b.webm",
-        "source/backend/assets/seeded_data/sh_07ea2b1b_meta.json",
         "source/backend/assets/seeded_data/sh_c8ec6b43.webm",
         "source/backend/assets/seeded_data/sh_c8ec6b43_meta.json",
+        "source/backend/assets/seeded_data/sh_f03170dc.webm",
+        "source/backend/assets/seeded_data/sh_f03170dc_meta.json",
+        "source/backend/core/monitor_reports.py",
+        "source/backend/data/HF_DATASET_CARD.md",
+        "source/backend/data/README.md",
+        "source/backend/scripts/evaluate_model.py",
+        "source/backend/scripts/export_orbit_dataset.py",
+        "source/backend/scripts/retag_training_assets.py",
+        "source/backend/scripts/retag_training_assets_ui.py",
+        "source/backend/scripts/upload_orbit_dataset_hf.py",
+        "source/backend/tests/test_evaluate_model.py",
         "source/backend/tests/test_export_orbit_dataset.py",
         "source/backend/tests/test_retag_training_assets.py",
         "source/backend/tests/test_retag_training_assets_ui.py",
-        "source/backend/tests/test_upload_orbit_dataset_hf.py",
-        "source/backend/tests/test_evaluate_model.py"
+        "source/backend/tests/test_upload_orbit_dataset_hf.py"
       ]
     },
     "issue_group_monitor_report_dataset_bridge": {
       "note": "API-generated maritime/lifeline monitor reports are persisted under runtime-data/monitor-reports and can be imported into dataset exports so STAC metadata and before/after candidates flow into training rows.",
       "files": [
         "README.md",
-        "docs/TODO.md",
         "docs/MODEL_HANDOFF.md",
+        "docs/TODO.md",
         "source/backend/api/main.py",
         "source/backend/core/monitor_reports.py",
         "source/backend/scripts/export_orbit_dataset.py",
@@ -354,34 +382,34 @@
       "note": "Deterministic runtime reset, replay hydration from cached real API imagery, dynamic cached-API Fast Replay catalog entries with structural WebM integrity gating, metadata-only replay support for valid scored evidence without video proof, rescan from saved replay metadata for current model/runtime checks, portable replay snapshot export/import for completed runtime surfaces, multi-mission replay packs, mission-specific replay actions, stricter observation readiness, cached-WebM integrity checks, and replay-backed demo/test helpers including visible tutorial and judge recordings.",
       "files": [
         "source/backend/api/main.py",
+        "source/backend/assets/replays/atacama_mining_replay.json",
+        "source/backend/assets/replays/delhi_urban_replay.json",
+        "source/backend/assets/replays/georgia_wildfire_replay.json",
+        "source/backend/assets/replays/greenland_ice_snow_extent_replay.json",
+        "source/backend/assets/replays/manchar_flood_replay.json",
+        "source/backend/assets/replays/rondonia_frontier_judge.json",
+        "source/backend/assets/replays/singapore_maritime_replay.json",
         "source/backend/core/observation_store.py",
         "source/backend/core/replay.py",
         "source/backend/core/replay_snapshot.py",
         "source/backend/core/runtime_state.py",
-        "source/frontend/App.tsx",
-        "source/frontend/components/MissionControl.tsx",
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_observation_store.py",
         "source/backend/tests/test_replay.py",
+        "source/backend/tests/test_seeded_timelapse_integrity.py",
+        "source/frontend/App.tsx",
+        "source/frontend/components/MissionControl.tsx",
         "source/frontend/e2e/app.spec.ts",
         "source/frontend/e2e/capture_screenshots.spec.ts",
+        "source/frontend/e2e/demos/demoHelpers.ts",
         "source/frontend/e2e/dual_agent_demo.spec.ts",
         "source/frontend/e2e/runtime.ts",
         "source/frontend/e2e/tutorialHelpers.ts",
-        "source/frontend/e2e/tutorial_video.spec.ts",
-        "source/backend/assets/replays/rondonia_frontier_judge.json",
-        "source/backend/assets/replays/manchar_flood_replay.json",
-        "source/backend/assets/replays/atacama_mining_replay.json",
-        "source/backend/assets/replays/singapore_maritime_replay.json",
-        "source/backend/assets/replays/georgia_wildfire_replay.json",
-        "source/backend/assets/replays/delhi_urban_replay.json",
-        "source/backend/assets/replays/greenland_ice_snow_extent_replay.json",
-        "source/backend/tests/test_seeded_timelapse_integrity.py",
-        "source/frontend/e2e/demos/demoHelpers.ts"
+        "source/frontend/e2e/tutorial_video.spec.ts"
       ]
     },
     "feature_group_timelapse_gallery_and_vlm": {
-      "note": "Timelapse generation, replay_cache provenance labels with seeded_cache legacy compatibility, cached-WebM visual proof, retryable API-error rendering, gallery evidence, VLM Find/Ask/Generate controls with structured fallback provenance, deterministic image-fetch fallback behavior, and judge demo flows.",
+      "note": "Timelapse generation, replay_cache provenance labels with seeded_cache legacy compatibility, cached-WebM visual proof, retryable API-error rendering, gallery evidence, optional visual evidence Find/Ask/Generate controls with structured fallback provenance, deterministic image-fetch fallback behavior, operator target presets with candidate-oriented fallback labels, and judge demo flows.",
       "files": [
         "source/backend/core/gallery.py",
         "source/backend/core/timelapse.py",
@@ -389,26 +417,24 @@
         "source/backend/tests/test_gallery.py",
         "source/backend/tests/test_timelapse.py",
         "source/backend/tests/test_vlm.py",
-        "source/frontend/e2e/app.spec.ts",
         "source/frontend/App.tsx",
+        "source/frontend/components/JudgeModePanel.tsx",
         "source/frontend/components/TimelapseViewer.tsx",
         "source/frontend/components/VlmPanel.tsx",
-        "source/frontend/e2e/tutorial_video.spec.ts",
-        "source/frontend/e2e/vlm.spec.ts",
-        "source/frontend/components/JudgeModePanel.tsx",
+        "source/frontend/e2e/app.spec.ts",
+        "source/frontend/e2e/demos/abstain-safety.demo.spec.ts",
         "source/frontend/e2e/demos/judge-mode.demo.spec.ts",
+        "source/frontend/e2e/demos/orbital-eclipse.demo.spec.ts",
         "source/frontend/e2e/demos/payload-reduction.demo.spec.ts",
         "source/frontend/e2e/demos/provenance.demo.spec.ts",
-        "source/frontend/e2e/demos/abstain-safety.demo.spec.ts",
-        "source/frontend/e2e/demos/orbital-eclipse.demo.spec.ts"
+        "source/frontend/e2e/tutorial_video.spec.ts",
+        "source/frontend/e2e/vlm.spec.ts"
       ]
     },
     "feature_group_provider_pipeline_and_seed_scripts": {
       "note": "Provider resolution, offline-safe cold-start defaults, DPhi SimSat Sentinel as the hackathon primary lane, optional SimSat Mapbox routing, optional Sentinel Hub secret-file compatibility including current labeled sh.txt shape, fallback order, cached real API replay assets, optional event-window Sentinel seeding for development, SCL-gated frame rejection where metadata exists, burn-scar visual composites, observation-record integrity, and debug diagnostics for safe fallback paths.",
       "files": [
         ".env.example",
-        "source/backend/test_evalscript.py",
-        "source/backend/test_wms.py",
         "source/backend/core/config.py",
         "source/backend/core/gee_provider.py",
         "source/backend/core/loader.py",
@@ -422,33 +448,35 @@
         "source/backend/scripts/gee_auth.py",
         "source/backend/scripts/seed_nasa_cache.py",
         "source/backend/scripts/seed_sentinel_cache.py",
+        "source/backend/test_evalscript.py",
+        "source/backend/test_wms.py",
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_config.py",
         "source/backend/tests/test_loader.py",
         "source/backend/tests/test_seed_sentinel_cache.py",
-        "source/backend/tests/test_simsat_client.py",
-        "source/backend/tests/test_sentinel_credentials.py"
+        "source/backend/tests/test_sentinel_credentials.py",
+        "source/backend/tests/test_simsat_client.py"
       ]
     },
     "feature_group_maritime_stac_and_investigation": {
       "note": "Orbit-native maritime monitoring, optional Element84 STAC scene metadata, date deduplication, and cardinal investigation planning.",
       "files": [
+        "source/backend/api/main.py",
         "source/backend/core/maritime_monitoring.py",
         "source/backend/core/temporal_use_cases.py",
-        "source/backend/api/main.py",
-        "source/backend/tests/test_maritime_monitoring.py",
         "source/backend/tests/test_api.py",
+        "source/backend/tests/test_maritime_monitoring.py",
         "source/backend/tests/test_temporal_use_cases.py"
       ]
     },
     "feature_group_lifeline_before_after_monitoring": {
       "note": "Civilian lifeline before/after monitoring, strict candidate validation, distinct frame-pair downlink gating, replay assets, eval metrics, and acceptance checks.",
       "files": [
+        "source/backend/api/main.py",
         "source/backend/core/lifeline_monitoring.py",
         "source/backend/core/temporal_use_cases.py",
-        "source/backend/api/main.py",
-        "source/backend/tests/test_lifeline_monitoring.py",
         "source/backend/tests/test_api.py",
+        "source/backend/tests/test_lifeline_monitoring.py",
         "source/backend/tests/test_temporal_use_cases.py"
       ]
     },
@@ -464,8 +492,8 @@
         "source/backend/tests/test_depth_anything.py",
         "source/frontend/components/SettingsPanel.tsx",
         "source/frontend/e2e/app.spec.ts",
-        "source/frontend/utils/depthMapStats.ts",
         "source/frontend/package.json",
+        "source/frontend/utils/depthMapStats.ts",
         "source/frontend/vite.config.ts"
       ]
     },
@@ -488,59 +516,62 @@
       "note": "Playwright coverage for main flows, mission/timelapse validation, normal E2E correctness, separate recorded Judge Mode demos, tutorial-style subtitles, cached-API WebM video quality checks, proof JSON artifacts with payload_accounting assertions, mock outage/error fixtures, and docs video exports.",
       "files": [
         ".github/workflows/ci.yml",
-        "source/frontend/playwright.config.ts",
+        "source/backend/tests/test_seeded_timelapse_integrity.py",
         "source/frontend/e2e/app.spec.ts",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/capture_screenshots.spec.ts",
         "source/frontend/e2e/debug_dashboard.spec.ts",
+        "source/frontend/e2e/demos/abstain-safety.demo.spec.ts",
+        "source/frontend/e2e/demos/demoHelpers.ts",
+        "source/frontend/e2e/demos/judge-mode.demo.spec.ts",
+        "source/frontend/e2e/demos/orbital-eclipse.demo.spec.ts",
+        "source/frontend/e2e/demos/payload-reduction.demo.spec.ts",
+        "source/frontend/e2e/demos/provenance.demo.spec.ts",
         "source/frontend/e2e/dual_agent_demo.spec.ts",
         "source/frontend/e2e/monitor_features.spec.ts",
         "source/frontend/e2e/qa-audit.spec.ts",
         "source/frontend/e2e/qa_verification.spec.ts",
         "source/frontend/e2e/runtime.ts",
-        "source/frontend/e2e/test_page_html.spec.ts",
         "source/frontend/e2e/testUrls.ts",
+        "source/frontend/e2e/test_page_html.spec.ts",
         "source/frontend/e2e/tutorialHelpers.ts",
         "source/frontend/e2e/tutorial_video.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
-        "source/frontend/playwright.demo.config.ts",
-        "source/frontend/e2e/demos/demoHelpers.ts",
-        "source/frontend/e2e/demos/judge-mode.demo.spec.ts",
-        "source/frontend/e2e/demos/payload-reduction.demo.spec.ts",
-        "source/frontend/e2e/demos/provenance.demo.spec.ts",
-        "source/frontend/e2e/demos/abstain-safety.demo.spec.ts",
-        "source/frontend/e2e/demos/orbital-eclipse.demo.spec.ts",
-        "source/backend/tests/test_seeded_timelapse_integrity.py"
+        "source/frontend/playwright.config.ts",
+        "source/frontend/playwright.demo.config.ts"
       ]
     },
     "runtime_entrypoints_and_tools": {
-      "note": "Operator entrypoints, pinned local runtimes, reproducible install/run/verify tooling with repo-root smoke coverage, safe manual provider probes, and retired legacy entrypoint guardrails.",
+      "note": "Operator entrypoints, pinned local runtimes, reproducible install/run/verify tooling with repo-root smoke coverage, cross-platform line-ending guardrails, platform-specific backend virtualenvs, optional llama-cpp model runtime fallback, safe manual provider probes, and retired legacy entrypoint guardrails.",
       "files": [
-        ".github/copilot-setup-steps.yml",
-        ".nvmrc",
         ".env.example",
+        ".gitattributes",
+        ".github/copilot-setup-steps.yml",
+        ".github/workflows/ci.yml",
+        ".gitignore",
+        ".nvmrc",
         ".tools/_gen_bank.py",
         ".tools/get-context.ps1",
         "run.bat",
         "run.ps1",
         "run.sh",
-        "source/backend/test_evalscript.py",
-        "source/backend/test_wms.py",
-        "source/frontend/.npmrc",
         "source/backend/autonomous_agent.py",
         "source/backend/satellite_debug.py",
         "source/backend/start_edge.py",
-        "source/backend/tests/test_autonomous_agent.py"
+        "source/backend/test_evalscript.py",
+        "source/backend/test_wms.py",
+        "source/backend/tests/test_autonomous_agent.py",
+        "source/frontend/.npmrc"
       ]
     },
     "issue_group_spectral_band_contract": {
       "note": "NDVI and NDSI require explicit spectral bands; RGB-only, missing, or non-numeric spectral inputs return unavailable/abstain instead of fabricated index values.",
       "files": [
-        "source/backend/core/indices.py",
+        "docs/TODO.md",
         "source/backend/core/ice_snow_monitoring.py",
-        "source/backend/tests/test_spectral_band_contract.py",
+        "source/backend/core/indices.py",
         "source/backend/tests/test_ice_snow_monitoring.py",
-        "docs/TODO.md"
+        "source/backend/tests/test_spectral_band_contract.py"
       ]
     },
     "feature_group_ice_snow_extent_monitoring": {
@@ -551,32 +582,32 @@
         "docs/JUDGE_DEMO.md",
         "docs/MODEL_HANDOFF.md",
         "docs/TODO.md",
+        "source/backend/api/main.py",
+        "source/backend/assets/replays/greenland_ice_snow_extent_replay.json",
         "source/backend/core/ice_snow_monitoring.py",
         "source/backend/core/indices.py",
         "source/backend/core/temporal_use_cases.py",
-        "source/backend/api/main.py",
-        "source/backend/assets/replays/greenland_ice_snow_extent_replay.json",
+        "source/backend/data/README.md",
         "source/backend/scripts/export_orbit_dataset.py",
-        "source/backend/tests/test_ice_snow_monitoring.py",
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_export_orbit_dataset.py",
+        "source/backend/tests/test_ice_snow_monitoring.py",
         "source/backend/tests/test_replay.py",
         "source/backend/tests/test_spectral_band_contract.py",
         "source/backend/tests/test_temporal_use_cases.py",
         "source/frontend/components/MissionControl.tsx",
-        "source/frontend/e2e/monitor_features.spec.ts",
-        "source/backend/data/README.md"
+        "source/frontend/e2e/monitor_features.spec.ts"
       ]
     },
     "feature_group_wildfire_seed_and_future_watch": {
-      "note": "Real wildfire candidate handling and timestamped future-catch proof. Highway 82 Georgia remains candidate-quality Sentinel-2 SWIR/NIR/Red replay evidence from cached API imagery; the SPC Southern High Plains watch is source-backed, timestamped, and unverified until post-window FIRMS/NIFC or Sentinel evidence exists.",
+      "note": "Real wildfire candidate handling and timestamped watch proof. Highway 82 Georgia remains candidate-quality Sentinel-2 SWIR/NIR/Red replay evidence from cached API imagery; the SPC Southern High Plains watch is now incident-report verified as a Sparks Fire candidate through NM Fire Info, while satellite burn-scar confirmation remains a separate post-event imagery step.",
       "files": [
         "docs/TODO.md",
-        "source/backend/data/README.md",
         "source/backend/assets/seeded_data/sh_4015e8b8.webm",
         "source/backend/assets/seeded_data/sh_4015e8b8_meta.json",
         "source/backend/assets/watchlists/wildfire_spc_day2_southern_high_plains_2026-04-28.json",
         "source/backend/core/temporal_use_cases.py",
+        "source/backend/data/README.md",
         "source/backend/scripts/seed_sentinel_cache.py",
         "source/backend/tests/test_future_watchlists.py",
         "source/backend/tests/test_seed_sentinel_cache.py",
@@ -586,51 +617,75 @@
       ]
     },
     "feature_group_judge_demo_mode": {
-      "note": "Judge-ready deterministic demo lane with visual overlay, tutorial-style UI flow, Judge Mode proof panel, Playwright video/trace/screenshots, proof JSON export with explicit payload_accounting, README presentation screenshots extracted from current demo WebMs, per-demo evidence-frame screenshot/luminance guards, preloaded mission/replay starts that avoid the legacy Amazonas sweep, Rondonia replay proof, Pakistan Manchar Lake payload reduction, Atacama provenance, Greenland abstain safety, Suez maritime link outage recovery, real Sentinel-2 L2A demo frames and cached API WebMs, active-replay Judge Mode proof binding, clearer replay proof-panel playback windows, and refreshed tutorial video output covering Singapore maritime plus Atacama mining.",
+      "note": "Judge-ready deterministic demo lane with visual overlay, tutorial-style UI flow, Judge Mode proof panel, Playwright video/trace/screenshots, proof JSON export with explicit payload_accounting, SimSat-first README proof positioning, backend-derived DTN queue proof, Liquid evidence-packet wording, README presentation screenshots extracted from current demo WebMs, per-demo evidence-frame screenshot/luminance guards, preloaded mission/replay starts that avoid the legacy Amazonas sweep, Rondonia replay proof, Pakistan Manchar Lake payload reduction, Atacama provenance, Greenland abstain safety, Suez maritime link outage recovery, real Sentinel-2 L2A demo frames and cached API WebMs, active-replay Judge Mode proof binding, clearer replay proof-panel playback windows, and refreshed tutorial video output covering Singapore maritime plus Atacama mining.",
       "files": [
         "README.md",
         "docs/JUDGE_DEMO.md",
+        "docs/readme-judge-mode.png",
+        "docs/readme-orbital-eclipse.png",
+        "docs/readme-payload-reduction.png",
+        "docs/readme-provenance.png",
+        "docs/readme-visual-grid.png",
+        "source/backend/api/main.py",
+        "source/backend/assets/seeded_data/sh_24541539.webm",
+        "source/backend/assets/seeded_data/sh_24541539_meta.json",
+        "source/backend/assets/seeded_data/sh_2d990c6b.webm",
+        "source/backend/assets/seeded_data/sh_2d990c6b_meta.json",
+        "source/backend/assets/seeded_data/sh_cc0e95b7.webm",
+        "source/backend/assets/seeded_data/sh_cc0e95b7_meta.json",
+        "source/backend/assets/seeded_data/sh_fbe644a9.webm",
+        "source/backend/assets/seeded_data/sh_fbe644a9_meta.json",
+        "source/backend/core/runtime_state.py",
+        "source/backend/tests/test_seeded_timelapse_integrity.py",
         "source/frontend/App.tsx",
         "source/frontend/components/JudgeModePanel.tsx",
+        "source/frontend/e2e/demos/abstain-safety.demo.spec.ts",
+        "source/frontend/e2e/demos/demoHelpers.ts",
+        "source/frontend/e2e/demos/judge-mode.demo.spec.ts",
+        "source/frontend/e2e/demos/orbital-eclipse.demo.spec.ts",
+        "source/frontend/e2e/demos/payload-reduction.demo.spec.ts",
+        "source/frontend/e2e/demos/provenance.demo.spec.ts",
         "source/frontend/package.json",
         "source/frontend/playwright.config.ts",
         "source/frontend/playwright.demo.config.ts",
-        "source/frontend/e2e/demos/demoHelpers.ts",
-        "source/frontend/e2e/demos/judge-mode.demo.spec.ts",
-        "source/frontend/e2e/demos/payload-reduction.demo.spec.ts",
-        "source/frontend/e2e/demos/provenance.demo.spec.ts",
-        "source/frontend/e2e/demos/abstain-safety.demo.spec.ts",
-        "source/frontend/e2e/demos/orbital-eclipse.demo.spec.ts",
-        "source/frontend/public/demo-assets/pakistan-manchar-flood.png",
         "source/frontend/public/demo-assets/atacama-mining.png",
         "source/frontend/public/demo-assets/greenland-ice.png",
-        "source/frontend/public/demo-assets/suez-maritime.png",
-        "docs/readme-judge-mode.png",
-        "docs/readme-payload-reduction.png",
-        "docs/readme-provenance.png",
+        "source/frontend/public/demo-assets/pakistan-manchar-flood.png",
+        "source/frontend/public/demo-assets/suez-maritime.png"
+      ]
+    },
+    "feature_group_simsat_dtn_judge_proof": {
+      "note": "Current show-ready proof surface for DPhi SimSat-first positioning, truthful proxy-band labels, local Liquid evidence-packet review, compact payload accounting, backend-derived unread-message DTN queue proof, and orbital-eclipse screenshot/video artifacts.",
+      "files": [
+        "README.md",
+        "docs/ARCHITECTURE.md",
+        "docs/JUDGE_DEMO.md",
+        "docs/TODO.md",
         "docs/readme-orbital-eclipse.png",
-        "docs/readme-visual-grid.png",
-        "source/backend/assets/seeded_data/sh_24541539.webm",
-        "source/backend/assets/seeded_data/sh_24541539_meta.json",
-        "source/backend/assets/seeded_data/sh_fbe644a9.webm",
-        "source/backend/assets/seeded_data/sh_fbe644a9_meta.json",
-        "source/backend/assets/seeded_data/sh_cc0e95b7.webm",
-        "source/backend/assets/seeded_data/sh_cc0e95b7_meta.json",
-        "source/backend/assets/seeded_data/sh_2d990c6b.webm",
-        "source/backend/assets/seeded_data/sh_2d990c6b_meta.json",
         "source/backend/api/main.py",
-        "source/backend/core/runtime_state.py",
-        "source/backend/tests/test_seeded_timelapse_integrity.py"
+        "source/backend/core/agent_bus.py",
+        "source/backend/core/config.py",
+        "source/backend/core/ground_agent_knowledge.py",
+        "source/backend/core/link_state.py",
+        "source/backend/core/simsat_client.py",
+        "source/backend/core/simsat_provider.py",
+        "source/backend/tests/test_agent_bus.py",
+        "source/backend/tests/test_api.py",
+        "source/frontend/App.tsx",
+        "source/frontend/components/GroundAgent.tsx",
+        "source/frontend/components/JudgeModePanel.tsx",
+        "source/frontend/e2e/demos/orbital-eclipse.demo.spec.ts",
+        "source/frontend/e2e/qa_verification.spec.ts"
       ]
     },
     "issue_group_runtime_truth_provenance_and_modes": {
-      "note": "Current truth/provenance split: runtime_truth_mode distinguishes realtime, replay, fallback, and unknown; imagery_origin captures provider/source family; scoring_basis captures multispectral, proxy, visual-only, fallback-none, or unknown scoring. Replay means stored real API imagery with date/provenance; fallback means degraded runtime behavior and must not promote generated or forced positives. Replay manifests and seeded-cache export preserve the evidence triplet, including multispectral ice/snow replay metadata. Frontend evidence labels now use cached-API replay wording consistently, and Judge Mode proof JSON carries explicit payload_accounting.",
+      "note": "Current truth/provenance split: runtime_truth_mode distinguishes realtime, replay, fallback, and unknown; imagery_origin captures provider/source family; scoring_basis captures multispectral, proxy, visual-only, fallback-none, or unknown scoring. Replay means stored real API imagery with date/provenance; fallback means degraded runtime behavior and must not promote generated or forced positives. Replay manifests and seeded-cache export preserve the evidence triplet, including multispectral ice/snow replay metadata. Frontend evidence labels now use cached-API replay wording consistently, and Judge Mode proof JSON carries explicit payload_accounting plus DTN queue provenance.",
       "files": [
         "README.md",
         "docs/ARCHITECTURE.md",
         "docs/TODO.md",
-        "summary_bank.json",
         "source/backend/api/main.py",
+        "source/backend/assets/replays/greenland_ice_snow_extent_replay.json",
         "source/backend/core/config.py",
         "source/backend/core/contracts.py",
         "source/backend/core/metrics.py",
@@ -640,6 +695,8 @@
         "source/backend/core/telemetry.py",
         "source/backend/core/timelapse.py",
         "source/backend/core/vlm.py",
+        "source/backend/data/HF_DATASET_CARD.md",
+        "source/backend/scripts/export_orbit_dataset.py",
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_config.py",
         "source/backend/tests/test_queue.py",
@@ -647,19 +704,17 @@
         "source/backend/tests/test_telemetry.py",
         "source/backend/tests/test_timelapse.py",
         "source/backend/tests/test_vlm.py",
+        "source/frontend/components/AlertsLogs.tsx",
         "source/frontend/components/JudgeModePanel.tsx",
         "source/frontend/components/MissionControl.tsx",
         "source/frontend/components/TimelapseViewer.tsx",
-        "source/frontend/types/telemetry.ts",
-        "source/frontend/utils/telemetry.ts",
+        "source/frontend/components/ValidationPanel.tsx",
         "source/frontend/e2e/app.spec.ts",
         "source/frontend/e2e/demos/judge-mode.demo.spec.ts",
-        "source/frontend/components/AlertsLogs.tsx",
-        "source/frontend/components/ValidationPanel.tsx",
         "source/frontend/e2e/tutorial_video.spec.ts",
-        "source/backend/data/HF_DATASET_CARD.md",
-        "source/backend/scripts/export_orbit_dataset.py",
-        "source/backend/assets/replays/greenland_ice_snow_extent_replay.json"
+        "source/frontend/types/telemetry.ts",
+        "source/frontend/utils/telemetry.ts",
+        "summary_bank.json"
       ]
     }
   },
@@ -722,9 +777,6 @@
       "note": "[collapsed (+)]"
     },
     "source/frontend/utils": {
-      "note": "[collapsed (+)]"
-    },
-    "source/backend/canopy_sentinel_backend.egg-info": {
       "note": "[collapsed (+)]"
     },
     "source/backend/lfm_orbit_backend.egg-info": {

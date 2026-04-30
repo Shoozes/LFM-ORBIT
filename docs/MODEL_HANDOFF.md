@@ -23,7 +23,8 @@ That means:
 
 - Orbit can resolve a trained artifact through a manifest instead of one hardcoded file path
 - Orbit does not yet run a fully image-conditioned multimodal `mmproj` inference path in production
-- a published `mmproj` can still be carried in the handoff manifest now so the artifact chain is ready for the next adapter step
+- a published `mmproj` can still be carried in a future handoff manifest so the artifact chain is ready for the next adapter step
+- the current NM-UNI Orbit bundle is a trained GGUF handoff without an `mmproj` file
 
 ## Orbit Runtime Contract
 
@@ -59,13 +60,31 @@ Orbit includes a fetch utility:
 
 [fetch_satellite_model.py](</C:/Users/jc816/OneDrive/Desktop/Gen-App/LFM Orbit/source/backend/scripts/fetch_satellite_model.py>)
 
-Examples:
+Default trained Orbit bundle:
+
+- Hugging Face repo: [Shoozes/lfm2.5-450m-vl-orbit-satellite](https://huggingface.co/Shoozes/lfm2.5-450m-vl-orbit-satellite)
+- Primary GGUF: `LFM2.5-VL-450M-Q4_0.gguf`
+- Handoff manifest: `orbit_model_handoff.json`
+- Training manifest: `training_result_manifest.json`
+
+The normal launcher path is:
+
+```powershell
+cd C:\Users\jc816\OneDrive\Desktop\Gen-App\LFM Orbit
+.\run.ps1 -Install -FetchModel
+```
+
+```bash
+./run.sh --install --fetch-model
+```
+
+`-FetchModel` / `--fetch-model` downloads the trained handoff and opportunistically installs the optional `model` extra (`llama-cpp-python`). If Linux/WSL compiler support is missing, the launcher falls back to the core locked backend install so the app still boots and the model files remain available for a host that can run the GGUF.
+
+Direct script usage:
 
 ```powershell
 cd C:\Users\jc816\OneDrive\Desktop\Gen-App\LFM Orbit\source\backend
-python scripts\fetch_satellite_model.py `
-  --repo-id your-org/lfm-orbit-satellite `
-  --model-filename LFM2.5-VL-450M-Q4_0.gguf
+python scripts\fetch_satellite_model.py
 ```
 
 Using a local handoff manifest:
@@ -91,6 +110,8 @@ Orbit supports these optional overrides:
 
 These are useful for local testing and temporary artifact swaps.
 
+The published GGUF contains a newer Hugging Face chat template that older local `llama_cpp` builds do not parse because of the Jinja `{% generation %}` tag. Orbit therefore defaults `CANOPY_SENTINEL_LLAMACPP_CHAT_FORMAT=chatml` and `CANOPY_SENTINEL_LLAMACPP_PATCH_CHAT_TEMPLATE=true` so the local runtime can load the GGUF and use Orbit's own evidence-packet prompt format.
+
 ## Recommended Bundle Shape
 
 Any external training or publishing workflow should stage a folder that contains:
@@ -108,6 +129,19 @@ The handoff manifest is the bridge between external training output and Orbit ru
 The current training/publish partner on this machine is `C:\DevStuff\NM-UNI-main`.
 NM-UNI is responsible for importing Orbit exports, preparing Liquid training runs, quantizing trained outputs to GGUF, staging `orbit_model_handoff.json`, and optionally publishing a Hugging Face model repo.
 Orbit is responsible for consuming that bundle and validating it against SimSat/replay evidence.
+
+Current published bundle:
+
+- repo: `Shoozes/lfm2.5-450m-vl-orbit-satellite`
+- generated at: `2026-04-29T23:47:02.448081Z`
+- training method: `vlm_sft`
+- train rows: `32`
+- multimodal rows: `32`
+- image blocks: `44`
+- eval rows: `0`
+- promotion gate: not required / not attached
+
+Treat this as the trained runtime artifact for the hackathon handoff. Do not overstate it as held-out-evaluated lift until a comparison report is attached.
 
 Do not move NM-UNI's training UI or provider management into Orbit. Keep Orbit's hackathon path centered on DPhi SimSat (`simsat_sentinel`), bundled replay fixtures, and manifest-driven model consumption.
 
@@ -170,7 +204,7 @@ Current replay cache includes Rondonia replay coverage plus cached API missions 
 
 Recorded proof demos now export both the full proof screen and the isolated `evidence-frame.png` surface. That keeps model/dataset review aligned with the exact visible evidence frame used in Judge Mode, not just the longer Playwright recording.
 
-Orbit also stores timestamped future-watch manifests under `source/backend/assets/watchlists/`. These are source-backed risk watches, not labels; the current SPC Day 2 Southern High Plains fire-weather watch must stay `watch_only_unverified` until independent post-window evidence exists.
+Orbit also stores timestamped watch manifests under `source/backend/assets/watchlists/`. These are source-backed risk watches, not labels. The SPC Day 2 Southern High Plains watch is now promoted only to `incident_report_verified_candidate` after NM Fire Info reported the Sparks Fire in Quay County inside the watch bbox; satellite burn-scar confirmation still requires a separate post-event imagery pass.
 
 Current local export after including replay cache:
 
@@ -182,15 +216,15 @@ Current local export after including replay cache:
 - `40` bounded Qwen/Ollama image calls plus `6` sequence calls with deterministic heuristic fallback for remaining assets
 - `74` image tags reused from the previous retag folder to avoid rescanning already-tagged assets
 
-Hugging Face upload is wired and completed locally for the current retagged training export. The dataset is published at `Shoozes/LFM-Orbit-SatData`, with latest data/card commit `1ebd19065e8a8124372425c4c0df9c0332275c9c` and `mission_metadata=1` for the metadata-only Greenland ice/snow extent replay.
+Hugging Face upload is wired and completed locally for the current retagged training export. The dataset is published at `Shoozes/LFM-Orbit-SatData`, with latest data/card commit `1ebd19065e8a8124372425c4c0df9c0332275c9c` and `mission_metadata=1` for the metadata-only Greenland ice/snow extent replay. The trained model handoff bundle is published at `Shoozes/lfm2.5-450m-vl-orbit-satellite`.
 
 ## Integration Sequence
 
 1. Export Orbit samples with `source/backend/scripts/export_orbit_dataset.py --include-seeded-cache`.
 2. Import, train, and package the model in an external training workspace.
 3. Generate `orbit_model_handoff.json`.
-4. Optionally upload the staged folder to Hugging Face.
-5. Run Orbit's fetch script against the handoff manifest or the repo directly.
+4. Upload the staged folder to Hugging Face.
+5. Run Orbit's fetch script against the handoff manifest or the default `Shoozes/lfm2.5-450m-vl-orbit-satellite` repo.
 6. Verify Orbit status at `/api/inference/status` or `/api/analysis/status`.
 7. When a real GGUF is installed, run `python scripts\smoke_satellite_model.py --require-present` from `source/backend`.
 8. Use `scripts/evaluate_model.py --baseline-summary ...` to write `comparison.json` and `promotion.json` before promoting a tuned bundle.
@@ -201,4 +235,4 @@ This handoff closes artifact resolution and publication flow. The runtime gaps b
 
 - a production multimodal image-input adapter inside Orbit
 - automatic `mmproj` use in the current `llama_cpp` path
-- replacement VLM VQA/caption runtimes for the final selected local model family
+- replacement visual VQA/caption runtimes for the final selected local model family

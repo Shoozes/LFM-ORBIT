@@ -17,7 +17,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await page.getByTestId("tab-agents").click();
     await expect(page.getByTestId("header-agent-bus")).toBeVisible();
     await expect(page.getByPlaceholder("Inject manual command into agent bus…")).toBeVisible();
-    await expect(page.getByPlaceholder("Command agent...")).toBeVisible();
+    await expect(page.getByPlaceholder("Request replay, mission pack, link action...")).toBeVisible();
 
     // 3. Logs tab
     await page.getByTestId("tab-logs").click();
@@ -62,7 +62,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
     // Navigate to Agents tab
     await page.getByTestId("tab-agents").click();
 
-    const chatInput = page.getByPlaceholder("Command agent...");
+    const chatInput = page.getByPlaceholder("Request replay, mission pack, link action...");
     await chatInput.fill("Start scanning the northern sector");
 
     const sendBtn = page.locator('button:has-text("Send")');
@@ -83,7 +83,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
 
     await page.getByTestId("tab-agents").click();
 
-    const chatInput = page.getByPlaceholder("Command agent...");
+    const chatInput = page.getByPlaceholder("Request replay, mission pack, link action...");
     await chatInput.fill("Start fallback analysis");
     await page.getByRole("button", { name: "Send" }).click();
 

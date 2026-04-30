@@ -1,7 +1,17 @@
 import { defineConfig } from "@playwright/test";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { API_BASE, API_HEALTH_URL, APP_BASE, DEBUG_BASE } from "./e2e/testUrls";
 
 const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === "1";
+const frontendDir = path.dirname(fileURLToPath(import.meta.url));
+const backendVenvName = process.platform === "win32"
+  ? ".venv-windows"
+  : process.platform === "darwin"
+    ? ".venv-macos"
+    : ".venv-linux";
+const backendVenvDir = process.env.UV_PROJECT_ENVIRONMENT ?? path.resolve(frontendDir, "../backend", backendVenvName);
+const backendEnv = { UV_PROJECT_ENVIRONMENT: backendVenvDir };
 
 export default defineConfig({
   testDir: "./e2e",
@@ -46,6 +56,7 @@ export default defineConfig({
       timeout: 60_000,
       reuseExistingServer,
       env: {
+        ...backendEnv,
         RESET_RUNTIME_STATE_ON_BOOT: "true",
         RUN_AGENT_PAIR_ON_BOOT: "false",
         OBSERVATION_PROVIDER: "simsat_sentinel",
@@ -57,6 +68,7 @@ export default defineConfig({
       url: DEBUG_BASE,
       timeout: 60_000,
       reuseExistingServer,
+      env: backendEnv,
     },
     {
       command: `npm run dev -- --host 127.0.0.1 --port ${new URL(APP_BASE).port}`,

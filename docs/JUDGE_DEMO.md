@@ -8,7 +8,7 @@ Run the main recorded proof:
 
 ```bash
 cd source/frontend
-npm install
+npm ci
 npm run demo:judge
 ```
 
@@ -16,12 +16,12 @@ What it proves:
 
 1. Deterministic satellite replay
 2. Edge triage
-3. Liquid VLM result
+3. Liquid evidence reasoning over retained packets
 4. Payload reduction
 5. Provenance
 6. Screenshot, video, and proof JSON artifacts
 7. Tutorial-style subtitles and visible UI flow before the proof panel
-8. Abstain and link-outage behavior in the full demo set
+8. Abstain and backend-derived link-outage queue behavior in the full demo set
 
 Artifacts:
 
@@ -64,11 +64,13 @@ Current mission split:
 2. Payload reduction uses a Pakistan Manchar Lake flood frame and compresses a flood alert to JSON.
 3. Provenance uses an Atacama open-pit mining frame and keeps source, capture time, bbox, prompt, and model together.
 4. Abstain safety uses the Greenland ice preset and shows no alert transmitted after the quality gate fails.
-5. Orbital eclipse uses the Suez maritime preset, queues compact JSON while offline, then flushes on restore.
+5. Orbital eclipse uses the Suez maritime preset, queues compact JSON while offline, then flushes on restore. Its proof JSON includes `link_state_before`, `queued_alerts_before_restore`, `link_state_after`, `flushed_alerts`, and `queue_source = agent_bus_unread_messages`.
 
 The tutorial walkthrough uses the app like an operator: load the Singapore maritime replay, inspect and analyze the retained alert, replace it with the Atacama mining replay, inspect that alert, then open Judge Mode on the active replay. The current recorded file is about 28 seconds and has distinct sampled frames across mission catalog, maritime evidence, Atacama evidence, and proof panel views.
 
 Replay-backed Judge Mode can now keep the active replay instead of forcing Rondonia, so mission-specific proof copy stays attached to maritime, mining, flood, wildfire, and urban replay packs. Some development replay fixtures use visible Sentinel-2 L2A frames and explicitly reject invalid still-image color-shift timelapses. Their real monthly WebMs are kept in the legacy `source/backend/assets/seeded_data/` cache for dataset export and training, but they are not a Sentinel Hub dependency for judges.
+
+Current runtime wording: SimSat is the primary realtime lane. Replay fixtures are used for deterministic judging. Liquid runtime currently reasons over scored evidence packets unless a manifest-resolved multimodal model bundle is installed.
 
 Replay WebMs may include cloudy context frames, but the proof panel keeps playback inside a clearer evidence window for final screenshots. Cloudy/no-data frames remain quality-gated in seeded creation and do not become positive detections.
 

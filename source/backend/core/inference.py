@@ -34,6 +34,45 @@ _model_lock = threading.Lock()
 _load_attempted = False
 
 
+def _llama_init_kwargs(model_path: str) -> dict:
+    chat_format = os.getenv("CANOPY_SENTINEL_LLAMACPP_CHAT_FORMAT", "chatml").strip() or "chatml"
+    return {
+        "model_path": model_path,
+        "n_ctx": _CTX_SIZE,
+        "n_threads": max(1, (os.cpu_count() or 4) - 1),
+        "chat_format": chat_format,
+        "verbose": False,
+    }
+
+
+def _should_patch_llama_chat_templates() -> bool:
+    raw = os.getenv("CANOPY_SENTINEL_LLAMACPP_PATCH_CHAT_TEMPLATE", "true").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _load_llama_model(llama_cls, kwargs: dict):
+    if not _should_patch_llama_chat_templates():
+        return llama_cls(**kwargs)
+
+    import llama_cpp.llama_chat_format as chat_format_module
+
+    original_formatter = chat_format_module.Jinja2ChatFormatter
+    fallback_format = str(kwargs.get("chat_format") or "chatml")
+
+    class _OrbitSafeJinjaFormatter:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def to_chat_handler(self):
+            return chat_format_module.get_chat_completion_handler(fallback_format)
+
+    chat_format_module.Jinja2ChatFormatter = _OrbitSafeJinjaFormatter
+    try:
+        return llama_cls(**kwargs)
+    finally:
+        chat_format_module.Jinja2ChatFormatter = original_formatter
+
+
 def _get_model():
     global _model, _load_attempted
     if _model is not None:
@@ -54,12 +93,7 @@ def _get_model():
                 )
                 return None
             logger.info("[INF] Loading LFM model: %s", artifact.model_path.name)
-            _model = Llama(
-                model_path=str(artifact.model_path),
-                n_ctx=_CTX_SIZE,
-                n_threads=max(1, (os.cpu_count() or 4) - 1),
-                verbose=False,
-            )
+            _model = _load_llama_model(Llama, _llama_init_kwargs(str(artifact.model_path)))
             logger.info("[INF] LFM model loaded successfully.")
         except Exception as exc:
             logger.error("[INF] Failed to load LFM model: %s", exc)

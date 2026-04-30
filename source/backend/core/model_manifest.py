@@ -11,6 +11,7 @@ from core.paths import get_models_dir
 
 DEFAULT_MODEL_SUBDIR = "lfm2.5-vlm-450m"
 DEFAULT_MODEL_FILENAME = "LFM2.5-VL-450M-Q4_0.gguf"
+DEFAULT_MODEL_REPO_ID = "Shoozes/lfm2.5-450m-vl-orbit-satellite"
 DEFAULT_MANIFEST_FILENAME = "model_manifest.json"
 DEFAULT_SOURCE_HANDOFF_FILENAME = "source_handoff.json"
 DEFAULT_README_FILENAME = "README.md"
@@ -160,8 +161,8 @@ def resolve_satellite_model_artifact() -> SatelliteModelArtifact:
     )
 
     source = (
-        _text(payload.get("source"))
-        or _nested_text(payload, "source", "kind")
+        _nested_text(payload, "source", "kind")
+        or _text(payload.get("source"))
         or ("huggingface" if repo_id else "local")
     )
 

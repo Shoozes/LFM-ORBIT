@@ -36,6 +36,14 @@ def _normalize_prompt_label(prompt: str) -> str:
     text = (prompt or "").strip().lower()
     if any(token in text for token in ("airplane", "airplanes", "plane", "planes", "airport")):
         return "airplane"
+    if any(token in text for token in ("home", "homes", "house", "houses", "roof", "roofs", "building", "buildings")):
+        return "homes"
+    if any(token in text for token in ("boat", "boats", "ship", "ships", "vessel", "vessels", "barge", "barges")):
+        return "boats"
+    if any(token in text for token in ("flaring", "flare", "gas flare", "well pad")):
+        return "possible flaring"
+    if any(token in text for token in ("dark smoke", "smoke", "plume", "black smoke")):
+        return "dark smoke"
     if any(token in text for token in ("clearing", "clearings", "deforestation", "canopy loss")):
         return "clearing"
     if "canopy" in text or "forest" in text:
@@ -69,7 +77,15 @@ def _fallback_grounding(prompt: str) -> list[dict]:
     label = _normalize_prompt_label(prompt)
     if label == "airplane":
         return []
-    return [{"label": label, "bbox": [0.24, 0.18, 0.74, 0.76]}]
+    boxes_by_label = {
+        "homes": [0.30, 0.28, 0.62, 0.58],
+        "boats": [0.35, 0.18, 0.58, 0.70],
+        "possible flaring": [0.18, 0.46, 0.42, 0.62],
+        "dark smoke": [0.12, 0.40, 0.46, 0.72],
+        "road": [0.42, 0.12, 0.56, 0.88],
+        "river": [0.20, 0.16, 0.80, 0.44],
+    }
+    return [{"label": label, "bbox": boxes_by_label.get(label, [0.24, 0.18, 0.74, 0.76])}]
 
 
 def _bbox_center(bbox: list[float]) -> tuple[float, float]:
@@ -92,6 +108,12 @@ def _fallback_vqa(question: str, bbox: list[float]) -> str:
     text = (question or "").lower()
     if "how many" in text and any(token in text for token in ("airplane", "plane")):
         return "Unable to answer precisely from fallback vision mode."
+    if any(token in text for token in ("boat", "ship", "vessel")):
+        return "Potential vessel-like targets require model-backed grounding or replay evidence before confirmation."
+    if any(token in text for token in ("smoke", "plume", "flaring", "flare")):
+        return "Potential plume or flaring-like targets should be treated as candidate evidence, not a confirmed detection."
+    if any(token in text for token in ("home", "house", "roof", "building")):
+        return "Built-structure-like targets can be queued for visual grounding, but fallback mode cannot confirm occupancy or use."
     if "how many" in text:
         return "1."
     if any(token in text for token in ("land cover", "visible", "scene")):
