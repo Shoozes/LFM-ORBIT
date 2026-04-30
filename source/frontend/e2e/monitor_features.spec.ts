@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { gotoApp, resetRuntimeState, waitForBasemapReady, waitForLinkOpen } from "./runtime";
+import { gotoApp, resetRuntimeState, waitForBasemapReady, waitForLinkOpen, waitForNextPaint } from "./runtime";
 import { API_BASE } from "./testUrls";
 
 const SHOT_DIR = "e2e/screenshots";
@@ -117,7 +117,7 @@ test.describe("Monitor Feature Visual Proof", () => {
     await expect(proofCard).toContainText("directions");
     await expect(proofCard).toContainText("STAC optional");
     await expect(page.locator("[data-testid='bbox-badge']")).toContainText("Active Area", { timeout: 10_000 });
-    await page.waitForTimeout(1_500);
+    await waitForNextPaint(page);
 
     await page.screenshot({
       path: `${SHOT_DIR}/07-maritime-monitor-preview.png`,
@@ -138,7 +138,7 @@ test.describe("Monitor Feature Visual Proof", () => {
     await expect(page.locator("textarea")).toHaveValue(/transportation mix scan/);
     await expect(page.locator("[data-testid='bbox-badge']")).toContainText("-81.53", { timeout: 10_000 });
     await page.locator("[data-testid='selected-mission-preset']").scrollIntoViewIfNeeded();
-    await page.waitForTimeout(1_500);
+    await waitForNextPaint(page);
 
     await page.screenshot({
       path: `${SHOT_DIR}/08-traffic-i4-preview.png`,
@@ -159,7 +159,7 @@ test.describe("Monitor Feature Visual Proof", () => {
     await expect(page.locator("textarea")).toHaveValue(/Highway 82 wildfire/);
     await expect(page.locator("[data-testid='bbox-badge']")).toContainText("-81.92", { timeout: 10_000 });
     await page.locator("[data-testid='selected-mission-preset']").scrollIntoViewIfNeeded();
-    await page.waitForTimeout(1_500);
+    await waitForNextPaint(page);
 
     await page.screenshot({
       path: `${SHOT_DIR}/09-highway-82-wildfire-preview.png`,
@@ -180,7 +180,7 @@ test.describe("Monitor Feature Visual Proof", () => {
     await expect(page.locator("textarea")).toHaveValue(/SPC Day 2 critical fire-weather/);
     await expect(page.locator("[data-testid='bbox-badge']")).toContainText("-104.90", { timeout: 10_000 });
     await page.locator("[data-testid='selected-mission-preset']").scrollIntoViewIfNeeded();
-    await page.waitForTimeout(1_500);
+    await waitForNextPaint(page);
 
     await page.screenshot({
       path: `${SHOT_DIR}/09b-spc-future-fire-watch-preview.png`,
@@ -201,7 +201,7 @@ test.describe("Monitor Feature Visual Proof", () => {
     await expect(page.locator("textarea")).toHaveValue(/Greenland edge snow and ice extent/);
     await expect(page.locator("[data-testid='bbox-badge']")).toContainText("-51.13", { timeout: 10_000 });
     await page.locator("[data-testid='selected-mission-preset']").scrollIntoViewIfNeeded();
-    await page.waitForTimeout(1_500);
+    await waitForNextPaint(page);
 
     await page.screenshot({
       path: `${SHOT_DIR}/10-greenland-ice-preview.png`,

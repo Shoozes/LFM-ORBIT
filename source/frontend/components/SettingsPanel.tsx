@@ -58,8 +58,32 @@ function providerDisplayName(key: string): string {
   return key;
 }
 
+function runtimeModeLabel(mode?: string): string {
+  if (mode === "image_conditioned") return "image-conditioned local inference";
+  if (mode === "text_evidence_packet") return "text evidence-packet reasoning";
+  return mode ? mode.replace(/_/g, " ") : "unknown";
+}
+
+function trainingModalityLabel(modality?: string, verified?: boolean): string {
+  if (modality === "image_text" && verified) return "image-text VLM SFT";
+  if (modality === "image_text") return "image-text rows detected";
+  if (modality === "text") return "text-only";
+  return "unknown";
+}
+
 function delay(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function readSettingsError(response: Response, fallback: string): Promise<string> {
+  try {
+    const payload = await response.json() as { error?: unknown; detail?: unknown };
+    if (typeof payload.error === "string" && payload.error.trim()) return payload.error;
+    if (typeof payload.detail === "string" && payload.detail.trim()) return payload.detail;
+  } catch {
+    return fallback;
+  }
+  return fallback;
 }
 
 export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsPanelProps) {
@@ -178,21 +202,24 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
   }
 
   async function handleSaveSettings() {
-    if (!clientId || !clientSecret) return;
+    const trimmedClientId = clientId.trim();
+    const trimmedClientSecret = clientSecret.trim();
+    if (!trimmedClientId || !trimmedClientSecret) return;
     setSavingSettings(true);
+    setError(null);
     try {
       const res = await fetch(`${apiBaseUrl}/api/settings/credentials`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_id: clientId, client_secret: clientSecret })
+        body: JSON.stringify({ client_id: trimmedClientId, client_secret: trimmedClientSecret })
       });
       if (res.ok) {
         setClientId("");
         setClientSecret("");
         await fetchStatus();
       } else {
-        setError("Failed to save credentials.");
+        setError(await readSettingsError(res, `Failed to save credentials with HTTP ${res.status}.`));
       }
-    } catch (e) {
+    } catch {
       setError("Network error saving credentials.");
     } finally {
       setSavingSettings(false);
@@ -223,6 +250,24 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
   if (!isOpen) {
     return null;
   }
+
+  const modelRuntime = analysisStatus?.runtime_capabilities;
+  const trainingModality = analysisStatus?.training_modality ?? modelRuntime?.training_modality;
+  const imageTrainingVerified = analysisStatus?.image_training_verified ?? modelRuntime?.image_training_verified ?? false;
+  const multimodalRows = analysisStatus?.training_multimodal_rows ?? modelRuntime?.training_multimodal_rows ?? 0;
+  const imageBlocks = analysisStatus?.training_image_blocks ?? modelRuntime?.training_image_blocks ?? 0;
+  const mmprojPresent = analysisStatus?.mmproj_present ?? modelRuntime?.mmproj_present ?? false;
+  const runtimeMode = analysisStatus?.runtime_inference_mode ?? modelRuntime?.runtime_inference_mode;
+  const imageRuntimeEnabled = (
+    analysisStatus?.image_conditioned_runtime_enabled
+    ?? modelRuntime?.image_conditioned_runtime_enabled
+    ?? false
+  );
+  const imageRuntimeReason = (
+    analysisStatus?.image_conditioned_runtime_reason
+    ?? modelRuntime?.image_conditioned_runtime_reason
+    ?? "direct image runtime adapter is not wired"
+  );
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-white">
@@ -370,6 +415,48 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
                       : "Standby — model file not yet fetched"}
                   </p>
                 </div>
+                <div className="rounded border border-zinc-200 bg-white p-3">
+                  <p className="text-zinc-500 font-semibold text-[10px] uppercase tracking-wider mb-2">Runtime Truth</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-zinc-500 font-semibold mb-1">Training Modality</p>
+                      <p className={`font-bold ${imageTrainingVerified ? "text-emerald-700" : "text-amber-600"}`}>
+                        {trainingModalityLabel(trainingModality, imageTrainingVerified)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-zinc-500 font-semibold mb-1">Image Proof</p>
+                      <p className="text-zinc-700 font-medium">
+                        {multimodalRows} rows / {imageBlocks} blocks
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-zinc-500 font-semibold mb-1">Runtime Mode</p>
+                      <p className="text-zinc-700 font-medium">{runtimeModeLabel(runtimeMode)}</p>
+                    </div>
+                    <div>
+                      <p className="text-zinc-500 font-semibold mb-1">Direct Image Runtime</p>
+                      <p className={`font-bold ${imageRuntimeEnabled ? "text-emerald-700" : "text-amber-600"}`}>
+                        {imageRuntimeEnabled ? "Enabled" : "Unavailable"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-zinc-500 font-semibold mb-1">mmproj</p>
+                      <p className={`font-semibold ${mmprojPresent ? "text-emerald-700" : "text-zinc-500"}`}>
+                        {mmprojPresent ? "Present" : "Missing"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-zinc-500 font-semibold mb-1">Image Backend</p>
+                      <p className="text-zinc-700 font-medium">{modelRuntime?.runtime_backend ?? "none"}</p>
+                    </div>
+                  </div>
+                  {!imageRuntimeEnabled && (
+                    <p className="mt-2 text-[11px] text-zinc-500">
+                      Direct image inference is unavailable until mmproj or native VLM runtime is present. {imageRuntimeReason}
+                    </p>
+                  )}
+                </div>
                 <div>
                   <p className="text-zinc-500 font-semibold text-[10px] uppercase tracking-wider mb-2">Model Tiers</p>
                   <div className="space-y-2">
@@ -500,7 +587,7 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
               <button
                 type="button"
                 onClick={handleSaveSettings}
-                disabled={savingSettings || !clientId || !clientSecret}
+                disabled={savingSettings || !clientId.trim() || !clientSecret.trim()}
                 className="rounded border border-zinc-300 bg-white py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 transition disabled:opacity-50"
               >
                 {savingSettings ? "Saving..." : "Save Credentials"}

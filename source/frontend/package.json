@@ -13,7 +13,7 @@
     "lint": "tsc --noEmit",
     "test:e2e": "npx playwright test",
     "demo:record": "npx playwright test -c playwright.demo.config.ts e2e/demos",
-    "demo:judge": "npx playwright test -c playwright.demo.config.ts e2e/demos/judge-mode.demo.spec.ts",
+    "demo:showcase": "npx playwright test -c playwright.demo.config.ts e2e/demos/showcase.demo.spec.ts",
     "demo:payload": "npx playwright test -c playwright.demo.config.ts e2e/demos/payload-reduction.demo.spec.ts",
     "demo:tutorial": "npx playwright test e2e/tutorial_video.spec.ts",
     "demo:report": "npx playwright show-report"

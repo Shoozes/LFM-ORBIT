@@ -2,7 +2,15 @@ import { test, expect, type APIRequestContext, type Page } from "@playwright/tes
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { API_BASE } from "./testUrls";
-import { gotoApp, openMapContextMenu, resetRuntimeState, waitForBasemapReady, waitForLinkOpen } from "./runtime";
+import {
+  gotoApp,
+  openMapContextMenu,
+  resetRuntimeState,
+  waitForBasemapReady,
+  waitForLinkOpen,
+  waitForNextPaint,
+  waitForVideoReady,
+} from "./runtime";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -34,6 +42,16 @@ async function waitForScanArtifacts(page: Page, timeoutMs = 60_000) {
   }).toPass({ timeout: timeoutMs });
 }
 
+async function waitForFlaggedExamples(page: Page, timeoutMs = 15_000) {
+  if ((await page.locator("[data-testid='tab-logs']").getAttribute("class")).indexOf("border-zinc-900") === -1) {
+    await page.locator("[data-testid='tab-logs']").click();
+  }
+  await expect(async () => {
+    const text = await page.getByText("Flagged Examples").locator("..").locator("p").nth(1).innerText();
+    expect(parseInt(text, 10)).toBeGreaterThan(0);
+  }).toPass({ timeout: timeoutMs, intervals: [300, 750, 1500] });
+}
+
 function seededTimelapseDataUrl() {
   const videoPath = resolve(process.cwd(), "../backend/assets/seeded_data/nasa_aa01bc81.webm");
   return `data:video/webm;base64,${readFileSync(videoPath).toString("base64")}`;
@@ -62,6 +80,51 @@ async function waitForAgentBusNote(request: APIRequestContext, pattern: RegExp) 
     const notes = (body.messages ?? []).map((message) => message.payload?.note ?? "");
     expect(notes.some((note) => pattern.test(note))).toBeTruthy();
   }).toPass({ timeout: 15_000, intervals: [300, 750, 1500] });
+}
+
+type RecentAlert = {
+  event_id?: unknown;
+  cell_id?: unknown;
+  change_score?: unknown;
+  confidence?: unknown;
+  priority?: unknown;
+  reason_codes?: unknown;
+};
+
+async function waitForRecentAlert(request: APIRequestContext): Promise<RecentAlert> {
+  let firstAlert: RecentAlert | null = null;
+  await expect(async () => {
+    const res = await request.get(`${API_BASE}/api/alerts/recent?limit=10`);
+    expect(res.ok()).toBeTruthy();
+    const body = await res.json() as { alerts?: RecentAlert[] };
+    expect(body.alerts?.length ?? 0).toBeGreaterThan(0);
+    firstAlert = body.alerts?.[0] ?? null;
+  }).toPass({ timeout: 20_000, intervals: [500, 1000, 2000] });
+
+  expect(firstAlert).not.toBeNull();
+  return firstAlert as RecentAlert;
+}
+
+async function waitForMetricsProgress(request: APIRequestContext) {
+  let metrics: {
+    total_cells_scanned?: unknown;
+    total_alerts_emitted?: unknown;
+    total_bandwidth_saved_mb?: unknown;
+  } | null = null;
+
+  await expect(async () => {
+    const res = await request.get(`${API_BASE}/api/metrics/summary`);
+    expect(res.ok()).toBeTruthy();
+    metrics = await res.json();
+    expect(metrics?.total_cells_scanned).toEqual(expect.any(Number));
+    expect(metrics?.total_alerts_emitted).toEqual(expect.any(Number));
+    expect(metrics?.total_bandwidth_saved_mb).toEqual(expect.any(Number));
+    expect(metrics!.total_cells_scanned as number).toBeGreaterThan(0);
+    expect(metrics!.total_alerts_emitted as number).toBeGreaterThan(0);
+    expect(metrics!.total_bandwidth_saved_mb as number).toBeGreaterThan(0);
+  }).toPass({ timeout: 20_000, intervals: [500, 1000, 2000] });
+
+  return metrics;
 }
 
 // ---------------------------------------------------------------------------
@@ -186,14 +249,7 @@ test.describe("Phase 3 – Alerts and temporal evidence", () => {
   test("flagged examples counter increments during scan", async ({ page }) => {
     await gotoApp(page);
     await waitForLinkOpen(page);
-    await page.waitForTimeout(3_000);
-    if ((await page.locator("[data-testid='tab-logs']").getAttribute("class")).indexOf("border-zinc-900") === -1) {
-      await page.locator("[data-testid='tab-logs']").click();
-    }
-    await expect(async () => {
-      const text = await page.getByText("Flagged Examples").locator("..").locator("p").nth(1).innerText();
-      expect(parseInt(text, 10)).toBeGreaterThan(0);
-    }).toPass({ timeout: 15_000 });
+    await waitForFlaggedExamples(page);
   });
 
   test("demo evidence disclaimer is visible on selected alert", async ({ page }) => {
@@ -302,13 +358,13 @@ test.describe("Phase 4.75 - Cached replay flow", () => {
     await page.locator("[data-testid='tab-mission']").click();
 
     await expect(page.getByTestId("fast-replay-panel")).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByTestId("load-replay-rondonia_frontier_judge")).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByTestId("rescan-replay-rondonia_frontier_judge")).toBeVisible();
+    await expect(page.getByTestId("load-replay-rondonia_frontier_showcase")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("rescan-replay-rondonia_frontier_showcase")).toBeVisible();
     await expect(page.getByTestId("load-replay-manchar_flood_replay")).toBeVisible();
     await expect(page.getByTestId("load-replay-singapore_maritime_replay")).toBeVisible();
 
-    await page.getByTestId("load-replay-rondonia_frontier_judge").click();
-    await expect(page.getByText("REPLAY ACTIVE: rondonia_frontier_judge")).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("load-replay-rondonia_frontier_showcase").click();
+    await expect(page.getByText("REPLAY ACTIVE: rondonia_frontier_showcase")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("Cached API Replay Evidence", { exact: true })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("sq_-10.0_-63.0").first()).toBeVisible({ timeout: 10_000 });
 
@@ -317,11 +373,11 @@ test.describe("Phase 4.75 - Cached replay flow", () => {
     await expect(page.getByRole("button", { name: "Inject" })).toBeDisabled();
 
     await page.locator("[data-testid='tab-mission']").click();
-    await expect(page.getByText("Replay Mission · rondonia_frontier_judge")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Replay Mission · rondonia_frontier_showcase")).toBeVisible({ timeout: 10_000 });
     await page.getByRole("button", { name: "Exit Replay" }).click();
-    await expect(page.getByText("REPLAY ACTIVE: rondonia_frontier_judge")).not.toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("REPLAY ACTIVE: rondonia_frontier_showcase")).not.toBeVisible({ timeout: 10_000 });
 
-    await page.getByTestId("rescan-replay-rondonia_frontier_judge").click();
+    await page.getByTestId("rescan-replay-rondonia_frontier_showcase").click();
     await expect(page.getByText("Live rescan started from replay metadata")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/Active Mission #/)).toBeVisible({ timeout: 10_000 });
   });
@@ -335,25 +391,13 @@ test.describe("Phase 5 – Full scan cycle", () => {
   test("full cycle completes and flagged examples appear", async ({ page }) => {
     await gotoApp(page);
     await waitForLinkOpen(page);
-    await page.waitForTimeout(8_000);
-    if ((await page.locator("[data-testid='tab-logs']").getAttribute("class")).indexOf("border-zinc-900") === -1) {
-      await page.locator("[data-testid='tab-logs']").click();
-    }
-    await expect(async () => {
-      const text = await page.getByText("Flagged Examples").locator("..").locator("p").nth(1).innerText();
-      expect(parseInt(text, 10)).toBeGreaterThan(0);
-    }).toPass({ timeout: 15_000 });
+    await waitForFlaggedExamples(page);
   });
 
 
 
   test("alerts API returns data after scanning", async ({ request }) => {
-    await new Promise((r) => setTimeout(r, 8_000));
-    const res = await request.get(`${API_BASE}/api/alerts/recent?limit=10`);
-    expect(res.ok()).toBeTruthy();
-    const body = await res.json();
-    expect(body.alerts.length).toBeGreaterThan(0);
-    const alert = body.alerts[0];
+    const alert = await waitForRecentAlert(request);
     expect(alert.event_id).toBeTruthy();
     expect(alert.cell_id).toBeTruthy();
     expect(typeof alert.change_score).toBe("number");
@@ -363,13 +407,7 @@ test.describe("Phase 5 – Full scan cycle", () => {
   });
 
   test("metrics summary shows scan progress after cycles", async ({ request }) => {
-    await new Promise((r) => setTimeout(r, 8_000));
-    const res = await request.get(`${API_BASE}/api/metrics/summary`);
-    expect(res.ok()).toBeTruthy();
-    const body = await res.json();
-    expect(body.total_cells_scanned).toBeGreaterThan(0);
-    expect(body.total_alerts_emitted).toBeGreaterThan(0);
-    expect(body.total_bandwidth_saved_mb).toBeGreaterThan(0);
+    await waitForMetricsProgress(request);
   });
 });
 
@@ -382,8 +420,7 @@ test.describe("Phase 6 – Visual evidence capture", () => {
     await gotoApp(page);
     await waitForLinkOpen(page);
     await waitForScanArtifacts(page, 45_000);
-    // Brief settle time for map tiles and animations to render
-    await page.waitForTimeout(1_000);
+    await waitForNextPaint(page);
     await page.screenshot({ path: "e2e/screenshots/app-scan-in-progress.png" });
   });
 
@@ -399,8 +436,7 @@ test.describe("Phase 6 – Visual evidence capture", () => {
     await expect(page.getByText("Signal Deltas", { exact: true })).toBeVisible({ timeout: 5_000 });
     // Wait for imagery to finish fetching (source label replaces "fetching…")
     await expect(page.getByText("fetching…")).not.toBeVisible({ timeout: 15_000 });
-    // Brief settle time for images to paint
-    await page.waitForTimeout(500);
+    await waitForNextPaint(page);
     await page.screenshot({ path: "e2e/screenshots/alert-temporal-evidence.png" });
   });
 
@@ -521,7 +557,7 @@ test.describe("Phase 9 - Context Module and Timelapse Validation", () => {
     await expect(page.getByText("◈ Agent Video Evaluation")).toBeVisible();
 
     // Capture Visual Baseline
-    await page.waitForTimeout(500);
+    await waitForNextPaint(page);
     await page.screenshot({ path: "e2e/screenshots/context-menu-deployed.png" });
   });
 
@@ -559,12 +595,7 @@ test.describe("Phase 9 - Context Module and Timelapse Validation", () => {
     await expect(page.getByText(/Orbital Timelapse/i)).toBeVisible({ timeout: 10_000 });
     await expect(page.locator("video")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("Cached real API timelapse")).toBeVisible({ timeout: 5_000 });
-    await page.waitForFunction(() => {
-      const video = document.querySelector("video");
-      return video instanceof HTMLVideoElement && video.readyState >= 2;
-    });
-
-    await page.waitForTimeout(2000);
+    await waitForVideoReady(page);
     await page.screenshot({ path: "e2e/screenshots/ffmpeg-timelapse-viewer.png" });
   });
 
@@ -612,7 +643,7 @@ test.describe("Phase 9 - Context Module and Timelapse Validation", () => {
     await busQuery.scrollIntoViewIfNeeded();
     await expect(busQuery).toBeVisible({ timeout: 10_000 });
 
-    await page.waitForTimeout(1000);
+    await waitForNextPaint(page);
     await page.screenshot({ path: "e2e/screenshots/agent-multimodality-evaluation.png" });
   });
 });

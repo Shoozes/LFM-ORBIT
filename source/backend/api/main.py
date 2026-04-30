@@ -51,7 +51,7 @@ from core.depth_anything import (
 )
 from core.gallery import list_gallery, get_gallery_item
 from core.ground_agent import run_ground_agent
-from core.inference import model_status as llm_model_status
+from core.inference import model_status as llm_model_status, runtime_capabilities
 from core.ice_snow_monitoring import score_ice_snow_extent
 from core.lifeline_monitoring import (
     build_lifeline_monitor_report,
@@ -79,9 +79,26 @@ from core.temporal_use_cases import (
     list_temporal_use_cases,
 )
 from core.timelapse import generate_timelapse_frames
+from core.multimodal_inference import generate_with_image
 from core.vlm import explain_vlm_caption, explain_vlm_grounding, explain_vlm_vqa
 
 logger = logging.getLogger(__name__)
+
+
+def _strip_required_text(value: str, field_name: str) -> str:
+    text = value.strip()
+    if not text:
+        raise ValueError(f"{field_name} is required")
+    return text
+
+
+def _strip_optional_text(value: str | None, field_name: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be text")
+    text = value.strip()
+    return text or None
 
 
 def _normalize_bbox_for_request(value: list[float] | None) -> list[float] | None:
@@ -960,8 +977,15 @@ def runtime_monitor_reports(limit: int = Query(default=100, ge=1, le=500), reque
 
 
 class CredentialsBody(BaseModel):
-    client_id: str
-    client_secret: str
+    client_id: str = Field(min_length=1, max_length=4000)
+    client_secret: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("client_id", "client_secret", mode="before")
+    @classmethod
+    def _strip_required_credentials(cls, value: str, info) -> str:
+        if not isinstance(value, str):
+            return value
+        return _strip_required_text(value, info.field_name)
 
 @app.post("/api/settings/credentials")
 def update_credentials(body: CredentialsBody, request: Request = None):
@@ -1033,7 +1057,51 @@ def generate_timelapse(body: TimelapseBody):
 @app.get("/api/inference/status")
 def inference_status():
     """LFM GGUF model load status for the satellite inference engine."""
-    return llm_model_status()
+    payload = llm_model_status()
+    payload["runtime_capabilities"] = runtime_capabilities()
+    return payload
+
+
+class ImageInferenceBody(BaseModel):
+    prompt: str = Field(min_length=1, max_length=1000)
+    image_b64: str | None = Field(default=None, max_length=15_000_000)
+    image_path: str | None = Field(default=None, max_length=1000)
+    cell_id: str | None = Field(default=None, max_length=80)
+    event_id: str | None = Field(default=None, max_length=120)
+    max_tokens: int = Field(default=256, ge=1, le=1024)
+
+    @field_validator("prompt", mode="before")
+    @classmethod
+    def _strip_required_prompt(cls, value: str) -> str:
+        if not isinstance(value, str):
+            raise ValueError("prompt must be text")
+        return _strip_required_text(value, "prompt")
+
+    @field_validator("image_b64", "image_path", "cell_id", "event_id", mode="before")
+    @classmethod
+    def _strip_optional_fields(cls, value: str | None, info) -> str | None:
+        return _strip_optional_text(value, info.field_name)
+
+    @model_validator(mode="after")
+    def _has_image_payload(self) -> "ImageInferenceBody":
+        if not self.image_b64 and not self.image_path:
+            raise ValueError("image_b64 or image_path is required")
+        return self
+
+
+@app.post("/api/inference/image")
+def inference_image(body: ImageInferenceBody):
+    """Status-safe image inference endpoint; unavailable until a real image adapter is wired."""
+    return generate_with_image(
+        body.prompt,
+        image_path=body.image_path,
+        image_b64=body.image_b64,
+        max_tokens=body.max_tokens,
+        metadata={
+            "cell_id": body.cell_id or "",
+            "event_id": body.event_id or "",
+        },
+    )
 
 
 @app.get("/api/analysis/status")
@@ -1046,11 +1114,31 @@ def analysis_status():
     analyzer which is always available.
     """
     ms = llm_model_status()
+    capabilities = runtime_capabilities()
     gguf_name = ms.get("name", "LFM2.5-VL-450M-Q4_0.gguf")
+    training_modality = ms.get("training_modality", "unknown")
+    image_training_verified = ms.get("image_training_verified", False)
+    training_multimodal_rows = ms.get("training_multimodal_rows", 0)
+    training_image_blocks = ms.get("training_image_blocks", 0)
+    runtime_inference_mode = capabilities.get("runtime_inference_mode", "text_evidence_packet")
+    image_conditioned_runtime_enabled = capabilities.get("image_conditioned_runtime_enabled", False)
+    image_conditioned_runtime_reason = capabilities.get(
+        "image_conditioned_runtime_reason",
+        "direct image runtime adapter is not wired",
+    )
     return {
         "default_model": "offline_lfm_v1",
         "optional_model": gguf_name,
         "satellite_inference_loaded": ms.get("loaded", False),
+        "runtime_capabilities": capabilities,
+        "training_modality": training_modality,
+        "image_training_verified": image_training_verified,
+        "training_multimodal_rows": training_multimodal_rows,
+        "training_image_blocks": training_image_blocks,
+        "mmproj_present": ms.get("mmproj_present", False),
+        "runtime_inference_mode": runtime_inference_mode,
+        "image_conditioned_runtime_enabled": image_conditioned_runtime_enabled,
+        "image_conditioned_runtime_reason": image_conditioned_runtime_reason,
         "models": {
             "offline_lfm_v1": {
                 "available": True,
@@ -1071,6 +1159,22 @@ def analysis_status():
                 "training_result_manifest": ms.get("training_result_manifest", ""),
                 "training_result_manifest_path": ms.get("training_result_manifest_path", ""),
                 "training_result_manifest_present": ms.get("training_result_manifest_present", False),
+                "training_method": ms.get("training_method", ""),
+                "training_base_model": ms.get("training_base_model", ""),
+                "training_modality": training_modality,
+                "image_training_verified": image_training_verified,
+                "training_train_rows": ms.get("training_train_rows", 0),
+                "training_multimodal_rows": training_multimodal_rows,
+                "training_image_blocks": training_image_blocks,
+                "training_eval_rows": ms.get("training_eval_rows", 0),
+                "hf_checkpoint_path": ms.get("hf_checkpoint_path", ""),
+                "hf_checkpoint_present": ms.get("hf_checkpoint_present", False),
+                "lora_adapter_path": ms.get("lora_adapter_path", ""),
+                "lora_adapter_present": ms.get("lora_adapter_present", False),
+                "mmproj_present": ms.get("mmproj_present", False),
+                "runtime_inference_mode": runtime_inference_mode,
+                "image_conditioned_runtime_enabled": image_conditioned_runtime_enabled,
+                "image_conditioned_runtime_reason": image_conditioned_runtime_reason,
                 "readme_path": ms.get("readme_path", ""),
                 "readme_present": ms.get("readme_present", False),
                 "requires": "llama-cpp-python",
@@ -1088,10 +1192,24 @@ def analysis_status():
 # ---------------------------------------------------------------------------
 
 class VlmGroundingBody(BboxRequest):
-    prompt: str
+    prompt: str = Field(min_length=1, max_length=400)
+
+    @field_validator("prompt", mode="before")
+    @classmethod
+    def _strip_required_prompt(cls, value: str) -> str:
+        if not isinstance(value, str):
+            return value
+        return _strip_required_text(value, "prompt")
 
 class VlmVqaBody(BboxRequest):
-    question: str
+    question: str = Field(min_length=1, max_length=400)
+
+    @field_validator("question", mode="before")
+    @classmethod
+    def _strip_required_question(cls, value: str) -> str:
+        if not isinstance(value, str):
+            return value
+        return _strip_required_text(value, "question")
 
 class VlmCaptionBody(BboxRequest):
     """Caption request for a validated bbox."""
@@ -1152,6 +1270,10 @@ class ChatRequest(BaseModel):
     messages: list[ChatMessage]
 
 
+class AgentActionConfirmBody(BaseModel):
+    proposal: dict[str, Any]
+
+
 @app.post("/api/agent/chat")
 def ground_agent_chat(request: ChatRequest, http_request: Request = None):
     """
@@ -1164,6 +1286,14 @@ def ground_agent_chat(request: ChatRequest, http_request: Request = None):
     last_msg = request.messages[-1].content
     from core.ground_agent_knowledge import execute_ground_agent_chat
     return execute_ground_agent_chat(last_msg)
+
+
+@app.post("/api/agent/action/confirm")
+def ground_agent_action_confirm(body: AgentActionConfirmBody, http_request: Request = None):
+    """Execute a whitelisted Ground Agent proposal after operator confirmation."""
+    _require_local_request(http_request)
+    from core.ground_agent_knowledge import execute_ground_agent_proposal
+    return execute_ground_agent_proposal(body.proposal)
 
 
 # ---------------------------------------------------------------------------

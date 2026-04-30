@@ -189,11 +189,22 @@ def test_analysis_status_endpoint_returns_model_info():
     assert "models" in data
     assert "offline_lfm_v1" in data["models"]
     assert data["models"]["offline_lfm_v1"]["available"] is True
+    assert data["runtime_inference_mode"] == "text_evidence_packet"
+    assert data["image_conditioned_runtime_enabled"] is False
+    assert isinstance(data["image_training_verified"], bool)
+    assert "runtime_capabilities" in data
     assert "note" in data
 
 
 def test_analysis_status_endpoint_surfaces_manifest_metadata():
     """Analysis status should surface resolved manifest/repo details for the optional model."""
+    runtime_payload = {
+        "runtime_inference_mode": "text_evidence_packet",
+        "image_conditioned_runtime_enabled": False,
+        "image_conditioned_runtime_reason": "mmproj not present",
+        "runtime_backend": "none",
+        "mmproj_present": False,
+    }
     with patch(
         "api.main.llm_model_status",
         return_value={
@@ -210,10 +221,22 @@ def test_analysis_status_endpoint_surfaces_manifest_metadata():
             "training_result_manifest": "training_result_manifest.json",
             "training_result_manifest_path": "C:/tmp/training_result_manifest.json",
             "training_result_manifest_present": True,
+            "training_method": "vlm_sft",
+            "training_base_model": "LiquidAI/LFM2.5-VL-450M",
+            "training_modality": "image_text",
+            "image_training_verified": True,
+            "training_train_rows": 32,
+            "training_multimodal_rows": 32,
+            "training_image_blocks": 44,
+            "training_eval_rows": 0,
+            "hf_checkpoint_path": "C:/tmp/hf-checkpoint",
+            "hf_checkpoint_present": True,
+            "lora_adapter_path": "C:/tmp/lora-adapter",
+            "lora_adapter_present": True,
             "readme_path": "C:/tmp/README.md",
             "readme_present": True,
         },
-    ):
+    ), patch("api.main.runtime_capabilities", return_value=runtime_payload):
         response = client.get("/api/analysis/status")
 
     assert response.status_code == 200
@@ -230,8 +253,71 @@ def test_analysis_status_endpoint_surfaces_manifest_metadata():
     assert model["training_result_manifest"] == "training_result_manifest.json"
     assert model["training_result_manifest_path"] == "C:/tmp/training_result_manifest.json"
     assert model["training_result_manifest_present"] is True
+    assert model["training_method"] == "vlm_sft"
+    assert model["training_modality"] == "image_text"
+    assert model["image_training_verified"] is True
+    assert model["training_multimodal_rows"] == 32
+    assert model["training_image_blocks"] == 44
+    assert model["hf_checkpoint_present"] is True
+    assert model["lora_adapter_present"] is True
+    assert model["runtime_inference_mode"] == "text_evidence_packet"
+    assert model["image_conditioned_runtime_enabled"] is False
+    assert model["image_conditioned_runtime_reason"] == "mmproj not present"
+    assert data["image_training_verified"] is True
+    assert data["training_multimodal_rows"] == 32
+    assert data["training_image_blocks"] == 44
+    assert data["runtime_capabilities"]["runtime_backend"] == "none"
     assert model["readme_path"] == "C:/tmp/README.md"
     assert model["readme_present"] is True
+
+
+def test_inference_status_surfaces_runtime_capabilities():
+    with patch(
+        "api.main.llm_model_status",
+        return_value={"name": "model.gguf", "loaded": False, "path": "C:/tmp/model.gguf"},
+    ), patch(
+        "api.main.runtime_capabilities",
+        return_value={
+            "runtime_inference_mode": "text_evidence_packet",
+            "image_conditioned_runtime_enabled": False,
+            "image_conditioned_runtime_reason": "feature disabled",
+        },
+    ):
+        response = client.get("/api/inference/status")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "model.gguf"
+    assert data["runtime_capabilities"]["runtime_inference_mode"] == "text_evidence_packet"
+    assert data["runtime_capabilities"]["image_conditioned_runtime_enabled"] is False
+
+
+def test_image_inference_endpoint_returns_status_safe_unavailable_payload():
+    response = client.post(
+        "/api/inference/image",
+        json={
+            "prompt": "Inspect this retained evidence frame.",
+            "image_b64": "data:image/png;base64,AAAA",
+            "cell_id": "8928308280fffff",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["available"] is False
+    assert data["image_conditioned"] is False
+    assert data["response"] == ""
+    assert data["provenance"]["image_b64_present"] is True
+    assert data["provenance"]["cell_id"] == "8928308280fffff"
+
+
+def test_image_inference_endpoint_rejects_missing_image_payload():
+    response = client.post(
+        "/api/inference/image",
+        json={"prompt": "Inspect this retained evidence frame."},
+    )
+
+    assert response.status_code == 422
 
 
 def test_analysis_alert_endpoint_returns_offline_result():
@@ -328,7 +414,7 @@ def test_provider_status_endpoint_returns_structure():
 
 
 def test_provider_status_keeps_simsat_as_primary_hackathon_path():
-    """SimSat must remain first in the provider chain for judge demos."""
+    """SimSat must remain first in the provider chain for recorded demos."""
     response = client.get("/api/provider/status")
 
     assert response.status_code == 200
@@ -401,6 +487,44 @@ def test_ground_agent_chat_lists_replay_tools():
     assert payload["actions"][0]["name"] == "list_replays"
     assert payload["actions"][0]["status"] == "ok"
     assert payload["actions"][0]["result"]["replays"]
+    assert payload.get("proposals", []) == []
+
+
+def test_ground_agent_chat_proposes_link_offline_before_mutating(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.link_state import is_link_connected, set_link_state
+
+    init_bus(reset=True)
+    set_link_state(True)
+
+    try:
+        response = client.post(
+            "/api/agent/chat",
+            json={"messages": [{"role": "user", "content": "set link offline"}]},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["actions"] == []
+        proposal = payload["proposals"][0]
+        assert proposal["id"] == "proposal_set_link_state_offline"
+        assert proposal["kind"] == "set_link_state"
+        assert proposal["details"]["connected"] is False
+        assert proposal["details"]["target_state"] == "offline"
+        assert is_link_connected() is True
+
+        confirm = client.post("/api/agent/action/confirm", json={"proposal": proposal})
+
+        assert confirm.status_code == 200
+        confirmed = confirm.json()
+        assert confirmed["actions"][0]["name"] == "set_link_state"
+        assert confirmed["actions"][0]["status"] == "ok"
+        assert confirmed["actions"][0]["result"]["connected"] is False
+        assert is_link_connected() is False
+    finally:
+        set_link_state(True)
 
 
 def test_ground_agent_chat_launches_context_mission_pack(tmp_path, monkeypatch):
@@ -426,9 +550,150 @@ def test_ground_agent_chat_launches_context_mission_pack(tmp_path, monkeypatch):
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["actions"][0]["name"] == "start_mission_pack"
-    assert payload["actions"][0]["status"] == "ok"
-    assert payload["actions"][0]["result"]["pack_id"] == "maritime_suez"
+    assert payload["actions"] == []
+    assert payload["proposals"][0]["kind"] == "start_mission_pack"
+    assert payload["proposals"][0]["details"]["pack_id"] == "maritime_suez"
+
+    confirm = client.post(
+        "/api/agent/action/confirm",
+        json={"proposal": payload["proposals"][0]},
+    )
+
+    assert confirm.status_code == 200
+    confirmed = confirm.json()
+    assert confirmed["actions"][0]["name"] == "start_mission_pack"
+    assert confirmed["actions"][0]["status"] == "ok"
+    assert confirmed["actions"][0]["result"]["pack_id"] == "maritime_suez"
+
+
+def test_ground_agent_chat_proposes_wildfire_replay_before_loading():
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "replay a wildfire mission"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "load_replay"
+    assert proposal["title"] == "Load replay: Highway 82 Wildfire Candidate Replay"
+    assert proposal["confirm_label"] == "Run Replay"
+    assert proposal["details"]["replay_id"] == "georgia_wildfire_replay"
+    assert proposal["details"]["runtime_truth_mode"] == "replay"
+    assert proposal["details"]["imagery_origin"] == "cached_api"
+
+
+def test_ground_agent_chat_proposes_wildfire_mission_pack_without_replay_keyword():
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "run wildfire mission"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "start_mission_pack"
+    assert proposal["title"] == "Launch Mission Pack: Highway 82 wildfire"
+    assert proposal["confirm_label"] == "Launch Mission"
+    assert proposal["details"]["pack_id"] == "wildfire_highway82"
+    assert proposal["details"]["use_case_id"] == "wildfire"
+
+
+def test_ground_agent_chat_proposes_rescan_before_runtime_reset(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+
+    from core.agent_bus import init_bus
+
+    init_bus(reset=True)
+
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "rescan georgia wildfire replay with current runtime"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "rescan_replay"
+    assert proposal["confirm_label"] == "Start Rescan"
+    assert proposal["details"]["replay_id"] == "georgia_wildfire_replay"
+    assert proposal["details"]["runtime_truth_mode"] == "realtime"
+    assert proposal["details"]["imagery_origin"] == "provider_chain"
+
+    confirm = client.post("/api/agent/action/confirm", json={"proposal": proposal})
+
+    assert confirm.status_code == 200
+    confirmed = confirm.json()
+    assert confirmed["actions"][0]["name"] == "rescan_replay"
+    assert confirmed["actions"][0]["status"] == "ok"
+    assert confirmed["actions"][0]["result"]["source_replay_id"] == "georgia_wildfire_replay"
+    assert confirmed["actions"][0]["result"]["mission"]["mission_mode"] == "live"
+
+
+def test_ground_agent_action_confirm_rejects_unknown_action():
+    response = client.post(
+        "/api/agent/action/confirm",
+        json={"proposal": {"kind": "delete_everything", "details": {}}},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"][0]["status"] == "error"
+    assert "whitelist" in payload["reply"].lower()
+
+
+def test_ground_agent_action_confirm_rejects_missing_replay_id():
+    response = client.post(
+        "/api/agent/action/confirm",
+        json={"proposal": {"kind": "load_replay", "details": {}}},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"][0]["name"] == "load_replay"
+    assert payload["actions"][0]["status"] == "error"
+    assert payload["actions"][0]["result"]["error"] == "Missing replay_id."
+    assert "did not include a replay id" in payload["reply"]
+
+
+def test_ground_agent_action_confirm_rejects_non_boolean_link_state():
+    response = client.post(
+        "/api/agent/action/confirm",
+        json={"proposal": {"kind": "set_link_state", "details": {"connected": "false"}}},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"][0]["name"] == "set_link_state"
+    assert payload["actions"][0]["status"] == "error"
+    assert payload["actions"][0]["result"]["error"] == "Missing boolean connected state."
+    assert "boolean connected value" in payload["reply"]
+
+
+def test_ground_agent_action_confirm_rejects_whitelisted_but_unimplemented_action(monkeypatch):
+    from core import ground_agent_knowledge
+
+    monkeypatch.setattr(
+        ground_agent_knowledge,
+        "ALLOWED_AGENT_ACTIONS",
+        {*ground_agent_knowledge.ALLOWED_AGENT_ACTIONS, "future_action"},
+    )
+
+    response = client.post(
+        "/api/agent/action/confirm",
+        json={"proposal": {"kind": "future_action", "details": {"connected": True}}},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"][0]["name"] == "confirm_proposal"
+    assert payload["actions"][0]["status"] == "error"
+    assert "dispatcher" in payload["reply"].lower()
 
 
 def test_ground_agent_chat_cautions_visual_evidence_candidates():
@@ -832,6 +1097,45 @@ def test_vlm_endpoint_validates_bbox_shape():
         "/api/vlm/caption",
         json={
             "bbox": [-60.50, -3.50],
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_vlm_grounding_endpoint_requires_operator_prompt():
+    """Grounding should fail on blank prompt text before returning vague fallback boxes."""
+    response = client.post(
+        "/api/vlm/grounding",
+        json={
+            "bbox": [-60.50, -3.50, -60.40, -3.40],
+            "prompt": "   ",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_vlm_vqa_endpoint_requires_operator_question():
+    """VQA should fail on blank question text before returning vague fallback answers."""
+    response = client.post(
+        "/api/vlm/vqa",
+        json={
+            "bbox": [-60.50, -3.50, -60.40, -3.40],
+            "question": "",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_settings_credentials_reject_blank_values():
+    """Credential writes should not replace a local secret file with blank values."""
+    response = client.post(
+        "/api/settings/credentials",
+        json={
+            "client_id": "   ",
+            "client_secret": "secret",
         },
     )
 

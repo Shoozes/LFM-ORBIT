@@ -13,7 +13,7 @@ const loadMissionControl = () => import("./components/MissionControl");
 const loadTimelapseViewer = () => import("./components/TimelapseViewer");
 const loadVlmPanel = () => import("./components/VlmPanel");
 const loadAlertsLogs = () => import("./components/AlertsLogs");
-const loadJudgeModePanel = () => import("./components/JudgeModePanel");
+const loadProofModePanel = () => import("./components/ProofModePanel");
 
 const MapVisualizer = lazy(loadMapVisualizer);
 const ValidationPanel = lazy(loadValidationPanel);
@@ -24,15 +24,15 @@ const MissionControl = lazy(loadMissionControl);
 const TimelapseViewer = lazy(loadTimelapseViewer);
 const VlmPanel = lazy(loadVlmPanel);
 const AlertsLogs = lazy(loadAlertsLogs);
-const JudgeModePanel = lazy(loadJudgeModePanel);
+const ProofModePanel = lazy(loadProofModePanel);
 
-type DemoCase = "judge" | "payload" | "provenance" | "abstain" | "eclipse";
+type DemoCase = "showcase" | "payload" | "provenance" | "abstain" | "eclipse";
 
-const JUDGE_REPLAY_ID = "rondonia_frontier_judge";
-const JUDGE_PRIMARY_CELL_ID = "sq_-10.0_-63.0";
-const JUDGE_FALLBACK_BBOX = [-63.15, -10.15, -62.85, -9.85];
+const SHOWCASE_REPLAY_ID = "rondonia_frontier_showcase";
+const SHOWCASE_PRIMARY_CELL_ID = "sq_-10.0_-63.0";
+const SHOWCASE_FALLBACK_BBOX = [-63.15, -10.15, -62.85, -9.85];
 const DEMO_STEPS_BY_CASE: Record<DemoCase, string[]> = {
-  judge: [
+  showcase: [
     "Step 1: Replay loaded",
     "Step 2: BBox selected",
     "Step 3: Edge triage passed",
@@ -102,12 +102,12 @@ function normalizeDemoCase(value: string | null): DemoCase {
   if (value === "provenance") return "provenance";
   if (value === "abstain") return "abstain";
   if (value === "eclipse") return "eclipse";
-  return "judge";
+  return "showcase";
 }
 
 function readDemoQuery(): { enabled: boolean; demoCase: DemoCase } {
   if (typeof window === "undefined") {
-    return { enabled: false, demoCase: "judge" };
+    return { enabled: false, demoCase: "showcase" };
   }
   const params = new URLSearchParams(window.location.search);
   return {
@@ -171,8 +171,8 @@ export default function App() {
   const [showMissionTimelapse, setShowMissionTimelapse] = useState(false);
   const [showBboxTools, setShowBboxTools] = useState(false);
   const [mission, setMission] = useState<Mission | null>(null);
-  const [judgeModeActive, setJudgeModeActive] = useState(false);
-  const [judgeMission, setJudgeMission] = useState<Mission | null>(null);
+  const [proofModeActive, setProofModeActive] = useState(false);
+  const [proofMission, setProofMission] = useState<Mission | null>(null);
   const [demoStepIndex, setDemoStepIndex] = useState(0);
   const apiBaseUrl = getApiBaseUrl();
 
@@ -270,13 +270,13 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState<"mission" | "agents" | "logs" | "inspect" | "settings">("mission");
 
-  const handleJudgeModeStart = useCallback(async () => {
+  const handleProofModeStart = useCallback(async () => {
     setDemoStepIndex(0);
-    setJudgeModeActive(true);
+    setProofModeActive(true);
 
     let activeMission = mission;
-    let requiresSeededReplay = demoQuery.demoCase === "judge" && !mission?.replay_id;
-    let primaryCellId: string | null = selectedCellId ?? (requiresSeededReplay ? JUDGE_PRIMARY_CELL_ID : null);
+    let requiresSeededReplay = demoQuery.demoCase === "showcase" && !mission?.replay_id;
+    let primaryCellId: string | null = selectedCellId ?? (requiresSeededReplay ? SHOWCASE_PRIMARY_CELL_ID : null);
 
     try {
       const currentResponse = await fetch(`${apiBaseUrl}/api/mission/current`);
@@ -287,14 +287,14 @@ export default function App() {
         }
       }
 
-      requiresSeededReplay = demoQuery.demoCase === "judge" && !activeMission?.replay_id;
+      requiresSeededReplay = demoQuery.demoCase === "showcase" && !activeMission?.replay_id;
       if (requiresSeededReplay && !primaryCellId) {
-        primaryCellId = JUDGE_PRIMARY_CELL_ID;
+        primaryCellId = SHOWCASE_PRIMARY_CELL_ID;
       }
 
-      if (requiresSeededReplay && activeMission?.replay_id !== JUDGE_REPLAY_ID) {
-        if (activeMission?.replay_id !== JUDGE_REPLAY_ID) {
-          const response = await fetch(`${apiBaseUrl}/api/replay/load/${JUDGE_REPLAY_ID}`, { method: "POST" });
+      if (requiresSeededReplay && activeMission?.replay_id !== SHOWCASE_REPLAY_ID) {
+        if (activeMission?.replay_id !== SHOWCASE_REPLAY_ID) {
+          const response = await fetch(`${apiBaseUrl}/api/replay/load/${SHOWCASE_REPLAY_ID}`, { method: "POST" });
           const payload = await response.json() as {
             mission?: Mission;
             primary_cell_id?: string | null;
@@ -309,7 +309,7 @@ export default function App() {
       }
 
       if (activeMission) {
-        setJudgeMission(activeMission);
+        setProofMission(activeMission);
       }
       setDemoStepIndex(1);
 
@@ -318,7 +318,7 @@ export default function App() {
         fetchMission(),
       ]);
 
-      const bbox = (!requiresSeededReplay && demoStartProfile ? demoStartProfile.bbox : activeMission?.bbox) ?? JUDGE_FALLBACK_BBOX;
+      const bbox = (!requiresSeededReplay && demoStartProfile ? demoStartProfile.bbox : activeMission?.bbox) ?? SHOWCASE_FALLBACK_BBOX;
       setDrawnBbox([...bbox]);
       setShowMissionTimelapse(false);
       setShowBboxTools(false);
@@ -338,9 +338,9 @@ export default function App() {
       setActiveTab("mission");
       setDemoStepIndex(2);
     } catch (error) {
-      console.error("Judge Mode failed to load replay", error);
-      setJudgeMission(activeMission);
-      setDrawnBbox(JUDGE_FALLBACK_BBOX);
+      console.error("Proof Mode failed to load replay", error);
+      setProofMission(activeMission);
+      setDrawnBbox(SHOWCASE_FALLBACK_BBOX);
       setVlmBoxes([{ label: "clearing", bbox: [0.24, 0.18, 0.74, 0.76] }]);
       if (primaryCellId) {
         setSelectedCellId(primaryCellId);
@@ -591,7 +591,7 @@ export default function App() {
 
           {activeTab === "agents" && (
             <div className="flex flex-col h-full">
-               <div className="flex-1 flex flex-col min-h-0 border-b border-zinc-200">
+               <div className="flex basis-[42%] flex-col min-h-0 border-b border-zinc-200">
                   <h2 data-testid="header-agent-bus" className="text-zinc-500 font-bold tracking-widest uppercase p-4 pb-0 text-xs shrink-0">Agent Dialogue Bus</h2>
                   <div className="flex-1 overflow-hidden">
                     <Suspense fallback={<LoadingPanel label="Agent Bus" />}>
@@ -599,7 +599,7 @@ export default function App() {
                     </Suspense>
                   </div>
                </div>
-               <div className="flex-1 flex flex-col min-h-0">
+               <div className="flex basis-[58%] flex-col min-h-0">
                   <h2 className="text-zinc-500 font-bold tracking-widest uppercase p-4 pb-0 text-xs shrink-0">Ground Agent Assistant</h2>
                   <div className="flex-1 overflow-hidden">
                     <Suspense fallback={<LoadingPanel label="Ground Agent" />}>
@@ -671,16 +671,16 @@ export default function App() {
           <div className="mb-3 flex items-center justify-between gap-3">
             <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-200">
               {demoStepIndex === 0
-                ? demoStartProfile?.readyLabel ?? "Judge demo ready"
+                ? demoStartProfile?.readyLabel ?? "Showcase ready"
                 : demoSteps[Math.min(demoStepIndex - 1, demoSteps.length - 1)]}
             </span>
             <button
               type="button"
-              data-testid="judge-mode-button"
-              onClick={() => void handleJudgeModeStart()}
+              data-testid="proof-mode-button"
+              onClick={() => void handleProofModeStart()}
               className="pointer-events-auto shrink-0 rounded border border-cyan-300/50 bg-cyan-500/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100 hover:border-cyan-200"
             >
-              Judge Mode
+              Proof Mode
             </button>
           </div>
           <div className="grid grid-cols-2 gap-1.5">
@@ -706,16 +706,16 @@ export default function App() {
         </div>
       )}
 
-      {judgeModeActive && (
-        <Suspense fallback={<LoadingPanel label="Judge Mode" className="absolute inset-0 z-40 bg-zinc-950 text-zinc-400" />}>
-          <JudgeModePanel
+      {proofModeActive && (
+        <Suspense fallback={<LoadingPanel label="Proof Mode" className="absolute inset-0 z-40 bg-zinc-950 text-zinc-400" />}>
+          <ProofModePanel
             apiBaseUrl={apiBaseUrl}
             demoCase={demoQuery.demoCase}
-            mission={judgeMission ?? mission}
+            mission={proofMission ?? mission}
             alerts={alerts}
             metricsSummary={metricsSummary}
             selectedCellId={selectedCellId}
-            onClose={() => setJudgeModeActive(false)}
+            onClose={() => setProofModeActive(false)}
             onStepChange={setDemoStepIndex}
           />
         </Suspense>

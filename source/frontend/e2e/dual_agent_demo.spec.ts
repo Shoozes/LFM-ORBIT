@@ -30,13 +30,13 @@ test("Tutorial: Dual-Agent Architecture Demo", async ({ page, request }) => {
   await drawMapBbox(page, { x: 0.15, y: 0.2 }, { x: 0.42, y: 0.52 });
 
   await page.fill('textarea', "Scan this region for recent clear-cut deforestation.");
-  const replayButtonSelector = "[data-testid='load-replay-rondonia_frontier_judge']";
+  const replayButtonSelector = "[data-testid='load-replay-rondonia_frontier_showcase']";
   const replayButton = page.locator(replayButtonSelector);
   await moveMouseToHighlight(page, replayButtonSelector);
   await expect(replayButton).toBeEnabled();
   await replayButton.click();
   await removeHighlight(page);
-  await expect(page.getByText("REPLAY ACTIVE: rondonia_frontier_judge")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("REPLAY ACTIVE: rondonia_frontier_showcase")).toBeVisible({ timeout: 15_000 });
   await showSubtitle(page, "Replay restores the SAT/GND exchange without waiting on realtime scan timing.", 1800);
 
   await page.locator("[data-testid='tab-agents']").click();

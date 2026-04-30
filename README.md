@@ -4,19 +4,19 @@ Satellites capture more imagery than they can downlink. LFM-ORBIT runs onboard t
 
 A 1-2 KB alert with bbox, confidence, provenance, model output, and payload accounting can move during a narrow contact window. Raw imagery can wait, or never be sent.
 
-[Hackathon event](https://luma.com/n9cw58h0) | [Judge demo guide](docs/JUDGE_DEMO.md) | [Architecture](docs/ARCHITECTURE.md) | [Model handoff](docs/MODEL_HANDOFF.md)
+[Hackathon event](https://luma.com/n9cw58h0) | [Demo guide](docs/DEMO_GUIDE.md) | [Architecture](docs/ARCHITECTURE.md) | [Model handoff](docs/MODEL_HANDOFF.md)
 
-![Onboard scan hero](docs/05-mission-control-scanning.png)
+![LFM Orbit Proof Mode showcase](docs/readme-showcase.png)
 
-## Run The Judge Proof
+## Run The Showcase
 
 ```bash
 cd source/frontend
 npm ci
-npm run demo:judge
+npm run demo:showcase
 ```
 
-The proof loads deterministic replay evidence, runs the UI flow, and writes video, screenshot, trace, and `proof.json` artifacts. No Sentinel Hub credentials are needed for the judge path.
+The showcase loads deterministic replay evidence, runs the UI flow, and writes video, screenshot, trace, and `proof.json` artifacts. No Sentinel Hub credentials are needed for the hackathon demo path.
 
 Full repo verification:
 
@@ -28,13 +28,13 @@ Full repo verification:
 ./run.sh --verify
 ```
 
-## What Judges Should See First
+## Product Highlights
 
 - DPhi SimSat is the primary runtime lane: `provider=simsat_sentinel`, `runtime_truth_mode=realtime`, `imagery_origin=simsat`, `scoring_basis=proxy_bands`.
 - Agent 1 prunes scan cells before downlink.
 - Agent 2 reviews retained evidence packets: bbox, source, temporal/proxy scores, confidence, and visual evidence references.
 - Link outages queue compact JSON alerts in the backend agent bus and flush after restore.
-- The Ground Agent chat can take local actions: load/rescan replay, start mission packs from context, and toggle the SAT/GND link simulator.
+- The Ground Agent chat can propose and confirm local actions: load/rescan replay, start mission packs from context, and toggle the SAT/GND link simulator.
 
 ## Proof Gallery
 
@@ -48,7 +48,7 @@ The satellite-side pruner scans the mission bbox, rejects low-value cells, and p
 
 ![Payload reduction proof](docs/readme-payload-reduction.png)
 
-Judge proof: `1.84 MB` raw frame -> `1.24 KB` alert JSON, a `1,483x` reduction. Raw imagery stays onboard; compact proof moves.
+Showcase proof: `1.84 MB` raw frame -> `1.24 KB` alert JSON, a `1,483x` reduction. Raw imagery stays onboard; compact proof moves.
 
 ### 03. Orbital Eclipse Queue
 
@@ -68,6 +68,12 @@ Every alert keeps provider, capture time, bbox, evidence path, confidence, promp
 
 Bad imagery does not become a confident answer. Cloud/no-data gates, spectral contracts, and replay integrity checks can withhold transmission.
 
+### 06. Chat-Driven Ground Operations
+
+![Ground Agent chat action](docs/readme-ground-agent-chat-action.png)
+
+The operator can ask for a mission in natural language. Ground Agent proposes the replay or mission action, shows provenance and expected state changes, then runs it only after confirmation.
+
 ## Architecture In 60 Seconds
 
 ```mermaid
@@ -84,17 +90,17 @@ flowchart LR
   H --> I[Audit UI + dataset export]
 ```
 
-Current runtime: SimSat-first imagery lane, deterministic replay fixtures for judging, and Liquid evidence-packet reasoning when a manifest-resolved local model runtime is available. Production image-conditioned `mmproj` inference is not claimed.
+Current runtime: SimSat-first imagery lane, deterministic replay fixtures for repeatable demos, and Liquid evidence-packet reasoning when a manifest-resolved local model runtime is available. NM-UNI training proof is surfaced from `training_result_manifest.json`; production image-conditioned inference is not claimed unless `mmproj` or native VLM runtime support is present and wired.
 
 ## Validation Snapshot
 
 | Check | Current State |
 |---|---|
 | Root verify | `.\run.ps1 -Verify` passing |
-| Backend tests | `317 passed` |
+| Backend tests | `335 passed` |
 | Frontend | typecheck + build passing |
-| Playwright E2E | `73 passed`, `1 skipped` |
-| Recorded demos | judge, payload, provenance, abstain, eclipse |
+| Playwright E2E | `75 passed`, `1 skipped` |
+| Recorded demos | main showcase, payload, provenance, abstain, eclipse |
 | Dataset export | `56` samples, `24` replay-cache rows |
 | Retagged training set | `179` assets, `26` temporal sequences |
 | Dataset | [Shoozes/LFM-Orbit-SatData](https://huggingface.co/datasets/Shoozes/LFM-Orbit-SatData) |
@@ -112,7 +118,15 @@ Pull the trained Orbit GGUF bundle into `runtime-data/models/lfm2.5-vlm-450m/`:
 ./run.sh --install --fetch-model
 ```
 
-This writes `model_manifest.json`, preserves `orbit_model_handoff.json` as `source_handoff.json`, and stores `training_result_manifest.json`. The launchers install the optional `llama-cpp-python` runtime when supported; Linux/WSL hosts without compiler support still complete the core install and boot safely.
+This writes `model_manifest.json`, preserves `orbit_model_handoff.json` as `source_handoff.json`, and stores `training_result_manifest.json`. Orbit exposes the distinction as:
+
+```text
+Training modality: image-text VLM SFT
+Runtime mode: text evidence-packet reasoning
+Direct image inference: unavailable until mmproj/native VLM runtime is present
+```
+
+The launchers install the optional `llama-cpp-python` runtime when supported; Linux/WSL hosts without compiler support still complete the core install and boot safely.
 
 Dataset export, retagging, and Hugging Face upload details live in [docs/DATASET_CYCLE_TUTORIAL.md](docs/DATASET_CYCLE_TUTORIAL.md).
 
@@ -144,7 +158,7 @@ API: `http://127.0.0.1:8000`
 
 | Doc | Purpose |
 |---|---|
-| [docs/JUDGE_DEMO.md](docs/JUDGE_DEMO.md) | Demo commands, artifacts, and replay assets |
+| [docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md) | Demo commands, artifacts, and replay assets |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Runtime map and design notes |
 | [docs/TODO.md](docs/TODO.md) | Active backlog and edge-case watchlist |
 | [docs/DATASET_CYCLE_TUTORIAL.md](docs/DATASET_CYCLE_TUTORIAL.md) | Seed, export, retag, and Hugging Face cycle |

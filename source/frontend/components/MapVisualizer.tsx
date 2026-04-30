@@ -267,6 +267,7 @@ export default function MapVisualizer({
   const markerRefs = useRef<Record<number, Marker>>({});
   const pinTooltipTimeoutRef = useRef<number | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
   const [shiftHeld, setShiftHeld] = useState(false);
   const [pinTooltip, setPinTooltip] = useState<string | null>(null);
 
@@ -389,7 +390,18 @@ export default function MapVisualizer({
 
     mapRef.current = map;
 
+    map.on("error", (event: unknown) => {
+      const message = (event as { error?: { message?: string } }).error?.message ?? "";
+      const isRenderIssue = /shader|webgl|style/i.test(message);
+      setMapError((current) => current ?? (
+        isRenderIssue
+          ? "Basemap rendering degraded. Scoring is unaffected."
+          : "Basemap imagery unavailable. Scoring is unaffected."
+      ));
+    });
+
     map.on("load", () => {
+      setMapError(null);
       map.addSource("scan-grid", {
         type: "geojson",
         data: geoJsonGridRef.current ?? ({ type: "FeatureCollection", features: [] } as GeoJSON.FeatureCollection),
@@ -1049,6 +1061,9 @@ export default function MapVisualizer({
             : "Loading satellite imagery…"}
         </p>
         <p className="text-gray-600 mt-1 text-[10px]">© Esri · Not part of detection or scoring</p>
+        {mapError && (
+          <p className="mt-1 text-[10px] text-amber-300">{mapError}</p>
+        )}
       </div>
     </div>
   );

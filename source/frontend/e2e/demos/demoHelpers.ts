@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { gotoApp, loadSeededReplay, resetRuntimeState, startMission, waitForBasemapReady, waitForLinkOpen } from "../runtime";
 import { hideSubtitle, moveMouseToHighlight, removeHighlight, showSubtitle } from "../tutorialHelpers";
 
-export type DemoCase = "judge" | "payload" | "provenance" | "abstain" | "eclipse";
+export type DemoCase = "showcase" | "payload" | "provenance" | "abstain" | "eclipse";
 
 export type ProofJson = {
   demo: string;
@@ -59,11 +59,11 @@ type DemoScenario = {
 };
 
 const DEMO_SCENARIOS: Record<DemoCase, DemoScenario> = {
-  judge: {
-    intro: "Judge Mode starts from a deterministic Rondonia replay and walks the strongest alert.",
+  showcase: {
+    intro: "Proof Mode starts from a deterministic Rondonia replay and walks the strongest alert.",
     proofSubtitle: "The final screen shows satellite evidence, bbox, model output, latency, provenance, and compact JSON.",
     replayCellId: "sq_-10.0_-63.0",
-    preloadReplayId: "rondonia_frontier_judge",
+    preloadReplayId: "rondonia_frontier_showcase",
   },
   payload: {
     intro: "Payload proof scans Pakistan's Manchar Lake flood overflow and compares raw imagery against compact alert JSON.",
@@ -225,7 +225,7 @@ export async function openDemo(page: Page, request: APIRequestContext, demoCase:
   await showSubtitle(page, scenario.intro, 1_900);
 
   await expect(page.getByTestId("demo-caption")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId("judge-mode-button")).toBeVisible();
+  await expect(page.getByTestId("proof-mode-button")).toBeVisible();
   await page.getByTestId("tab-mission").click();
 
   if (scenario.presetId) {
@@ -239,7 +239,7 @@ export async function openDemo(page: Page, request: APIRequestContext, demoCase:
 
   if (scenario.replayCellId) {
     await showSubtitle(page, "The deterministic replay is active before telemetry starts, so the video never opens on the generic scan.", 1_600);
-    await expect(page.getByText("REPLAY ACTIVE: rondonia_frontier_judge")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("REPLAY ACTIVE: rondonia_frontier_showcase")).toBeVisible({ timeout: 15_000 });
 
     await showSubtitle(page, "Open Logs and choose the evidence cell for this specific proof.", 1_500);
     await page.getByTestId("tab-logs").click();
@@ -273,7 +273,7 @@ export async function openDemo(page: Page, request: APIRequestContext, demoCase:
     }
 
     if (scenario.launchMission) {
-      await showSubtitle(page, "Confirm the deterministic mission is active before Judge Mode binds the proof.", 1_500);
+      await showSubtitle(page, "Confirm the deterministic mission is active before Proof Mode binds the proof.", 1_500);
       const launchButton = page.getByRole("button", { name: "Launch Mission" });
       if ((await launchButton.count()) > 0 && await launchButton.first().isEnabled()) {
         await moveMouseToHighlight(page, "button:has-text('Launch Mission')");
@@ -286,11 +286,11 @@ export async function openDemo(page: Page, request: APIRequestContext, demoCase:
     }
   }
 
-  await showSubtitle(page, "Open Judge Mode for the recorded proof panel.", 1_400);
-  await moveMouseToHighlight(page, "[data-testid='judge-mode-button']");
-  await page.getByTestId("judge-mode-button").click();
+  await showSubtitle(page, "Open Proof Mode for the recorded proof panel.", 1_400);
+  await moveMouseToHighlight(page, "[data-testid='proof-mode-button']");
+  await page.getByTestId("proof-mode-button").click();
   await removeHighlight(page);
-  await expect(page.getByTestId("judge-mode-panel")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("proof-mode-panel")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("proof-json")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("proof-model")).toContainText("LFM2.5-VL-450M", { timeout: 30_000 });
   await showSubtitle(page, scenario.proofSubtitle, 2_000);

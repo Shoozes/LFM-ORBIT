@@ -63,10 +63,10 @@ MISSION_PACKS: dict[str, dict[str, Any]] = {
 }
 
 REPLAY_ALIASES: dict[str, str] = {
-    "rondonia": "rondonia_frontier_judge",
-    "amazon": "rondonia_frontier_judge",
-    "frontier": "rondonia_frontier_judge",
-    "deforestation": "rondonia_frontier_judge",
+    "rondonia": "rondonia_frontier_showcase",
+    "amazon": "rondonia_frontier_showcase",
+    "frontier": "rondonia_frontier_showcase",
+    "deforestation": "rondonia_frontier_showcase",
     "flood": "manchar_flood_replay",
     "manchar": "manchar_flood_replay",
     "pakistan": "manchar_flood_replay",
@@ -83,6 +83,13 @@ REPLAY_ALIASES: dict[str, str] = {
     "maritime": "singapore_maritime_replay",
     "singapore": "singapore_maritime_replay",
     "vessel": "singapore_maritime_replay",
+}
+
+ALLOWED_AGENT_ACTIONS = {
+    "load_replay",
+    "rescan_replay",
+    "start_mission_pack",
+    "set_link_state",
 }
 
 
@@ -104,6 +111,43 @@ def _action(name: str, status: str, result: dict[str, Any]) -> dict[str, Any]:
     return {"name": name, "status": status, "result": result}
 
 
+def _proposal_subject(details: dict[str, Any]) -> str:
+    if details.get("replay_id"):
+        return str(details["replay_id"])
+    if details.get("pack_id"):
+        return str(details["pack_id"])
+    if "connected" in details:
+        return "online" if bool(details["connected"]) else "offline"
+    return "unknown"
+
+
+def _proposal(
+    *,
+    kind: str,
+    title: str,
+    summary: str,
+    details: dict[str, Any],
+    confirm_label: str,
+    risk_level: str,
+    cancel_label: str = "Cancel",
+) -> dict[str, Any]:
+    return {
+        "id": f"proposal_{kind}_{_proposal_subject(details)}",
+        "kind": kind,
+        "title": title,
+        "summary": summary,
+        "details": details,
+        "confirm_label": confirm_label,
+        "cancel_label": cancel_label,
+        "risk_level": risk_level,
+    }
+
+
+def _with_request(proposal: dict[str, Any], user_msg: str) -> dict[str, Any]:
+    proposal["details"]["request"] = user_msg.strip()
+    return proposal
+
+
 def _catalog_summary(limit: int = 8) -> list[dict[str, Any]]:
     from core.replay import list_seeded_replays
 
@@ -117,6 +161,110 @@ def _catalog_summary(limit: int = 8) -> list[dict[str, Any]]:
         }
         for item in list_seeded_replays()[:limit]
     ]
+
+
+def _replay_catalog_item(replay_id: str) -> dict[str, Any] | None:
+    from core.replay import list_seeded_replays
+
+    for item in list_seeded_replays():
+        if item.get("replay_id") == replay_id:
+            return item
+    return None
+
+
+def _replay_scoring_basis(replay_id: str, use_case_id: str | None) -> str:
+    if replay_id == "greenland_ice_snow_extent_replay" or use_case_id == "ice_snow_extent":
+        return "multispectral_bands"
+    return "visual_only"
+
+
+def _replay_proposal(kind: str, replay_id: str) -> dict[str, Any]:
+    item = _replay_catalog_item(replay_id) or {"replay_id": replay_id, "title": replay_id}
+    title = str(item.get("title") or replay_id)
+    use_case_id = str(item.get("use_case_id") or "")
+    scoring_basis = _replay_scoring_basis(replay_id, use_case_id or None)
+    action_label = "Load replay" if kind == "load_replay" else "Rescan replay"
+    details = {
+        "replay_id": replay_id,
+        "title": title,
+        "use_case_id": use_case_id,
+        "runtime_truth_mode": "replay" if kind == "load_replay" else "realtime",
+        "imagery_origin": "cached_api" if kind == "load_replay" else "provider_chain",
+        "scoring_basis": scoring_basis if kind == "load_replay" else "current_runtime",
+        "start_date": item.get("start_date") or "",
+        "end_date": item.get("end_date") or "",
+        "alert_count": item.get("alert_count") or 0,
+        "cells_scanned": item.get("cells_scanned") or 0,
+        "expected_reset": kind == "load_replay",
+        "state_impact": [
+            "Runtime reset" if kind == "load_replay" else "Start active mission from replay bbox",
+            "Load replay evidence" if kind == "load_replay" else "Use current provider/model stack",
+            "Refresh Mission Control",
+            "Refresh Logs, Inspect, Gallery, and Agent Dialogue",
+        ],
+    }
+    return _proposal(
+        kind=kind,
+        title=f"{action_label}: {title}",
+        summary=(
+            "Load cached real API replay evidence into Mission, Logs, Inspect, Gallery, and Agent Dialogue."
+            if kind == "load_replay"
+            else "Start a live rescan from this replay's bbox and dates using the current runtime/model stack."
+        ),
+        details=details,
+        confirm_label="Run Replay" if kind == "load_replay" else "Start Rescan",
+        risk_level="medium",
+    )
+
+
+def _mission_pack_proposal(pack_id: str, pack: dict[str, Any]) -> dict[str, Any]:
+    return _proposal(
+        kind="start_mission_pack",
+        title=f"Launch Mission Pack: {pack['label']}",
+        summary="Start a new mission from this preset bbox, date range, and task text.",
+        details={
+            "pack_id": pack_id,
+            "label": pack["label"],
+            "use_case_id": pack["use_case_id"],
+            "bbox": pack["bbox"],
+            "start_date": pack["start_date"],
+            "end_date": pack["end_date"],
+            "task_text": pack["task_text"],
+            "expected_reset": False,
+            "state_impact": [
+                "Set active mission",
+                "Start satellite scan loop on preset bbox",
+                "Refresh Mission Control",
+                "Append Agent Dialogue mission note",
+            ],
+        },
+        confirm_label="Launch Mission",
+        risk_level="medium",
+    )
+
+
+def _link_state_proposal(connected: bool) -> dict[str, Any]:
+    return _proposal(
+        kind="set_link_state",
+        title="Restore SAT/GND Link" if connected else "Set SAT/GND Link Offline",
+        summary=(
+            "Restore downlink so queued compact alerts can flush."
+            if connected
+            else "Set the link offline so satellite alerts queue locally until restore."
+        ),
+        details={
+            "connected": connected,
+            "target_state": "online" if connected else "offline",
+            "expected_reset": False,
+            "state_impact": [
+                "Update link state",
+                "Write Agent Dialogue status note",
+                "Affect queued alert flush behavior",
+            ],
+        },
+        confirm_label="Restore Link" if connected else "Set Offline",
+        risk_level="medium",
+    )
 
 
 def _match_replay_id(text: str) -> str | None:
@@ -172,74 +320,60 @@ def _match_mission_pack_from_context() -> tuple[str, dict[str, Any]] | None:
     return _match_mission_pack(context_text)
 
 
-def execute_ground_agent_chat(user_msg: str) -> dict[str, Any]:
-    """Answer the operator and execute a small set of local ground-agent tools."""
+def execute_ground_agent_proposal(proposal: dict[str, Any]) -> dict[str, Any]:
+    """Execute a whitelisted Ground Agent action after operator confirmation."""
     from core.agent_bus import post_message
     from core.link_state import is_link_connected, set_link_state
     from core.mission import start_mission
     from core.replay import load_seeded_replay, rescan_seeded_replay
 
-    text = user_msg.lower().strip()
+    kind = str(proposal.get("kind") or "").strip()
+    details = proposal.get("details") if isinstance(proposal.get("details"), dict) else {}
     actions: list[dict[str, Any]] = []
 
-    if not text:
+    if kind not in ALLOWED_AGENT_ACTIONS:
+        actions.append(_action("confirm_proposal", "error", {"error": "Unsupported Ground Agent action."}))
         return {
-            "reply": "No message received.",
+            "reply": "I cannot run that proposal. The action is not in the Ground Agent whitelist.",
             "actions": actions,
             "state": _base_state(),
             "suggestions": _suggestions(),
         }
 
-    if "replay" in text and any(k in text for k in ("list", "show", "available", "catalog")):
-        catalog = _catalog_summary()
-        actions.append(_action("list_replays", "ok", {"replays": catalog}))
-        return {
-            "reply": f"{len(catalog)} replay entries are available. Ask me to load or rescan one by name.",
-            "actions": actions,
-            "state": _base_state(),
-            "suggestions": _suggestions(),
-        }
-
-    if any(k in text for k in ("restore link", "link online", "reconnect", "downlink online")):
-        was_connected = is_link_connected()
-        set_link_state(True)
-        post_message(
-            sender="operator",
-            recipient="broadcast",
-            msg_type="status",
-            payload={"connected": True, "note": "Ground agent restored the SAT/GND downlink."},
-        )
-        actions.append(_action("set_link_state", "ok", {"connected": True, "was_connected": was_connected}))
-        return {
-            "reply": "SAT/GND link restored. Queued compact alerts can now flush through the ground validator.",
-            "actions": actions,
-            "state": _base_state(),
-            "suggestions": _suggestions(),
-        }
-
-    if any(k in text for k in ("link offline", "sever link", "drop link", "blackout", "eclipse")):
-        was_connected = is_link_connected()
-        set_link_state(False)
-        post_message(
-            sender="operator",
-            recipient="broadcast",
-            msg_type="status",
-            payload={"connected": False, "note": "Ground agent set the SAT/GND downlink offline."},
-        )
-        actions.append(_action("set_link_state", "ok", {"connected": False, "was_connected": was_connected}))
-        return {
-            "reply": "SAT/GND link is offline. Satellite flags will remain unread in the agent bus until restore.",
-            "actions": actions,
-            "state": _base_state(),
-            "suggestions": _suggestions(),
-        }
-
-    if "replay" in text and any(k in text for k in ("rescan", "rerun", "run live", "current runtime")):
-        replay_id = _match_replay_id(text)
+    if kind == "load_replay":
+        replay_id = str(details.get("replay_id") or "").strip()
         if not replay_id:
-            actions.append(_action("rescan_replay", "error", {"error": "No matching replay found."}))
+            actions.append(_action("load_replay", "error", {"error": "Missing replay_id."}))
             return {
-                "reply": "I could not match that replay. Ask for 'list replays' or name Rondonia, Manchar, Atacama, Greenland, Georgia, Delhi, or Singapore.",
+                "reply": "Replay load cancelled because the proposal did not include a replay id.",
+                "actions": actions,
+                "state": _base_state(),
+                "suggestions": _suggestions(),
+            }
+        try:
+            result = load_seeded_replay(replay_id)
+        except Exception as exc:
+            actions.append(_action("load_replay", "error", {"replay_id": replay_id, "error": str(exc)}))
+            return {
+                "reply": f"Replay load failed for `{replay_id}`: {exc}",
+                "actions": actions,
+                "state": _base_state(),
+                "suggestions": _suggestions(),
+            }
+        actions.append(_action("load_replay", "ok", result))
+        return {
+            "reply": f"Loaded replay `{replay_id}` into Mission, Logs, Inspect, Gallery, and Agent Dialogue.",
+            "actions": actions,
+            "state": _base_state(),
+            "suggestions": _suggestions(),
+        }
+
+    if kind == "rescan_replay":
+        replay_id = str(details.get("replay_id") or "").strip()
+        if not replay_id:
+            actions.append(_action("rescan_replay", "error", {"error": "Missing replay_id."}))
+            return {
+                "reply": "Replay rescan cancelled because the proposal did not include a replay id.",
                 "actions": actions,
                 "state": _base_state(),
                 "suggestions": _suggestions(),
@@ -262,47 +396,17 @@ def execute_ground_agent_chat(user_msg: str) -> dict[str, Any]:
             "suggestions": _suggestions(),
         }
 
-    if "replay" in text and any(k in text for k in ("load", "open", "request", "hydrate", "switch")):
-        replay_id = _match_replay_id(text)
-        if not replay_id:
-            actions.append(_action("load_replay", "error", {"error": "No matching replay found."}))
+    if kind == "start_mission_pack":
+        pack_id = str(details.get("pack_id") or "").strip()
+        pack = MISSION_PACKS.get(pack_id)
+        if not pack:
+            actions.append(_action("start_mission_pack", "error", {"pack_id": pack_id, "error": "Unknown pack."}))
             return {
-                "reply": "I could not match that replay. Ask for 'list replays' or name Rondonia, Manchar, Atacama, Greenland, Georgia, Delhi, or Singapore.",
+                "reply": "Mission pack launch cancelled because the proposal did not match a known pack.",
                 "actions": actions,
                 "state": _base_state(),
                 "suggestions": _suggestions(),
             }
-        try:
-            result = load_seeded_replay(replay_id)
-        except Exception as exc:
-            actions.append(_action("load_replay", "error", {"replay_id": replay_id, "error": str(exc)}))
-            return {
-                "reply": f"Replay load failed for `{replay_id}`: {exc}",
-                "actions": actions,
-                "state": _base_state(),
-                "suggestions": _suggestions(),
-            }
-        actions.append(_action("load_replay", "ok", result))
-        return {
-            "reply": f"Loaded replay `{replay_id}` into Mission, Logs, Inspect, and Agent Dialogue.",
-            "actions": actions,
-            "state": _base_state(),
-            "suggestions": _suggestions(),
-        }
-
-    wants_mission = any(k in text for k in ("mission pack", "run mission", "start mission", "launch mission", "task satellite"))
-    if wants_mission:
-        match = _match_mission_pack(text) or _match_mission_pack_from_context()
-        if not match:
-            packs = ", ".join(pack["label"] for pack in MISSION_PACKS.values())
-            actions.append(_action("start_mission_pack", "error", {"available_packs": list(MISSION_PACKS)}))
-            return {
-                "reply": f"I could not match a mission pack. Available packs: {packs}.",
-                "actions": actions,
-                "state": _base_state(),
-                "suggestions": _suggestions(),
-            }
-        pack_id, pack = match
         try:
             mission = start_mission(
                 task_text=pack["task_text"],
@@ -334,6 +438,158 @@ def execute_ground_agent_chat(user_msg: str) -> dict[str, Any]:
         return {
             "reply": f"Launched mission pack `{pack_id}`. The satellite pruner will scan the pack bbox and downlink compact alerts only.",
             "actions": actions,
+            "state": _base_state(),
+            "suggestions": _suggestions(),
+        }
+
+    if kind == "set_link_state":
+        if not isinstance(details.get("connected"), bool):
+            actions.append(_action("set_link_state", "error", {"error": "Missing boolean connected state."}))
+            return {
+                "reply": "Link-state change cancelled because the proposal did not include a boolean connected value.",
+                "actions": actions,
+                "state": _base_state(),
+                "suggestions": _suggestions(),
+            }
+
+        connected = details["connected"]
+        was_connected = is_link_connected()
+        set_link_state(connected)
+        post_message(
+            sender="operator",
+            recipient="broadcast",
+            msg_type="status",
+            payload={
+                "connected": connected,
+                "note": (
+                    "Ground agent restored the SAT/GND downlink."
+                    if connected
+                    else "Ground agent set the SAT/GND downlink offline."
+                ),
+            },
+        )
+        actions.append(_action("set_link_state", "ok", {"connected": connected, "was_connected": was_connected}))
+        return {
+            "reply": (
+                "SAT/GND link restored. Queued compact alerts can now flush through the ground validator."
+                if connected
+                else "SAT/GND link is offline. Satellite flags will remain unread in the agent bus until restore."
+            ),
+            "actions": actions,
+            "state": _base_state(),
+            "suggestions": _suggestions(),
+        }
+
+    # Defensive guard for future whitelist edits without a dispatch branch.
+    actions.append(_action("confirm_proposal", "error", {"error": "Unsupported Ground Agent action."}))
+    return {
+        "reply": "I cannot run that proposal. The action is not in the Ground Agent dispatcher.",
+        "actions": actions,
+        "state": _base_state(),
+        "suggestions": _suggestions(),
+    }
+
+
+def execute_ground_agent_chat(user_msg: str) -> dict[str, Any]:
+    """Answer the operator and execute a small set of local ground-agent tools."""
+    text = user_msg.lower().strip()
+    actions: list[dict[str, Any]] = []
+
+    if not text:
+        return {
+            "reply": "No message received.",
+            "actions": actions,
+            "state": _base_state(),
+            "suggestions": _suggestions(),
+        }
+
+    if "replay" in text and any(k in text for k in ("list", "show", "available", "catalog")):
+        catalog = _catalog_summary()
+        actions.append(_action("list_replays", "ok", {"replays": catalog}))
+        return {
+            "reply": f"{len(catalog)} replay entries are available. Ask me to load or rescan one by name.",
+            "actions": actions,
+            "state": _base_state(),
+            "suggestions": _suggestions(),
+        }
+
+    if any(k in text for k in ("restore link", "link online", "reconnect", "downlink online")):
+        return {
+            "reply": "I can restore the SAT/GND link. Review the state change before I apply it.",
+            "actions": [],
+            "proposals": [_with_request(_link_state_proposal(True), user_msg)],
+            "state": _base_state(),
+            "suggestions": _suggestions(),
+        }
+
+    if any(k in text for k in ("link offline", "sever link", "drop link", "blackout", "eclipse")):
+        return {
+            "reply": "I can set the SAT/GND link offline for queue proof. Review the state change before I apply it.",
+            "actions": [],
+            "proposals": [_with_request(_link_state_proposal(False), user_msg)],
+            "state": _base_state(),
+            "suggestions": _suggestions(),
+        }
+
+    if "replay" in text and any(k in text for k in ("rescan", "rerun", "run live", "current runtime")):
+        replay_id = _match_replay_id(text)
+        if not replay_id:
+            actions.append(_action("rescan_replay", "error", {"error": "No matching replay found."}))
+            return {
+                "reply": "I could not match that replay. Ask for 'list replays' or name Rondonia, Manchar, Atacama, Greenland, Georgia, Delhi, or Singapore.",
+                "actions": actions,
+                "state": _base_state(),
+                "suggestions": _suggestions(),
+            }
+        return {
+            "reply": f"I found replay `{replay_id}`. Review the rescan before starting a new runtime pass.",
+            "actions": [],
+            "proposals": [_with_request(_replay_proposal("rescan_replay", replay_id), user_msg)],
+            "state": _base_state(),
+            "suggestions": _suggestions(),
+        }
+
+    if "replay" in text and (
+        any(k in text for k in ("load", "open", "request", "hydrate", "switch", "run"))
+        or _match_replay_id(text)
+    ):
+        replay_id = _match_replay_id(text)
+        if not replay_id:
+            actions.append(_action("load_replay", "error", {"error": "No matching replay found."}))
+            return {
+                "reply": "I could not match that replay. Ask for 'list replays' or name Rondonia, Manchar, Atacama, Greenland, Georgia, Delhi, or Singapore.",
+                "actions": actions,
+                "state": _base_state(),
+                "suggestions": _suggestions(),
+            }
+        return {
+            "reply": f"I found a replay candidate: `{replay_id}`. Review before loading it into the app.",
+            "actions": [],
+            "proposals": [_with_request(_replay_proposal("load_replay", replay_id), user_msg)],
+            "state": _base_state(),
+            "suggestions": _suggestions(),
+        }
+
+    wants_mission = (
+        any(k in text for k in ("mission pack", "run mission", "start mission", "launch mission", "task satellite"))
+        or ("mission" in text and _match_mission_pack(text) is not None)
+    )
+    if wants_mission:
+        match = _match_mission_pack(text) or _match_mission_pack_from_context()
+        if not match:
+            packs = ", ".join(pack["label"] for pack in MISSION_PACKS.values())
+            actions.append(_action("start_mission_pack", "error", {"available_packs": list(MISSION_PACKS)}))
+            return {
+                "reply": f"I could not match a mission pack. Available packs: {packs}.",
+                "actions": actions,
+                "state": _base_state(),
+                "suggestions": _suggestions(),
+            }
+        pack_id, pack = match
+        return {
+            "reply": f"I matched mission pack `{pack_id}`. Review the mission before launch.",
+            "actions": [],
+            "proposals": [_with_request(_mission_pack_proposal(pack_id, pack), user_msg)],
             "state": _base_state(),
             "suggestions": _suggestions(),
         }

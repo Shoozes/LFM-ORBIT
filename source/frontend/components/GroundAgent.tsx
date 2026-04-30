@@ -1,22 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import { getApiBaseUrl } from "../utils/telemetry";
-
-type AgentAction = {
-  name: string;
-  status: "ok" | "error" | string;
-  result?: Record<string, unknown>;
-};
+import GroundAgentActionCard, {
+  type AgentAction,
+  type ChatResponse,
+  type GroundAgentProposal,
+} from "./GroundAgentActionCard";
 
 type Message = {
   role: "user" | "assistant";
   content: string;
   actions?: AgentAction[];
-};
-
-type ChatResponse = {
-  reply?: unknown;
-  actions?: AgentAction[];
-  suggestions?: string[];
+  proposals?: GroundAgentProposal[];
 };
 
 async function readAgentError(response: Response, fallback: string): Promise<string> {
@@ -78,6 +72,34 @@ export default function GroundAgent({ onActionComplete }: GroundAgentProps) {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const appendAgentResponse = async (data: ChatResponse) => {
+    const reply = typeof data.reply === "string" && data.reply.trim() ? data.reply : "[Error: Empty reply]";
+    const actions = Array.isArray(data.actions) ? data.actions : [];
+    const proposals = Array.isArray(data.proposals) ? data.proposals : [];
+    if (Array.isArray(data.suggestions) && data.suggestions.every((item) => typeof item === "string")) {
+      setQuickCommands(data.suggestions.slice(0, 5));
+    }
+    setMessages((prev) => [...prev, { role: "assistant", content: reply, actions, proposals }]);
+    if (actions.some((action) => action.status === "ok")) {
+      try {
+        await onActionComplete?.();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "UI refresh failed.";
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: `Action completed, but the UI refresh did not finish: ${message}` },
+        ]);
+      }
+    }
+  };
+
+  const handleProposalCancelled = (proposal: GroundAgentProposal) => {
+    setMessages((prev) => [
+      ...prev,
+      { role: "assistant", content: `Cancelled proposal: ${proposal.title}. No app state changed.` },
+    ]);
+  };
+
   const sendMessage = async (override?: string) => {
     const outbound = (override ?? input).trim();
     if (!outbound || isLoading) return;
@@ -101,15 +123,7 @@ export default function GroundAgent({ onActionComplete }: GroundAgentProps) {
         throw new Error(await readAgentError(response, `Ground Agent failed with HTTP ${response.status}.`));
       }
       const data = await response.json() as ChatResponse;
-      const reply = typeof data.reply === "string" && data.reply.trim() ? data.reply : "[Error: Empty reply]";
-      const actions = Array.isArray(data.actions) ? data.actions : [];
-      if (Array.isArray(data.suggestions) && data.suggestions.every((item) => typeof item === "string")) {
-        setQuickCommands(data.suggestions.slice(0, 5));
-      }
-      setMessages((prev) => [...prev, { role: "assistant", content: reply, actions }]);
-      if (actions.some((action) => action.status === "ok")) {
-        await onActionComplete?.();
-      }
+      await appendAgentResponse(data);
     } catch (e) {
       const message = e instanceof DOMException && e.name === "AbortError"
         ? "Ground Agent timed out."
@@ -131,10 +145,13 @@ export default function GroundAgent({ onActionComplete }: GroundAgentProps) {
 
   return (
     <div className="flex h-full w-full flex-col bg-white">
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3" data-testid="ground-agent-thread">
         {messages.map((m, i) => (
           <div key={i} className={`text-sm leading-relaxed ${m.role === "user" ? "text-right" : "text-left"}`}>
-            <div className={`inline-block max-w-full rounded-lg px-4 py-2 shadow-sm ${m.role === "user" ? "bg-zinc-900 text-white" : "bg-zinc-50 border border-zinc-200 text-zinc-900"}`}>
+            <div
+              data-testid={`ground-agent-message-${m.role}`}
+              className={`inline-block max-w-full rounded-lg px-4 py-2 shadow-sm ${m.role === "user" ? "bg-zinc-900 text-white" : "bg-zinc-50 border border-zinc-200 text-zinc-900"}`}
+            >
               <p className="whitespace-pre-wrap break-words">{m.content}</p>
               {m.actions && m.actions.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -149,6 +166,18 @@ export default function GroundAgent({ onActionComplete }: GroundAgentProps) {
                     >
                       {action.name.replace(/_/g, " ")} - {summarizeAction(action)}
                     </span>
+                  ))}
+                </div>
+              )}
+              {m.proposals && m.proposals.length > 0 && (
+                <div className="space-y-2">
+                  {m.proposals.map((proposal) => (
+                    <GroundAgentActionCard
+                      key={proposal.id}
+                      proposal={proposal}
+                      onConfirmed={appendAgentResponse}
+                      onCancelled={handleProposalCancelled}
+                    />
                   ))}
                 </div>
               )}

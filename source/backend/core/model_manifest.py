@@ -38,6 +38,107 @@ class SatelliteModelArtifact:
     training_result_manifest_path: Path | None = None
     readme_path: Path | None = None
 
+    def training_status_dict(self) -> dict[str, Any]:
+        payload = load_model_manifest(self.training_result_manifest_path) if self.training_result_manifest_path else {}
+        manifest_present = bool(self.training_result_manifest_path and self.training_result_manifest_path.exists())
+
+        train_rows = _manifest_int(
+            payload,
+            "train_rows",
+            "training_rows",
+            "dataset_summary.rows",
+            "dataset_summary.train_rows",
+            "row_counts.train_rows",
+            "counts.train_rows",
+        )
+        multimodal_rows = _manifest_int(
+            payload,
+            "multimodal_rows",
+            "image_text_rows",
+            "dataset_summary.multimodal_rows",
+            "dataset_summary.image_text_rows",
+            "row_counts.multimodal_rows",
+            "counts.multimodal_rows",
+        )
+        image_blocks = _manifest_int(
+            payload,
+            "image_blocks",
+            "image_block_count",
+            "dataset_summary.image_blocks",
+            "dataset_summary.image_block_count",
+            "row_counts.image_blocks",
+            "counts.image_blocks",
+        )
+        eval_rows = _manifest_int(
+            payload,
+            "eval_rows",
+            "evaluation_rows",
+            "evaluation_metadata.eval_rows",
+            "dataset_summary.eval_rows",
+            "row_counts.eval_rows",
+            "counts.eval_rows",
+        )
+        method = _manifest_text(payload, "training_method", "method", "training.method", "run.method", "trainer.method")
+        base_model = (
+            _manifest_text(
+                payload,
+                "base_model",
+                "source_model",
+                "training.source_model_path",
+                "model.base_model",
+                "run.base_model",
+            )
+            or self.base_model
+        )
+        manifest_modality = (_manifest_text(payload, "training_modality", "modality", "data.modality") or "").lower()
+
+        if image_blocks > 0 or multimodal_rows > 0 or manifest_modality in {"image_text", "multimodal", "vlm"}:
+            training_modality = "image_text"
+        elif manifest_present:
+            training_modality = manifest_modality or "text"
+        else:
+            training_modality = "unknown"
+
+        hf_checkpoint_path = _training_asset_path(
+            self.model_dir,
+            payload,
+            (
+                "hf_checkpoint",
+                "hf_checkpoint_path",
+                "hf_checkpoint_dir",
+                "artifacts.hf_checkpoint",
+                "outputs.hf_checkpoint",
+            ),
+            ("hf-checkpoint", "hf_checkpoint"),
+        )
+        lora_adapter_path = _training_asset_path(
+            self.model_dir,
+            payload,
+            (
+                "lora_adapter",
+                "lora_adapter_path",
+                "lora_adapter_dir",
+                "artifacts.lora_adapter",
+                "outputs.lora_adapter",
+            ),
+            ("lora-adapter", "lora_adapter"),
+        )
+
+        return {
+            "training_method": method or "",
+            "training_base_model": base_model or "",
+            "training_modality": training_modality,
+            "image_training_verified": bool(manifest_present and image_blocks > 0),
+            "training_train_rows": train_rows,
+            "training_multimodal_rows": multimodal_rows,
+            "training_image_blocks": image_blocks,
+            "training_eval_rows": eval_rows,
+            "hf_checkpoint_path": str(hf_checkpoint_path) if hf_checkpoint_path else "",
+            "hf_checkpoint_present": bool(hf_checkpoint_path and hf_checkpoint_path.exists()),
+            "lora_adapter_path": str(lora_adapter_path) if lora_adapter_path else "",
+            "lora_adapter_present": bool(lora_adapter_path and lora_adapter_path.exists()),
+        }
+
     def to_status_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["manifest_path"] = str(self.manifest_path)
@@ -55,6 +156,10 @@ class SatelliteModelArtifact:
             self.training_result_manifest_path and self.training_result_manifest_path.exists()
         )
         payload["readme_present"] = bool(self.readme_path and self.readme_path.exists())
+        payload.update(self.training_status_dict())
+        payload["runtime_inference_mode"] = "text_evidence_packet"
+        payload["image_conditioned_runtime_enabled"] = False
+        payload["image_conditioned_runtime_reason"] = "direct image runtime adapter is not wired"
         return payload
 
 
@@ -64,12 +169,71 @@ def _text(value: Any) -> str | None:
 
 
 def _nested_text(payload: dict[str, Any], *keys: str) -> str | None:
+    return _text(_nested_value(payload, *keys))
+
+
+def _nested_value(payload: dict[str, Any], *keys: str) -> Any:
     current: Any = payload
     for key in keys:
         if not isinstance(current, dict):
             return None
         current = current.get(key)
-    return _text(current)
+    return current
+
+
+def _manifest_value(payload: dict[str, Any], path: str) -> Any:
+    if not payload:
+        return None
+    return _nested_value(payload, *[part for part in path.split(".") if part])
+
+
+def _manifest_text(payload: dict[str, Any], *paths: str) -> str | None:
+    for path in paths:
+        text = _text(_manifest_value(payload, path))
+        if text is not None:
+            return text
+    return None
+
+
+def _int(value: Any) -> int:
+    if isinstance(value, bool) or value is None:
+        return 0
+    if isinstance(value, int):
+        return max(0, value)
+    if isinstance(value, float):
+        return max(0, int(value))
+    text = str(value).strip()
+    if not text:
+        return 0
+    try:
+        return max(0, int(float(text)))
+    except ValueError:
+        return 0
+
+
+def _manifest_int(payload: dict[str, Any], *paths: str) -> int:
+    for path in paths:
+        value = _manifest_value(payload, path)
+        if value not in (None, ""):
+            return _int(value)
+    return 0
+
+
+def _training_asset_path(
+    base_dir: Path,
+    payload: dict[str, Any],
+    manifest_paths: tuple[str, ...],
+    default_names: tuple[str, ...],
+) -> Path | None:
+    explicit = _manifest_text(payload, *manifest_paths)
+    explicit_path = _resolve_local_artifact_path(base_dir, explicit)
+    if explicit_path is not None:
+        return explicit_path
+    for name in default_names:
+        candidate = base_dir / name
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def _manifest_env_path() -> Path | None:

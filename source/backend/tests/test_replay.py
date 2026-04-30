@@ -11,7 +11,7 @@ from core.replay_snapshot import SNAPSHOT_FORMAT, export_replay_snapshot, import
 from core.runtime_state import reset_runtime_state
 
 EXPECTED_REPLAY_IDS = {
-    "rondonia_frontier_judge",
+    "rondonia_frontier_showcase",
     "manchar_flood_replay",
     "atacama_mining_replay",
     "singapore_maritime_replay",
@@ -32,7 +32,7 @@ def _reset_runtime_state() -> None:
     reset_runtime_state()
 
 
-def test_replay_catalog_lists_seeded_judge_pack(tmp_path, monkeypatch):
+def test_replay_catalog_lists_seeded_showcase_pack(tmp_path, monkeypatch):
     monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
     monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
     monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
@@ -41,8 +41,8 @@ def test_replay_catalog_lists_seeded_judge_pack(tmp_path, monkeypatch):
     payload = replay_catalog()
 
     assert "replays" in payload
-    replay = next(item for item in payload["replays"] if item["replay_id"] == "rondonia_frontier_judge")
-    assert replay["title"] == "Rondonia Frontier Judge Replay"
+    replay = next(item for item in payload["replays"] if item["replay_id"] == "rondonia_frontier_showcase")
+    assert replay["title"] == "Rondonia Frontier Showcase Replay"
     assert replay["primary_cell_id"] == "sq_-10.0_-63.0"
     assert replay["alert_count"] == 4
 
@@ -59,10 +59,10 @@ def test_replay_load_seeds_runtime_surfaces(tmp_path, monkeypatch):
     monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
     _reset_runtime_state()
 
-    payload = replay_load("rondonia_frontier_judge")
+    payload = replay_load("rondonia_frontier_showcase")
 
     assert isinstance(payload, dict)
-    assert payload["replay_id"] == "rondonia_frontier_judge"
+    assert payload["replay_id"] == "rondonia_frontier_showcase"
     assert payload["primary_cell_id"] == "sq_-10.0_-63.0"
     assert payload["alerts_loaded"] == 4
     assert payload["mission"]["mission_mode"] == "replay"
@@ -71,7 +71,7 @@ def test_replay_load_seeds_runtime_surfaces(tmp_path, monkeypatch):
     current = mission_current()
     assert current["mission"] is not None
     assert current["mission"]["mission_mode"] == "replay"
-    assert current["mission"]["replay_id"] == "rondonia_frontier_judge"
+    assert current["mission"]["replay_id"] == "rondonia_frontier_showcase"
 
     recent_alerts = get_recent_alerts(limit=10)["alerts"]
     assert len(recent_alerts) == 4
@@ -170,7 +170,7 @@ def test_replay_stop_restores_live_mode_note(tmp_path, monkeypatch):
     monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
     _reset_runtime_state()
 
-    replay_load("rondonia_frontier_judge")
+    replay_load("rondonia_frontier_showcase")
 
     payload = mission_stop()
 
@@ -227,7 +227,7 @@ def test_replay_snapshot_export_import_round_trips_runtime_surfaces(tmp_path, mo
     monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
     _reset_runtime_state()
 
-    replay_load("rondonia_frontier_judge")
+    replay_load("rondonia_frontier_showcase")
     snapshot = export_replay_snapshot(limit=50)
 
     assert snapshot["format"] == SNAPSHOT_FORMAT

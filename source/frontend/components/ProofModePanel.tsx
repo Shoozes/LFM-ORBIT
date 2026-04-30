@@ -3,7 +3,7 @@ import type { Mission } from "../types/mission";
 import type { AlertItem, ApiMetricsSummary, RecentAlertsResponse } from "../types/telemetry";
 import { formatReasonCode, formatSourceLabel } from "../utils/telemetry";
 
-type DemoCase = "judge" | "payload" | "provenance" | "abstain" | "eclipse";
+type DemoCase = "showcase" | "payload" | "provenance" | "abstain" | "eclipse";
 
 type GalleryItem = {
   context_thumb: string | null;
@@ -30,7 +30,7 @@ type VlmCaptionResponse = {
   caption?: string;
 };
 
-type JudgeProof = {
+type ProofJson = {
   demo: string;
   replay_id: string;
   model: string;
@@ -72,7 +72,7 @@ type DtnProof = {
   proof_message_ids?: number[];
 };
 
-type JudgeModePanelProps = {
+type ProofModePanelProps = {
   apiBaseUrl: string;
   demoCase: DemoCase;
   mission: Mission | null;
@@ -83,14 +83,14 @@ type JudgeModePanelProps = {
   onStepChange?: (stepIndex: number) => void;
 };
 
-const JUDGE_REPLAY_ID = "rondonia_frontier_judge";
-const JUDGE_MODEL = "Liquid evidence reviewer (LFM2.5-VL-450M handoff-ready)";
-const JUDGE_BBOX = [-63.15, -10.15, -62.85, -9.85];
+const SHOWCASE_REPLAY_ID = "rondonia_frontier_showcase";
+const SHOWCASE_MODEL = "Liquid evidence reviewer (LFM2.5-VL-450M handoff-ready)";
+const SHOWCASE_BBOX = [-63.15, -10.15, -62.85, -9.85];
 const RAW_FRAME_BYTES = 1_840_000;
 const ALERT_JSON_BYTES = 1_240;
 const SEEDED_LATENCY_MS = 842;
 const FALLBACK_CAPTURE_TIME = "2025-01-15";
-const JUDGE_PROMPT = "Find fresh clearing and road-edge canopy loss.";
+const SHOWCASE_PROMPT = "Find fresh clearing and road-edge canopy loss.";
 const COUNTED_ALERT_FIELDS = [
   "status",
   "result",
@@ -111,7 +111,7 @@ const EXCLUDED_PAYLOAD_FIELDS = [
   "payload_accounting metadata",
 ];
 const DEMO_TITLES: Record<DemoCase, string> = {
-  judge: "Judge walkthrough proof",
+  showcase: "Showcase proof",
   payload: "Pakistan flood payload reduction proof",
   provenance: "Atacama provenance proof",
   abstain: "Greenland abstain safety proof",
@@ -119,7 +119,7 @@ const DEMO_TITLES: Record<DemoCase, string> = {
 };
 
 const DEMO_STORY_LINES: Record<DemoCase, string[]> = {
-  judge: [
+  showcase: [
     "Satellite saw too much data.",
     "Edge triage ignored noise.",
     "Liquid reasoning checked the retained evidence packet.",
@@ -135,7 +135,7 @@ const DEMO_STORY_LINES: Record<DemoCase, string[]> = {
     "Provider, capture time, mine bbox, and task stay attached.",
     "The prompt and model name are recorded.",
     "The output JSON is visible for audit.",
-    "Judges can verify the chain without narration.",
+    "Reviewers can verify the chain without narration.",
   ],
   abstain: [
     "The ice mission bbox was selected.",
@@ -152,7 +152,7 @@ const DEMO_STORY_LINES: Record<DemoCase, string[]> = {
 };
 
 const DEMO_REASON_CODES: Record<DemoCase, string[]> = {
-  judge: ["ndvi_drop", "nbr_drop", "soil_exposure_spike"],
+  showcase: ["ndvi_drop", "nbr_drop", "soil_exposure_spike"],
   payload: ["flood_extent", "compact_json", "downlink_saved"],
   provenance: ["provider_bound", "capture_time", "bbox_bound"],
   abstain: ["quality_gate_failed", "low_confidence", "no_transmit"],
@@ -178,14 +178,14 @@ type DemoProfile = {
 };
 
 const DEMO_PROFILES: Record<DemoCase, DemoProfile> = {
-  judge: {
-    replayId: JUDGE_REPLAY_ID,
+  showcase: {
+    replayId: SHOWCASE_REPLAY_ID,
     provider: "Replay (Cached API Imagery)",
-    bbox: JUDGE_BBOX,
+    bbox: SHOWCASE_BBOX,
     result: "forest boundary disturbance detected",
     mission: "Rondonia frontier canopy-loss replay",
     captureTime: FALLBACK_CAPTURE_TIME,
-    prompt: JUDGE_PROMPT,
+    prompt: SHOWCASE_PROMPT,
     confidence: 0.82,
     latencyMs: SEEDED_LATENCY_MS,
     cellId: "sq_-10.0_-63.0",
@@ -269,7 +269,7 @@ function demoName(demoCase: DemoCase): string {
   if (demoCase === "provenance") return "provenance";
   if (demoCase === "abstain") return "abstain-safety";
   if (demoCase === "eclipse") return "orbital-eclipse";
-  return "judge-mode";
+  return "showcase";
 }
 
 function formatBytes(bytes: number): string {
@@ -283,7 +283,7 @@ function formatRatio(ratio: number | null): string {
   return `${Math.floor(ratio).toLocaleString()}x`;
 }
 
-function buildPayloadAccounting(isAbstain: boolean): JudgeProof["payload_accounting"] {
+function buildPayloadAccounting(isAbstain: boolean): ProofJson["payload_accounting"] {
   if (isAbstain) {
     return {
       raw_payload_basis: "candidate satellite frame bytes before edge triage",
@@ -317,7 +317,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-function buildFallbackProof(demoCase: DemoCase): JudgeProof {
+function buildFallbackProof(demoCase: DemoCase): ProofJson {
   const isAbstain = demoCase === "abstain";
   const profile = DEMO_PROFILES[demoCase];
   const ratio = isAbstain ? null : Number((RAW_FRAME_BYTES / ALERT_JSON_BYTES).toFixed(2));
@@ -325,7 +325,7 @@ function buildFallbackProof(demoCase: DemoCase): JudgeProof {
   return {
     demo: demoName(demoCase),
     replay_id: profile.replayId,
-    model: JUDGE_MODEL,
+    model: SHOWCASE_MODEL,
     provider: profile.provider,
     bbox: profile.bbox,
     latency_ms: profile.latencyMs,
@@ -388,7 +388,7 @@ function proofString(value: unknown, fallback = "unknown"): string {
   return fallback;
 }
 
-export default function JudgeModePanel({
+export default function ProofModePanel({
   apiBaseUrl,
   demoCase,
   mission,
@@ -397,7 +397,7 @@ export default function JudgeModePanel({
   selectedCellId,
   onClose,
   onStepChange,
-}: JudgeModePanelProps) {
+}: ProofModePanelProps) {
   const [recentAlerts, setRecentAlerts] = useState<AlertItem[]>(alerts);
   const [metrics, setMetrics] = useState<ApiMetricsSummary | null>(metricsSummary);
   const [galleryItem, setGalleryItem] = useState<GalleryItem | null>(null);
@@ -408,7 +408,7 @@ export default function JudgeModePanel({
   const [vqaAnswer, setVqaAnswer] = useState(DEMO_PROFILES[demoCase].vqa);
   const [caption, setCaption] = useState(DEMO_PROFILES[demoCase].caption);
   const [observedLatencyMs, setObservedLatencyMs] = useState<number | null>(null);
-  const [proof, setProof] = useState<JudgeProof>(() => buildFallbackProof(demoCase));
+  const [proof, setProof] = useState<ProofJson>(() => buildFallbackProof(demoCase));
   const [linkOffline, setLinkOffline] = useState(false);
   const [queueCount, setQueueCount] = useState(0);
   const [flushedQueueCount, setFlushedQueueCount] = useState(0);
@@ -423,7 +423,7 @@ export default function JudgeModePanel({
     setMetrics(metricsSummary);
   }, [metricsSummary]);
 
-  const usesReplayEvidence = Boolean(mission?.replay_id) || demoCase === "judge";
+  const usesReplayEvidence = Boolean(mission?.replay_id) || demoCase === "showcase";
 
   const activeAlert = useMemo(() => {
     if (selectedCellId) {
@@ -460,8 +460,8 @@ export default function JudgeModePanel({
       if (usesReplayEvidence) {
         await sleep(700);
         onStepChange?.(4);
-        const bbox = mission?.bbox ?? JUDGE_BBOX;
-        const replayPrompt = mission?.task_text ?? JUDGE_PROMPT;
+        const bbox = mission?.bbox ?? SHOWCASE_BBOX;
+        const replayPrompt = mission?.task_text ?? SHOWCASE_PROMPT;
         const startedAt = performance.now();
         const [groundingPayload, vqaPayload, captionPayload] = await Promise.all([
           fetchJson<VlmGroundingResponse>(`${apiBaseUrl}/api/vlm/grounding`, {
@@ -569,7 +569,7 @@ export default function JudgeModePanel({
     setProof({
       demo: demoName(demoCase),
       replay_id: usesReplayEvidence ? mission?.replay_id ?? mission?.use_case_id ?? profile.replayId : profile.replayId,
-      model: JUDGE_MODEL,
+      model: SHOWCASE_MODEL,
       provider,
       bbox,
       latency_ms: usesReplayEvidence ? SEEDED_LATENCY_MS : profile.latencyMs,
@@ -643,10 +643,10 @@ export default function JudgeModePanel({
   const alertsEmitted = metrics?.total_alerts_emitted ?? mission?.flags_found ?? 4;
 
   return (
-    <div data-testid="judge-mode-panel" className="absolute inset-0 z-40 flex flex-col bg-zinc-950 text-zinc-100">
+    <div data-testid="proof-mode-panel" className="absolute inset-0 z-40 flex flex-col bg-zinc-950 text-zinc-100">
       <header className="flex shrink-0 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-5 py-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-300">Judge Mode</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-300">Proof Mode</p>
           <h1 data-testid="demo-title" className="text-xl font-semibold text-white">
             {DEMO_TITLES[demoCase]}
           </h1>
@@ -672,7 +672,7 @@ export default function JudgeModePanel({
               {usesReplayEvidence ? "Replay Position" : "Mission Position"}
             </p>
             <h2 className="mt-1 text-sm font-semibold text-white">
-              {usesReplayEvidence ? mission?.replay_id ?? JUDGE_REPLAY_ID : mission?.use_case_id ?? DEMO_PROFILES[demoCase].replayId}
+              {usesReplayEvidence ? mission?.replay_id ?? SHOWCASE_REPLAY_ID : mission?.use_case_id ?? DEMO_PROFILES[demoCase].replayId}
             </h2>
           </div>
           <div className="grid grid-cols-3 gap-2">

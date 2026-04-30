@@ -1,9 +1,9 @@
 {
-  "replay_id": "rondonia_frontier_judge",
-  "title": "Rondonia Frontier Judge Replay",
-  "description": "Completed mission replay seeded with local Sentinel Hub timelapses, alert evidence, and agent decisions for a compact judge-friendly walkthrough.",
+  "replay_id": "rondonia_frontier_showcase",
+  "title": "Rondonia Frontier Showcase Replay",
+  "description": "Completed mission replay seeded with local Sentinel Hub timelapses, alert evidence, and agent decisions for a compact product walkthrough.",
   "task_text": "Replay a completed orbit-to-ground mission across the Rondonia western frontier. Review why the system escalated a subset of cells and how the evidence supports a durable canopy-loss conclusion.",
-  "summary": "A seeded replay of corridor-style canopy loss across a frontier clearing zone. Four cells are promoted into Inspect with cached timelapses, grounded notes, and agent dialogue so judges can follow the decision chain without waiting on a live scan.",
+  "summary": "A seeded replay of corridor-style canopy loss across a frontier clearing zone. Four cells are promoted into Inspect with cached timelapses, grounded notes, and agent dialogue so reviewers can follow the decision chain without waiting on a live scan.",
   "bbox": [
     -63.15,
     -10.15,

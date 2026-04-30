@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { openDemo, saveProofArtifacts } from "./demoHelpers";
 
-test("judge mode records deterministic evidence proof", async ({ page, request }, testInfo) => {
-  await openDemo(page, request, "judge");
+test("showcase records deterministic evidence proof", async ({ page, request }, testInfo) => {
+  await openDemo(page, request, "showcase");
 
-  await expect(page.getByTestId("demo-title")).toContainText("Judge walkthrough proof");
+  await expect(page.getByTestId("demo-title")).toContainText("Showcase proof");
   await expect(page.getByTestId("satellite-frame")).toBeVisible();
   await expect(page.getByTestId("proof-timelapse-video")).toBeVisible();
   await expect(page.getByTestId("timelapse-integrity")).toContainText("25 contextual frames");
@@ -15,9 +15,9 @@ test("judge mode records deterministic evidence proof", async ({ page, request }
   await expect(page.getByTestId("proof-payload-accounting")).toContainText("compact downlink alert JSON only");
   await expect(page.getByTestId("proof-reduction-ratio")).toContainText("1,483x");
 
-  const proof = await saveProofArtifacts(page, "judge-mode", testInfo);
-  expect(proof.demo).toBe("judge-mode");
-  expect(proof.replay_id).toBe("rondonia_frontier_judge");
+  const proof = await saveProofArtifacts(page, "showcase", testInfo);
+  expect(proof.demo).toBe("showcase");
+  expect(proof.replay_id).toBe("rondonia_frontier_showcase");
   expect(proof.abstained).toBe(false);
   expect(proof.result).toContain("forest boundary disturbance");
   expect(proof.raw_payload_bytes).toBe(1_840_000);

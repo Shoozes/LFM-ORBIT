@@ -125,9 +125,48 @@ test("screenshot: full mission control — replay ready", async ({ page, request
   await waitForLinkOpen(page);
   await waitForBasemapReady(page);
   await page.locator("[data-testid='tab-mission']").click();
-  await expect(page.getByText("Replay Mission · rondonia_frontier_judge")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Replay Mission · rondonia_frontier_showcase")).toBeVisible({ timeout: 15_000 });
   await page.screenshot({
     path: `${SHOT_DIR}/05-mission-control-scanning.png`,
     fullPage: false,
   });
+});
+
+// ── 6. Ground Agent chat-driven operation proposal ─────────────────────────
+
+test("screenshot: Ground Agent proposes wildfire replay from chat", async ({ page, request }) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 1440, height: 1400 });
+  await resetRuntimeState(request);
+  await gotoApp(page);
+  await waitForLinkOpen(page);
+  await waitForBasemapReady(page);
+  await page.locator("[data-testid='tab-agents']").click();
+  await waitForAgentDialogue(page);
+
+  const chatInput = page.getByPlaceholder("Request replay, mission pack, link action...");
+  await chatInput.fill("replay a wildfire mission");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const userMessage = page
+    .getByTestId("ground-agent-message-user")
+    .filter({ hasText: "replay a wildfire mission" });
+  const proposal = page.getByTestId("ground-agent-proposal-card");
+  await expect(proposal).toBeVisible({ timeout: 15_000 });
+  await expect(userMessage).toBeVisible();
+  await expect(proposal.getByText("Load replay: Highway 82 Wildfire Candidate Replay")).toBeVisible();
+  await expect(proposal.getByText("georgia_wildfire_replay")).toBeVisible();
+  await expect(proposal.getByText("replay a wildfire mission")).toBeVisible();
+  await expect(proposal.getByText("cached_api")).toBeVisible();
+  await expect(proposal.getByText("State Impact")).toBeVisible();
+  await expect(proposal.getByRole("button", { name: "Run Replay" })).toBeVisible();
+
+  await page.screenshot({
+    path: "../../docs/readme-ground-agent-chat-action.png",
+    fullPage: false,
+  });
+
+  await page.getByTestId("ground-agent-run-proposal").click();
+  await expect(page.getByText("Loaded replay `georgia_wildfire_replay`")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("load replay - georgia_wildfire_replay")).toBeVisible({ timeout: 10_000 });
 });

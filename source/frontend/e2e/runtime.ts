@@ -1,6 +1,10 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import { API_BASE } from "./testUrls";
 
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function gotoApp(page: Page, path = "/") {
   let lastError: unknown;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -12,7 +16,7 @@ export async function gotoApp(page: Page, path = "/") {
       if (attempt === 3) {
         throw error;
       }
-      await page.waitForTimeout(500 * attempt);
+      await delay(500 * attempt);
     }
   }
 
@@ -38,14 +42,14 @@ export async function resetRuntimeState(
       if (attempt === 3) {
         throw error;
       }
-      await new Promise((resolve) => setTimeout(resolve, 350));
+      await delay(350);
     }
   }
 
   throw lastError;
 }
 
-export async function loadSeededReplay(request: APIRequestContext, replayId = "rondonia_frontier_judge") {
+export async function loadSeededReplay(request: APIRequestContext, replayId = "rondonia_frontier_showcase") {
   const response = await request.post(`${API_BASE}/api/replay/load/${replayId}`);
   expect(response.ok()).toBeTruthy();
   return response.json();
@@ -72,7 +76,39 @@ export async function waitForLinkOpen(page: Page, timeoutMs = 30_000) {
 
 export async function waitForBasemapReady(page: Page, timeoutMs = 20_000) {
   await expect(page.getByText(/Esri World Imagery/)).toBeVisible({ timeout: timeoutMs });
-  await page.waitForTimeout(750);
+  await waitForNextPaint(page);
+}
+
+export async function waitForNextPaint(page: Page, frames = 2) {
+  await page.evaluate((frameCount) => new Promise<void>((resolve) => {
+    let remaining = Math.max(1, frameCount);
+    const tick = () => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        resolve();
+        return;
+      }
+      window.requestAnimationFrame(tick);
+    };
+    window.requestAnimationFrame(tick);
+  }), frames);
+}
+
+export async function waitForVideoReady(page: Page, selector = "video", timeoutMs = 10_000) {
+  await page.waitForFunction(
+    (videoSelector) => {
+      const video = document.querySelector(videoSelector);
+      return (
+        video instanceof HTMLVideoElement &&
+        video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+        video.clientWidth > 0 &&
+        video.clientHeight > 0
+      );
+    },
+    selector,
+    { timeout: timeoutMs },
+  );
+  await waitForNextPaint(page);
 }
 
 export async function openMapContextMenu(

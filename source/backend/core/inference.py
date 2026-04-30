@@ -20,6 +20,7 @@ import threading
 from typing import Iterator
 
 from core.model_manifest import resolve_satellite_model_artifact
+from core.multimodal_inference import multimodal_status
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,8 @@ def _load_llama_model(llama_cls, kwargs: dict):
 
     class _OrbitSafeJinjaFormatter:
         def __init__(self, *args, **kwargs):
-            pass
+            self.args = args
+            self.kwargs = kwargs
 
         def to_chat_handler(self):
             return chat_format_module.get_chat_completion_handler(fallback_format)
@@ -121,6 +123,14 @@ def model_status() -> dict:
         return payload
     payload["loaded"] = False
     payload["reason"] = "not yet attempted"
+    return payload
+
+
+def runtime_capabilities() -> dict:
+    """Report GGUF load state separately from direct image-runtime capability."""
+    artifact = resolve_satellite_model_artifact()
+    payload = multimodal_status(artifact)
+    payload["gguf_loaded"] = _model is not None
     return payload
 
 

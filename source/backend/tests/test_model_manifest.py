@@ -24,8 +24,25 @@ def test_resolve_satellite_model_artifact_reads_manifest(monkeypatch, tmp_path):
     runtime_dir = tmp_path / "runtime-data"
     model_dir = runtime_dir / "models" / "nm-uni-orbit"
     model_dir.mkdir(parents=True, exist_ok=True)
+    (model_dir / "hf-checkpoint").mkdir()
+    (model_dir / "lora-adapter").mkdir()
     (model_dir / "source_handoff.json").write_text("{\"repo_id\": \"example/orbit-satellite\"}", encoding="utf-8")
-    (model_dir / "training_result_manifest.json").write_text("{\"run_id\": \"orbit-run-1\"}", encoding="utf-8")
+    (model_dir / "training_result_manifest.json").write_text(
+        """
+{
+  "run_id": "orbit-run-1",
+  "method": "vlm_sft",
+  "base_model": "LiquidAI/LFM2.5-VL-450M",
+  "train_rows": 32,
+  "multimodal_rows": 32,
+  "image_blocks": 44,
+  "eval_rows": 0,
+  "hf_checkpoint_path": "hf-checkpoint",
+  "lora_adapter_path": "lora-adapter"
+}
+""".strip(),
+        encoding="utf-8",
+    )
     (model_dir / "README.md").write_text("# Orbit Bundle\n", encoding="utf-8")
     manifest_path = model_dir / model_manifest.DEFAULT_MANIFEST_FILENAME
     manifest_path.write_text(
@@ -73,6 +90,63 @@ def test_resolve_satellite_model_artifact_reads_manifest(monkeypatch, tmp_path):
     assert status["source_handoff_present"] is True
     assert status["training_result_manifest_present"] is True
     assert status["readme_present"] is True
+    assert status["training_method"] == "vlm_sft"
+    assert status["training_modality"] == "image_text"
+    assert status["image_training_verified"] is True
+    assert status["training_train_rows"] == 32
+    assert status["training_multimodal_rows"] == 32
+    assert status["training_image_blocks"] == 44
+    assert status["training_eval_rows"] == 0
+    assert status["hf_checkpoint_present"] is True
+    assert status["lora_adapter_present"] is True
+    assert status["runtime_inference_mode"] == "text_evidence_packet"
+    assert status["image_conditioned_runtime_enabled"] is False
+
+
+def test_training_status_reads_nested_nm_uni_manifest(monkeypatch, tmp_path):
+    runtime_dir = tmp_path / "runtime-data"
+    model_dir = runtime_dir / "models" / "lfm2.5-vlm-450m"
+    model_dir.mkdir(parents=True, exist_ok=True)
+    (model_dir / "training_result_manifest.json").write_text(
+        """
+{
+  "training": {
+    "method": "vlm_sft",
+    "source_model_path": "LiquidAI/LFM2.5-VL-450M"
+  },
+  "dataset_summary": {
+    "rows": 32,
+    "multimodal_rows": 32,
+    "image_blocks": 44
+  },
+  "eval_rows": 0
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    (model_dir / model_manifest.DEFAULT_MANIFEST_FILENAME).write_text(
+        """
+{
+  "model_subdir": "lfm2.5-vlm-450m",
+  "model_filename": "LFM2.5-VL-450M-Q4_0.gguf",
+  "training_result_manifest": "training_result_manifest.json"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(runtime_dir))
+    monkeypatch.setenv("CANOPY_SENTINEL_MODEL_SUBDIR", "lfm2.5-vlm-450m")
+    monkeypatch.delenv("CANOPY_SENTINEL_MODEL_MANIFEST", raising=False)
+
+    status = model_manifest.resolve_satellite_model_artifact().to_status_dict()
+
+    assert status["training_method"] == "vlm_sft"
+    assert status["training_base_model"] == "LiquidAI/LFM2.5-VL-450M"
+    assert status["training_modality"] == "image_text"
+    assert status["image_training_verified"] is True
+    assert status["training_train_rows"] == 32
+    assert status["training_multimodal_rows"] == 32
+    assert status["training_image_blocks"] == 44
 
 
 def test_satellite_model_smoke_skips_when_optional_model_missing(monkeypatch, tmp_path):

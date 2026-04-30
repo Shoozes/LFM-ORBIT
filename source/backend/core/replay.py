@@ -2,7 +2,7 @@
 
 Loads curated, local-first replay packs into the existing runtime tables so
 the standard Mission / Logs / Inspect / Agent Dialogue surfaces can walk a
-judge through a completed mission without waiting for a realtime scan loop.
+reviewer through a completed mission without waiting for a realtime scan loop.
 """
 
 from __future__ import annotations

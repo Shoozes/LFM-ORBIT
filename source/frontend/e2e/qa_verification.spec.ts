@@ -91,6 +91,37 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await expect(page.getByText("[Link Error: Mock assistant outage]")).toBeVisible({ timeout: 10_000 });
   });
 
+  test("verify Ground Agent proposal confirmation surfaces action errors", async ({ page }) => {
+    await page.route("**/api/agent/action/confirm", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          reply: "Mock confirm rejected",
+          actions: [
+            {
+              name: "set_link_state",
+              status: "error",
+              result: { error: "Mock confirm rejected" },
+            },
+          ],
+          suggestions: ["List replays"],
+        }),
+      });
+    });
+
+    await page.getByTestId("tab-agents").click();
+    await page.getByPlaceholder("Request replay, mission pack, link action...").fill("set link offline");
+    await page.getByRole("button", { name: "Send" }).click();
+
+    const proposal = page.getByTestId("ground-agent-proposal-card");
+    await expect(proposal).toBeVisible({ timeout: 10_000 });
+    await proposal.getByRole("button", { name: "Set Offline" }).click();
+
+    await expect(proposal.getByText("Mock confirm rejected")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("set link state - Mock confirm rejected")).toBeVisible();
+  });
+
   test("verify Agent Dialogue surfaces bus failures", async ({ page }) => {
     await page.route("**/api/agent/bus/stats", async (route) => {
       await route.fulfill({

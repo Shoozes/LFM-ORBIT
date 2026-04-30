@@ -1,15 +1,15 @@
-# Judge Demo
+# Hackathon Demo
 
-This is the recorded proof path for the Liquid AI x DPhi Space Hackathon submission.
+This is the recorded showcase path for the Liquid AI x DPhi Space Hackathon submission.
 
-The hackathon integration target is DPhi Space SimSat. The judge proof does not require Sentinel Hub credentials; bundled replay fixtures and SimSat-first runtime defaults keep the demo deterministic and quota-free.
+The hackathon integration target is DPhi Space SimSat. The recorded showcase does not require Sentinel Hub credentials; bundled replay fixtures and SimSat-first runtime defaults keep the demo deterministic and quota-free.
 
-Run the main recorded proof:
+Run the main recorded showcase:
 
 ```bash
 cd source/frontend
 npm ci
-npm run demo:judge
+npm run demo:showcase
 ```
 
 What it proves:
@@ -26,11 +26,11 @@ What it proves:
 Artifacts:
 
 ```txt
-source/frontend/e2e/artifacts/judge-mode/final-screen.png
-source/frontend/e2e/artifacts/judge-mode/evidence-frame.png
-source/frontend/e2e/artifacts/judge-mode/video.webm
-source/frontend/e2e/artifacts/judge-mode/proof.json
-docs/judge-mode-demo.webm
+source/frontend/e2e/artifacts/showcase/final-screen.png
+source/frontend/e2e/artifacts/showcase/evidence-frame.png
+source/frontend/e2e/artifacts/showcase/video.webm
+source/frontend/e2e/artifacts/showcase/proof.json
+docs/showcase-demo.webm
 ```
 
 Payload accounting: `raw_payload_bytes` represents the local satellite frame payload. `alert_payload_bytes` represents the compact alert JSON that would be downlinked. The larger proof artifact envelope, screenshots, video, trace, and UI-only audit fields are intentionally excluded and are listed in `proof.json` under `payload_accounting.excluded_from_alert_payload_bytes`.
@@ -51,7 +51,7 @@ Docs video exports:
 
 | Demo | Video |
 |---|---|
-| Judge Mode | `docs/judge-mode-demo.webm` |
+| Main Showcase | `docs/showcase-demo.webm` |
 | Payload Reduction | `docs/payload-reduction-demo.webm` |
 | Provenance | `docs/provenance-demo.webm` |
 | Greenland Abstain Safety | `docs/abstain-safety-demo.webm` |
@@ -60,17 +60,17 @@ Docs video exports:
 
 Current mission split:
 
-1. Judge Mode uses the deterministic Rondonia replay and cached real API WebM evidence.
+1. Main Showcase uses the deterministic Rondonia replay and cached real API WebM evidence.
 2. Payload reduction uses a Pakistan Manchar Lake flood frame and compresses a flood alert to JSON.
 3. Provenance uses an Atacama open-pit mining frame and keeps source, capture time, bbox, prompt, and model together.
 4. Abstain safety uses the Greenland ice preset and shows no alert transmitted after the quality gate fails.
 5. Orbital eclipse uses the Suez maritime preset, queues compact JSON while offline, then flushes on restore. Its proof JSON includes `link_state_before`, `queued_alerts_before_restore`, `link_state_after`, `flushed_alerts`, and `queue_source = agent_bus_unread_messages`.
 
-The tutorial walkthrough uses the app like an operator: load the Singapore maritime replay, inspect and analyze the retained alert, replace it with the Atacama mining replay, inspect that alert, then open Judge Mode on the active replay. The current recorded file is about 28 seconds and has distinct sampled frames across mission catalog, maritime evidence, Atacama evidence, and proof panel views.
+The tutorial walkthrough uses the app like an operator: load the Singapore maritime replay, inspect and analyze the retained alert, replace it with the Atacama mining replay, inspect that alert, then open the proof panel on the active replay. The current recorded file is about 28 seconds and has distinct sampled frames across mission catalog, maritime evidence, Atacama evidence, and proof panel views.
 
-Replay-backed Judge Mode can now keep the active replay instead of forcing Rondonia, so mission-specific proof copy stays attached to maritime, mining, flood, wildfire, and urban replay packs. Some development replay fixtures use visible Sentinel-2 L2A frames and explicitly reject invalid still-image color-shift timelapses. Their real monthly WebMs are kept in the legacy `source/backend/assets/seeded_data/` cache for dataset export and training, but they are not a Sentinel Hub dependency for judges.
+Replay-backed proof mode can now keep the active replay instead of forcing Rondonia, so mission-specific proof copy stays attached to maritime, mining, flood, wildfire, and urban replay packs. Some development replay fixtures use visible Sentinel-2 L2A frames and explicitly reject invalid still-image color-shift timelapses. Their real monthly WebMs are kept in the legacy `source/backend/assets/seeded_data/` cache for dataset export and training, but they are not a Sentinel Hub dependency for the default demo.
 
-Current runtime wording: SimSat is the primary realtime lane. Replay fixtures are used for deterministic judging. Liquid runtime currently reasons over scored evidence packets unless a manifest-resolved multimodal model bundle is installed.
+Current runtime wording: SimSat is the primary realtime lane. Replay fixtures are used for deterministic demos. Liquid runtime currently reasons over scored evidence packets unless a manifest-resolved multimodal model bundle is installed.
 
 Replay WebMs may include cloudy context frames, but the proof panel keeps playback inside a clearer evidence window for final screenshots. Cloudy/no-data frames remain quality-gated in seeded creation and do not become positive detections.
 
@@ -93,7 +93,7 @@ cd source/backend
 uv run --no-sync python scripts/seed_sentinel_cache.py --target rondoniaWS --grid 3 --cell-dim 0.05 --start 2023-01 --end 2025-01 --force --skip-vlm-metadata
 ```
 
-This is useful for local real-data testing and dataset refreshes. It is not part of the DPhi SimSat judge path. Credentials can come from environment variables, `.tools/.secrets/sentinel.txt`, or `.tools/.secrets/sh.txt`. The Process API path needs an OAuth client id and client secret, either as `SH_CLIENT_ID`/`SH_CLIENT_SECRET` assignments or the legacy two-line secret-then-id format. A single OGC/WMS instance id is only usable if its `GetCapabilities` endpoint is valid; it is not enough for Process API seeding.
+This is useful for local real-data testing and dataset refreshes. It is not part of the DPhi SimSat showcase path. Credentials can come from environment variables, `.tools/.secrets/sentinel.txt`, or `.tools/.secrets/sh.txt`. The Process API path needs an OAuth client id and client secret, either as `SH_CLIENT_ID`/`SH_CLIENT_SECRET` assignments or the legacy two-line secret-then-id format. A single OGC/WMS instance id is only usable if its `GetCapabilities` endpoint is valid; it is not enough for Process API seeding.
 
 The current local `sh.txt` label format is also supported:
 

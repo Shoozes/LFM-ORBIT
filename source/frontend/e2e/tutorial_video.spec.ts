@@ -42,7 +42,7 @@ test("Tutorial: mission replay workflow across maritime and mining evidence", as
 
   await page.getByTestId("alert-button").filter({ hasText: "maritime_singapore_strait" }).click();
   await expect(page.getByText("Cached API Replay Evidence", { exact: true })).toBeVisible({ timeout: 15_000 });
-  await showSubtitle(page, "Inspect shows the evidence frame, reason codes, and replay provenance a judge can verify.", 1900);
+  await showSubtitle(page, "Inspect shows the evidence frame, reason codes, and replay provenance for review.", 1900);
 
   await moveMouseToHighlight(page, "[data-testid='analyze-button']");
   await page.locator("[data-testid='analyze-button']").click();
@@ -66,11 +66,11 @@ test("Tutorial: mission replay workflow across maritime and mining evidence", as
   await expect(page.getByText("Cached API Replay Evidence", { exact: true })).toBeVisible({ timeout: 15_000 });
   await showSubtitle(page, "Different mission, different geography, different evidence category. Same operator flow.", 1900);
 
-  await showSubtitle(page, "Open Judge Mode to export the proof screen with payload, latency, model, and provenance fields.", 1900);
-  await moveMouseToHighlight(page, "[data-testid='judge-mode-button']");
-  await page.getByTestId("judge-mode-button").click();
+  await showSubtitle(page, "Open Proof Mode to export the proof screen with payload, latency, model, and provenance fields.", 1900);
+  await moveMouseToHighlight(page, "[data-testid='proof-mode-button']");
+  await page.getByTestId("proof-mode-button").click();
   await removeHighlight(page);
-  await expect(page.getByTestId("judge-mode-panel")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("proof-mode-panel")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("proof-json")).toBeVisible({ timeout: 30_000 });
   await showSubtitle(page, "The final frame is useful muted: image, bbox, evidence, model output, and JSON proof are all on screen.", 2200);
   await hideSubtitle(page);

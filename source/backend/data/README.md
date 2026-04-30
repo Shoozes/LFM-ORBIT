@@ -58,7 +58,7 @@ If a context thumbnail falls back to an offline SVG chip, the exporter rasterize
 
 ## Optional Sentinel Replay Data
 
-LFM Orbit's hackathon runtime is DPhi Space SimSat-first. Sentinel Hub is optional support for local real-data testing, replay-cache refreshes, and dataset development; judges should not need Sentinel Hub credentials.
+LFM Orbit's hackathon runtime is DPhi Space SimSat-first. Sentinel Hub is optional support for local real-data testing, replay-cache refreshes, and dataset development; the default showcase does not need Sentinel Hub credentials.
 
 High-quality replay timelapses can be refreshed from Sentinel Hub and then reused by demos and dataset export through the existing `assets/seeded_data/sh_<signature>.webm` cache. The folder name is legacy; the data is stored real API imagery, not generated evidence.
 
