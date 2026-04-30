@@ -68,22 +68,6 @@ Every alert keeps provider, capture time, bbox, evidence path, confidence, promp
 
 Bad imagery does not become a confident answer. Cloud/no-data gates, spectral contracts, and replay integrity checks can withhold transmission.
 
-## Architecture In 60 Seconds
-
-```mermaid
-flowchart LR
-  A[DPhi SimSat imagery] --> B[Scene QC]
-  B --> C[Agent 1: scan + prune]
-  C -->|discard noise/cloud/empty cells| D[No downlink]
-  C -->|candidate anomaly| E[Evidence packet]
-  E --> F[Agent 2: Liquid evidence reasoning]
-  F --> G[Compact proof JSON]
-  G -->|link online| H[Ground Validator]
-  G -->|link offline| Q[DTN queue]
-  Q -->|restore| H
-  H --> I[Audit UI + dataset export]
-```
-
 Current runtime: SimSat-first imagery lane, deterministic replay fixtures for judging, and Liquid evidence-packet reasoning when a manifest-resolved local model runtime is available. Production image-conditioned `mmproj` inference is not claimed.
 
 ## Validation Snapshot
