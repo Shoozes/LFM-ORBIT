@@ -75,7 +75,7 @@ Operators choose what matters. LFM-ORBIT boxes retained object or area evidence 
 
 ![Object Evidence runtime audit](docs/media/readme/cv-object-evidence-local-audit.png)
 
-The runtime audit capture keeps the same port bbox and records the operator flow without promoting exact-object boat/home claims. The recorded pass is `docs/media/videos/object-evidence-demo.webm`.
+The runtime audit capture uses the audited port review bbox and records the operator flow without promoting exact-object boat/home claims. The recorded pass is `docs/media/videos/object-evidence-demo.webm`.
 
 ### 06. Provenance And Audit
 

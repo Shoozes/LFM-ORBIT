@@ -5,13 +5,32 @@ import { gotoApp, openMapContextMenu, resetRuntimeState, waitForBasemapReady, wa
 import { API_BASE } from "../testUrls";
 import { hideSubtitle, showSubtitle } from "../tutorialHelpers";
 
+const PORT_CONTEXT_BBOX: [number, number, number, number] = [32.515, 29.9, 32.575, 29.955];
+const PORT_AUDITED_CROP: [number, number, number, number] = [0.60, 0.05, 0.96, 0.43];
+
+function cropToReviewBbox(
+  contextBbox: [number, number, number, number],
+  crop: [number, number, number, number],
+): [number, number, number, number] {
+  const [west, south, east, north] = contextBbox;
+  const [xmin, ymin, xmax, ymax] = crop;
+  return [
+    west + (east - west) * xmin,
+    north - (north - south) * ymax,
+    west + (east - west) * xmax,
+    north - (north - south) * ymin,
+  ];
+}
+
+const PORT_REVIEW_BBOX = cropToReviewBbox(PORT_CONTEXT_BBOX, PORT_AUDITED_CROP);
+
 test("records glowing CV object evidence boxes and tooltips", async ({ page, request }, testInfo) => {
   await resetRuntimeState(request);
   const mission = await request.post(`${API_BASE}/api/mission/start`, {
     data: {
       task_text:
         "Run Port Activity Object Evidence. Look for visible shipping container clusters, docked-vessel groups, and berth basin context.",
-      bbox: [32.515, 29.9, 32.575, 29.955],
+      bbox: PORT_REVIEW_BBOX,
       start_date: "2026-01-01",
       end_date: "2026-02-15",
       use_case_id: "maritime_activity",
@@ -122,7 +141,7 @@ test("records glowing CV object evidence boxes and tooltips", async ({ page, req
 
   await page.getByTestId("tab-mission").click();
   await expect(page.getByText("Run Port Activity Object Evidence")).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByTestId("bbox-badge")).toContainText("[32.52, 29.90, 32.58, 29.95]");
+  await expect(page.getByTestId("bbox-badge")).toContainText("[32.55, 29.93, 32.57, 29.95]");
   await page.getByTestId("mission-panel-tab-targets").click();
   await expect(page.getByTestId("object-targets-panel")).toContainText("shipping container cluster", { timeout: 10_000 });
   await page.getByTestId("mission-panel-tab-plan").click();
@@ -150,10 +169,10 @@ test("records glowing CV object evidence boxes and tooltips", async ({ page, req
   const mapTooltip = page.getByTestId("vlm-box-tooltip");
   let sawMapTooltip = false;
   for (const point of [
+    { x: 0.505, y: 0.335 },
     { x: 0.375, y: 0.695 },
     { x: 0.210, y: 0.680 },
     { x: 0.550, y: 0.480 },
-    { x: 0.505, y: 0.335 },
   ]) {
     await page.mouse.move(canvasBox.x + canvasBox.width * point.x, canvasBox.y + canvasBox.height * point.y, { steps: 12 });
     await waitForNextPaint(page, 2);
@@ -170,7 +189,7 @@ test("records glowing CV object evidence boxes and tooltips", async ({ page, req
   const currentMission = await request.get(`${API_BASE}/api/mission/current`);
   expect(currentMission.ok()).toBeTruthy();
   const currentPayload = await currentMission.json() as { mission?: { bbox?: number[] } };
-  expect(currentPayload.mission?.bbox).toEqual([32.515, 29.9, 32.575, 29.955]);
+  expect(currentPayload.mission?.bbox).toEqual(PORT_REVIEW_BBOX);
 
   const artifactDir = path.resolve("e2e", "artifacts", "object-evidence");
   const artifactScreenshot = path.join(artifactDir, "cv-object-evidence-local-audit.png");
