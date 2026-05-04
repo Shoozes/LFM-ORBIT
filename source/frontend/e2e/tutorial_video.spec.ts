@@ -30,6 +30,9 @@ test.use({
 const execFileAsync = promisify(execFile);
 const RONDONIA_REPLAY_ID = "rondonia_frontier_showcase";
 const RONDONIA_PRIMARY_CELL = "sq_-10.0_-63.0";
+const VOICEOVER_WORDS_PER_MINUTE = 135;
+const VOICEOVER_PAD_MS = 1_200;
+const VOICEOVER_MIN_MS = 4_600;
 
 const FOREST_BOXES = [
   {
@@ -79,6 +82,16 @@ const FOREST_BOXES = [
 async function rondoniaTimelapseDataUrl(): Promise<string> {
   const videoPath = path.resolve("..", "backend", "assets", "seeded_data", "sh_07da3a0b.webm");
   return `data:video/webm;base64,${(await readFile(videoPath)).toString("base64")}`;
+}
+
+function voiceoverDurationMs(text: string, minMs = VOICEOVER_MIN_MS): number {
+  const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+  const readMs = Math.ceil((wordCount / VOICEOVER_WORDS_PER_MINUTE) * 60_000);
+  return Math.max(minMs, readMs + VOICEOVER_PAD_MS);
+}
+
+async function showVoiceoverSubtitle(page: Page, text: string, minMs = VOICEOVER_MIN_MS) {
+  await showSubtitle(page, text, voiceoverDurationMs(text, minMs));
 }
 
 async function mockTutorialVision(page: Page) {
@@ -213,7 +226,7 @@ async function assertTutorialVideoQuality(videoPath: string) {
     videoPath,
   ]);
   const durationSeconds = Number(durationResult.stdout.trim());
-  if (!Number.isFinite(durationSeconds) || durationSeconds < 58 || durationSeconds > 110) {
+  if (!Number.isFinite(durationSeconds) || durationSeconds < 95 || durationSeconds > 190) {
     throw new Error(`Tutorial video should be a paced walkthrough, got ${durationSeconds.toFixed(2)}s.`);
   }
 
@@ -239,7 +252,7 @@ async function assertTutorialVideoQuality(videoPath: string) {
 }
 
 test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request }, testInfo) => {
-  test.setTimeout(260_000);
+  test.setTimeout(380_000);
 
   await mockTutorialVision(page);
   await resetRuntimeState(request);
@@ -253,27 +266,24 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
   await page.getByTestId("mission-panel-tab-plan").click();
   await waitForNextPaint(page, 8);
 
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "LFM-ORBIT opens on a ready Rondonia mission. No loading screen, no blank map, and no live credentials needed.",
-    3_100,
+    "LFM-ORBIT opens on a ready Rondonia mission. The map and replay load without live credentials.",
   );
   await expect(page.locator("#tutorial-subtitle-container")).toBeVisible();
 
   await moveMouseToHighlight(page, "[data-testid='bbox-badge']");
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "The active focus area is already mapped. The SELECT TOOL can redraw or confirm exactly what the mission studies.",
-    3_200,
+    "The focus area is already mapped. The SELECT TOOL can redraw or confirm it.",
   );
   await removeHighlight(page);
   await page.getByTestId("bbox-badge").getByRole("button", { name: "Clear" }).click();
 
   await moveMouseToHighlight(page, "[data-testid='draw-area-button']");
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "The SELECT TOOL makes the operator's area explicit before any agent spends compute or bandwidth.",
-    3_100,
+    "The SELECT TOOL makes the review area explicit before agents spend compute or bandwidth.",
   );
   await page.getByTestId("draw-area-button").click();
   await removeHighlight(page);
@@ -284,20 +294,18 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
   await page.getByTestId("object-targets-panel").scrollIntoViewIfNeeded();
 
   await moveMouseToHighlight(page, "[data-testid='object-targets-panel']");
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "The mission target pack is concrete: clearing candidates, road expansion, exposed soil, forest edge, and canopy-loss boundaries.",
-    3_500,
+    "The target pack is clear: clearing regions, roads, exposed soil, forest edge, and canopy loss.",
   );
   await removeHighlight(page);
 
   await page.getByTestId("tab-agents").click();
   const chatInput = page.getByPlaceholder("Request replay, mission pack, link action...");
   await moveMouseToHighlight(page, "textarea[placeholder='Request replay, mission pack, link action...']");
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "GROUND AGENT is the operator workflow layer. It proposes state changes instead of quietly mutating the app.",
-    3_300,
+    "GROUND AGENT handles operator workflow. It proposes changes before the app state moves.",
   );
   await chatInput.fill("load the Rondonia deforestation replay and explain the clearing, road, exposed soil, and boundary targets");
   await page.getByRole("button", { name: "Send" }).click();
@@ -308,10 +316,9 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
   await expect(proposal).toContainText("Rondonia Frontier Showcase Replay");
   await expect(proposal).toContainText("proxy_bands");
   await expect(proposal).toContainText("cached_api");
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "The action card exposes truth mode, imagery origin, scoring basis, reset impact, and what will refresh.",
-    4_200,
+    "The action card shows truth mode, imagery source, scoring basis, reset impact, and refresh scope.",
   );
 
   await moveMouseToHighlight(page, "[data-testid='ground-agent-run-proposal']");
@@ -319,10 +326,9 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
   await removeHighlight(page);
   await expect(proposal.getByRole("button", { name: "Confirmed" })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(`Loaded replay \`${RONDONIA_REPLAY_ID}\``)).toBeVisible({ timeout: 15_000 });
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "SATELLITE AGENT restored a completed scan: 9 cells swept, 4 retained, and lower-value cells pruned before downlink.",
-    4_300,
+    "SATELLITE AGENT restores the completed scan: 9 cells swept, 4 retained, low-value cells pruned.",
   );
 
   await page.getByTestId("tab-mission").click();
@@ -330,46 +336,41 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
   await page.getByText("Set Mission BBox Here").click();
   await expect(page.getByTestId("vlm-run-mission-targets")).toBeVisible({ timeout: 10_000 });
   await moveMouseToHighlight(page, "[data-testid='vlm-run-mission-targets']");
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "CV BOXES run against the selected area and mission target pack. These are region-level review boxes, not legal claims.",
-    3_700,
+    "CV BOXES run inside the selected area. They are region-level review evidence, not final claims.",
   );
   await page.getByTestId("vlm-run-mission-targets").click();
   await removeHighlight(page);
   await expect(page.getByTestId("vlm-grounding-result").first()).toContainText("clearing candidate", { timeout: 10_000 });
   await expect(page.getByTestId("vlm-object-box-legend")).toBeVisible({ timeout: 10_000 });
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "CV BOXES stay visible on the map with confidence and provenance so the retained evidence is reviewable.",
-    3_800,
+    "CV BOXES stay on the map with confidence and provenance, so reviewers can audit them.",
   );
 
   await expect(page.getByTestId("map-3d-toggle")).toBeVisible({ timeout: 10_000 });
   await moveMouseToHighlight(page, "[data-testid='map-3d-toggle']");
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "3D CONTEXT is optional. It helps terrain orientation, but it does not replace satellite evidence.",
-    3_000,
+    "3D CONTEXT helps terrain orientation. It does not replace satellite evidence.",
   );
   await page.getByTestId("map-3d-toggle").click();
   await removeHighlight(page);
   await expect(page.getByTestId("map-3d-panel")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText("This 3D view is terrain/context, not a satellite acquisition frame.")).toBeVisible({ timeout: 10_000 });
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "3D terrain is static context. Acquisition dates still come from the satellite replay and static frame metadata.",
-    3_300,
+    "The 3D view is static context. Dates still come from satellite replay metadata.",
   );
   await page.getByTestId("map-3d-close").click();
 
   await page.getByTestId("tab-logs").click();
   await expect(page.getByText(`Replay Bundle · ${RONDONIA_REPLAY_ID}`)).toBeVisible({ timeout: 10_000 });
   await expect(page.getByTestId("alert-button").filter({ hasText: RONDONIA_PRIMARY_CELL })).toBeVisible({ timeout: 10_000 });
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "Logs show why pruning matters: the ground side receives retained evidence packets, not every raw frame from every cell.",
-    4_000,
+    "Logs show pruning value: the ground side receives retained evidence packets, not every raw frame.",
   );
   await moveMouseToHighlight(page, "[data-testid='alert-button']");
   await page.getByTestId("alert-button").filter({ hasText: RONDONIA_PRIMARY_CELL }).click();
@@ -379,51 +380,45 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
   await expect(page.getByTestId("inspect-object-evidence")).toContainText("deforestation", { timeout: 15_000 });
   await expect(page.getByText("Timelapse Evidence", { exact: true })).toBeVisible({ timeout: 15_000 });
   await waitForVideoReady(page, "video", 20_000);
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "TIMELAPSE mode shows temporal change across acquisition dates: baseline canopy, road-edge opening, then persistent clearing.",
-    5_000,
+    "TIMELAPSE shows change across acquisitions: canopy baseline, road-edge opening, then persistent clearing.",
   );
 
   await page.getByText("After Window").scrollIntoViewIfNeeded();
   await expect(page.getByText("2025-01-15").first()).toBeVisible({ timeout: 10_000 });
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "STATIC FRAME means one selected acquisition time. Here the current retained frame is 2025-01-15, not the 3D terrain context.",
-    4_600,
+    "STATIC FRAME means one acquisition time. This retained frame is 2025-01-15.",
   );
 
   await page.getByText("Object Evidence").first().scrollIntoViewIfNeeded();
   await expect(page.getByTestId("inspect-object-evidence")).toContainText("clearing candidate");
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "Inspect keeps confidence honest: source, capture time, bbox, scoring basis, proxy-band deltas, and CV region provenance stay together.",
-    4_800,
+    "Inspect keeps provenance together: capture time, bbox, scoring basis, proxy deltas, and CV regions.",
   );
 
   await moveMouseToHighlight(page, "[data-testid='analyze-button']");
   await page.locator("[data-testid='analyze-button']").click();
   await removeHighlight(page);
   await expect(page.getByText("offline_lfm_v1", { exact: true }).first()).toBeVisible({ timeout: 15_000 });
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "GROUND AGENT review and the local evidence model summarize the finding without overclaiming beyond the imagery.",
-    4_000,
+    "GROUND AGENT and the local model summarize the finding without overclaiming.",
   );
 
   await page.getByText("Model Training Export").scrollIntoViewIfNeeded();
   await expect(page.getByText("Export Assets")).toBeVisible({ timeout: 10_000 });
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "TAGGED TRAINING DATA keeps task text, bbox, capture date, imagery origin, scoring basis, CV boxes, confidence, and review action.",
-    4_600,
+    "TAGGED TRAINING DATA keeps the task, bbox, date, source, scores, boxes, and review action.",
   );
 
   await moveMouseToHighlight(page, "[data-testid='proof-mode-button']");
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "COMPACT PROOF JSON is the downlink story: keep raw imagery local, transmit a small auditable packet.",
-    3_800,
+    "COMPACT PROOF JSON is the downlink story: raw imagery stays local; the audit packet is small.",
   );
   await page.getByTestId("proof-mode-button").click();
   await removeHighlight(page);
@@ -436,10 +431,9 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
   await expect(page.getByTestId("proof-json")).toContainText("confidence_stack");
   await expect(page.getByTestId("proof-json")).toContainText("detections");
   await waitForNextPaint(page, 10);
-  await showSubtitle(
+  await showVoiceoverSubtitle(
     page,
-    "The final proof shows retained evidence, confidence components, provenance, CV BOXES, and a compact JSON payload.",
-    5_500,
+    "The final proof shows retained evidence, confidence, provenance, CV BOXES, and compact JSON.",
   );
 
   await hideSubtitle(page);
@@ -447,7 +441,7 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
     page,
     {
       title: "Persistent land-use-change evidence retained for review.",
-      body: "Rondonia replay evidence shows a clearing candidate region with road-edge expansion and proxy-band support. Action: defer for human review. Payload: compact proof JSON. Export: tagged training sample.",
+      body: "Rondonia replay evidence shows a clearing candidate with road-edge expansion and proxy-band support. Action: human review. Payload: compact proof JSON. Export: tagged training sample.",
       tags: [
         "deforestation_candidate",
         "clearing_region",
@@ -457,7 +451,7 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
         "candidate_review",
       ],
     },
-    6_000,
+    8_500,
   );
   await expect(page.getByTestId("tutorial-final-card")).toBeVisible();
 
