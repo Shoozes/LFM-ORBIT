@@ -47,6 +47,7 @@ _JSONL_SKIP_NAMES = {
     "temporal_sequences.jsonl",
     "training_temporal_sequences.jsonl",
     "sequence_tagger_failures.jsonl",
+    "mission_metadata.jsonl",
 }
 _DEFAULT_OUTPUT_DIR = "retagged_training"
 _PROMPT_VERSION = "orbit_asset_retag_prompt_v1"
@@ -738,6 +739,27 @@ def _copy_unique_image(source: Path, images_dir: Path, asset_id: str) -> str:
     return f"{_HF_IMAGE_DIR}/{target.name}"
 
 
+def _reset_generated_asset_dir(path: Path) -> None:
+    """Clear generated image/frame outputs without touching reusable JSONL tags."""
+    if path.exists():
+        shutil.rmtree(path)
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def _manifest_path_label(path: Path | None, *, dataset_dir: Path, output_dir: Path) -> str | None:
+    if path is None:
+        return None
+    if path == output_dir:
+        return "."
+    if path == dataset_dir:
+        return dataset_dir.name
+    if _is_relative_to(path, output_dir):
+        return path.relative_to(output_dir).as_posix()
+    if _is_relative_to(path, dataset_dir):
+        return path.relative_to(dataset_dir).as_posix()
+    return path.name
+
+
 def _load_existing_retag_rows(existing_dir: Path | None, filename: str, key_name: str) -> dict[str, dict[str, Any]]:
     if existing_dir is None:
         return {}
@@ -749,6 +771,34 @@ def _load_existing_retag_rows(existing_dir: Path | None, filename: str, key_name
         key = str(row.get(key_name) or "")
         if key and isinstance(row.get("retag"), dict):
             rows.setdefault(key, row)
+    return rows
+
+
+def _mission_metadata_rows(dataset_dir: Path, output_dir: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for record in _load_records(dataset_dir, output_dir):
+        if record.get("record_type") != "mission_metadata":
+            continue
+        rows.append({
+            "format": "orbit_mission_metadata_v1",
+            "sample_id": record.get("sample_id"),
+            "split": record.get("split"),
+            "target_task": record.get("target_task"),
+            "target_category": record.get("target_category"),
+            "target_action": record.get("target_action"),
+            "task_text": record.get("task_text"),
+            "summary": record.get("summary"),
+            "bbox": record.get("bbox"),
+            "use_case_id": record.get("use_case_id"),
+            "target_pack_id": record.get("target_pack_id"),
+            "object_targets": record.get("object_targets") if isinstance(record.get("object_targets"), list) else [],
+            "mission_mode": record.get("mission_mode"),
+            "replay_id": record.get("replay_id"),
+            "confirmation_source": record.get("confirmation_source"),
+            "archived_at": record.get("archived_at"),
+            "timestamp": record.get("timestamp"),
+            "training_contract": record.get("training_contract"),
+        })
     return rows
 
 
@@ -794,6 +844,8 @@ def retag_dataset(
         if reuse_existing_sequences
         else {}
     )
+    _reset_generated_asset_dir(images_dir)
+    _reset_generated_asset_dir(frames_dir)
 
     record_candidates, skipped = _collect_record_assets(dataset_dir, output_dir)
     candidates = record_candidates
@@ -828,6 +880,7 @@ def retag_dataset(
     queue_rows: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
     sequence_failures: list[dict[str, Any]] = []
+    mission_rows = _mission_metadata_rows(dataset_dir, output_dir)
     digest_to_file: dict[str, str] = {}
     provider_asset_calls = 0
     provider_sequence_calls = 0
@@ -1117,15 +1170,20 @@ def retag_dataset(
     _write_jsonl(output_dir / "training_temporal_sequences.jsonl", sequence_training_rows)
     _write_jsonl(output_dir / "metadata.jsonl", metadata_rows)
     _write_jsonl(output_dir / "review_queue.jsonl", queue_rows)
+    _write_jsonl(output_dir / "mission_metadata.jsonl", mission_rows)
     _write_jsonl(output_dir / "skipped_assets.jsonl", skipped)
     _write_jsonl(output_dir / "tagger_failures.jsonl", failures)
     _write_jsonl(output_dir / "sequence_tagger_failures.jsonl", sequence_failures)
 
     manifest = {
         "format": "orbit_retag_manifest_v1",
-        "dataset_dir": str(dataset_dir),
-        "output_dir": str(output_dir),
-        "reuse_existing_dir": str(reuse_existing_dir) if reuse_existing_dir else None,
+        "dataset_dir": _manifest_path_label(dataset_dir, dataset_dir=dataset_dir, output_dir=output_dir),
+        "output_dir": _manifest_path_label(output_dir, dataset_dir=dataset_dir, output_dir=output_dir),
+        "reuse_existing_dir": _manifest_path_label(
+            reuse_existing_dir,
+            dataset_dir=dataset_dir,
+            output_dir=output_dir,
+        ),
         "reuse_existing_sequences": reuse_existing_sequences,
         "provider": provider,
         "model": model_name,
@@ -1139,6 +1197,7 @@ def retag_dataset(
         "reused_sequence_tags": reused_sequence_tags,
         "unique_training_assets": len(asset_rows),
         "unique_temporal_sequences": len(sequence_rows),
+        "mission_metadata_rows": len(mission_rows),
         "source_candidates": len(candidates),
         "expanded_image_candidates": len(expanded_candidates),
         "duplicate_assets_removed": max(0, len(expanded_candidates) - len(asset_rows)),
@@ -1155,6 +1214,7 @@ def retag_dataset(
             "temporal_sequences_jsonl": "temporal_sequences.jsonl",
             "training_temporal_sequences_jsonl": "training_temporal_sequences.jsonl",
             "review_queue_jsonl": "review_queue.jsonl",
+            "mission_metadata_jsonl": "mission_metadata.jsonl",
             "images": f"{_HF_IMAGE_DIR}/",
         },
         "notes": [
@@ -1196,6 +1256,14 @@ def _parse_args() -> argparse.Namespace:
         help="Reuse matching image tags but force temporal sequence labels to be regenerated.",
     )
     parser.add_argument(
+        "--reuse-existing-only",
+        action="store_true",
+        help=(
+            "Reuse matching rows from --reuse-existing-dir and route any new image/sequence hashes "
+            "through deterministic heuristic fallback instead of calling Ollama/OpenAI."
+        ),
+    )
+    parser.add_argument(
         "--max-provider-assets",
         type=int,
         default=16,
@@ -1214,6 +1282,8 @@ def main() -> int:
     args = _parse_args()
     dataset_dir = args.dataset_dir.resolve()
     output_dir = args.output_dir.resolve() if args.output_dir else dataset_dir / _DEFAULT_OUTPUT_DIR
+    max_provider_assets = 0 if args.reuse_existing_only else int(args.max_provider_assets)
+    max_provider_sequences = 0 if args.reuse_existing_only else int(args.max_provider_sequences)
     manifest = retag_dataset(
         dataset_dir,
         output_dir,
@@ -1228,8 +1298,8 @@ def main() -> int:
         openai_detail=args.openai_detail,
         timeout=max(1.0, float(args.timeout)),
         sleep_seconds=max(0.0, float(args.sleep_seconds)),
-        max_provider_assets=int(args.max_provider_assets),
-        max_provider_sequences=int(args.max_provider_sequences),
+        max_provider_assets=max_provider_assets,
+        max_provider_sequences=max_provider_sequences,
         reuse_existing_dir=args.reuse_existing_dir,
         reuse_existing_sequences=not args.no_reuse_existing_sequences,
     )

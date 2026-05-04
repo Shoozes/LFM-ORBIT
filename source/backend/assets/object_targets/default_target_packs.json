@@ -1,0 +1,417 @@
+{
+  "packs": [
+    {
+      "id": "critical_minerals",
+      "name": "Critical Minerals Expansion Watch",
+      "description": "Region-level extraction-site evidence for mining corridors, evaporation ponds, tailings, roads, facilities, and surface-change boundaries.",
+      "targets": [
+        {
+          "label": "evaporation pond region",
+          "prompt": "Find evaporation pond regions",
+          "class_key": "water_industrial",
+          "enabled": true
+        },
+        {
+          "label": "tailings region",
+          "prompt": "Find tailings regions",
+          "class_key": "industrial_surface",
+          "enabled": true
+        },
+        {
+          "label": "open-pit expansion",
+          "prompt": "Find open-pit expansion",
+          "class_key": "excavation",
+          "enabled": true
+        },
+        {
+          "label": "industrial road",
+          "prompt": "Find industrial roads",
+          "class_key": "infrastructure",
+          "enabled": true
+        },
+        {
+          "label": "facility cluster",
+          "prompt": "Find facility clusters",
+          "class_key": "infrastructure",
+          "enabled": true
+        },
+        {
+          "label": "exposed soil",
+          "prompt": "Find exposed soil regions",
+          "class_key": "surface_change",
+          "enabled": true
+        },
+        {
+          "label": "surface color change",
+          "prompt": "Find surface color change regions",
+          "class_key": "surface_change",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "deforestation",
+      "name": "Deforestation / Land-Use Change Watch",
+      "description": "Region-level canopy-loss and land-use-change evidence for known frontier-clearing areas, with road, clearing, exposed-soil, and boundary targets.",
+      "targets": [
+        {
+          "label": "clearing candidate",
+          "prompt": "Find clearing candidate regions",
+          "class_key": "land_cover_change",
+          "enabled": true
+        },
+        {
+          "label": "road expansion",
+          "prompt": "Find road expansion corridors",
+          "class_key": "infrastructure",
+          "enabled": true
+        },
+        {
+          "label": "exposed soil region",
+          "prompt": "Find exposed soil regions",
+          "class_key": "surface_change",
+          "enabled": true
+        },
+        {
+          "label": "canopy-loss boundary",
+          "prompt": "Find canopy-loss boundaries",
+          "class_key": "land_cover_change",
+          "enabled": true
+        },
+        {
+          "label": "forest edge",
+          "prompt": "Find forest edge regions",
+          "class_key": "vegetation",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "fireline",
+      "name": "Fireline",
+      "description": "Wildfire, smoke, burn scar, and mobility-corridor evidence.",
+      "targets": [
+        {
+          "label": "dark smoke",
+          "prompt": "Find dark smoke",
+          "class_key": "hazard",
+          "enabled": true
+        },
+        {
+          "label": "burn scar",
+          "prompt": "Find burn scar",
+          "class_key": "hazard",
+          "enabled": true
+        },
+        {
+          "label": "road obstruction",
+          "prompt": "Find road obstruction",
+          "class_key": "lifeline",
+          "enabled": true
+        },
+        {
+          "label": "buildings",
+          "prompt": "Find buildings",
+          "class_key": "structure",
+          "enabled": true
+        },
+        {
+          "label": "vehicle queue",
+          "prompt": "Find vehicle queue",
+          "class_key": "mobility",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "camp",
+      "name": "Humanitarian Shelter Count",
+      "description": "Shelter and aid-infrastructure counting from satellite frames.",
+      "targets": [
+        {
+          "label": "shelter",
+          "prompt": "Find shelters",
+          "class_key": "structure",
+          "enabled": true
+        },
+        {
+          "label": "tent",
+          "prompt": "Find tents",
+          "class_key": "structure",
+          "enabled": true
+        },
+        {
+          "label": "vehicle",
+          "prompt": "Find vehicles",
+          "class_key": "vehicle",
+          "enabled": true
+        },
+        {
+          "label": "water tank",
+          "prompt": "Find water tanks",
+          "class_key": "aid",
+          "enabled": true
+        },
+        {
+          "label": "clinic roof",
+          "prompt": "Find clinic roofs",
+          "class_key": "aid",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "port",
+      "name": "Port Activity",
+      "description": "Area-level supply-chain evidence around ports and terminals. Use region/group labels instead of exact boat or vessel counts unless source and model evidence are strong.",
+      "targets": [
+        {
+          "label": "shipping container cluster",
+          "prompt": "Find shipping container clusters",
+          "class_key": "cargo",
+          "enabled": true
+        },
+        {
+          "label": "container yard cluster",
+          "prompt": "Find container yard clusters",
+          "class_key": "cargo",
+          "enabled": true
+        },
+        {
+          "label": "docked-vessel group",
+          "prompt": "Find docked-vessel groups along berth edges",
+          "class_key": "vessel",
+          "enabled": true
+        },
+        {
+          "label": "berth basin context",
+          "prompt": "Find berth basin context areas",
+          "class_key": "infrastructure",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "plastic",
+      "name": "Coastal Debris / Slick Candidate Watch",
+      "description": "Candidate coastal slick, foam-line, and debris accumulation evidence near visible context. Not a garbage-patch mass or material-identification claim.",
+      "targets": [
+        {
+          "label": "coastal debris candidate",
+          "prompt": "Find coastal debris candidate regions",
+          "class_key": "environmental",
+          "enabled": true
+        },
+        {
+          "label": "slick candidate area",
+          "prompt": "Find slick candidate areas",
+          "class_key": "environmental",
+          "enabled": true
+        },
+        {
+          "label": "foam line region",
+          "prompt": "Find foam line regions",
+          "class_key": "environmental",
+          "enabled": true
+        },
+        {
+          "label": "storm debris zone",
+          "prompt": "Find storm debris zones",
+          "class_key": "environmental",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "waterline",
+      "name": "Waterline Watch",
+      "description": "Long-term shoreline, exposed lakebed, water extent, and basin color-boundary evidence.",
+      "targets": [
+        {
+          "label": "water extent",
+          "prompt": "Find water extent",
+          "class_key": "water",
+          "enabled": true
+        },
+        {
+          "label": "shoreline retreat",
+          "prompt": "Find shoreline retreat",
+          "class_key": "waterline",
+          "enabled": true
+        },
+        {
+          "label": "exposed lakebed",
+          "prompt": "Find exposed lakebed",
+          "class_key": "surface_change",
+          "enabled": true
+        },
+        {
+          "label": "dry basin region",
+          "prompt": "Find dry basin regions",
+          "class_key": "surface_change",
+          "enabled": true
+        },
+        {
+          "label": "water color boundary",
+          "prompt": "Find water color boundaries",
+          "class_key": "water",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "algae_bloom",
+      "name": "Algal Bloom Candidate Watch",
+      "description": "Candidate high-chlorophyll, cyanobacteria-like, surface-scum, turbidity, and water-color evidence. This does not confirm toxicity, species, or red tide.",
+      "targets": [
+        {
+          "label": "probable surface bloom",
+          "prompt": "Find probable surface bloom regions",
+          "class_key": "water_quality",
+          "enabled": true
+        },
+        {
+          "label": "high chlorophyll signal",
+          "prompt": "Find high chlorophyll signal regions",
+          "class_key": "water_quality",
+          "enabled": true
+        },
+        {
+          "label": "cyanobacteria-like signal",
+          "prompt": "Find cyanobacteria-like signal regions",
+          "class_key": "water_quality",
+          "enabled": true
+        },
+        {
+          "label": "surface scum candidate",
+          "prompt": "Find surface scum candidate regions",
+          "class_key": "water_quality",
+          "enabled": true
+        },
+        {
+          "label": "turbidity control area",
+          "prompt": "Find turbidity control areas",
+          "class_key": "water_quality",
+          "enabled": true
+        },
+        {
+          "label": "cloud/glint control",
+          "prompt": "Find cloud and sun-glint control regions",
+          "class_key": "quality_control",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "glacier",
+      "name": "Glacier Retreat Watch",
+      "description": "Long-form glacier terminus, open-water expansion, exposed-bedrock, moraine/debris, and retreat-boundary evidence.",
+      "targets": [
+        {
+          "label": "ice terminus",
+          "prompt": "Find ice terminus regions",
+          "class_key": "cryosphere",
+          "enabled": true
+        },
+        {
+          "label": "open water expansion",
+          "prompt": "Find open water expansion",
+          "class_key": "water",
+          "enabled": true
+        },
+        {
+          "label": "exposed bedrock",
+          "prompt": "Find exposed bedrock",
+          "class_key": "surface_change",
+          "enabled": true
+        },
+        {
+          "label": "glacier retreat boundary",
+          "prompt": "Find glacier retreat boundaries",
+          "class_key": "cryosphere",
+          "enabled": true
+        },
+        {
+          "label": "moraine/debris region",
+          "prompt": "Find moraine and debris regions",
+          "class_key": "cryosphere",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "urban_expansion",
+      "name": "Urban Expansion / Construction Watch",
+      "description": "Region-level construction progression, subdivision growth, road-grid expansion, cleared parcels, and built-surface persistence evidence.",
+      "targets": [
+        {
+          "label": "construction footprint",
+          "prompt": "Find construction footprint regions",
+          "class_key": "construction",
+          "enabled": true
+        },
+        {
+          "label": "new subdivision region",
+          "prompt": "Find new subdivision regions",
+          "class_key": "urban_surface",
+          "enabled": true
+        },
+        {
+          "label": "road expansion corridor",
+          "prompt": "Find road expansion corridors",
+          "class_key": "infrastructure",
+          "enabled": true
+        },
+        {
+          "label": "cleared parcel",
+          "prompt": "Find cleared parcels",
+          "class_key": "surface_change",
+          "enabled": true
+        },
+        {
+          "label": "retention pond / drainage context",
+          "prompt": "Find retention pond and drainage context",
+          "class_key": "waterline",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "lifeline",
+      "name": "Civilian Lifeline Monitor",
+      "description": "Civilian mobility, water-service, aid, logistics, and infrastructure continuity evidence.",
+      "targets": [
+        {
+          "label": "road obstruction",
+          "prompt": "Find road obstruction",
+          "class_key": "lifeline",
+          "enabled": true
+        },
+        {
+          "label": "bridge",
+          "prompt": "Find bridges",
+          "class_key": "infrastructure",
+          "enabled": true
+        },
+        {
+          "label": "road closure",
+          "prompt": "Find road closures",
+          "class_key": "lifeline",
+          "enabled": true
+        },
+        {
+          "label": "water facility",
+          "prompt": "Find water facilities",
+          "class_key": "aid",
+          "enabled": true
+        },
+        {
+          "label": "aid vehicle queue",
+          "prompt": "Find aid vehicle queues",
+          "class_key": "mobility",
+          "enabled": true
+        }
+      ]
+    }
+  ]
+}

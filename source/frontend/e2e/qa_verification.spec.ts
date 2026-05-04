@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { gotoApp, resetRuntimeState } from "./runtime";
+import { gotoApp, resetRuntimeState, startMission } from "./runtime";
 
 test.describe("QA Verification — Single Page Architecture", () => {
   test.beforeEach(async ({ page, request }) => {
@@ -16,6 +16,9 @@ test.describe("QA Verification — Single Page Architecture", () => {
     // 2. Agents tab
     await page.getByTestId("tab-agents").click();
     await expect(page.getByTestId("header-agent-bus")).toBeVisible();
+    await expect(page.getByTestId("agent-role-strip")).toContainText("Satellite Pruner");
+    await expect(page.getByTestId("agent-role-strip")).toContainText("Ground Validator");
+    await expect(page.getByTestId("ground-agent-operator-playbook")).toContainText("Operator Playbook");
     await expect(page.getByPlaceholder("Inject manual command into agent bus…")).toBeVisible();
     await expect(page.getByPlaceholder("Request replay, mission pack, link action...")).toBeVisible();
 
@@ -30,6 +33,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
   });
 
   test("verify empty and disabled states", async ({ page }) => {
+    await page.getByTestId("tab-mission").click();
     const launchBtn = page.getByRole("button", { name: /Launch Mission|Mission Complete/i });
     await expect(launchBtn).toBeVisible();
     await expect(launchBtn).toBeDisabled();
@@ -62,7 +66,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
     // Navigate to Agents tab
     await page.getByTestId("tab-agents").click();
 
-    const chatInput = page.getByPlaceholder("Request replay, mission pack, link action...");
+    const chatInput = page.getByTestId("ground-agent-chat-input");
     await chatInput.fill("Start scanning the northern sector");
 
     const sendBtn = page.locator('button:has-text("Send")');
@@ -70,6 +74,258 @@ test.describe("QA Verification — Single Page Architecture", () => {
 
     // Expect the user message to be reflected instantly
     await expect(page.getByText("Start scanning the northern sector")).toBeVisible();
+  });
+
+  test("verify Ground Agent multiline mission planning workflow", async ({ page }) => {
+    await page.getByTestId("tab-agents").click();
+
+    const chatInput = page.getByTestId("ground-agent-chat-input");
+    await chatInput.fill([
+      "try looking for recent drought conditions and wildfires in florida",
+      "return the safest mission attempt and final result",
+    ].join("\n"));
+    await expect(chatInput).toHaveValue(/wildfires in florida\nreturn the safest mission attempt/);
+    await page.getByRole("button", { name: "Send" }).click();
+
+    const proposal = page.getByTestId("ground-agent-proposal-card");
+    await expect(page.getByText("Planning pass complete.")).toBeVisible({ timeout: 15_000 });
+    await expect(proposal).toBeVisible({ timeout: 15_000 });
+    await expect(proposal).toContainText("Florida Fire/Drought Readiness Watch");
+    await expect(proposal).toContainText("curated_mission_pack_ready");
+    await expect(proposal).toContainText("fireline");
+  });
+
+  test("verify Ground Agent plans a semantic construction timelapse over Davenport", async ({ page }) => {
+    await page.getByTestId("tab-agents").click();
+
+    const chatInput = page.getByTestId("ground-agent-chat-input");
+    await chatInput.fill("show me a timelapse of new construction in the last 10 years of Davenport Florida");
+    await page.getByRole("button", { name: "Send" }).click();
+
+    const proposal = page.getByTestId("ground-agent-proposal-card");
+    await expect(page.getByText("Planning pass complete.")).toBeVisible({ timeout: 15_000 });
+    await expect(proposal).toBeVisible({ timeout: 15_000 });
+    await expect(proposal).toContainText("Davenport, FL");
+    await expect(proposal).toContainText("urban_expansion");
+    await expect(proposal).toContainText("construction footprint");
+    await expect(proposal).toContainText("local_registry");
+    await expect(proposal).toContainText("Launch Plan");
+  });
+
+  test("verify Ground Agent reframes garbage patch timelapse as debris candidate mission", async ({ page }) => {
+    await page.getByTestId("tab-agents").click();
+
+    const chatInput = page.getByTestId("ground-agent-chat-input");
+    await chatInput.fill("show me one of the biggest garbage patches in the ocean and make a timelapse for every month in the last 10 years to current");
+    await page.getByRole("button", { name: "Send" }).click();
+
+    const proposal = page.getByTestId("ground-agent-proposal-card");
+    await expect(page.getByText("Planning pass complete.")).toBeVisible({ timeout: 15_000 });
+    await expect(proposal).toBeVisible({ timeout: 15_000 });
+    await expect(proposal).toContainText("North Pacific Debris Convergence Review Window");
+    await expect(proposal).toContainText("plastic");
+    await expect(proposal).toContainText("monthly");
+    await expect(proposal).toContainText("coastal debris candidate");
+    await expect(proposal).toContainText("Great Pacific Garbage Patch mass");
+
+    await proposal.getByRole("button", { name: "Launch Plan" }).click();
+
+    await expect(page.getByTestId("tab-mission")).toHaveClass(/border-zinc-900/, { timeout: 15_000 });
+    await expect(page.getByText(/Active Mission #/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("AREA MAPPED")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("bbox-badge")).toContainText("[-145.60, 34.40, -145.40, 34.60]");
+    await expect(page.getByText("Visual Evidence Tools")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("vlm-mission-targets")).toContainText("coastal debris candidate");
+
+    await expect(page.getByRole("button", { name: "Mission Complete" })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("mission-complete-summary")).toContainText("Mission Pass Complete");
+    await expect(page.getByTestId("mission-complete-summary")).toContainText("plastic");
+
+    await page.getByTestId("vlm-run-mission-targets").click();
+    await expect(page.getByTestId("vlm-grounding-result").first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("vlm-grounding-result").first()).toContainText(/debris|slick|foam/i);
+  });
+
+  test("verify Ground Agent operator shortcuts navigate the app", async ({ page }) => {
+    await page.getByTestId("tab-agents").click();
+
+    await expect(page.getByTestId("ground-agent-nav-object_evidence")).toBeDisabled();
+    await expect(page.getByTestId("ground-agent-nav-proof")).toBeVisible();
+
+    await page.getByTestId("ground-agent-nav-logs").click();
+    await expect(page.getByText("Alerts & Logs")).toBeVisible();
+
+    await page.getByTestId("tab-agents").click();
+    await page.getByTestId("ground-agent-nav-settings").click();
+    await expect(page.getByText("Provider Status")).toBeVisible();
+
+    await page.getByTestId("tab-agents").click();
+    await page.getByTestId("ground-agent-nav-mission").click();
+    await expect(page.getByText("New Mission", { exact: true })).toBeVisible();
+  });
+
+  test("verify Ground Agent is the first operator surface", async ({ page }) => {
+    await expect(page.getByTestId("tab-agents")).toHaveClass(/border-zinc-900/);
+    await expect(page.getByText("Ground Agent").first()).toBeVisible();
+    await expect(page.getByTestId("ground-agent-operator-playbook")).toContainText("Task, replay, tune.");
+    await expect(page.getByRole("button", { name: "Run Florida fire drought mission" })).toBeVisible();
+    await expect(page.getByTestId("header-agent-bus")).toContainText("SAT/GND Dialogue Bus");
+  });
+
+  test("verify Mission Control declutters advanced tools behind tabs", async ({ page }) => {
+    await page.getByTestId("tab-mission").click();
+    await expect(page.getByTestId("mission-panel-tab-plan")).toHaveClass(/bg-white/);
+    await expect(page.getByTestId("mission-preset-panel")).toBeVisible();
+    await expect(page.getByTestId("fast-replay-panel")).not.toBeVisible();
+
+    await page.getByTestId("mission-panel-tab-replay").click();
+    await expect(page.getByTestId("fast-replay-panel")).toBeVisible();
+    await expect(page.getByTestId("mission-preset-panel")).not.toBeVisible();
+
+    await page.getByTestId("mission-panel-tab-targets").click();
+    await expect(page.getByTestId("object-targets-panel")).toBeVisible();
+
+    await page.getByTestId("mission-panel-tab-monitors").click();
+    await expect(page.getByTestId("monitor-template-panel")).toBeVisible();
+  });
+
+  test("verify Ground Agent can confirm a replay fetch action", async ({ page }) => {
+    await page.getByTestId("tab-agents").click();
+
+    const chatInput = page.getByPlaceholder("Request replay, mission pack, link action...");
+    await chatInput.fill("replay a wildfire mission");
+    await page.getByRole("button", { name: "Send" }).click();
+
+    const proposal = page.getByTestId("ground-agent-proposal-card");
+    await expect(proposal).toBeVisible({ timeout: 15_000 });
+    await expect(proposal.getByText("Load replay: Highway 82 Wildfire Candidate Replay")).toBeVisible();
+    await expect(proposal.getByText("georgia_wildfire_replay")).toBeVisible();
+    await expect(proposal.getByText("cached_api")).toBeVisible();
+
+    await proposal.getByRole("button", { name: "Run Replay" }).click();
+    await expect(proposal.getByRole("button", { name: "Confirmed" })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Loaded replay `georgia_wildfire_replay`")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("load replay - georgia_wildfire_replay")).toBeVisible({ timeout: 10_000 });
+
+    await page.getByTestId("tab-mission").click();
+    await expect(page.getByText("Replay Mission · georgia_wildfire_replay")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("REPLAY ACTIVE: georgia_wildfire_replay")).toBeVisible({ timeout: 15_000 });
+
+    await page.getByTestId("tab-agents").click();
+    await expect(page.getByTestId("ground-agent-nav-object_evidence")).toBeEnabled();
+    await page.getByTestId("ground-agent-nav-object_evidence").click();
+    await expect(page.getByText("Visual Evidence Tools")).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("verify Ground Agent reframes protected wildlife population requests", async ({ page }) => {
+    await page.getByTestId("tab-agents").click();
+
+    const chatInput = page.getByPlaceholder("Request replay, mission pack, link action...");
+    await chatInput.fill("try looking for manatee populations in florida");
+    await page.getByRole("button", { name: "Send" }).click();
+
+    const proposal = page.getByTestId("ground-agent-proposal-card");
+    await expect(page.getByText("I cannot count or locate manatee populations from orbital imagery.")).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(proposal).toBeVisible({ timeout: 15_000 });
+    await expect(proposal).toContainText("Florida Manatee Habitat Review");
+    await expect(proposal).toContainText("waterline");
+  });
+
+  test("verify Ground Agent handles hard manatee water searches as habitat proxy missions", async ({ page }) => {
+    await page.getByTestId("tab-agents").click();
+
+    const chatInput = page.getByTestId("ground-agent-chat-input");
+    await chatInput.fill("try looking for manatees in water around Banana River in winter");
+    await page.getByRole("button", { name: "Send" }).click();
+
+    const proposal = page.getByTestId("ground-agent-proposal-card");
+    await expect(page.getByText(/hard protected-wildlife mission/i)).toBeVisible({ timeout: 15_000 });
+    await expect(proposal).toBeVisible({ timeout: 15_000 });
+    await expect(proposal).toContainText("Banana River lagoon context");
+    await expect(proposal).toContainText("protected wildlife habitat proxy ready");
+    await expect(proposal).toContainText("waterline");
+  });
+
+  test("verify Ground Agent can stop mission state and fly map camera", async ({ page }) => {
+    await page.getByTestId("tab-agents").click();
+
+    const chatInput = page.getByPlaceholder("Request replay, mission pack, link action...");
+    await chatInput.fill("cancel the current mission and take us to bull creek fl");
+    await page.getByRole("button", { name: "Send" }).click();
+
+    const proposal = page.getByTestId("ground-agent-proposal-card");
+    await expect(proposal).toBeVisible({ timeout: 15_000 });
+    await expect(proposal).toContainText("Bull Creek, FL");
+    await expect(proposal).toContainText("Stop Mission");
+    await expect(proposal).toContainText("wetland / pine-flatwoods context");
+    await expect(proposal).toContainText("road or trail corridor");
+
+    await proposal.getByRole("button", { name: "Stop & Fly Map" }).click();
+
+    await expect(page.getByTestId("map-camera-hud")).toContainText("Bull Creek, FL", { timeout: 15_000 });
+    await expect(page.getByTestId("map-camera-hud")).toContainText("wetland / pine-flatwoods context");
+    await expect(page.getByTestId("map-camera-hud")).toContainText("Terrain:");
+    await expect(page.getByTestId("map-camera-hud")).toContainText("canal or drainage line");
+    await expect(page.getByTestId("mission-stopped-notice")).toContainText(/Mission Stopped|No active mission/i, {
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("map-camera-hud")).toContainText("Arrived", { timeout: 15_000 });
+    await expect(page.getByTestId("map-scan-paused-hint")).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("verify Ground Agent can fly map camera to Bronx from chat", async ({ page }) => {
+    await page.getByTestId("tab-agents").click();
+
+    const chatInput = page.getByTestId("ground-agent-chat-input");
+    await chatInput.fill("take me to the bronx, ny");
+    await page.getByRole("button", { name: "Send" }).click();
+
+    const proposal = page.getByTestId("ground-agent-proposal-card");
+    await expect(proposal).toBeVisible({ timeout: 15_000 });
+    await expect(proposal).toContainText("Bronx, NY");
+    await expect(proposal).toContainText("urban borough context");
+    await expect(proposal).toContainText("transport corridor");
+    await expect(proposal.getByTestId("location-preview-tiles")).toBeVisible();
+    await expect(proposal.getByText("local_registry")).toBeVisible();
+
+    await proposal.getByRole("button", { name: "Fly Map" }).click();
+
+    const hud = page.getByTestId("map-camera-hud");
+    await expect(hud).toContainText("Bronx, NY", { timeout: 15_000 });
+    await expect(hud).toContainText("urban borough context");
+    await expect(hud).toContainText("Terrain:");
+    await expect(hud).toContainText("shoreline or river boundary");
+    await expect(hud).toContainText("Arrived", { timeout: 15_000 });
+  });
+
+  test("verify Ground Agent asks before redirecting active missions to map destinations", async ({ page, request }) => {
+    await startMission(request, {
+      task_text: "Run Florida Fire/Drought Readiness Watch over a North Florida corridor.",
+      bbox: [-83.2, 29.0, -81.3, 30.7],
+      start_date: "2026-04-15",
+      end_date: "2026-04-25",
+      use_case_id: "wildfire",
+    });
+    await page.getByTestId("tab-agents").click();
+
+    const chatInput = page.getByTestId("ground-agent-chat-input");
+    await chatInput.fill("take me to giza pyramid");
+    await page.getByRole("button", { name: "Send" }).click();
+
+    const proposal = page.getByTestId("ground-agent-proposal-card");
+    await expect(page.getByText("You have an active mission. I can stop it and fly the camera to Giza Pyramid Complex")).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(proposal).toBeVisible({ timeout: 15_000 });
+    await expect(proposal).toContainText("Giza Pyramid Complex");
+    await expect(proposal).toContainText("Stop Mission");
+    await expect(proposal).toContainText("archaeological heritage site context");
+
+    await proposal.getByRole("button", { name: "Stop & Fly Map" }).click();
+    await expect(page.getByTestId("map-camera-hud")).toContainText("Giza Pyramid Complex", { timeout: 15_000 });
+    await expect(page.getByTestId("map-camera-hud")).toContainText("archaeological heritage site context");
   });
 
   test("verify Ground Agent surfaces backend errors", async ({ page }) => {

@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { getApiBaseUrl } from "../utils/telemetry";
+import type { LocationBbox, LocationPreviewTile } from "../types/location";
+import { buildPreviewTiles } from "../utils/locationPreviewTiles";
 
 export type AgentAction = {
   name: string;
@@ -9,7 +11,7 @@ export type AgentAction = {
 
 export type GroundAgentProposal = {
   id: string;
-  kind: "load_replay" | "rescan_replay" | "start_mission_pack" | "set_link_state" | string;
+  kind: "load_replay" | "rescan_replay" | "start_mission_pack" | "start_custom_mission" | "navigate_map_location" | "set_link_state" | string;
   title: string;
   summary: string;
   details: Record<string, unknown>;
@@ -48,9 +50,40 @@ function detailLabel(key: string): string {
 
 function detailValue(value: unknown): string {
   if (typeof value === "boolean") return value ? "yes" : "no";
-  if (Array.isArray(value)) return value.join(", ");
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => entry && typeof entry === "object" ? JSON.stringify(entry) : String(entry))
+      .join(", ");
+  }
   if (value && typeof value === "object") return JSON.stringify(value);
   return String(value ?? "");
+}
+
+function normalizeNumberArray(value: unknown, length: number): number[] | null {
+  if (!Array.isArray(value) || value.length !== length) return null;
+  const numbers = value.map((entry) => Number(entry));
+  return numbers.every(Number.isFinite) ? numbers : null;
+}
+
+function normalizePreviewTiles(value: unknown): LocationPreviewTile[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const raw = entry as Record<string, unknown>;
+    const z = Number(raw.z);
+    const x = Number(raw.x);
+    const y = Number(raw.y);
+    const url = typeof raw.url === "string" ? raw.url : "";
+    if (!Number.isFinite(z) || !Number.isFinite(x) || !Number.isFinite(y) || !url) return [];
+    return [{ z, x, y, url }];
+  });
+}
+
+function locationPreviewTiles(details: Record<string, unknown>): LocationPreviewTile[] {
+  const fromDetails = normalizePreviewTiles(details.preview_tiles);
+  if (fromDetails.length > 0) return fromDetails;
+  const bbox = normalizeNumberArray(details.bbox, 4) as LocationBbox | null;
+  return bbox ? buildPreviewTiles(bbox) : [];
 }
 
 function riskClass(riskLevel: string): string {
@@ -73,11 +106,40 @@ function responseActionError(payload: ChatResponse): string | null {
 
 function proofLabel(key: string): string {
   if (key === "request") return "Request";
+  if (key === "planner_result") return "Planner Result";
+  if (key === "workflow_mode") return "Workflow";
+  if (key === "difficulty") return "Difficulty";
   if (key === "replay_id") return "Replay";
   if (key === "runtime_truth_mode") return "Truth";
   if (key === "imagery_origin") return "Origin";
   if (key === "scoring_basis") return "Scoring";
   if (key === "use_case_id") return "Use Case";
+  if (key === "target_pack_id") return "Target Pack";
+  if (key === "object_target_labels") return "Object Targets";
+  if (key === "location_id") return "Location";
+  if (key === "query") return "Query";
+  if (key === "provider") return "Provider";
+  if (key === "location_provider") return "Location Provider";
+  if (key === "location_confidence") return "Location Confidence";
+  if (key === "feature_type") return "Feature";
+  if (key === "bbox") return "BBox";
+  if (key === "location_context_bbox") return "Context BBox";
+  if (key === "center") return "Center";
+  if (key === "camera") return "Camera";
+  if (key === "stop_active_mission") return "Stop Mission";
+  if (key === "location_type") return "Type";
+  if (key === "terrain_context") return "Terrain";
+  if (key === "mission_context") return "Use";
+  if (key === "semantic_tags") return "Tags";
+  if (key === "suggested_targets") return "Suggested Targets";
+  if (key === "evidence_guidance") return "Evidence Guidance";
+  if (key === "region_label") return "Region";
+  if (key === "start_date") return "Start";
+  if (key === "end_date") return "End";
+  if (key === "temporal_cadence") return "Cadence";
+  if (key === "requested_frame_count") return "Requested Frames";
+  if (key === "cadence_note") return "Cadence Note";
+  if (key === "confidence") return "Confidence";
   return detailLabel(key);
 }
 
@@ -92,10 +154,13 @@ export default function GroundAgentActionCard({
   const stateImpact = Array.isArray(proposal.details.state_impact)
     ? proposal.details.state_impact.map((item) => String(item))
     : [];
-  const proofDetails = ["request", "replay_id", "runtime_truth_mode", "imagery_origin", "scoring_basis", "use_case_id"]
+  const previewTiles = proposal.kind === "navigate_map_location"
+    ? locationPreviewTiles(proposal.details).slice(0, 9)
+    : [];
+  const proofDetails = ["request", "query", "planner_result", "workflow_mode", "difficulty", "replay_id", "region_label", "location_id", "provider", "location_provider", "location_confidence", "feature_type", "location_type", "suggested_targets", "evidence_guidance", "bbox", "location_context_bbox", "center", "start_date", "end_date", "temporal_cadence", "requested_frame_count", "cadence_note", "runtime_truth_mode", "imagery_origin", "scoring_basis", "use_case_id", "target_pack_id", "object_target_labels", "confidence"]
     .map((key) => [key, proposal.details[key]] as const)
-    .filter(([, value]) => value !== undefined && value !== "");
-  const visibleDetails = Object.entries(proposal.details).filter(([key]) => key !== "state_impact");
+    .filter(([, value]) => value !== undefined && value !== null && value !== "");
+  const visibleDetails = Object.entries(proposal.details).filter(([key]) => key !== "state_impact" && key !== "preview_tiles");
   const canAct = status === "pending" || status === "error";
 
   async function confirmProposal() {
@@ -150,12 +215,31 @@ export default function GroundAgentActionCard({
 
       <p className="text-xs leading-relaxed text-zinc-600">{proposal.summary}</p>
 
+      {previewTiles.length > 0 && (
+        <div className="mt-3 overflow-hidden rounded border border-zinc-200 bg-zinc-950" data-testid="location-preview-tiles">
+          <div className="grid aspect-[3/2] grid-cols-3 grid-rows-3">
+            {previewTiles.map((tile) => (
+              <img
+                key={`${tile.z}/${tile.x}/${tile.y}`}
+                src={tile.url}
+                alt=""
+                className="h-full w-full object-cover"
+                draggable={false}
+              />
+            ))}
+          </div>
+          <p className="border-t border-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-300">
+            Preview imagery for confirmation only
+          </p>
+        </div>
+      )}
+
       {proofDetails.length > 0 && (
         <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
           {proofDetails.map(([key, value]) => (
             <div
               key={key}
-              className={`rounded border border-zinc-100 bg-zinc-50 px-2 py-1 ${key === "request" ? "col-span-2" : ""}`}
+              className={`rounded border border-zinc-100 bg-zinc-50 px-2 py-1 ${["request", "evidence_guidance", "cadence_note", "object_target_labels"].includes(key) ? "col-span-2" : ""}`}
             >
               <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">{proofLabel(key)}</p>
               <p className="break-words font-semibold text-zinc-800">{detailValue(value)}</p>

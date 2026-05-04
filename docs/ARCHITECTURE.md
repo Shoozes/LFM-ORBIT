@@ -1,10 +1,10 @@
 # LFM Orbit Architecture
 
-Current as of **April 30, 2026**.
+Current as of **May 2, 2026**.
 
 ## System Shape
 
-LFM Orbit is a single-page React frontend backed by a FastAPI service. The frontend is organized around five operator surfaces:
+LFM Orbit is a single-page React frontend backed by a FastAPI service. The frontend is organized around five operator surfaces plus one replay proof surface:
 
 - `Mission`: define bbox, task text, and temporal window.
 - `Agents`: inspect the SAT/GND dialogue bus and interact with the ground assistant.
@@ -31,17 +31,22 @@ The backend runs two long-lived loops during app lifespan:
 9. `core/loader.py` resolves observations from the configured provider chain, with DPhi SimSat as the hackathon path, and caches by provider plus date-window labels.
 10. `core/paths.py` centralizes repo-root runtime-data/model/boundary paths so cache and model resolution do not drift with working directory.
 11. `core/model_manifest.py` resolves the optional satellite artifact from a runtime manifest plus environment overrides.
-12. `core/scene_qc.py` rejects unusable scenes before scoring.
-13. `core/scorer.py` and `core/analyzer.py` compute deltas, confidence, and interpretation signals.
-14. `core/overlays/attribution.py` adds governance/boundary context when available.
-15. `core/telemetry.py` emits typed `scan_result` payloads defined in `core/contracts.py`.
-16. `core/queue.py` persists confirmed alerts for `Logs`, `Inspect`, and recent-alert APIs.
-17. `core/gallery.py` expands confirmed alerts into imagery/timelapse evidence and now reuses local replay cache imagery for thumbnail fallback before dropping to offline chips; dataset export rasterizes SVG fallbacks to PNG.
-18. `core/replay.py` can reset runtime state and load a completed mission directly into the same mission, queue, gallery, metrics, and dialogue stores used by realtime operations. It also exposes cached API WebMs as Fast Replay entries and can rescan replay metadata through the current runtime/model stack.
-19. `ValidationPanel.tsx`, `TimelapseViewer.tsx`, and `VlmPanel.tsx` expand a selected alert into imagery, analysis, exports, and timelapse context. Mission-tab timelapse output renders ahead of optional visual-evidence actions so active temporal video evidence remains visible.
-20. `SettingsPanel.tsx` queries provider, SimSat, analysis, and depth status endpoints independently, with short retries so one transient miss does not force a false offline settings surface.
-21. `GroundAgent.tsx`, `/api/agent/chat`, and `/api/agent/action/confirm` provide a local action chat that proposes and confirms replay loads/rescans, mission packs, and SAT/GND link changes before mutating app state.
-22. `ProofModePanel.tsx` turns replay state into visible Proof Mode output: satellite frame, bbox/evidence overlay, evidence result, latency, provenance, raw-vs-alert bytes, reduction ratio, abstain state, backend-derived link outage queue, and proof JSON.
+12. `core/object_targets.py` loads versioned default target packs plus runtime custom packs, normalizes object targets, rejects unsafe labels, and backs the `/api/object-targets/*` registry routes.
+13. `core/mission.py` stores mission-level `target_pack_id` and `object_targets`, exposes add/remove/set/clear mutation helpers, and keeps old mission rows migration-safe.
+14. `core/object_evidence.py` runs enabled mission targets through batch grounding, normalizes boxes to `unit_xyxy`, summarizes counts, and preserves provenance.
+15. `core/mission_archive.py` preserves mission intent before runtime resets and feeds dataset exports with target packs/object targets without new provider calls.
+16. `core/scene_qc.py` rejects unusable scenes before scoring.
+17. `core/scorer.py` and `core/analyzer.py` compute deltas, confidence, and interpretation signals.
+18. `core/overlays/attribution.py` adds governance/boundary context when available.
+19. `core/telemetry.py` emits typed `scan_result` payloads defined in `core/contracts.py`.
+20. `core/queue.py` persists confirmed alerts for `Logs`, `Inspect`, and recent-alert APIs.
+21. `core/gallery.py` expands confirmed alerts into imagery/timelapse evidence and now reuses local replay cache imagery for thumbnail fallback before dropping to offline chips; dataset export rasterizes SVG fallbacks to PNG.
+22. `core/replay.py` can reset runtime state and load a completed mission directly into the same mission, queue, gallery, metrics, and dialogue stores used by realtime operations. It also exposes cached API WebMs as Fast Replay entries and can rescan replay metadata through the current runtime/model stack while preserving replay target packs when present.
+23. `ValidationPanel.tsx`, `TimelapseViewer.tsx`, and `VlmPanel.tsx` expand a selected alert into imagery, analysis, exports, mission-target visual grounding, and timelapse context. Mission-tab timelapse output renders ahead of optional visual-evidence actions so active temporal video evidence remains visible.
+24. `Map3DOverlay.tsx` is an optional timestamped context view, not a timeline mode. It opens a no-auth MapLibre satellite-terrain map after the operator presses the floating 3D button, validates the active 2D bbox before scene initialization, layers Sentinel-2 cloudless raster imagery over public DEM terrain plus a deterministic local fallback texture and relief mesh, reuses the bbox and CV object boxes as raised terrain overlays, surfaces recoverable initialization errors, exposes terrain exaggeration and optional AI context cues, and labels its context timestamp separately from the selected timeline date.
+25. `SettingsPanel.tsx` queries provider, SimSat, analysis, and depth status endpoints independently, with short retries so one transient miss does not force a false offline settings surface.
+26. `GroundAgent.tsx`, `/api/agent/chat`, and `/api/agent/action/confirm` provide a local action chat that proposes and confirms replay loads/rescans, mission packs, object-target edits, target-pack saves, and SAT/GND link changes before mutating app state.
+27. `ProofModePanel.tsx` turns replay state into visible Proof Mode output: satellite frame, bbox/evidence overlay, evidence result, latency, provenance, raw-vs-alert bytes, reduction ratio, abstain state, backend-derived link outage queue, and proof JSON.
 
 ## Module Map
 
@@ -52,7 +57,13 @@ The backend runs two long-lived loops during app lifespan:
 - `source/backend/core/config.py`
   Region selection, provider ordering, thresholds, runtime summaries.
 - `source/backend/core/contracts.py`
-  Typed wire contracts shared across telemetry, alert persistence, tests, and frontend normalization.
+  Typed wire contracts shared across telemetry, alert persistence, object evidence, tests, and frontend normalization.
+- `source/backend/core/object_targets.py`
+  Object target pack registry. It loads default and runtime custom packs, normalizes target labels/prompts/classes, rejects unsafe target labels, saves/deletes custom packs, and keeps defaults read-only.
+- `source/backend/core/object_evidence.py`
+  Batch object-evidence adapter around visual grounding. It skips disabled targets, clamps boxes, emits semantic colors, summarizes counts, and carries provenance for compact proof plumbing.
+- `source/backend/core/mission_archive.py`
+  Append-only mission metadata archive used before runtime resets. It keeps task text, bbox, target packs, and object targets available for dataset export and future model-training cycles without refetching imagery.
 - `source/backend/core/scanner.py`
   Scan orchestration and anomaly-confirmation gating.
 - `source/backend/core/grid.py`
@@ -84,7 +95,7 @@ The backend runs two long-lived loops during app lifespan:
 - `source/backend/core/depth_anything.py`
   Optional Depth Anything V3 adapter, `/api/depth/*` status/toggle support, package detection, and compact depth-map statistics.
 - `source/backend/core/mission.py`
-  Mission lifecycle and operator-run state, including `live` vs `replay` mission modes and auto-selected temporal use-case metadata.
+  Mission lifecycle and operator-run state, including `live` vs `replay` mission modes, auto-selected temporal use-case metadata, `target_pack_id`, and normalized `object_targets`.
 - `source/backend/core/temporal_use_cases.py`
   Temporal use-case catalog, examples, classifier, API-prep plan builder, and chat-style training JSONL row builder.
 - `source/backend/core/lifeline_monitoring.py`
@@ -102,7 +113,7 @@ The backend runs two long-lived loops during app lifespan:
 - `source/backend/core/replay.py`
   Replay catalog/loading path that hydrates the existing runtime tables for showcase walkthroughs and fixture-driven demos, dynamically catalogs valid cached API WebMs, and starts realtime rescans from replay metadata.
 - `source/backend/core/replay_snapshot.py`
-  Portable runtime snapshot export/import for completed missions. It packages mission, alert, gallery, pin, dialogue, and metrics surfaces without changing the bundled replay manifest format.
+  Portable runtime snapshot export/import for completed missions. It packages mission, object targets, alert, gallery, pin, dialogue, and metrics surfaces without changing the bundled replay manifest format.
 - `source/backend/core/monitor_reports.py`
   Runtime persistence helper for API-generated maritime and lifeline monitor reports under `runtime-data/monitor-reports/`.
 - `source/backend/core/timelapse.py`
@@ -114,7 +125,7 @@ The backend runs two long-lived loops during app lifespan:
 - `source/backend/scripts/fetch_satellite_model.py`
   Fetch utility that stages a published artifact into `runtime-data/models/` and writes the local runtime manifest.
 - `source/backend/scripts/export_orbit_dataset.py`
-  Dataset exporter for recent alerts, fetched/cached API imagery, local gallery evidence, weak reject controls, cached API observations, direct replay-cache rows, persisted maritime/lifeline monitor reports, enriched sample JSONL, and SFT-style training JSONL.
+  Dataset exporter for recent alerts, fetched/cached API imagery, local gallery evidence, weak reject controls, cached API observations, direct replay-cache rows, persisted maritime/lifeline monitor reports, current/archived mission metadata, enriched sample JSONL, and SFT-style training JSONL.
 - `source/backend/scripts/retag_training_assets.py`
   Standalone second-pass retagger for exported data directories. It deduplicates images/frames by SHA-256, extracts sampled timelapse frames, writes ordered temporal sequence JSONL, and can use heuristic/manual queue, Ollama vision, or OpenAI-compatible vision providers.
 - `source/backend/scripts/retag_training_assets_ui.py`
@@ -139,11 +150,17 @@ The backend runs two long-lived loops during app lifespan:
 - `source/frontend/hooks/useTelemetry.ts`
   Grid, alerts, selected cell, mission completion, websocket lifecycle.
 - `source/frontend/components/MapVisualizer.tsx`
-  MapLibre basemap, scan grid, pins, bbox preview, context menu, visual evidence boxes, safe marker-label rendering, basemap degradation notices, and map-pin sync failure visibility.
+  MapLibre basemap, scan grid, pins, bbox preview, context menu, glowing visual evidence boxes, object-evidence legend, hover provenance popup, floating 3D context toggle, safe marker-label rendering, basemap degradation notices, and map-pin sync failure visibility.
+- `source/frontend/components/Map3DOverlay.tsx`
+  Lazy no-auth MapLibre satellite-terrain overlay. It opens only after a valid bbox exists, drapes Sentinel-2 cloudless raster imagery over public DEM terrain with a deterministic local fallback texture and local relief mesh for visible terrain shape, reuses the active selected bbox and object-evidence boxes as raised context overlays, shows object hover tooltips, exposes terrain exaggeration, reports recoverable tile/style initialization errors, and states that the 3D view is timestamped context rather than a timeline frame. Future dated 3D or 3D Tiles assets should be added through explicit context metadata, attribution, coverage polygons, and capture-time separation, not by treating 3D as a replay frame.
+- `source/frontend/utils/geo3d.ts`
+  Bbox geometry helpers, context timestamp warning logic, and coordinate utilities for sharing 2D mission selection geometry with the optional 3D context view.
+- `source/frontend/utils/objectEvidence.ts`
+  Shared semantic object-evidence colors plus normalized bbox conversion used by both MapLibre overlays and the 3D context view.
 - `source/frontend/utils/depthMapStats.ts`
   WebGL shader texture reducer for depth-map summaries with CPU fallback.
 - `source/frontend/components/MissionControl.tsx`
-  Mission entry form, Fast Replay loader/rescan controls, maritime/lifeline monitor previews, temporal windows, bbox controls, stop/launch state.
+  Mission entry form, object-target pack selector/chips, manual add/remove/clear target controls, Fast Replay loader/rescan controls, maritime/lifeline monitor previews, temporal windows, bbox controls, stop/launch state.
 - `source/frontend/components/SettingsPanel.tsx`
   Independent provider/SimSat/model/depth status fetches with retry, trimmed credential validation, optional Depth Anything V3 toggle, and runtime health surface.
 - `source/frontend/e2e/testUrls.ts`
@@ -152,6 +169,8 @@ The backend runs two long-lived loops during app lifespan:
   Shared retryable app navigation, runtime-reset, replay-load, link-readiness, basemap/video-readiness, paint-settle, and canvas-relative map context-menu helpers for deterministic demos, visual captures, and fixtures.
 - `source/frontend/e2e/app.spec.ts`
   Main app E2E coverage, including deterministic cached-API WebM timelapse proof, settings API readiness guards, agent-dialogue REST polling before bus screenshots, and polling-based scan/API assertions instead of fixed waits.
+- `source/frontend/e2e/map3d.spec.ts`
+  Focused browser coverage for the optional 3D context view: active bbox selection, deterministic CV box input, no-auth satellite terrain canvas, raised CV region, AI context summary, timestamp wording, object tooltip, screenshot capture, WebGL pixel sanity checks, recoverable initialization errors, and clean return to the 2D map.
 - `source/frontend/e2e/tutorialHelpers.ts`
   Shared Playwright subtitle, highlight, and map-drawing helpers used by tutorial-style recording specs.
 - `source/frontend/playwright.config.ts`
@@ -165,9 +184,9 @@ The backend runs two long-lived loops during app lifespan:
 - `source/frontend/components/AgentDialogue.tsx`
   Live SAT/GND bus stream and operator injection, including inline bus stats and injection failure visibility.
 - `source/frontend/components/GroundAgent.tsx`
-  Ground assistant chat surface with inline backend-error payloads, timeout labeling, guarded send state, proposal cards, and confirmed local action results for replay, mission-pack, and link-control tool calls.
+  Ground assistant chat surface with inline backend-error payloads, timeout labeling, guarded send state, proposal cards, and confirmed local action results for replay, mission-pack, object-target, target-pack, and link-control tool calls.
 - `source/frontend/components/VlmPanel.tsx`
-  Grounding, VQA, and caption actions for the selected bbox, with explicit action controls, prompt/question validation through the API contract, and inline API-error handling.
+  Grounding, mission-target batch grounding, VQA, and caption actions for the selected bbox, with explicit action controls, prompt/question validation through the API contract, inline API-error handling, result-chip provenance tooltips, and normalized object box propagation to the map.
 - `source/frontend/components/TimelapseViewer.tsx`
   Timelapse generation, playback UI, and retryable error display for provider/API failures.
 - `source/frontend/components/ProofModePanel.tsx`
@@ -187,7 +206,7 @@ The backend runs two long-lived loops during app lifespan:
 ### Observation Providers
 
 - Hackathon primary: `simsat_sentinel` from DPhi Space SimSat.
-- Optional SimSat imagery provider: `simsat_mapbox` via `MAPBOX_ACCESS_TOKEN`.
+- Optional SimSat imagery provider: `simsat_mapbox` via `MAPBOX_ACCESS_TOKEN`. Orbit treats any non-empty value as configured for local SimSat routing, but real upstream Mapbox imagery still requires a valid token; empty SimSat image payloads are rejected before scoring.
 - Optional development/replay support: `sentinelhub_direct`, `nasa_api_direct`, and GEE-style paths.
 - Final safety net: local deterministic fallback data.
 - Cold-start `.env.example` sets `OBSERVATION_PROVIDER=simsat_sentinel` and `DISABLE_EXTERNAL_APIS=true` so fresh installs and hackathon demos do not depend on Sentinel Hub, NASA, GEE, or provider quota unless the operator explicitly opts in.
@@ -212,6 +231,7 @@ Cached replay imagery can still carry `scoring_basis=multispectral_bands` when t
 - Optional manifest-resolved local GGUF: `runtime-data/models/lfm2.5-vlm-450m/model_manifest.json`
 - Default GGUF target artifact: `runtime-data/models/lfm2.5-vlm-450m/LFM2.5-VL-450M-Q4_0.gguf`
 - Default trained GGUF source: `Shoozes/lfm2.5-450m-vl-orbit-satellite`, generated by NM-UNI from `C:\DevStuff\NM-UNI-main`
+- Latest checked model revision: `560b0c6e4eb68696527630b8e652cc34850a82b9`, task `orbit-satellite-triage`, `training_modality=image_text`, `image_training_verified=true`, `1611` train rows, `1878` image blocks, and `179` eval rows.
 - Optional remote handoff path: `source/backend/scripts/fetch_satellite_model.py` fetches the published Hugging Face artifact, preserves `orbit_model_handoff.json` / `training_result_manifest.json`, and writes the local runtime manifest
 - Runtime capability contract: `core/model_manifest.py` parses `training_result_manifest.json` for `training_method`, `training_modality`, row counts, `image_blocks`, HF checkpoint, and LoRA adapter presence; `core/multimodal_inference.py` reports direct image runtime as unavailable until an adapter actually passes pixels into the model.
 - Image runtime flags: `ORBIT_IMAGE_CONDITIONED_INFERENCE=false`, `ORBIT_IMAGE_INFERENCE_BACKEND=none`, and `ORBIT_REQUIRE_MMPROJ_FOR_IMAGE_INFERENCE=true` keep image-conditioned inference opt-in and capability-gated.
@@ -219,35 +239,22 @@ Cached replay imagery can still carry `scoring_basis=multispectral_bands` when t
 - Optional visual evidence actions: safe offline fallback responses when compatible transformers paths are unavailable
 - Optional Depth Anything V3: disabled by default through `DEPTH_ANYTHING_V3_ENABLED=false`; when enabled, `/api/depth/status` reports package/model/device readiness, and malformed image payloads are rejected before optional model loading.
 
-## Verification State
+## Verification Model
 
-Current repo-wide validation results:
+Architecture docs describe the guard suite; run-by-run totals live in `README.md` and `docs/TODO.md` to avoid duplicating progress history.
 
-- `uv sync --extra dev --locked` -> passing; `--extra model` is optional and installed by `-FetchModel` / `--fetch-model` when the host can build or install `llama-cpp-python`
-- `uv run --no-sync pytest -q` -> `335 passed`
-- `npm run lint` -> passing
-- `npm run build` -> passing, with split chunks and no large-chunk warning
-- `npx playwright test` -> `75 passed`, `1 skipped` debug-only HTML dump
-- `npm run demo:showcase` -> passing with Playwright video/trace/final screenshot, `e2e/artifacts/showcase/evidence-frame.png`, and `e2e/artifacts/showcase/proof.json`
-- `npm run demo:record` -> passing for main showcase, payload-reduction, provenance, abstain-safety, and orbital-eclipse demo specs
-- `npm run demo:tutorial` -> passing with refreshed `docs/tutorial_video.webm`
-- Dataset export with `--include-seeded-cache` -> `56` current-cycle samples, `24` replay-cache rows, `25` timelapse rows, `2` wildfire replay-cache rows, and `2` volcanic surface-change rows; bounded Qwen/Ollama retagged training export -> `179` deduplicated assets, `26` temporal sequences, `40` model image calls, `6` sequence calls, `74` reused image tags, and deterministic heuristic fallback for the rest
-- Optional Sentinel Hub Process API OAuth -> validated locally for replay-cache development only; Hugging Face dataset upload -> published to `Shoozes/LFM-Orbit-SatData` with viewer-safe configs at commit `1ebd19065e8a8124372425c4c0df9c0332275c9c`
-- `.\run.ps1 -Verify` -> passing from repo root; backend `335 passed`, frontend lint/build passed, and Playwright `75 passed`, `1 skipped`.
-- `python scripts\smoke_satellite_model.py --require-present --max-tokens 8` -> passing with the downloaded `Shoozes/lfm2.5-450m-vl-orbit-satellite` GGUF bundle.
-- Screenshot captures include Settings, timelapse, context-menu, agent-evaluation, monitor-preview, known-location mission presets, debug-dashboard, and visual evidence road-corridor proof images.
-- `.github/workflows/ci.yml` runs the same backend, frontend, and Playwright checks in GitHub Actions using the repo-pinned Node version from `.nvmrc`.
-- Repo-root launchers expose the same full local check through `.\run.ps1 -Verify` or `./run.sh --verify`.
-- A copied `.env.example` has been smoke-tested with `.\run.ps1 -InstallOnly` and a bounded `.\run.ps1 -Run` startup check against backend health plus the Vite index.
-- Current E2E stability work uses fresh local web servers by default, shared retryable app navigation, readiness-polled scan/API assertions, canvas-relative map context-menu retries, a keyboard/touch-accessible map-actions fallback path, replay fixtures for deterministic showcase captures, and an opt-in HTML dump spec.
-- Current demo integrity work also checks proof-frame luminance and sampled video-frame uniqueness so recorded proof videos cannot silently collapse into blank/static evidence.
+- Backend guard: import contracts, API contracts, replay/object evidence, docs/media references, queue/persistence, provider fallbacks, and dataset export tests.
+- Frontend guard: TypeScript typecheck, production build, normal Playwright E2E, targeted CV/3D/map specs, and separate recorded-demo specs.
+- Artifact guard: README links, documented media, story-plate manifests, repo-relative summary-bank file references, proof-frame luminance, and timelapse integrity checks.
+- Wrapper guard: `.\run.ps1 -Verify` and `./run.sh --verify` run the repo-level install/runtime validation path with platform-specific backend virtualenvs.
+- State-isolation guard: normal Playwright runs start fresh local servers by default; stale server reuse is opt-in through `PLAYWRIGHT_REUSE_SERVER=1`.
 
 ## Known Constraints
 
 - The satellite path is still metadata/evidence-packet GGUF reasoning over scored signals. Production image-conditioned `mmproj` or native VLM inference is not wired into runtime yet.
-- The trained Orbit bundle fills the image-backed NM-UNI training artifact requirement when `training_result_manifest.json` reports `image_blocks > 0`, but it should not be described as direct image-conditioned runtime inference unless `/api/analysis/status` reports `image_conditioned_runtime_enabled=true`.
+- The current trained Orbit bundle includes image-text training rows, but it should not be described as direct image-conditioned runtime inference unless `/api/analysis/status` reports `image_conditioned_runtime_enabled=true`.
 - The optional visual evidence grounding path works with available dependencies, but VQA/caption currently rely on compatibility fallbacks unless a matching local transformer setup is added.
-- Depth Anything V3 is integrated as an optional adapter and Settings toggle, but depth statistics are not yet part of the live alert scoring or promotion gate.
+- Depth Anything V3 is integrated as an optional adapter and Settings toggle. The 3D context panel can show fast local terrain/canvas structure cues and Depth Anything readiness, but depth statistics are not part of the live alert scoring or promotion gate and per-frame timelapse inference remains opt-in due runtime cost.
 - Tool-call parsing supports nested fenced JSON arguments for local LFM output. Inline JSON extraction remains intentionally conservative to avoid over-parsing normal prose.
 - The primary UI is desktop-operator oriented with a fixed right mission rail. The map now has a non-right-click action path, but responsive/mobile layout coverage remains follow-up work.
 - The eval lane now writes baseline-vs-candidate promotion artifacts, but it still depends on exported labels and should not be treated as a substitute for operator-reviewed gold benchmarks.
@@ -255,3 +262,4 @@ Current repo-wide validation results:
 - Proof Mode is intentionally app-level demo UI, not a correctness substitute. Correctness remains covered by backend tests, frontend type checks, and normal Playwright specs.
 - Satellite GGUF reasoning is only active when a manifest-resolved model artifact is installed locally.
 - The current scan grid is the repo-local square-cell compatibility layer, which is sufficient for the SimSat hackathon demo. Production geospatial scale-out is intentionally parked outside the active scope.
+- Object Evidence boxes are normalized to `unit_xyxy`; disabled targets are skipped, unsafe civilian-scope labels are rejected before persistence, and degenerate boxes are discarded before counts or proof JSON are emitted.

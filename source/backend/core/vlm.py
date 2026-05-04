@@ -36,12 +36,27 @@ def _normalize_prompt_label(prompt: str) -> str:
     text = (prompt or "").strip().lower()
     if any(token in text for token in ("airplane", "airplanes", "plane", "planes", "airport")):
         return "airplane"
+    if any(token in text for token in ("structure cluster", "structure clusters", "built-structure", "built structure")):
+        return "structure cluster"
     if any(token in text for token in ("home", "homes", "house", "houses", "roof", "roofs", "building", "buildings")):
         return "homes"
     if any(token in text for token in ("boat", "boats", "ship", "ships", "vessel", "vessels", "barge", "barges")):
         return "boats"
     if any(token in text for token in ("flaring", "flare", "gas flare", "well pad")):
         return "possible flaring"
+    if any(
+        token in text
+        for token in (
+            "critical minerals",
+            "mining",
+            "mine",
+            "open pit",
+            "tailings",
+            "evaporation pond",
+            "industrial road",
+        )
+    ):
+        return "mining expansion region"
     if any(token in text for token in ("dark smoke", "smoke", "plume", "black smoke")):
         return "dark smoke"
     if any(token in text for token in ("clearing", "clearings", "deforestation", "canopy loss")):
@@ -75,13 +90,12 @@ def _load_pipeline(task: str, model: str) -> Callable[..., Any] | None:
 
 def _fallback_grounding(prompt: str) -> list[dict]:
     label = _normalize_prompt_label(prompt)
-    if label == "airplane":
+    if label in {"airplane", "homes", "boats"}:
         return []
     boxes_by_label = {
-        "homes": [0.30, 0.28, 0.62, 0.58],
-        "boats": [0.35, 0.18, 0.58, 0.70],
         "possible flaring": [0.18, 0.46, 0.42, 0.62],
         "dark smoke": [0.12, 0.40, 0.46, 0.72],
+        "structure cluster": [0.30, 0.28, 0.62, 0.58],
         "road": [0.42, 0.12, 0.56, 0.88],
         "river": [0.20, 0.16, 0.80, 0.44],
     }
@@ -99,6 +113,8 @@ def _fallback_scene_family(bbox: list[float]) -> str:
         return "florida_corridor"
     if -52.0 <= lon <= -45.0 and 64.0 <= lat <= 70.5:
         return "greenland_ice"
+    if -70.5 <= lon <= -68.0 and -25.5 <= lat <= -23.0:
+        return "atacama_mining"
     if -63.0 <= lon <= -59.0 and -11.0 <= lat <= -2.0:
         return "amazon_forest"
     return "generic"
@@ -106,6 +122,20 @@ def _fallback_scene_family(bbox: list[float]) -> str:
 
 def _fallback_vqa(question: str, bbox: list[float]) -> str:
     text = (question or "").lower()
+    scene_family = _fallback_scene_family(bbox)
+    if scene_family == "atacama_mining" and any(
+        token in text
+        for token in (
+            "change",
+            "changed",
+            "evidence",
+            "mining",
+            "critical minerals",
+            "tailings",
+            "pond",
+        )
+    ):
+        return "Extraction-site regions are visible; treat pit, tailings, pond, road, and facility context as review evidence."
     if "how many" in text and any(token in text for token in ("airplane", "plane")):
         return "Unable to answer precisely from fallback vision mode."
     if any(token in text for token in ("boat", "ship", "vessel")):
@@ -117,11 +147,12 @@ def _fallback_vqa(question: str, bbox: list[float]) -> str:
     if "how many" in text:
         return "1."
     if any(token in text for token in ("land cover", "visible", "scene")):
-        scene_family = _fallback_scene_family(bbox)
         if scene_family == "florida_corridor":
             return "Urban road corridor, water bodies, and managed vegetation."
         if scene_family == "greenland_ice":
             return "Ice sheet, exposed rock, and coastal water."
+        if scene_family == "atacama_mining":
+            return "Arid extraction-site terrain with pit, tailings, pond, road, and facility context."
         return "Mixed vegetation, exposed clearing, and road context."
     return "Unable to answer precisely from fallback vision mode."
 
@@ -132,6 +163,8 @@ def _fallback_caption(bbox: list[float]) -> str:
         return "Florida road corridor beside lakes and developed land."
     if scene_family == "greenland_ice":
         return "Greenland ice edge with coastal water and exposed rock."
+    if scene_family == "atacama_mining":
+        return "Atacama extraction-site region with pit, tailings, pond, road, and facility context."
     return "Deforested clearing beside intact canopy."
 
 
@@ -200,13 +233,14 @@ def explain_vlm_grounding(bbox: list[float], prompt: str) -> dict[str, Any]:
     out = []
     width, height = image.size
     for r in results:
-        if r["score"] > 0.05:
+        score = float(r.get("score", 0.0))
+        if score >= 0.18:
             box = r["box"]
             xmin = box["xmin"] / width
             ymin = box["ymin"] / height
             xmax = box["xmax"] / width
             ymax = box["ymax"] / height
-            out.append({"label": r["label"], "bbox": [ymin, xmin, ymax, xmax]})
+            out.append({"label": r["label"], "bbox": [ymin, xmin, ymax, xmax], "confidence": score})
 
     if out:
         return {"results": out, "provenance": _provenance(mode="model", model=model)}

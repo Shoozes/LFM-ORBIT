@@ -1,6 +1,7 @@
 import json
 import os
 
+from core.config import REGION
 from core.metrics import (
     init_metrics,
     read_metrics_summary,
@@ -50,7 +51,7 @@ def test_metrics_summary_tracks_cycles_and_examples(tmp_path):
 
     assert summary["total_cycles_completed"] == 1
     assert summary["demo_mode_enabled"] is False
-    assert isinstance(summary["demo_mode_loop_scan"], bool)
+    assert summary["demo_mode_loop_scan"] is bool(REGION.demo_mode_loop_scan)
     assert summary["total_cells_scanned"] == 2
     assert summary["total_alerts_emitted"] == 1
     assert summary["total_payload_bytes"] == 123

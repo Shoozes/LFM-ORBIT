@@ -66,6 +66,8 @@ def _restore_active_mission(snapshot: dict[str, Any]) -> int | None:
         replay_id=mission.get("replay_id"),
         summary=mission.get("summary"),
         use_case_id=mission.get("use_case_id"),
+        target_pack_id=mission.get("target_pack_id") if mission.get("target_pack_id") else None,
+        object_targets=mission.get("object_targets") if isinstance(mission.get("object_targets"), list) else None,
     )
     update_mission_progress(
         int(restored["id"]),

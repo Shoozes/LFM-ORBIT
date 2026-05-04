@@ -15,12 +15,22 @@ Orbit's data cycle is:
 
 The goal is a closed loop: collect evidence in Orbit, package it cleanly, retag it with a stronger vision model when useful, train or evaluate externally, then bring model artifacts back into Orbit.
 
+![LFM-ORBIT data cycle](../../../docs/media/infographics/image-to-training-data-flow-info.png)
+
+The app-growth loop starts even earlier: real operator prompts become confirmable actions, tests, docs, local semantics rows, and then future model/app improvements. The full method lives in `../../../docs/AGENT_GROWTH_LOOP.md`.
+
+![App usage to agent growth loop](../../../docs/media/infographics/app-usage-to-agent-growth-info.png)
+
 ## Folder Roles
 
 - `source/backend/data/`
   Repo-local data inputs and fixtures. Keep this small and intentional.
 - `source/backend/data/boundaries/`
   Boundary/concession/protected-area inputs used by overlay import tooling.
+- `source/backend/data/ground_agent_tool_semantics.example.jsonl`
+  Small product-specific Ground Agent routing/eval examples for local tool semantics such as map navigation, replay loading, mission-pack launch, and link-state changes. This is not a Hugging Face dataset and not a geography source of truth.
+- `source/backend/data/ground_agent_tool_semantics.local.jsonl`
+  Optional private extension for local experiments. It is ignored by git via `source/backend/data/*.local.jsonl`.
 - `runtime-data/`
   Mutable local runtime state, generated exports, model bundles, and scratch outputs.
 - `runtime-data/modeling/orbit-export/`
@@ -37,7 +47,8 @@ cd source/backend
 uv run --no-sync python scripts\export_orbit_dataset.py `
   --output-dir ..\..\runtime-data\modeling\orbit-export `
   --monitor-reports-dir ..\..\runtime-data\monitor-reports `
-  --include-seeded-cache
+  --include-seeded-cache `
+  --offline-context-thumbnails
 ```
 
 The export writes:
@@ -54,7 +65,15 @@ The export writes:
 
 Export rows include target task/category/action, temporal use-case metadata, alert scores, agent evidence, local imagery/video references, provenance, replay-cache timelapse rows when enabled, weak-negative reject rows when available, and `orbit_training_contract_v1` review/localization metadata for NM-UNI import.
 
-If a context thumbnail falls back to an offline SVG chip, the exporter rasterizes it to PNG before writing the sample asset. Future Qwen/Ollama tagging cycles should therefore receive raster image files, not unsupported SVG placeholders.
+If a context thumbnail falls back to an offline SVG chip, the exporter rasterizes it to PNG before writing the sample asset. Use `--offline-context-thumbnails` for local refreshes that should not wait on ESRI thumbnail fetches. The exporter also clears generated `samples/` before writing the new footprint so retag loose scans do not pick up stale sample assets.
+
+## Ground Agent Tool Semantics
+
+`ground_agent_tool_semantics.example.jsonl` is a small local eval/guidance fixture for product-specific operator language. It helps keep phrases such as "take me to the Bronx, NY", "show me the Suez canal", "scan the Bronx for changes", "show me a monthly 10-year garbage patch timelapse", "load the Manchar flood replay", and "restore the downlink" aligned with the intended proposal kinds.
+
+The file must stay local to the repo and should not be uploaded to Hugging Face. It is too small and product-specific for public training value. It also must not become a hidden gazetteer: location names still resolve through explicit vetted targets or a future geocoding provider behind `/api/location/resolve`.
+
+Future marine-debris examples should stay out of the active fixture until `start_marine_debris_scan` exists in the backend whitelist, scan path, and UI. Prototype those rows in `ground_agent_tool_semantics.local.jsonl` only; the future implementation plan lives in `../../../docs/MARINE_DEBRIS_SENTINEL_HUB_PLAN.md`.
 
 ## Optional Sentinel Replay Data
 
@@ -147,13 +166,13 @@ uv run --no-sync python scripts\retag_training_assets.py `
   --dataset-dir ..\..\runtime-data\modeling\orbit-export `
   --provider ollama `
   --model qwen3.6:27b `
-  --max-provider-assets 16 `
-  --max-provider-sequences 0
+  --reuse-existing-dir ..\..\runtime-data\modeling\orbit-export\retagged_training `
+  --reuse-existing-only
 ```
 
 `--max-provider-assets` keeps local visual-model retagging bounded for show-ready runs. `--max-provider-sequences 0` keeps temporal sequence rows heuristic by default because multi-image local visual-model calls are slower; set a positive number when you intentionally want sequence-level model calls.
 
-Use `--reuse-existing-dir <previous-retagged-folder>` to avoid sending already-tagged image hashes back through Qwen/Ollama. Use `--no-reuse-existing-sequences` when sequence-level prompts changed and should be regenerated while still reusing image-level tags.
+Use `--reuse-existing-dir <previous-retagged-folder>` to avoid sending already-tagged image hashes back through Qwen/Ollama. Add `--reuse-existing-only` for normal refresh/upload cycles where existing visual-model labels should be preserved and any new hashes should receive deterministic heuristic labels. Use `--no-reuse-existing-sequences` when sequence-level prompts changed and should be regenerated while still reusing image-level tags.
 
 Provider options:
 
@@ -271,8 +290,8 @@ The helper reads `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or `.tools/.secrets/hf.txt
 
 Current local packaging result after optional replay seeding:
 
-- Dataset export: `56` current-cycle samples, `24` replay-cache rows, `25` rows with timelapse references, `2` wildfire rows, and `2` volcanic surface-change rows.
-- Retag output: `179` deduplicated training assets, `26` temporal sequences, `40` bounded Qwen/Ollama image calls, `6` bounded Qwen/Ollama sequence calls, `74` reused image tags, `9` historical skipped SVG placeholders, and `0` tagger failures. New exports rasterize SVG fallbacks to PNG before retagging.
+- Dataset export: `200` current-cycle samples, `0` cached API observation rows, `11` replay-cache rows, `0` visual story frames, `0` monitor-report rows, `185` mission metadata rows, and `15` rows with timelapse references.
+- Retag output: `163` deduplicated training assets, `15` temporal sequences, `185` mission metadata rows, `0` external provider calls in the final cleanup rerun, `163` reused image tags, `15` reused sequence tags, `0` skipped assets, `0` tagger failures, and `0` orphan or missing image files. New exports rasterize SVG fallbacks to PNG before retagging, support offline context thumbnails, clear generated `samples/` before export, suppress unresolved monitor frame refs, and clear generated `images/` / `frames/` output after reusable prior tags are loaded.
 
 ## Dataset Refresh Cadence
 
@@ -281,7 +300,7 @@ Current local packaging result after optional replay seeding:
 - Keep `mission_metadata` for metadata-only missions such as the Greenland ice/snow extent replay instead of forcing invalid timelapse assets into image configs.
 - Record each Hub refresh in this README, `docs/DATASET_CYCLE_TUTORIAL.md`, and `summary_bank.json` with counts, commit hash, tagger source, and skipped/failed asset counts.
 - For hackathon demos, prefer seeded replay data and SimSat runtime evidence before spending direct-provider quota on refreshes.
-- Hugging Face dataset: `Shoozes/LFM-Orbit-SatData`, latest data/card commit `1ebd19065e8a8124372425c4c0df9c0332275c9c`, with `mission_metadata=1` for the metadata-only Greenland ice/snow extent replay.
+- Hugging Face dataset: `Shoozes/LFM-Orbit-SatData`, latest data/card commit `2d5c5c400b61e869a1154881743ac6f1c1f77e3b`, with `mission_metadata=185` for operator task text, target packs, object targets, bbox intent, and metadata-only replay missions.
 - Dataset Viewer schema note: upload `source/backend/data/HF_DATASET_CARD.md` as the Hub `README.md` so single-image SFT rows, temporal SFT rows, metadata, mission metadata, and review records load as separate configs instead of one mixed inferred JSON split.
 
 ## Optional Tkinter UI
@@ -294,8 +313,6 @@ Run it from the backend folder:
 cd source/backend
 uv run --no-sync python scripts\retag_training_assets_ui.py
 ```
-
-![Orbit training asset retagger Tkinter UI](../../../docs/retag-training-assets-ui.png)
 
 The UI exposes:
 

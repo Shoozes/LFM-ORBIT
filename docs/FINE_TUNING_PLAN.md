@@ -16,14 +16,21 @@ Published handoff contents:
 - native `hf-checkpoint/`
 - `lora-adapter/`
 
-Training manifest summary:
+Current training manifest summary:
 
 - method: `vlm_sft`
-- train rows: `32`
-- multimodal rows: `32`
-- image blocks: `44`
-- eval rows: `0`
-- promotion gate: not attached
+- task: `orbit-satellite-triage`
+- train rows: `1611`
+- multimodal rows: `1611`
+- image blocks: `1878`
+- eval rows: `179`
+- promotion gate: not required in the exported manifest
+
+## Satellite VLM Reference Alignment
+
+The Liquid satellite-VLM cookbook is useful as an alignment reference, not as a replacement for Orbit's runtime. It fine-tunes `LiquidAI/LFM2.5-VL-450M` on VRSBench satellite tasks: VQA, visual grounding, and captioning. Its grounding format is the same contract Orbit now enforces: JSON objects with labels and normalized `[x1, y1, x2, y2]` boxes, scored with IoU@0.5.
+
+The LearnOpenCV Qwen2.5-VL object-detection workflow is also useful as a visual-grounding pattern: prompt for structured coordinates, parse JSON, scale coordinates back to the image, draw boxes, and verify that the boxes land on visible objects. We keep the Orbit model/handoff target, but adapt the structured-output and visual-QA discipline.
 
 Runtime pull:
 
@@ -31,4 +38,4 @@ Runtime pull:
 .\run.ps1 -Install -FetchModel
 ```
 
-This satisfies the trained-artifact handoff requirement. Held-out lift is still not claimed until a base-vs-tuned evaluation manifest is attached.
+This satisfies the trained-artifact handoff requirement for image-text training provenance plus evidence-packet and bbox JSON reasoning. The current fetched GGUF is not claimed as direct image-conditioned Orbit inference because Orbit has no wired `mmproj`/native image adapter yet.

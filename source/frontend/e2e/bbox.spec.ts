@@ -10,7 +10,7 @@ test.describe("Bounding Box Draw Validation", () => {
     await expect(page.getByText("Spatial Options")).toBeVisible({ timeout: 5_000 });
     await page.getByText("◫ Set Mission BBox Here").click();
 
-    await expect(page.getByRole("button", { name: "View Timelapse Preview" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("view-timelapse-preview")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/\[-?\d+\.\d+, -?\d+\.\d+, -?\d+\.\d+, -?\d+\.\d+\]/)).toBeVisible();
   });
 
@@ -29,7 +29,7 @@ test.describe("Bounding Box Draw Validation", () => {
     await mapActionsButton.click();
     await page.getByText("◫ Set Mission BBox Here").click();
 
-    await expect(page.getByRole("button", { name: "View Timelapse Preview" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("view-timelapse-preview")).toBeVisible({ timeout: 10_000 });
   });
 
   test("mission form shows date validation errors before deployment", async ({ page, request }) => {
@@ -43,5 +43,19 @@ test.describe("Bounding Box Draw Validation", () => {
     await page.getByRole("button", { name: "Launch Mission" }).click();
 
     await expect(page.getByText("Start date must be on or before end date.")).toBeVisible();
+  });
+
+  test("mission launch readiness explains missing task and optional area", async ({ page, request }) => {
+    await resetRuntimeState(request);
+    await gotoApp(page);
+    await page.locator("[data-testid='tab-mission']").click();
+
+    await expect(page.getByTestId("mission-launch-readiness")).toContainText("Add an instruction to launch.");
+    await page.getByTestId("mission-task-input").fill("Review the active region for publish QA.");
+    await expect(page.getByTestId("mission-launch-readiness")).toContainText("active region will be scanned");
+
+    await openMapContextMenu(page);
+    await page.getByText("◫ Set Mission BBox Here").click();
+    await expect(page.getByTestId("mission-launch-readiness")).toContainText("selected area will be scanned");
   });
 });

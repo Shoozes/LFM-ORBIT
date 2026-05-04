@@ -1,0 +1,104 @@
+{
+  "story_id": "critical_minerals",
+  "title": "Critical Minerals Expansion Watch",
+  "what": "Extraction-site region evidence",
+  "where": "Salar de Atacama / Escondida / Atacama corridor",
+  "when": {
+    "date_from": "2024-01-15",
+    "date_to": "2025-12-15"
+  },
+  "why": "retain pond, tailings, pit, road, and facility regions without production or pollution claims",
+  "bbox": [
+    -69.115,
+    -24.29,
+    -69.035,
+    -24.21
+  ],
+  "date_from": "2024-01-15",
+  "date_to": "2025-12-15",
+  "visual_mode": "true_color",
+  "source": "cached visual story frame",
+  "imagery_provider": "sentinelhub",
+  "imagery_origin": "cached_api",
+  "runtime_truth_mode": "replay",
+  "scoring_basis": "visual_only",
+  "box_source": "visual_story_fixture",
+  "box_count": 5,
+  "boxes": [
+    {
+      "label": "open-pit expansion region",
+      "bbox": [
+        0.29,
+        0.18,
+        0.7,
+        0.82
+      ],
+      "confidence": 0.86,
+      "color": "#f97316"
+    },
+    {
+      "label": "tailings region",
+      "bbox": [
+        0.32,
+        0.02,
+        0.69,
+        0.25
+      ],
+      "confidence": 0.82,
+      "color": "#facc15"
+    },
+    {
+      "label": "evaporation pond region",
+      "bbox": [
+        0.03,
+        0.61,
+        0.2,
+        0.95
+      ],
+      "confidence": 0.79,
+      "color": "#22d3ee"
+    },
+    {
+      "label": "industrial road corridor",
+      "bbox": [
+        0.08,
+        0.18,
+        0.24,
+        0.65
+      ],
+      "confidence": 0.75,
+      "color": "#a3e635"
+    },
+    {
+      "label": "facility cluster region",
+      "bbox": [
+        0.65,
+        0.54,
+        0.78,
+        0.7
+      ],
+      "confidence": 0.72,
+      "color": "#2dd4bf"
+    }
+  ],
+  "targets": [
+    "evaporation pond regions",
+    "tailings regions",
+    "open-pit expansion",
+    "industrial roads",
+    "facility clusters"
+  ],
+  "crop": null,
+  "frame_path": "source/backend/assets/seeded_data/visual_story_frames/critical_minerals_sentinel.png",
+  "output_path": "docs/media/story-plates/story-critical-minerals-expansion.png",
+  "public_docs": true,
+  "visual_audit_status": "approved",
+  "visual_audit_notes": [
+    "Public plate uses region/corridor/cluster labels only; no illegal-mining, pollution, or output-volume claim is made.",
+    "The image is visually strong for extraction-site region evidence: benches, pond-like areas, roads, and facility clusters are legible."
+  ],
+  "fetched_at": null,
+  "fetch_error": "",
+  "training_ready": true,
+  "note": "Boxes are deterministic visual-story evidence fixtures over cached/fetched imagery, not a claim of live model-backed object detection."
+}

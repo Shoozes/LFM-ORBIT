@@ -170,3 +170,57 @@ def test_bbox_serializes_and_deserializes_correctly():
     m = start_mission("Bbox test", bbox=bbox)
     loaded = get_mission(m["id"])
     assert loaded["bbox"] == pytest.approx(bbox)
+
+
+def test_start_mission_with_target_pack_loads_object_targets():
+    from core.mission import start_mission
+
+    mission = start_mission("Run fireline watch", target_pack_id="fireline")
+
+    assert mission["target_pack_id"] == "fireline"
+    labels = {target["label"] for target in mission["object_targets"]}
+    assert {"dark smoke", "burn scar", "road obstruction"} <= labels
+
+
+def test_start_mission_rejects_unknown_target_pack():
+    from core.mission import start_mission
+
+    with pytest.raises(ValueError, match="Unknown target_pack_id"):
+        start_mission("Run unknown pack", target_pack_id="missing_pack")
+
+
+def test_mission_target_mutations_merge_remove_and_clear():
+    from core.mission import (
+        add_mission_targets,
+        clear_mission_targets,
+        get_mission_target_state,
+        remove_mission_targets,
+        set_mission_target_pack,
+        start_mission,
+    )
+
+    mission = start_mission("Mutable targets")
+    mission = set_mission_target_pack(mission["id"], "fireline")
+    assert mission["target_pack_id"] == "fireline"
+
+    mission = add_mission_targets(
+        mission["id"],
+        [
+            {"label": "vehicle queue", "prompt": "Find vehicle queues", "class_key": "mobility"},
+            {"label": "dark smoke", "prompt": "Find darker smoke", "class_key": "hazard"},
+        ],
+    )
+    labels = [target["label"] for target in mission["object_targets"]]
+    assert labels.count("dark smoke") == 1
+    assert "vehicle queue" in labels
+
+    mission = remove_mission_targets(mission["id"], ["DARK SMOKE"])
+    assert "dark smoke" not in {target["label"] for target in mission["object_targets"]}
+
+    state = get_mission_target_state(mission["id"])
+    assert state["mission_id"] == mission["id"]
+    assert state["object_targets"] == mission["object_targets"]
+
+    mission = clear_mission_targets(mission["id"])
+    assert mission["target_pack_id"] is None
+    assert mission["object_targets"] == []

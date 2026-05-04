@@ -26,9 +26,8 @@ test.describe('LFM Orbit QA Focus Validation', () => {
     const wsLabel = page.getByTestId('header-agent-bus');
     await expect(wsLabel).toBeVisible();
 
-    // Note: React 18 strict mode forces a reconnect, it may briefly flash CONNECTING
-    // Usually playwright detects internal node bindings smoothly. We search for text indicating UI completion.
-    await expect(page.locator('text=AGENT DIALOGUE BUS').first()).toBeVisible();
+    // Note: React 18 strict mode forces a reconnect, it may briefly flash CONNECTING.
+    await expect(wsLabel).toContainText('SAT/GND Dialogue Bus');
   });
 
   test('Settings Panel Connects and Retrieves Status', async ({ page }) => {

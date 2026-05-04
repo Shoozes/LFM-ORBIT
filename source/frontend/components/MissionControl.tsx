@@ -9,7 +9,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { getApiBaseUrl } from "../utils/telemetry";
-import { Mission } from "../types/mission";
+import { Mission, ObjectTarget, TargetPack } from "../types/mission";
 
 type ReplayCatalogItem = {
   replay_id: string;
@@ -54,7 +54,11 @@ type MissionPreset = {
   startDate: string;
   endDate: string;
   tone: MissionPresetTone;
+  targetPackId?: string;
+  sourceNote?: string;
 };
+
+type MissionPanelTab = "plan" | "replay" | "targets" | "monitors";
 
 type MaritimeMonitorResponse = {
   mode?: string;
@@ -83,21 +87,34 @@ const MARITIME_PREVIEW_TARGET = {
   lat: 29.92,
   lon: 32.54,
   timestamp: "2025-12-15",
-  bbox: [32.5, 29.88, 32.58, 29.96],
-  taskText: "Review maritime vessel queueing near the Suez channel.",
+  bbox: [32.515, 29.9, 32.575, 29.955],
+  taskText: "Review Suez channel port activity areas: visible shipping container clusters, docked-vessel groups, and berth basin context without claiming exact vessel or boat counts.",
 };
 
 const MISSION_LOCATION_PRESETS: MissionPreset[] = [
   {
+    id: "mining_atacama",
+    label: "Critical Minerals",
+    place: "Atacama mining corridor",
+    useCaseId: "mining_expansion",
+    taskText: "Run Critical Minerals Expansion Watch over the Salar de Atacama / Escondida / Atacama mining corridor. Compare historical and current satellite imagery for evaporation pond regions, tailings regions, open-pit expansion, industrial roads, facility clusters, exposed soil, and surface color change without claiming illegal mining, pollution confirmation, or production output.",
+    bbox: [-69.115, -24.29, -69.035, -24.21],
+    startDate: "2024-01-15",
+    endDate: "2025-12-15",
+    tone: "mining",
+    targetPackId: "critical_minerals",
+  },
+  {
     id: "deforestation_amazon",
     label: "Deforestation",
-    place: "Amazon frontier",
+    place: "Rondonia frontier",
     useCaseId: "deforestation",
-    taskText: "Scan the Amazon frontier near Rondonia for new canopy loss against the same-season baseline.",
-    bbox: [-62.1, -9.8, -61.4, -9.1],
-    startDate: "2024-06-01",
-    endDate: "2025-06-01",
+    taskText: "Run a Deforestation / Land-Use Change Watch over the Rondonia western frontier. Compare same-season replay frames for persistent canopy loss, clearing candidate regions, road expansion corridors, exposed soil, and canopy-loss boundaries without claiming legal status or exact land-use attribution from imagery alone.",
+    bbox: [-63.15, -10.15, -62.85, -9.85],
+    startDate: "2023-01-15",
+    endDate: "2025-01-15",
     tone: "forest",
+    targetPackId: "deforestation",
   },
   {
     id: "traffic_i4_disney",
@@ -109,6 +126,20 @@ const MISSION_LOCATION_PRESETS: MissionPreset[] = [
     startDate: "2025-03-01",
     endDate: "2025-03-15",
     tone: "traffic",
+    targetPackId: "lifeline",
+  },
+  {
+    id: "fire_drought_florida_2026",
+    label: "FL Fire/Drought",
+    place: "North Florida corridor",
+    useCaseId: "wildfire",
+    taskText: "Run Florida Fire/Drought Readiness Watch over a North Florida corridor. Triage drought-stressed vegetation, smoke candidates, burn-scar candidates, road or trail access, firebreak context, water/vegetation boundaries, and civilian lifeline exposure. Treat this as candidate evidence until source-backed imagery confirms smoke, active fire, or burn scar.",
+    bbox: [-83.2, 29.0, -81.3, 30.7],
+    startDate: "2026-04-15",
+    endDate: "2026-04-25",
+    tone: "fire",
+    targetPackId: "fireline",
+    sourceNote: "Official April/May 2026 context: Drought.gov Southeast update and NIFC National Fire News; candidate triage only.",
   },
   {
     id: "maritime_suez",
@@ -120,10 +151,11 @@ const MISSION_LOCATION_PRESETS: MissionPreset[] = [
     startDate: "2025-03-01",
     endDate: MARITIME_PREVIEW_TARGET.timestamp,
     tone: "water",
+    targetPackId: "port",
   },
   {
     id: "ice_greenland",
-    label: "Ice/Snow",
+    label: "Glacier",
     place: "Greenland coast",
     useCaseId: "ice_snow_extent",
     taskText: "Review Greenland edge snow and ice extent using NDSI, SCL cloud rejection, and multi-frame persistence before any extent-change label.",
@@ -131,6 +163,7 @@ const MISSION_LOCATION_PRESETS: MissionPreset[] = [
     startDate: "2024-01-15",
     endDate: "2025-12-15",
     tone: "ice",
+    targetPackId: "glacier",
   },
   {
     id: "wildfire_highway82",
@@ -142,6 +175,7 @@ const MISSION_LOCATION_PRESETS: MissionPreset[] = [
     startDate: "2026-04-01",
     endDate: "2026-04-28",
     tone: "fire",
+    targetPackId: "fireline",
   },
   {
     id: "wildfire_future_spc_high_plains",
@@ -153,6 +187,7 @@ const MISSION_LOCATION_PRESETS: MissionPreset[] = [
     startDate: "2026-04-28",
     endDate: "2026-04-29",
     tone: "fire",
+    targetPackId: "fireline",
   },
   {
     id: "flood_manchar",
@@ -164,6 +199,19 @@ const MISSION_LOCATION_PRESETS: MissionPreset[] = [
     startDate: "2022-06-15",
     endDate: "2022-09-15",
     tone: "flood",
+    targetPackId: "lifeline",
+  },
+  {
+    id: "waterline_lake_mead",
+    label: "Waterline",
+    place: "Lake Mead",
+    useCaseId: "flood_extent",
+    taskText: "Run Waterline Watch over Lake Mead. Compare long-term water extent, exposed lakebed, shoreline retreat, dry basin regions, and water color boundaries with source dates attached.",
+    bbox: [-114.9, 35.95, -114.25, 36.45],
+    startDate: "2023-01-01",
+    endDate: "2025-01-01",
+    tone: "water",
+    targetPackId: "waterline",
   },
   {
     id: "crop_kansas",
@@ -187,17 +235,6 @@ const MISSION_LOCATION_PRESETS: MissionPreset[] = [
     endDate: "2026-01-01",
     tone: "urban",
   },
-  {
-    id: "mining_atacama",
-    label: "Mining",
-    place: "Atacama open pit",
-    useCaseId: "mining_expansion",
-    taskText: "Detect Atacama open-pit mining expansion and separate persistent bare earth from seasonal vegetation loss.",
-    bbox: [-69.115, -24.29, -69.035, -24.21],
-    startDate: "2024-01-15",
-    endDate: "2025-12-15",
-    tone: "mining",
-  },
 ];
 
 const PRESET_TONE_CLASSES: Record<MissionPresetTone, string> = {
@@ -213,6 +250,16 @@ const PRESET_TONE_CLASSES: Record<MissionPresetTone, string> = {
 };
 
 const cleanApiError = (message: string) => message.replace(/^Value error,\s*/i, "");
+
+function makePackId(name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80);
+  return slug || "custom_pack";
+}
 
 async function readApiError(response: Response, fallback: string) {
   try {
@@ -265,6 +312,7 @@ type MissionControlProps = {
   onReplayLoaded?: (primaryCellId: string | null) => void | Promise<void>;
   onReplayRescanStarted?: (mission: Mission) => void | Promise<void>;
   onPreviewBbox?: (bbox: number[]) => void;
+  onOpenEvidenceTools?: () => void;
   initialPresetId?: string | null;
 };
 
@@ -281,6 +329,7 @@ export default function MissionControl({
   onReplayLoaded,
   onReplayRescanStarted,
   onPreviewBbox,
+  onOpenEvidenceTools,
   initialPresetId = null,
 }: MissionControlProps) {
   const apiBase = getApiBaseUrl();
@@ -294,6 +343,12 @@ export default function MissionControl({
   const [monitorPreview, setMonitorPreview] = useState<MonitorPreview | null>(null);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [selectedUseCaseId, setSelectedUseCaseId] = useState<string | null>(null);
+  const [targetPacks, setTargetPacks] = useState<TargetPack[]>([]);
+  const [selectedTargetPackId, setSelectedTargetPackId] = useState<string | null>(null);
+  const [newTargetLabel, setNewTargetLabel] = useState("");
+  const [customPackName, setCustomPackName] = useState("");
+  const [targetBusy, setTargetBusy] = useState(false);
+  const [activePanelTab, setActivePanelTab] = useState<MissionPanelTab>("plan");
 
   const [submitting, setSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -314,14 +369,35 @@ export default function MissionControl({
           setReplays([]);
         }
       })();
+      void (async () => {
+        try {
+          const response = await fetch(`${apiBase}/api/object-targets/packs`);
+          if (!response.ok) {
+            setTargetPacks([]);
+            return;
+          }
+          const payload = (await response.json()) as { packs?: TargetPack[] };
+          setTargetPacks(payload.packs ?? []);
+        } catch {
+          setTargetPacks([]);
+        }
+      })();
     }
   }, [apiBase, isOpen, onRefresh]);
 
   const [errorMsg, setErrorMsg] = useState("");
 
+  useEffect(() => {
+    if (mission?.target_pack_id !== undefined) {
+      setSelectedTargetPackId(mission.target_pack_id ?? null);
+    }
+  }, [mission?.id, mission?.target_pack_id]);
+
   const applyMissionPreset = (preset: MissionPreset) => {
+    setActivePanelTab("plan");
     setSelectedPresetId(preset.id);
     setSelectedUseCaseId(preset.useCaseId);
+    setSelectedTargetPackId(preset.targetPackId ?? null);
     setMonitorPreview(null);
     setErrorMsg("");
     setTask(preset.taskText);
@@ -338,8 +414,10 @@ export default function MissionControl({
     if (!preset) {
       return;
     }
+    setActivePanelTab("plan");
     setSelectedPresetId(preset.id);
     setSelectedUseCaseId(preset.useCaseId);
+    setSelectedTargetPackId(preset.targetPackId ?? null);
     setMonitorPreview(null);
     setErrorMsg("");
     setTask(preset.taskText);
@@ -366,6 +444,7 @@ export default function MissionControl({
           start_date: startDate || null,
           end_date: endDate || null,
           use_case_id: selectedUseCaseId,
+          target_pack_id: selectedTargetPackId,
         }),
       });
       if (!response.ok) {
@@ -386,6 +465,184 @@ export default function MissionControl({
   const handleStop = async () => {
     await fetch(`${apiBase}/api/mission/stop`, { method: "POST" });
     await onRefresh();
+  };
+
+  const readTargetError = (response: Response) => readApiError(response, "Object target update failed.");
+
+  const handleTargetPackChange = async (packId: string) => {
+    setSelectedTargetPackId(packId || null);
+    if (!mission?.id || !packId) return;
+    setTargetBusy(true);
+    setErrorMsg("");
+    try {
+      const response = await fetch(`${apiBase}/api/mission/targets/set-pack`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mission_id: mission.id, target_pack_id: packId }),
+      });
+      if (!response.ok) {
+        throw new Error(await readTargetError(response));
+      }
+      await onRefresh();
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : "Target pack update failed.");
+    } finally {
+      setTargetBusy(false);
+    }
+  };
+
+  const handleAddTarget = async () => {
+    const label = newTargetLabel.trim();
+    if (!mission?.id || !label) return;
+    setTargetBusy(true);
+    setErrorMsg("");
+    try {
+      const response = await fetch(`${apiBase}/api/mission/targets/add`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mission_id: mission.id,
+          targets: [{ label, prompt: `Find ${label}`, class_key: "custom", enabled: true }],
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(await readTargetError(response));
+      }
+      setNewTargetLabel("");
+      await onRefresh();
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : "Object target update failed.");
+    } finally {
+      setTargetBusy(false);
+    }
+  };
+
+  const handleRemoveTarget = async (target: ObjectTarget) => {
+    if (!mission?.id) return;
+    setTargetBusy(true);
+    setErrorMsg("");
+    try {
+      const response = await fetch(`${apiBase}/api/mission/targets/remove`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mission_id: mission.id, labels: [target.label] }),
+      });
+      if (!response.ok) {
+        throw new Error(await readTargetError(response));
+      }
+      await onRefresh();
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : "Object target update failed.");
+    } finally {
+      setTargetBusy(false);
+    }
+  };
+
+  const handleToggleTarget = async (target: ObjectTarget) => {
+    if (!mission?.id) return;
+    setTargetBusy(true);
+    setErrorMsg("");
+    try {
+      const response = await fetch(`${apiBase}/api/mission/targets/add`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mission_id: mission.id,
+          targets: [{ ...target, enabled: !target.enabled }],
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(await readTargetError(response));
+      }
+      await onRefresh();
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : "Object target update failed.");
+    } finally {
+      setTargetBusy(false);
+    }
+  };
+
+  const handleResetTargetsToPack = async () => {
+    const packId = selectedTargetPackId ?? mission?.target_pack_id ?? null;
+    if (!mission?.id || !packId) return;
+    setTargetBusy(true);
+    setErrorMsg("");
+    try {
+      const response = await fetch(`${apiBase}/api/mission/targets/set-pack`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mission_id: mission.id, target_pack_id: packId }),
+      });
+      if (!response.ok) {
+        throw new Error(await readTargetError(response));
+      }
+      await onRefresh();
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : "Target pack reset failed.");
+    } finally {
+      setTargetBusy(false);
+    }
+  };
+
+  const handleSaveTargetPack = async () => {
+    const name = customPackName.trim();
+    const targets = mission?.object_targets ?? [];
+    if (!name || targets.length === 0) return;
+    setTargetBusy(true);
+    setErrorMsg("");
+    try {
+      const response = await fetch(`${apiBase}/api/object-targets/packs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: makePackId(name),
+          name,
+          description: "Runtime custom pack saved from Mission Control.",
+          targets,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(await readTargetError(response));
+      }
+      const payload = (await response.json()) as { pack?: TargetPack };
+      if (payload.pack) {
+        setTargetPacks((current) => {
+          const others = current.filter((pack) => pack.id !== payload.pack!.id);
+          return [...others, payload.pack!].sort((a, b) => a.name.localeCompare(b.name));
+        });
+        setSelectedTargetPackId(payload.pack.id);
+      }
+      setCustomPackName("");
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : "Target pack save failed.");
+    } finally {
+      setTargetBusy(false);
+    }
+  };
+
+  const handleClearTargets = async () => {
+    if (!mission?.id) {
+      setSelectedTargetPackId(null);
+      return;
+    }
+    setTargetBusy(true);
+    setErrorMsg("");
+    try {
+      const response = await fetch(`${apiBase}/api/mission/targets/clear`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mission_id: mission.id }),
+      });
+      if (!response.ok) {
+        throw new Error(await readTargetError(response));
+      }
+      setSelectedTargetPackId(null);
+      await onRefresh();
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : "Object target clear failed.");
+    } finally {
+      setTargetBusy(false);
+    }
   };
 
   const formatMonitorLabel = (value: string) => value.replace(/_/g, " ");
@@ -446,6 +703,7 @@ export default function MissionControl({
     setErrorMsg("");
     setSelectedPresetId("maritime_suez");
     setSelectedUseCaseId("maritime_activity");
+    setSelectedTargetPackId("port");
     setTask(MARITIME_PREVIEW_TARGET.taskText);
     setStartDate("2025-03-01");
     setEndDate(MARITIME_PREVIEW_TARGET.timestamp);
@@ -491,6 +749,7 @@ export default function MissionControl({
     setErrorMsg("");
     setSelectedPresetId(null);
     setSelectedUseCaseId("civilian_lifeline_disruption");
+    setSelectedTargetPackId("lifeline");
     try {
       const response = await fetch(`${apiBase}/api/lifelines/monitor`, {
         method: "POST",
@@ -548,6 +807,17 @@ export default function MissionControl({
   if (!isOpen) return null;
 
   const hasBlockingLiveMission = mission?.status === "active" && mission.mission_mode !== "replay";
+  const selectedTargetPack = targetPacks.find((pack) => pack.id === selectedTargetPackId) ?? null;
+  const objectTargets = mission?.object_targets ?? selectedTargetPack?.targets ?? [];
+  const objectTargetCount = objectTargets.filter((target) => target.enabled).length;
+  const selectedPreset = MISSION_LOCATION_PRESETS.find((preset) => preset.id === selectedPresetId) ?? null;
+  const launchBlockedReason = hasBlockingLiveMission
+    ? "Mission already running."
+    : !task.trim()
+      ? "Add an instruction to launch."
+      : "";
+  const launchReadiness = launchBlockedReason
+    || (drawnBbox ? "Ready: selected area will be scanned." : "Ready: no area selected; active region will be scanned.");
 
   const severityColor = (s: string) => {
     if (s === "active") return "text-emerald-700 bg-emerald-50 border-emerald-200";
@@ -585,7 +855,7 @@ export default function MissionControl({
               }`}>
                 {mission.mission_mode === "replay"
                   ? `Replay Mission · ${mission.replay_id || `#${mission.id}`}`
-                  : `Active Mission #${mission.id}`}
+                  : isScanComplete ? `Mission Pass Complete #${mission.id}` : `Active Mission #${mission.id}`}
               </p>
               <p className="text-sm text-zinc-900 font-medium leading-snug">{mission.task_text}</p>
               {mission.summary && (
@@ -610,7 +880,69 @@ export default function MissionControl({
             </div>
           )}
 
-          {replays.length > 0 && (
+          {mission && mission.mission_mode !== "replay" && isScanComplete && (
+            <div
+              data-testid="mission-complete-summary"
+              className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900"
+            >
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700">
+                Mission Pass Complete
+              </p>
+              <p className="mt-1 leading-relaxed">
+                Satellite Pruner finished the selected review area. Review object-target results, Logs, Inspect, or Proof Mode before turning candidate evidence into a claim.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-wider text-emerald-800">
+                <span>{mission.cells_scanned} cells recorded</span>
+                <span>{mission.flags_found} flags found</span>
+                {mission.target_pack_id && <span>{mission.target_pack_id.replace(/_/g, " ")}</span>}
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-lg border border-cyan-200 bg-cyan-50/70 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-700">Hackathon Runtime</p>
+                <p className="mt-1 text-xs leading-relaxed text-cyan-950">
+                  Default path stays DPhi SimSat first, with SimSat Mapbox context next. Sentinel Hub `sh.txt` is for development cache refreshes only.
+                </p>
+              </div>
+              <span className="shrink-0 rounded border border-cyan-300 bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-700">
+                SimSat First
+              </span>
+            </div>
+          </div>
+
+          <div data-testid="mission-panel-tabs" className="grid grid-cols-4 gap-1 rounded-lg border border-zinc-200 bg-zinc-50 p-1">
+            {([
+              ["plan", "Plan"],
+              ["replay", "Replay"],
+              ["targets", `Targets ${objectTargetCount}`],
+              ["monitors", "Monitors"],
+            ] as const).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                data-testid={`mission-panel-tab-${id}`}
+                onClick={() => setActivePanelTab(id)}
+                className={`rounded-md px-2 py-2 text-[11px] font-semibold uppercase tracking-wider transition ${
+                  activePanelTab === id
+                    ? "bg-white text-zinc-900 shadow-sm"
+                    : "text-zinc-500 hover:bg-white/70 hover:text-zinc-700"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {errorMsg && (
+            <div className="rounded border border-red-200 bg-red-50 p-2 text-center text-xs font-semibold text-red-600">
+              {errorMsg}
+            </div>
+          )}
+
+          {activePanelTab === "replay" && replays.length > 0 && (
             <div className="space-y-2" data-testid="fast-replay-panel">
               <div className="flex items-center justify-between gap-3">
                 <label className="block text-[10px] uppercase tracking-wider font-semibold text-zinc-500">
@@ -681,6 +1013,7 @@ export default function MissionControl({
             </div>
           )}
 
+          {activePanelTab === "plan" && (
           <div data-testid="mission-preset-panel" className="space-y-3 rounded-lg border border-zinc-200 bg-white px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <label className="block text-[10px] uppercase tracking-wider font-semibold text-zinc-500">
@@ -709,13 +1042,161 @@ export default function MissionControl({
             </div>
             {selectedPresetId && (
               <div data-testid="selected-mission-preset" className="rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] font-medium text-zinc-700">
-                {MISSION_LOCATION_PRESETS.find((preset) => preset.id === selectedPresetId)?.place}
+                {selectedPreset?.place}
                 <span className="text-zinc-400"> · </span>
                 {selectedUseCaseId?.replace(/_/g, " ")}
+                {selectedPreset?.sourceNote && (
+                  <p className="mt-1 text-[10px] leading-snug text-zinc-500">{selectedPreset.sourceNote}</p>
+                )}
               </div>
             )}
           </div>
+          )}
 
+          {activePanelTab === "targets" && (
+          <div data-testid="object-targets-panel" className="space-y-3 rounded-lg border border-zinc-200 bg-white px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <label className="block text-[10px] uppercase tracking-wider font-semibold text-zinc-500">
+                Object Targets
+              </label>
+              <span className="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold">
+                {objectTargetCount} active
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] uppercase tracking-wider font-semibold text-zinc-400">
+                Target Pack
+              </label>
+              <select
+                data-testid="target-pack-select"
+                value={selectedTargetPackId ?? ""}
+                onChange={(event) => void handleTargetPackChange(event.target.value)}
+                disabled={targetBusy || targetPacks.length === 0}
+                className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-800 outline-none transition focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 disabled:opacity-50"
+              >
+                <option value="">Custom objects</option>
+                {targetPacks.map((pack) => (
+                  <option key={pack.id} value={pack.id}>
+                    {pack.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {objectTargets.length > 0 ? (
+                objectTargets.map((target) => (
+                  <span
+                    key={target.label}
+                    data-testid="object-target-chip"
+                    className={`inline-flex max-w-full items-center gap-1.5 rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider ${
+                      target.enabled
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : "border-zinc-200 bg-zinc-50 text-zinc-400"
+                    }`}
+                    title={`${target.prompt} · ${target.class_key}`}
+                  >
+                    <button
+                      type="button"
+                      data-testid="object-target-toggle"
+                      aria-label={`${target.enabled ? "Disable" : "Enable"} ${target.label}`}
+                      aria-pressed={target.enabled}
+                      onClick={() => void handleToggleTarget(target)}
+                      disabled={!mission?.id || targetBusy}
+                      className="min-w-0 truncate text-left disabled:cursor-not-allowed"
+                    >
+                      {target.label}
+                    </button>
+                    {mission?.id && (
+                      <button
+                        type="button"
+                        aria-label={`Remove ${target.label}`}
+                        onClick={() => void handleRemoveTarget(target)}
+                        disabled={targetBusy}
+                        className="rounded px-1 text-[11px] leading-none text-zinc-500 hover:bg-white hover:text-red-600 disabled:opacity-40"
+                      >
+                        x
+                      </button>
+                    )}
+                  </span>
+                ))
+              ) : (
+                <span className="rounded border border-zinc-200 bg-zinc-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                  No objects
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2">
+              <input
+                data-testid="object-target-pack-name"
+                value={customPackName}
+                onChange={(event) => setCustomPackName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void handleSaveTargetPack();
+                  }
+                }}
+                disabled={!mission?.id || objectTargets.length === 0 || targetBusy}
+                placeholder="Save as pack"
+                className="min-w-0 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 placeholder-zinc-400 outline-none transition focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 disabled:opacity-50"
+              />
+              <button
+                type="button"
+                data-testid="object-target-save-pack"
+                onClick={() => void handleSaveTargetPack()}
+                disabled={!mission?.id || !customPackName.trim() || objectTargets.length === 0 || targetBusy}
+                className="shrink-0 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                data-testid="object-target-reset-pack"
+                onClick={() => void handleResetTargetsToPack()}
+                disabled={!mission?.id || !selectedTargetPackId || targetBusy}
+                className="shrink-0 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Reset
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <input
+                data-testid="object-target-input"
+                value={newTargetLabel}
+                onChange={(event) => setNewTargetLabel(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void handleAddTarget();
+                  }
+                }}
+                disabled={!mission?.id || targetBusy}
+                placeholder="Add object"
+                className="min-w-0 flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 placeholder-zinc-400 outline-none transition focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 disabled:opacity-50"
+              />
+              <button
+                type="button"
+                data-testid="object-target-add"
+                onClick={() => void handleAddTarget()}
+                disabled={!mission?.id || !newTargetLabel.trim() || targetBusy}
+                className="shrink-0 rounded-lg border border-zinc-300 bg-zinc-900 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                data-testid="object-target-clear"
+                onClick={() => void handleClearTargets()}
+                disabled={targetBusy || (!mission?.id && !selectedTargetPackId)}
+                className="shrink-0 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+          )}
+
+          {activePanelTab === "monitors" && (
           <div data-testid="monitor-template-panel" className="space-y-3 rounded-lg border border-zinc-200 bg-white px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <label className="block text-[10px] uppercase tracking-wider font-semibold text-zinc-500">
@@ -777,7 +1258,10 @@ export default function MissionControl({
               </div>
             )}
           </div>
+          )}
 
+          {activePanelTab === "plan" && (
+          <>
           {/* Task prompt */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
@@ -788,6 +1272,7 @@ export default function MissionControl({
                 onClick={() => {
                   setSelectedPresetId(null);
                   setSelectedUseCaseId("deforestation");
+                  setSelectedTargetPackId(null);
                   setTask("Conduct a high-resolution sweep for active logging in the northern sector. Flag any significant NDVI drop.");
                 }}
                 className="text-[10px] font-bold text-zinc-400 hover:text-zinc-600 transition"
@@ -855,18 +1340,32 @@ export default function MissionControl({
                   </button>
                 </div>
                 {onOpenTimelapse && (
-                  <button
-                    type="button"
-                    onClick={onOpenTimelapse}
-                    className="w-full mt-1 rounded border border-zinc-200 bg-white px-3 py-1.5 text-[10px] uppercase tracking-wider text-zinc-700 hover:bg-zinc-100 transition font-semibold"
-                  >
-                    View Timelapse Preview
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      data-testid="view-timelapse-preview"
+                      onClick={onOpenTimelapse}
+                      className="w-full mt-1 rounded border border-zinc-200 bg-white px-3 py-1.5 text-[10px] uppercase tracking-wider text-zinc-700 hover:bg-zinc-100 transition font-semibold"
+                    >
+                      Timelapse
+                    </button>
+                    {onOpenEvidenceTools && (
+                      <button
+                        type="button"
+                        data-testid="open-evidence-tools"
+                        onClick={onOpenEvidenceTools}
+                        className="w-full mt-1 rounded border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-[10px] uppercase tracking-wider text-cyan-800 hover:bg-cyan-100 transition font-semibold"
+                      >
+                        Evidence Tools
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             ) : (
               <button
                 type="button"
+                data-testid="draw-area-button"
                 onClick={() => { onDrawBbox(); onClose(); }}
                 className="w-full rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-4 py-3 text-xs font-semibold text-zinc-500 hover:border-zinc-400 hover:text-zinc-700 transition"
               >
@@ -876,19 +1375,28 @@ export default function MissionControl({
           </div>
 
           {/* Submit */}
+          <p
+            id="mission-launch-readiness"
+            data-testid="mission-launch-readiness"
+            className={`rounded border px-3 py-2 text-xs font-medium ${
+              launchBlockedReason
+                ? "border-amber-200 bg-amber-50 text-amber-800"
+                : "border-emerald-200 bg-emerald-50 text-emerald-800"
+            }`}
+          >
+            {launchReadiness}
+          </p>
           <button
             type="button"
             onClick={handleSubmit}
+            aria-describedby="mission-launch-readiness"
+            title={launchReadiness}
             disabled={submitting || !task.trim() || mission?.status === "active"}
             className="w-full rounded-lg bg-zinc-900 py-3 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
           >
-            {submitting ? "Deploying..." : (isScanComplete ? "Mission Complete" : (mission?.status === "active" ? "Mission In Progress" : "Launch Mission"))}
+            {submitting ? "Deploying..." : (mission && isScanComplete ? "Mission Complete" : (mission?.status === "active" ? "Mission In Progress" : "Launch Mission"))}
           </button>
-
-          {errorMsg && (
-            <div className="text-xs text-red-600 font-semibold p-2 bg-red-50 border border-red-200 rounded text-center">
-              {errorMsg}
-            </div>
+          </>
           )}
 
 

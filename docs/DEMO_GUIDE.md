@@ -12,16 +12,38 @@ npm ci
 npm run demo:showcase
 ```
 
+Record the dedicated Object Evidence proof with the glowing CV square and tooltip:
+
+```bash
+npm run demo:object-evidence
+```
+
+Refresh the visual use-case proof grid:
+
+```bash
+cd ../backend
+python scripts/build_visual_story_proofs.py --force-fetch
+```
+
+Run the live-app visual story guard:
+
+```bash
+cd ../frontend
+npx playwright test e2e/visual-stories.spec.ts
+```
+
 What it proves:
 
-1. Deterministic satellite replay
-2. Edge triage
-3. Liquid evidence reasoning over retained packets
-4. Payload reduction
-5. Provenance
-6. Screenshot, video, and proof JSON artifacts
-7. Tutorial-style subtitles and visible UI flow before the proof panel
-8. Abstain and backend-derived link-outage queue behavior in the full demo set
+1. Critical Minerals Expansion Watch as the main product story
+2. Deterministic satellite replay
+3. Edge triage
+4. Liquid evidence reasoning over retained packets
+5. Payload reduction
+6. Provenance
+7. Screenshot, video, and proof JSON artifacts
+8. Tutorial-style subtitles and visible UI flow before the proof panel
+9. Abstain and backend-derived link-outage queue behavior in the full demo set
+10. Optional CV object evidence overlays with glowing boxes and provenance tooltips when an operator runs visual grounding inside a selected bbox
 
 Artifacts:
 
@@ -30,7 +52,7 @@ source/frontend/e2e/artifacts/showcase/final-screen.png
 source/frontend/e2e/artifacts/showcase/evidence-frame.png
 source/frontend/e2e/artifacts/showcase/video.webm
 source/frontend/e2e/artifacts/showcase/proof.json
-docs/showcase-demo.webm
+docs/media/videos/showcase-demo.webm
 ```
 
 Payload accounting: `raw_payload_bytes` represents the local satellite frame payload. `alert_payload_bytes` represents the compact alert JSON that would be downlinked. The larger proof artifact envelope, screenshots, video, trace, and UI-only audit fields are intentionally excluded and are listed in `proof.json` under `payload_accounting.excluded_from_alert_payload_bytes`.
@@ -51,30 +73,51 @@ Docs video exports:
 
 | Demo | Video |
 |---|---|
-| Main Showcase | `docs/showcase-demo.webm` |
-| Payload Reduction | `docs/payload-reduction-demo.webm` |
-| Provenance | `docs/provenance-demo.webm` |
-| Greenland Abstain Safety | `docs/abstain-safety-demo.webm` |
-| Suez Maritime Eclipse | `docs/orbital-eclipse-demo.webm` |
-| Tutorial Walkthrough | `docs/tutorial_video.webm` |
+| Main Showcase | `docs/media/videos/showcase-demo.webm` |
+| Payload Reduction | `docs/media/videos/payload-reduction-demo.webm` |
+| Provenance | `docs/media/videos/provenance-demo.webm` |
+| Greenland Abstain Safety | `docs/media/videos/abstain-safety-demo.webm` |
+| Object Evidence Port Audit | `docs/media/videos/object-evidence-demo.webm` |
+| Suez Maritime Eclipse | `docs/media/videos/orbital-eclipse-demo.webm` |
+| Tutorial Walkthrough | `docs/media/videos/tutorial_video.webm` |
+| README Timelapse Highlight | `docs/media/timelapse/highlight-greenland-ice-timelapse.gif`, `docs/media/timelapse/highlight-greenland-ice-timelapse.webm` |
 
 Current mission split:
 
-1. Main Showcase uses the deterministic Rondonia replay and cached real API WebM evidence.
-2. Payload reduction uses a Pakistan Manchar Lake flood frame and compresses a flood alert to JSON.
-3. Provenance uses an Atacama open-pit mining frame and keeps source, capture time, bbox, prompt, and model together.
-4. Abstain safety uses the Greenland ice preset and shows no alert transmitted after the quality gate fails.
-5. Orbital eclipse uses the Suez maritime preset, queues compact JSON while offline, then flushes on restore. Its proof JSON includes `link_state_before`, `queued_alerts_before_restore`, `link_state_after`, `flushed_alerts`, and `queue_source = agent_bus_unread_messages`.
+1. Main Showcase uses `Critical Minerals Expansion Watch` over the Salar de Atacama / Escondida / Atacama mining corridor. It boxes region-level extraction evidence: evaporation pond regions, tailings regions, open-pit expansion, industrial roads, facility clusters, exposed soil, and surface color change.
+2. Fireline-to-Lifeline Watch stays second. Wildfire remains useful proof-of-work and emergency relevance, but it is no longer the centerpiece.
+3. Maritime Activity Watch stays third and uses activity-level wording for vessel-like regions, wakes, and port clusters. It should not imply exact boat counts when resolution is insufficient.
+4. Glacier / Ice Retreat Watch is fourth and should use slower long-form pacing. Columbia Glacier is the preferred future public story because NASA has a long Landsat-backed retreat series; the current Greenland replay remains a spectral-confidence guard.
+5. Waterline Watch is fifth. Great Salt Lake or Lake Mead are better long-term water/lifeline examples than garbage-patch mass monitoring because the water boundary is visible and measurable.
+6. Coastal Debris / Slick Candidate Watch is experimental only. Use coastal, river-mouth, port, storm-aftermath, foam-line, slick, or debris-accumulation candidates. Do not frame it as Great Pacific Garbage Patch mass from optical imagery.
 
-The tutorial walkthrough uses the app like an operator: load the Singapore maritime replay, inspect and analyze the retained alert, replace it with the Atacama mining replay, inspect that alert, then open the proof panel on the active replay. The current recorded file is about 28 seconds and has distinct sampled frames across mission catalog, maritime evidence, Atacama evidence, and proof panel views.
+The Critical Minerals story is the strongest current main example because it is visually clear, long-term, commercially relevant, environmentally relevant, non-wildfire, non-maritime, and object/region-detection friendly. Public source backing is explicit: USGS shows Salar de Atacama lithium mining expansion between 1993 and 2015 with blue evaporation ponds visible in Landsat imagery, and ties lithium demand to rechargeable batteries, smartphones, mobile computers, and electric cars. NASA Earthdata identifies Salar de Atacama as Chile's largest salt flat, the world's third-largest salt flat, and one of the world's largest active lithium brine sources. NOAA's Great Pacific Garbage Patch guidance is the opposite kind of source: it says the patch is not a continuous visible trash island and may not be evident to the naked eye, so garbage-patch mass is not a safe main optical-satellite demo claim.
+
+Sources:
+
+- USGS: [Lithium Mining in Salar de Atacama, Chile](https://www.usgs.gov/media/before-after/lithium-mining-salar-de-atacama-chile)
+- NASA Earthdata: [Lithium Mining in the Salar de Atacama, Chile](https://www.earthdata.nasa.gov/news/worldview-image-archive/lithium-mining-salar-de-atacama-chile)
+- NOAA National Ocean Service: [What is the Great Pacific Garbage Patch?](https://oceanservice.noaa.gov/facts/garbagepatch.html)
+
+The tutorial walkthrough is now the Rondonia first-impression product run-through. It starts from a ready mission, uses the select tool to confirm the bbox, shows Ground Agent proposal/confirmation, shows Satellite Agent scan/prune/retain behavior, runs the deforestation target pack through CV region boxes, briefly labels optional 3D context as non-evidence, explains timelapse versus static acquisition dates, opens Proof Mode, and ends with compact proof JSON plus tagged training data. The main showcase video still leads with Critical Minerals Expansion Watch; the tutorial is optimized for showing how to use the app end to end.
 
 Replay-backed proof mode can now keep the active replay instead of forcing Rondonia, so mission-specific proof copy stays attached to maritime, mining, flood, wildfire, and urban replay packs. Some development replay fixtures use visible Sentinel-2 L2A frames and explicitly reject invalid still-image color-shift timelapses. Their real monthly WebMs are kept in the legacy `source/backend/assets/seeded_data/` cache for dataset export and training, but they are not a Sentinel Hub dependency for the default demo.
 
 Current runtime wording: SimSat is the primary realtime lane. Replay fixtures are used for deterministic demos. Liquid runtime currently reasons over scored evidence packets unless a manifest-resolved multimodal model bundle is installed.
 
+Object Evidence Mode wording: target packs and CV boxes are product-facing evidence tools, not one-off demo controls. Defaults and custom packs are available through `/api/object-targets/packs`; active missions carry `target_pack_id` and `object_targets`; Mission Control, Ground Agent, and VLM batch grounding can edit and run those targets. The main public showcase pack is `critical_minerals`; `deforestation`, `fireline`, `port`, `glacier`, `waterline`, `lifeline`, `camp`, and cautious `plastic`/coastal-debris packs remain available. Alert proofs can carry persisted `detection_summary` and `object_deltas`; replay snapshots and dataset exports preserve mission target intent for cost control and future training.
+
+The dedicated Object Evidence recording writes local Playwright artifacts under `source/frontend/e2e/artifacts/object-evidence/`. It starts the approved Port Activity mission bbox used by `docs/media/story-plates/story-object-evidence-port.png`, keeps that bbox stable, uses group/area targets for `shipping container cluster`, `container yard cluster`, `docked-vessel group`, and `berth basin context`, returns deterministic visually audited boxes, hovers a glowing map square, and captures the CV tooltip with confidence, bbox, prompt, model, runtime mode, imagery origin, and scoring basis. The recording must not reopen exact/singular object boxes such as the rejected `channel vessel` box or any 3D overlay selection boxes.
+
+The visual use-case story builder writes every generated story plate and manifest under `source/backend/assets/seeded_data/visual_story_frames/`. Only promoted, visually audited public plates are copied to `docs/media/story-plates/`; currently that public set is Critical Minerals Expansion Watch and the port Object Evidence plate. Public plates must carry `visual_audit_status=approved`, and their box labels must read as areas, groups, zones, samples, corridors, or candidates unless a true object-scale model path supports a singular-object claim. The builder reads Sentinel Hub OAuth credentials from environment variables, `.tools/.secrets/sentinel.txt`, or `.tools/.secrets/sh.txt`, then stores reusable frames and provenance in `source/backend/assets/seeded_data/visual_story_frames/`.
+
+The story plates are visual proof assets, not hidden model claims. Sentinel Hub is used for broad satellite-context plates and timelapse-friendly development frames. Esri World Imagery context is used only where object-scale roofs/shelters need to be visible; those plates label `imagery_origin=esri_context`. All story boxes label `box_source=visual_story_fixture`, and the roof plate calls out sample boxes rather than an exhaustive roof count, so they are not confused with live model-backed detections. The cached story frames can be recycled into dataset exports with `python scripts/export_orbit_dataset.py --include-seeded-cache ...`, and the Playwright visual-story spec still verifies the real app can draw glowing CV boxes, legends, and provenance tooltips without overwriting README proof plates.
+
+Optional 3D context view: once a bbox is selected on the 2D map, the floating `3D` button opens a no-auth MapLibre satellite-terrain view. It uses Sentinel-2 cloudless EOX raster imagery over public MapLibre DEM terrain, with a deterministic local fallback texture and relief mesh underneath live tiles so demos do not wait on external tile timing or disappear over low-relief regions. It reuses the same selected bbox and CV object boxes, extrudes CV regions over terrain, exposes terrain exaggeration, shows object tooltips, and labels `Context timestamp` separately from `Timeline`. The `AI context experimental` toggle reads a fast local terrain/canvas structure cue and shows Depth Anything V3 readiness when available; it does not auto-run per-frame model inference, identify objects, or change satellite acquisition dates.
+
 Replay WebMs may include cloudy context frames, but the proof panel keeps playback inside a clearer evidence window for final screenshots. Cloudy/no-data frames remain quality-gated in seeded creation and do not become positive detections.
 
-Each recorded demo also saves `evidence-frame.png` beside `final-screen.png` and rejects blank or washed-out proof frames before copying the WebM into `docs/`.
+Each recorded demo also saves `evidence-frame.png` beside `final-screen.png` and rejects blank or washed-out proof frames before copying the promoted WebM into `docs/media/videos/`.
 
 Recorded demos preload their target mission or replay before the browser connects to telemetry. Demo config also disables the boot-time live agent pair, so recordings should not open on the legacy Amazonas sweep.
 
@@ -85,6 +128,22 @@ Refresh the tutorial video:
 ```bash
 npm run demo:tutorial
 ```
+
+Refresh the README-safe Greenland timelapse highlight:
+
+```bash
+cd ../backend
+uv run --no-sync python scripts/build_docs_timelapse_highlight.py
+```
+
+Verify the optional 3D context view:
+
+```bash
+cd ../frontend
+npx playwright test e2e/map3d.spec.ts
+```
+
+That captures `source/frontend/e2e/screenshots/map-3d-context-view.png` and checks that the 3D terrain view uses the active bbox/CV box, AI context summary, timestamp warnings, and fallback/error paths without presenting itself as a timeline frame.
 
 Optional development only: refresh high-quality Sentinel Hub replay cache after adding OAuth credentials:
 
@@ -107,8 +166,10 @@ Current cached development replay assets:
 
 | Demo | Use case | WebM |
 |---|---|---|
+| Main Showcase | `mining_expansion` | `source/backend/assets/seeded_data/sh_fbe644a9.webm` |
+| Tutorial Walkthrough | `deforestation` | `source/backend/assets/seeded_data/sh_07da3a0b.webm` cached into `docs/media/videos/tutorial_video.webm` by `npm run demo:tutorial` |
 | Payload Reduction | `flood_extent` | `source/backend/assets/seeded_data/sh_24541539.webm` |
 | Provenance | `mining_expansion` | `source/backend/assets/seeded_data/sh_fbe644a9.webm` |
 | Greenland Abstain Safety | `ice_cap_growth` | Local static preview; static WebM is excluded from Fast Replay |
-| Greenland Ice/Snow Extent | `ice_snow_extent` | Metadata-only curated replay until a refreshed contextual WebM is seeded |
+| Greenland Ice/Snow Extent | `ice_snow_extent` | Metadata-scored curated replay with `source/frontend/public/demo-assets/greenland-ice-timelapse.webm` used as secondary science context |
 | Suez Maritime Eclipse | `maritime_activity` | `source/backend/assets/seeded_data/sh_2d990c6b.webm` |

@@ -19,12 +19,17 @@ if (-not $BackendVenvDir) {
 }
 $RuntimeDir = Join-Path $RepoRoot "runtime-data"
 $LegacyBackendRuntimeDir = Join-Path $BackendDir "runtime-data"
+$ToolsDir = Join-Path $RuntimeDir "tools"
+$UvVenvDir = Join-Path $ToolsDir "uv-venv"
+$UvBootstrapExe = Join-Path $UvVenvDir "Scripts\uv.exe"
 $ModelDir = Join-Path $RuntimeDir "models\lfm2.5-vlm-450m"
 $ModelFile = Join-Path $ModelDir "LFM2.5-VL-450M-Q4_0.gguf"
 $ModelManifest = Join-Path $ModelDir "model_manifest.json"
 $DefaultModelRepoId = "Shoozes/lfm2.5-450m-vl-orbit-satellite"
 $DefaultModelRevision = "main"
 $SimSatDir = Join-Path $BackendDir "SimSat-main"
+$script:UvCommand = $null
+$script:PythonCommand = $null
 
 Set-Location -LiteralPath $RepoRoot
 
@@ -76,6 +81,90 @@ function Require-Command {
     }
 }
 
+function Ensure-Python {
+    if ($script:PythonCommand) {
+        return $script:PythonCommand
+    }
+
+    $command = Get-Command "python" -ErrorAction SilentlyContinue
+    if (-not $command) {
+        throw "Python 3.10+ not found. Install Python 3.10 or newer, then rerun the launcher."
+    }
+
+    & $command.Source -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Python 3.10+ is required. Found an older Python at $($command.Source)."
+    }
+
+    $script:PythonCommand = $command.Source
+    return $script:PythonCommand
+}
+
+function Find-UvCommand {
+    $command = Get-Command "uv" -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    if (Test-Path $UvBootstrapExe) {
+        return $UvBootstrapExe
+    }
+
+    return $null
+}
+
+function Ensure-Uv {
+    if ($script:UvCommand) {
+        return $script:UvCommand
+    }
+
+    $uv = Find-UvCommand
+    if ($uv) {
+        $script:UvCommand = $uv
+        return $script:UvCommand
+    }
+
+    if ($env:LFM_ORBIT_SKIP_UV_BOOTSTRAP -eq "1") {
+        throw "uv not found. Install uv or unset LFM_ORBIT_SKIP_UV_BOOTSTRAP so the launcher can bootstrap repo-local uv."
+    }
+
+    $python = Ensure-Python
+    Write-Host "[*] uv not found; bootstrapping repo-local uv into runtime-data\tools\uv-venv..." -ForegroundColor Cyan
+    New-Item -ItemType Directory -Force -Path $ToolsDir | Out-Null
+
+    & $python -m venv $UvVenvDir
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to create uv bootstrap virtualenv at $UvVenvDir."
+    }
+
+    $venvPython = Join-Path $UvVenvDir "Scripts\python.exe"
+    if (-not (Test-Path $venvPython)) {
+        throw "uv bootstrap virtualenv did not contain $venvPython."
+    }
+
+    & $venvPython -m pip install --upgrade pip uv
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to install uv into $UvVenvDir."
+    }
+
+    if (-not (Test-Path $UvBootstrapExe)) {
+        throw "uv bootstrap did not produce $UvBootstrapExe."
+    }
+
+    $script:UvCommand = $UvBootstrapExe
+    return $script:UvCommand
+}
+
+function Ensure-Node {
+    Require-Command -Name "node" -Hint "Install Node.js 20.19.0 or newer 22.12.0+; .nvmrc pins 20.19.0."
+    Require-Command -Name "npm" -Hint "Install Node.js 20.19.0 or newer 22.12.0+; npm ships with Node.js."
+
+    node -e "const [maj,min,patch]=process.versions.node.split('.').map(Number); const ok=(maj===20 && (min>19 || (min===19 && patch>=0))) || (maj>22) || (maj===22 && min>=12); process.exit(ok?0:1);"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unsupported Node.js version $(node --version). Use Node.js 20.19.0, or Node.js 22.12.0 or newer."
+    }
+}
+
 function Show-Usage {
     Write-Host "LFM Orbit launcher" -ForegroundColor Cyan
     Write-Host ""
@@ -100,7 +189,7 @@ function Write-SimSatStatus {
 }
 
 function Install-BackendDeps {
-    Require-Command -Name "uv" -Hint "Install uv from https://docs.astral.sh/uv/ to honor source/backend/uv.lock."
+    $uv = Ensure-Uv
     Write-Host "[*] Syncing backend dependencies from uv.lock..." -ForegroundColor Cyan
 
     $syncArgs = @("sync", "--extra", "dev", "--locked")
@@ -112,12 +201,12 @@ function Install-BackendDeps {
 
     Push-Location $BackendDir
     try {
-        & uv @syncArgs
+        & $uv @syncArgs
         $syncExit = $LASTEXITCODE
         if ($syncExit -ne 0) {
             if ($installModelRuntime) {
                 Write-Host "[!] Optional llama-cpp model runtime failed to install. Retrying core backend install without model runtime." -ForegroundColor Yellow
-                uv sync --extra dev --locked
+                & $uv sync --extra dev --locked
                 if ($LASTEXITCODE -ne 0) {
                     throw "Backend dependency sync failed with exit code $LASTEXITCODE."
                 }
@@ -131,7 +220,7 @@ function Install-BackendDeps {
 }
 
 function Install-FrontendDeps {
-    Require-Command -Name "npm" -Hint "Install Node.js using the version pinned in .nvmrc."
+    Ensure-Node
     Write-Host "[*] Installing frontend dependencies from package-lock.json..." -ForegroundColor Cyan
     Push-Location $FrontendDir
     try {
@@ -147,7 +236,7 @@ function Ensure-OptionalModel {
         return
     }
 
-    Require-Command -Name "python" -Hint "Install Python 3.12 to fetch the optional GGUF model."
+    $python = Ensure-Python
 
     $minSizeBytes = 1MB
 
@@ -176,7 +265,7 @@ function Ensure-OptionalModel {
         Write-Host "    Source: $modelUrl" -ForegroundColor Gray
         Write-Host "    Target: $ModelFile" -ForegroundColor Gray
 
-        python -c "import urllib.request, sys; print('Downloading optional model...', flush=True); urllib.request.urlretrieve(sys.argv[1], sys.argv[2])" $modelUrl $ModelFile
+        & $python -c "import urllib.request, sys; print('Downloading optional model...', flush=True); urllib.request.urlretrieve(sys.argv[1], sys.argv[2])" $modelUrl $ModelFile
     } else {
         $modelRepoId = $env:LFM_MODEL_REPO_ID
         if (-not $modelRepoId) { $modelRepoId = $env:CANOPY_SENTINEL_MODEL_REPO_ID }
@@ -214,7 +303,8 @@ function Ensure-OptionalModel {
         Write-Host "    Target: $ModelDir" -ForegroundColor Gray
         Push-Location $BackendDir
         try {
-            python scripts\fetch_satellite_model.py --repo-id $modelRepoId --revision $modelRevision --force
+            $uv = Ensure-Uv
+            & $uv run --no-sync python scripts\fetch_satellite_model.py --repo-id $modelRepoId --revision $modelRevision --force
         } finally {
             Pop-Location
         }
@@ -241,7 +331,7 @@ function Install-Deps {
 }
 
 function Install-PlaywrightBrowser {
-    Require-Command -Name "npm" -Hint "Install Node.js using the version pinned in .nvmrc."
+    Ensure-Node
     Write-Host "[*] Ensuring Playwright Chromium is installed..." -ForegroundColor Cyan
     Push-Location $FrontendDir
     try {
@@ -260,7 +350,8 @@ function Run-Verify {
     Push-Location $BackendDir
     try {
         Write-Host "[*] Backend tests..." -ForegroundColor Cyan
-        uv run --no-sync pytest -q
+        $uv = Ensure-Uv
+        & $uv run --no-sync pytest -q
     } finally {
         Pop-Location
     }
@@ -281,11 +372,11 @@ function Run-Verify {
 }
 
 function Start-BackendProcess {
-    $uvCommand = Get-Command "uv" -ErrorAction SilentlyContinue
+    $uvCommand = Find-UvCommand
     $venvPython = Join-Path $BackendVenvDir "Scripts\python.exe"
 
     if ($uvCommand) {
-        return Start-Process -FilePath $uvCommand.Source -ArgumentList "run", "--no-sync", "uvicorn", "api.main:app", "--host", "127.0.0.1", "--port", "8000" -WorkingDirectory $BackendDir -WindowStyle Hidden -PassThru
+        return Start-Process -FilePath $uvCommand -ArgumentList "run", "--no-sync", "uvicorn", "api.main:app", "--host", "127.0.0.1", "--port", "8000" -WorkingDirectory $BackendDir -WindowStyle Hidden -PassThru
     }
 
     if (Test-Path $venvPython) {
@@ -296,7 +387,7 @@ function Start-BackendProcess {
 }
 
 function Run-App {
-    Require-Command -Name "npm" -Hint "Install Node.js using the version pinned in .nvmrc."
+    Ensure-Node
 
     Write-Host "[*] Starting LFM Orbit..." -ForegroundColor Cyan
     Write-SimSatStatus

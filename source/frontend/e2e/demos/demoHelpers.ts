@@ -21,6 +21,7 @@ export type ProofJson = {
   confidence: number;
   abstained: boolean;
   result: string;
+  prompt?: string;
   payload_accounting: {
     raw_payload_basis: string;
     alert_payload_basis: string;
@@ -60,10 +61,10 @@ type DemoScenario = {
 
 const DEMO_SCENARIOS: Record<DemoCase, DemoScenario> = {
   showcase: {
-    intro: "Proof Mode starts from a deterministic Rondonia replay and walks the strongest alert.",
-    proofSubtitle: "The final screen shows satellite evidence, bbox, model output, latency, provenance, and compact JSON.",
-    replayCellId: "sq_-10.0_-63.0",
-    preloadReplayId: "rondonia_frontier_showcase",
+    intro: "Proof Mode starts from Critical Minerals Expansion Watch over the Atacama mining corridor.",
+    proofSubtitle: "The final screen shows region evidence, bbox, confidence stack, provenance, compact JSON, and training-ready tags.",
+    replayCellId: "mining_atacama_open_pit",
+    preloadReplayId: "atacama_mining_replay",
   },
   payload: {
     intro: "Payload proof scans Pakistan's Manchar Lake flood overflow and compares raw imagery against compact alert JSON.",
@@ -79,13 +80,13 @@ const DEMO_SCENARIOS: Record<DemoCase, DemoScenario> = {
     useCaseId: "flood_extent",
   },
   provenance: {
-    intro: "Provenance proof scans an Atacama mine and keeps source, capture time, bbox, prompt, and model together.",
-    proofSubtitle: "The proof JSON is visible so the mining result is auditable without narration.",
+    intro: "Provenance proof scans the Atacama critical-minerals corridor and keeps source, capture time, bbox, prompt, and model together.",
+    proofSubtitle: "The proof JSON is visible so the region-level mining result is auditable without production or pollution claims.",
     presetId: "mining_atacama",
-    presetLabel: "Atacama open pit",
+    presetLabel: "Atacama mining corridor",
     launchMission: true,
     initialBboxText: "-69.11",
-    taskText: "Detect Atacama open-pit mining expansion and separate persistent bare earth from seasonal vegetation loss.",
+    taskText: "Run Critical Minerals Expansion Watch over the Salar de Atacama / Escondida / Atacama mining corridor. Compare historical and current satellite imagery for evaporation pond regions, tailings regions, open-pit expansion, industrial roads, facility clusters, exposed soil, and surface color change without claiming illegal mining, pollution confirmation, or production output.",
     bbox: [-69.115, -24.29, -69.035, -24.21],
     startDate: "2024-01-15",
     endDate: "2025-12-15",
@@ -238,8 +239,8 @@ export async function openDemo(page: Page, request: APIRequestContext, demoCase:
   }
 
   if (scenario.replayCellId) {
-    await showSubtitle(page, "The deterministic replay is active before telemetry starts, so the video never opens on the generic scan.", 1_600);
-    await expect(page.getByText("REPLAY ACTIVE: rondonia_frontier_showcase")).toBeVisible({ timeout: 15_000 });
+    await showSubtitle(page, "The deterministic minerals replay is active before telemetry starts, so the video never opens on the generic scan.", 1_600);
+    await expect(page.getByText("REPLAY ACTIVE: atacama_mining_replay")).toBeVisible({ timeout: 15_000 });
 
     await showSubtitle(page, "Open Logs and choose the evidence cell for this specific proof.", 1_500);
     await page.getByTestId("tab-logs").click();
@@ -262,7 +263,12 @@ export async function openDemo(page: Page, request: APIRequestContext, demoCase:
 
     if (scenario.monitorButtonTestId) {
       await showSubtitle(page, "Run the monitor preview before the proof screen so the video shows the mission logic.", 1_600);
+      const monitorsTab = page.getByTestId("mission-panel-tab-monitors");
+      if (await monitorsTab.count()) {
+        await monitorsTab.click();
+      }
       const monitorSelector = `[data-testid='${scenario.monitorButtonTestId}']`;
+      await expect(page.locator(monitorSelector)).toBeVisible({ timeout: 15_000 });
       await moveMouseToHighlight(page, monitorSelector);
       await page.locator(monitorSelector).click();
       await removeHighlight(page);
@@ -270,19 +276,28 @@ export async function openDemo(page: Page, request: APIRequestContext, demoCase:
       await expect(proofCard).toBeVisible({ timeout: 15_000 });
       await expect(proofCard).toContainText(scenario.monitorProofText ?? "");
       await showSubtitle(page, "The monitor returns deterministic evidence fields before any downlink story begins.", 1_800);
+      const planTab = page.getByTestId("mission-panel-tab-plan");
+      if (await planTab.count()) {
+        await planTab.click();
+      }
     }
 
     if (scenario.launchMission) {
       await showSubtitle(page, "Confirm the deterministic mission is active before Proof Mode binds the proof.", 1_500);
       const launchButton = page.getByRole("button", { name: "Launch Mission" });
       if ((await launchButton.count()) > 0 && await launchButton.first().isEnabled()) {
+        await launchButton.first().scrollIntoViewIfNeeded();
         await moveMouseToHighlight(page, "button:has-text('Launch Mission')");
-        await launchButton.click();
+        await launchButton.first().click();
         await removeHighlight(page);
       } else {
-        await expect(page.getByRole("button", { name: "Mission In Progress" })).toBeVisible({ timeout: 10_000 });
+        await expect(
+          page.getByRole("button", { name: /Mission In Progress|Mission Complete/ }),
+        ).toBeVisible({ timeout: 10_000 });
       }
-      await expect(page.getByText(/MISSION ACTIVE|Active Mission/).first()).toBeVisible({ timeout: 15_000 });
+      await expect(
+        page.getByText(/MISSION ACTIVE|Active Mission|Mission In Progress|Mission Pass Complete|Mission Complete/).first(),
+      ).toBeVisible({ timeout: 15_000 });
     }
   }
 
@@ -303,12 +318,29 @@ export async function saveProofArtifacts(page: Page, demoName: string, testInfo:
   const evidenceFramePath = path.join(artifactDir, "evidence-frame.png");
   const proofPath = path.join(artifactDir, "proof.json");
   const videoPath = path.join(artifactDir, "video.webm");
-  const docsVideoPath = path.resolve("..", "..", "docs", `${demoName}-demo.webm`);
+  const docsVideoPath = path.resolve("..", "..", "docs", "media", "videos", `${demoName}-demo.webm`);
+  const docsScreenshotByDemo: Record<string, string> = {
+    "payload-reduction": "readme-payload-reduction.png",
+    provenance: "readme-provenance.png",
+    "orbital-eclipse": "readme-orbital-eclipse.png",
+  };
+  const docsScreenshotName = docsScreenshotByDemo[demoName];
+  const docsScreenshotPath = docsScreenshotName
+    ? path.resolve("..", "..", "docs", "media", "readme", docsScreenshotName)
+    : null;
 
   await mkdir(artifactDir, { recursive: true });
   await mkdir(path.dirname(docsVideoPath), { recursive: true });
-  await page.waitForTimeout(8_000);
+  if (docsScreenshotPath) {
+    await mkdir(path.dirname(docsScreenshotPath), { recursive: true });
+  }
+  await expect(page.getByText(/Step 6:/).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("proof-json")).toContainText("\"payload_accounting\"", { timeout: 5_000 });
+  await page.waitForTimeout(300);
   await page.screenshot({ path: screenshotPath, fullPage: false });
+  if (docsScreenshotPath) {
+    await copyFile(screenshotPath, docsScreenshotPath);
+  }
   await page.getByTestId("satellite-frame").screenshot({ path: evidenceFramePath });
   await assertProofFrameQuality(evidenceFramePath, demoName);
 

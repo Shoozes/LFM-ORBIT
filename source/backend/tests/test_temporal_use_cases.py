@@ -11,6 +11,7 @@ def test_temporal_use_case_catalog_includes_required_examples():
         "ice_snow_extent",
         "ice_cap_growth",
         "volcanic_surface_change",
+        "harmful_algal_bloom",
     ):
         assert use_case_id in cases
         assert cases[use_case_id]["temporal_methods"]
@@ -70,6 +71,12 @@ def test_temporal_use_case_classifier_handles_mission_text():
             "target_category": "volcanic_surface_change",
         }
     )
+    algae = classify_temporal_use_case(
+        {
+            "task_text": "Check Lake Okeechobee for algae blooms and cyanobacteria-like chlorophyll signal.",
+            "reason_codes": ["high_ndci", "surface_bloom_fai_signal", "requires_field_confirmation"],
+        }
+    )
     explicit_volcanic = classify_temporal_use_case({}, requested_use_case_id="volcanic_surface_change")
 
     assert wildfire["id"] == "wildfire"
@@ -81,4 +88,6 @@ def test_temporal_use_case_classifier_handles_mission_text():
     assert highway82_wildfire["id"] == "wildfire"
     assert future_fire_watch["id"] == "wildfire"
     assert mauna_loa["id"] == "volcanic_surface_change"
+    assert algae["id"] == "harmful_algal_bloom"
+    assert algae["target_category"] == "water_quality"
     assert explicit_volcanic["target_category"] == "volcanic_surface_change"

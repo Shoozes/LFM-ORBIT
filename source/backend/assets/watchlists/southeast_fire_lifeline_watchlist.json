@@ -1,0 +1,26 @@
+{
+  "schema": "orbit_watchlist_v1",
+  "watchlist_id": "southeast_fire_lifeline_watch",
+  "display_name": "Southeast Fireline Watch",
+  "purpose": "Onboard wildfire, drought-stress, and civilian lifeline triage for Georgia and Florida.",
+  "assets": [
+    {
+      "asset_id": "ga_highway82_fire_candidate",
+      "display_name": "Highway 82 wildfire candidate corridor",
+      "region": "Georgia",
+      "asset_type": "wildfire_corridor",
+      "bbox": [-81.916, 31.143, -81.756, 31.303],
+      "priority": "high",
+      "target_pack": "fireline"
+    },
+    {
+      "asset_id": "fl_i4_sr536_lifeline",
+      "display_name": "Florida I-4 / SR-536 mobility corridor",
+      "region": "Florida",
+      "asset_type": "transport_corridor",
+      "bbox": [-81.535, 28.36, -81.505, 28.39],
+      "priority": "medium",
+      "target_pack": "lifeline"
+    }
+  ]
+}

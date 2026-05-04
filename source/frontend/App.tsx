@@ -1,8 +1,10 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { VlmBox } from "./components/VlmPanel";
 import { useTelemetry } from "./hooks/useTelemetry";
 import { getApiBaseUrl, generateGridForBbox } from "./utils/telemetry";
 import type { Mission } from "./types/mission";
+import type { ChatResponse } from "./components/GroundAgentActionCard";
+import type { MapCameraRequest } from "./types/mapCamera";
 
 const loadMapVisualizer = () => import("./components/MapVisualizer");
 const loadValidationPanel = () => import("./components/ValidationPanel");
@@ -26,19 +28,19 @@ const VlmPanel = lazy(loadVlmPanel);
 const AlertsLogs = lazy(loadAlertsLogs);
 const ProofModePanel = lazy(loadProofModePanel);
 
-type DemoCase = "showcase" | "payload" | "provenance" | "abstain" | "eclipse";
+type DemoCase = "showcase" | "payload" | "provenance" | "abstain" | "eclipse" | "ice" | "forest";
 
-const SHOWCASE_REPLAY_ID = "rondonia_frontier_showcase";
-const SHOWCASE_PRIMARY_CELL_ID = "sq_-10.0_-63.0";
-const SHOWCASE_FALLBACK_BBOX = [-63.15, -10.15, -62.85, -9.85];
+const SHOWCASE_REPLAY_ID = "atacama_mining_replay";
+const SHOWCASE_PRIMARY_CELL_ID = "mining_atacama_open_pit";
+const SHOWCASE_FALLBACK_BBOX = [-69.115, -24.29, -69.035, -24.21];
 const DEMO_STEPS_BY_CASE: Record<DemoCase, string[]> = {
   showcase: [
-    "Step 1: Replay loaded",
-    "Step 2: BBox selected",
-    "Step 3: Edge triage passed",
+    "Step 1: Minerals replay loaded",
+    "Step 2: Corridor bbox selected",
+    "Step 3: Region targets applied",
     "Step 4: Evidence reviewed",
-    "Step 5: Alert compressed",
-    "Step 6: Downlink packet ready",
+    "Step 5: Proof JSON compressed",
+    "Step 6: Training tags ready",
   ],
   payload: [
     "Step 1: Flood mission loaded",
@@ -49,8 +51,8 @@ const DEMO_STEPS_BY_CASE: Record<DemoCase, string[]> = {
     "Step 6: Downlink savings shown",
   ],
   provenance: [
-    "Step 1: Mining mission loaded",
-    "Step 2: Mine bbox selected",
+    "Step 1: Minerals mission loaded",
+    "Step 2: Corridor bbox selected",
     "Step 3: Source resolved",
     "Step 4: Evidence reviewed",
     "Step 5: Prompt captured",
@@ -63,6 +65,22 @@ const DEMO_STEPS_BY_CASE: Record<DemoCase, string[]> = {
     "Step 4: Review abstained",
     "Step 5: Alert blocked",
     "Step 6: No downlink sent",
+  ],
+  ice: [
+    "Step 1: Ice replay loaded",
+    "Step 2: BBox selected",
+    "Step 3: NDSI scored",
+    "Step 4: Clouds rejected",
+    "Step 5: Confidence weighted",
+    "Step 6: Proof packet ready",
+  ],
+  forest: [
+    "Step 1: Rondonia replay ready",
+    "Step 2: Select tool confirms bbox",
+    "Step 3: Ground Agent action approved",
+    "Step 4: CV regions retained",
+    "Step 5: Compact proof JSON",
+    "Step 6: Training tags exported",
   ],
   eclipse: [
     "Step 1: Maritime mission loaded",
@@ -90,6 +108,16 @@ const DEMO_START_PROFILES: Partial<Record<DemoCase, { presetId: string; bbox: nu
     bbox: [-51.13, 69.1, -50.97, 69.26],
     readyLabel: "Abstain demo ready",
   },
+  ice: {
+    presetId: "ice_greenland",
+    bbox: [-51.13, 69.1, -50.97, 69.26],
+    readyLabel: "Ice proof demo ready",
+  },
+  forest: {
+    presetId: "deforestation_amazon",
+    bbox: [-63.15, -10.15, -62.85, -9.85],
+    readyLabel: "Rondonia tutorial ready",
+  },
   eclipse: {
     presetId: "maritime_suez",
     bbox: [32.5, 29.88, 32.58, 29.96],
@@ -102,6 +130,8 @@ function normalizeDemoCase(value: string | null): DemoCase {
   if (value === "provenance") return "provenance";
   if (value === "abstain") return "abstain";
   if (value === "eclipse") return "eclipse";
+  if (value === "ice") return "ice";
+  if (value === "forest") return "forest";
   return "showcase";
 }
 
@@ -114,6 +144,26 @@ function readDemoQuery(): { enabled: boolean; demoCase: DemoCase } {
     enabled: params.get("demo") === "1",
     demoCase: normalizeDemoCase(params.get("demoCase") ?? params.get("case")),
   };
+}
+
+function demoBoxLabel(demoCase: DemoCase): string {
+  switch (demoCase) {
+    case "payload":
+      return "flood extent";
+    case "provenance":
+      return "mine expansion";
+    case "eclipse":
+      return "vessel queue";
+    case "ice":
+      return "ice/snow extent";
+    case "forest":
+      return "clearing candidate region";
+    case "abstain":
+      return "quality gate";
+    case "showcase":
+    default:
+      return "mining expansion region";
+  }
 }
 
 function LoadingPanel({ label, className = "" }: { label: string; className?: string }) {
@@ -159,6 +209,29 @@ function getCellIdFromProperties(properties: unknown): string | null {
   return typeof value === "string" || typeof value === "number" ? String(value) : null;
 }
 
+function normalizeNumberArray(value: unknown, length: number): number[] | null {
+  if (!Array.isArray(value) || value.length !== length) return null;
+  const numbers = value.map((entry) => Number(entry));
+  return numbers.every((entry) => Number.isFinite(entry)) ? numbers : null;
+}
+
+function normalizeCameraNumber(value: unknown): number | undefined {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : undefined;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => typeof entry === "string" ? entry.trim() : "")
+    .filter(Boolean);
+}
+
+function findOkAction(response: ChatResponse | undefined, name: string): Record<string, unknown> | null {
+  const action = response?.actions?.find((candidate) => candidate.name === name && candidate.status === "ok");
+  return action?.result ?? null;
+}
+
 export default function App() {
   const demoQuery = useMemo(readDemoQuery, []);
   const demoSteps = DEMO_STEPS_BY_CASE[demoQuery.demoCase];
@@ -171,9 +244,13 @@ export default function App() {
   const [showMissionTimelapse, setShowMissionTimelapse] = useState(false);
   const [showBboxTools, setShowBboxTools] = useState(false);
   const [mission, setMission] = useState<Mission | null>(null);
+  const [mapCameraRequest, setMapCameraRequest] = useState<MapCameraRequest | null>(null);
+  const [missionStopNotice, setMissionStopNotice] = useState<string | null>(null);
   const [proofModeActive, setProofModeActive] = useState(false);
   const [proofMission, setProofMission] = useState<Mission | null>(null);
   const [demoStepIndex, setDemoStepIndex] = useState(0);
+  const previousActiveMissionRef = useRef<Mission | null>(null);
+  const previewedMissionIdRef = useRef<number | null>(null);
   const apiBaseUrl = getApiBaseUrl();
 
   const fetchMission = useCallback(async () => {
@@ -196,6 +273,28 @@ export default function App() {
     const id = setInterval(fetchMission, 5000);
     return () => clearInterval(id);
   }, [fetchMission]);
+
+  useEffect(() => {
+    if (mission?.status === "active") {
+      previousActiveMissionRef.current = mission;
+      setMissionStopNotice(null);
+      if (mission.bbox && previewedMissionIdRef.current !== mission.id) {
+        setDrawnBbox([...mission.bbox]);
+        setVlmBoxes([]);
+        setShowMissionTimelapse(false);
+        setShowBboxTools(false);
+        previewedMissionIdRef.current = mission.id;
+      }
+      return;
+    }
+    const previousMission = previousActiveMissionRef.current;
+    if (previousMission) {
+      setMissionStopNotice(
+        `Mission #${previousMission.id} stopped. Scan animation paused until a new live mission starts.`,
+      );
+      previousActiveMissionRef.current = null;
+    }
+  }, [mission]);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -267,8 +366,20 @@ export default function App() {
     }
     return geoJsonGrid;
   }, [drawnBbox, geoJsonGrid]);
+  const selectedGridCellCount = displayGrid?.features.length ?? 0;
+  const missionPassComplete = Boolean(
+    isScanComplete
+      || (
+        mission?.status === "active"
+        && mission.mission_mode !== "replay"
+        && selectedGridCellCount > 0
+        && Number(mission.cells_scanned ?? 0) >= selectedGridCellCount
+      ),
+  );
 
-  const [activeTab, setActiveTab] = useState<"mission" | "agents" | "logs" | "inspect" | "settings">("mission");
+  const [activeTab, setActiveTab] = useState<"agents" | "mission" | "logs" | "inspect" | "settings">(
+    demoQuery.enabled ? "mission" : "agents",
+  );
 
   const handleProofModeStart = useCallback(async () => {
     setDemoStepIndex(0);
@@ -322,16 +433,7 @@ export default function App() {
       setDrawnBbox([...bbox]);
       setShowMissionTimelapse(false);
       setShowBboxTools(false);
-      const label = demoQuery.demoCase === "payload"
-        ? "flood extent"
-        : demoQuery.demoCase === "provenance"
-          ? "mine expansion"
-          : demoQuery.demoCase === "eclipse"
-            ? "vessel queue"
-            : demoQuery.demoCase === "abstain"
-              ? "quality gate"
-              : "clearing";
-      setVlmBoxes([{ label, bbox: [0.24, 0.18, 0.74, 0.76] }]);
+      setVlmBoxes([{ label: demoBoxLabel(demoQuery.demoCase), bbox: [0.24, 0.18, 0.74, 0.76] }]);
       if (primaryCellId) {
         setSelectedCellId(primaryCellId);
       }
@@ -341,7 +443,7 @@ export default function App() {
       console.error("Proof Mode failed to load replay", error);
       setProofMission(activeMission);
       setDrawnBbox(SHOWCASE_FALLBACK_BBOX);
-      setVlmBoxes([{ label: "clearing", bbox: [0.24, 0.18, 0.74, 0.76] }]);
+      setVlmBoxes([{ label: "mining expansion region", bbox: [0.24, 0.18, 0.74, 0.76] }]);
       if (primaryCellId) {
         setSelectedCellId(primaryCellId);
       }
@@ -349,11 +451,116 @@ export default function App() {
     }
   }, [apiBaseUrl, demoQuery.demoCase, demoStartProfile, fetchMission, mission, refreshTelemetry, selectedCellId, setSelectedCellId]);
 
+  const handleGroundAgentNavigate = useCallback(async (
+    target: "mission" | "logs" | "settings" | "object_evidence" | "proof",
+  ) => {
+    if (target === "proof") {
+      await handleProofModeStart();
+      return;
+    }
+    if (target === "object_evidence") {
+      const bbox = mission?.bbox ?? drawnBbox;
+      if (bbox) {
+        setDrawnBbox([...bbox]);
+        setVlmBoxes([]);
+        setShowMissionTimelapse(false);
+        setShowBboxTools(true);
+      }
+      setActiveTab("mission");
+      return;
+    }
+    setActiveTab(target);
+  }, [drawnBbox, handleProofModeStart, mission]);
+
+  const handleGroundAgentActionComplete = useCallback(async (response?: ChatResponse) => {
+    const [, refreshedMission] = await Promise.all([
+      refreshTelemetry({ replaceAlerts: true }),
+      fetchMission(),
+    ]);
+
+    const navigateResult = findOkAction(response, "navigate_map");
+    if (navigateResult) {
+      const center = normalizeNumberArray(navigateResult.center, 2);
+      const bbox = normalizeNumberArray(navigateResult.bbox, 4);
+      const camera = navigateResult.camera && typeof navigateResult.camera === "object"
+        ? navigateResult.camera as Record<string, unknown>
+        : {};
+      const label = typeof navigateResult.label === "string" && navigateResult.label.trim()
+        ? navigateResult.label
+        : "Ground Agent camera target";
+      if (bbox) {
+        setDrawnBbox([...bbox]);
+        setVlmBoxes([]);
+        setShowMissionTimelapse(false);
+        setShowBboxTools(true);
+        setSelectedCellId(null);
+        setActiveTab("mission");
+      }
+      if (center) {
+        setMapCameraRequest({
+          id: `ground-agent-${Date.now()}`,
+          label,
+          center: [center[0], center[1]],
+          bbox,
+          zoom: normalizeCameraNumber(camera.zoom),
+          pitch: normalizeCameraNumber(camera.pitch),
+          bearing: normalizeCameraNumber(camera.bearing),
+          reason: typeof navigateResult.reason === "string" ? navigateResult.reason : "Ground Agent repositioned the map camera.",
+          source: "Ground Agent",
+          locationType: typeof navigateResult.location_type === "string" ? navigateResult.location_type : null,
+          terrainContext: typeof navigateResult.terrain_context === "string" ? navigateResult.terrain_context : null,
+          missionContext: typeof navigateResult.mission_context === "string" ? navigateResult.mission_context : null,
+          semanticTags: normalizeStringArray(navigateResult.semantic_tags),
+          suggestedTargets: normalizeStringArray(navigateResult.suggested_targets),
+          evidenceGuidance: typeof navigateResult.evidence_guidance === "string" ? navigateResult.evidence_guidance : null,
+        });
+      }
+    } else if (refreshedMission?.bbox) {
+      const launchedMission = Boolean(
+        findOkAction(response, "start_custom_mission") || findOkAction(response, "start_mission_pack"),
+      );
+      if (launchedMission) {
+        previewedMissionIdRef.current = refreshedMission.id;
+      }
+      setDrawnBbox([...refreshedMission.bbox]);
+      if (launchedMission) {
+        setVlmBoxes([]);
+        setShowMissionTimelapse(false);
+        setShowBboxTools(true);
+        setSelectedCellId(null);
+        setActiveTab("mission");
+      }
+    }
+
+    const stopResult = findOkAction(response, "stop_mission");
+    if (stopResult) {
+      const stoppedMissionId = normalizeCameraNumber(stopResult.stopped_mission_id);
+      setMissionStopNotice(
+        stoppedMissionId
+          ? `Mission #${stoppedMissionId} stopped. Scan animation paused until a new live mission starts.`
+          : "No active mission was running. Scan animation is paused until a new live mission starts.",
+      );
+    }
+  }, [fetchMission, refreshTelemetry, setSelectedCellId]);
+
+  const scanAnimationActive = Boolean(
+    mission?.status === "active"
+      && mission.mission_mode !== "replay"
+      && !missionPassComplete,
+  );
+
   useEffect(() => {
     if (selectedCellId && activeTab !== "inspect") {
       setActiveTab("inspect");
     }
   }, [selectedCellId]);
+
+  useEffect(() => {
+    if (missionPassComplete) {
+      void fetchMission();
+      void refreshTelemetry();
+    }
+  }, [fetchMission, missionPassComplete, refreshTelemetry]);
 
   useEffect(() => {
     void loadMapVisualizer();
@@ -394,6 +601,19 @@ export default function App() {
       void loadMissionControl();
     }
   }, [activeTab]);
+
+  const linkStatusLabel = apiHealth
+    ? connectionState === "open"
+      ? "LINK OPEN"
+      : connectionState === "connecting" || connectionState === "reconnecting"
+        ? "LINK SYNCING"
+        : "LINK DEGRADED"
+    : "BACKEND OFFLINE";
+  const linkStatusDot = apiHealth
+    ? connectionState === "open"
+      ? "bg-emerald-500 animate-pulse"
+      : "bg-amber-400"
+    : "bg-red-500";
 
   return (
     <div className="relative flex h-screen w-screen overflow-hidden bg-zinc-50 text-zinc-900 font-sans text-sm">
@@ -461,15 +681,21 @@ export default function App() {
               }
             }}
             vlmBoxes={vlmBoxes}
+            timelineDate={mission?.end_date ?? mission?.start_date ?? null}
+            scanAnimationActive={scanAnimationActive}
+            cameraRequest={mapCameraRequest}
+            onCameraRequestHandled={(requestId) => {
+              setMapCameraRequest((current) => current?.id === requestId ? null : current);
+            }}
           />
         </Suspense>
 
         {/* Simple Connection Status overlay top-left on map */}
         <div className="absolute left-4 top-4 z-10 flex flex-col gap-2">
           <div className="flex items-center gap-2 rounded border border-zinc-200 bg-white/90 px-3 py-1.5 shadow-sm backdrop-blur cursor-default" title="Telemetry Link Status (View Only)">
-             <span className={`h-2 w-2 rounded-full ${connectionState === "open" ? "bg-emerald-500 animate-pulse" : "bg-zinc-400"}`}></span>
+             <span className={`h-2 w-2 rounded-full ${linkStatusDot}`}></span>
              <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-700">
-               {connectionState === "open" ? "LINK OPEN" : "DISCONNECTED"}
+               {linkStatusLabel}
              </span>
           </div>
 
@@ -489,6 +715,16 @@ export default function App() {
                </span>
             </div>
           )}
+
+          {missionStopNotice && mission?.status !== "active" && (
+            <div
+              data-testid="mission-stopped-notice"
+              className="max-w-[360px] rounded border border-amber-200 bg-amber-50/94 px-3 py-2 shadow-sm backdrop-blur"
+            >
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-700">Mission Stopped</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-amber-900">{missionStopNotice}</p>
+            </div>
+          )}
         </div>
 
         {drawBboxActive && (
@@ -505,17 +741,17 @@ export default function App() {
       </div>
 
       {/* RIGHT PANE: SIDEBAR */}
-      <div className="w-[450px] min-w-[450px] flex flex-col h-full bg-white border-l border-zinc-200 shadow-xl relative z-20 overflow-hidden">
+      <div className="w-[clamp(500px,38vw,620px)] min-w-[500px] flex flex-col h-full bg-white border-l border-zinc-200 shadow-xl relative z-20 overflow-hidden">
 
         {/* Tabs Header */}
         <div className="flex items-center border-b border-zinc-200 bg-zinc-50 px-2 pt-2 shrink-0">
-           <button data-testid="tab-mission" onClick={() => setActiveTab("mission")} className={`px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === "mission" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Mission</button>
-           <button data-testid="tab-agents" onClick={() => setActiveTab("agents")} className={`px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === "agents" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Agents</button>
-           <button data-testid="tab-logs" onClick={() => setActiveTab("logs")} className={`px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === "logs" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Logs</button>
+           <button data-testid="tab-agents" data-ui-tip="Chat and actions" onClick={() => setActiveTab("agents")} className={`px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === "agents" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Agent</button>
+           <button data-testid="tab-mission" data-ui-tip="Mission setup" onClick={() => setActiveTab("mission")} className={`px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === "mission" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Mission</button>
+           <button data-testid="tab-logs" data-ui-tip="Events and alerts" onClick={() => setActiveTab("logs")} className={`px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === "logs" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Logs</button>
            {selectedCellId && (
-              <button data-testid="tab-inspect" onClick={() => setActiveTab("inspect")} className={`px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === "inspect" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Inspect</button>
+              <button data-testid="tab-inspect" data-ui-tip="Selected cell" onClick={() => setActiveTab("inspect")} className={`px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === "inspect" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Inspect</button>
            )}
-           <button data-testid="tab-settings" onClick={() => setActiveTab("settings")} className={`px-4 py-2 text-sm font-medium border-b-2 transition ml-auto ${activeTab === "settings" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Settings</button>
+           <button data-testid="tab-settings" data-ui-tip="Providers and model" onClick={() => setActiveTab("settings")} className={`px-4 py-2 text-sm font-medium border-b-2 transition ml-auto ${activeTab === "settings" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Settings</button>
         </div>
 
         {/* Tab Content */}
@@ -532,9 +768,10 @@ export default function App() {
                       drawnBbox={drawnBbox}
                       onClearBbox={() => { setDrawnBbox(null); setVlmBoxes([]); setShowMissionTimelapse(false); setShowBboxTools(false); }}
                       onOpenTimelapse={() => { setShowBboxTools(true); setShowMissionTimelapse((prev) => !prev); }}
+                      onOpenEvidenceTools={() => { setShowBboxTools(true); setShowMissionTimelapse(false); }}
                       mission={mission}
                       onRefresh={fetchMission}
-                      isScanComplete={isScanComplete}
+                      isScanComplete={missionPassComplete}
                       onReplayLoaded={handleReplayLoaded}
                       onReplayRescanStarted={handleReplayRescanStarted}
                       onPreviewBbox={(bbox) => {
@@ -568,6 +805,8 @@ export default function App() {
                         onClose={() => { setDrawnBbox(null); setVlmBoxes([]); setShowBboxTools(false); }}
                         activeBbox={drawnBbox}
                         onBoxesUpdate={setVlmBoxes}
+                        activeMissionTargets={mission?.object_targets ?? []}
+                        targetPackId={mission?.target_pack_id ?? null}
                       />
                     </Suspense>
                   </div>
@@ -591,26 +830,23 @@ export default function App() {
 
           {activeTab === "agents" && (
             <div className="flex flex-col h-full">
-               <div className="flex basis-[42%] flex-col min-h-0 border-b border-zinc-200">
-                  <h2 data-testid="header-agent-bus" className="text-zinc-500 font-bold tracking-widest uppercase p-4 pb-0 text-xs shrink-0">Agent Dialogue Bus</h2>
-                  <div className="flex-1 overflow-hidden">
-                    <Suspense fallback={<LoadingPanel label="Agent Bus" />}>
-                      <AgentDialogue isOpen={true} onClose={() => {}} mission={mission} />
-                    </Suspense>
-                  </div>
-               </div>
-               <div className="flex basis-[58%] flex-col min-h-0">
-                  <h2 className="text-zinc-500 font-bold tracking-widest uppercase p-4 pb-0 text-xs shrink-0">Ground Agent Assistant</h2>
+               <div className="flex basis-[78%] flex-col min-h-0 border-b border-zinc-200">
+                  <h2 className="sr-only">Ground Agent</h2>
                   <div className="flex-1 overflow-hidden">
                     <Suspense fallback={<LoadingPanel label="Ground Agent" />}>
                       <GroundAgent
-                        onActionComplete={async () => {
-                          await Promise.all([
-                            refreshTelemetry({ replaceAlerts: true }),
-                            fetchMission(),
-                          ]);
-                        }}
+                        onActionComplete={handleGroundAgentActionComplete}
+                        onNavigate={handleGroundAgentNavigate}
+                        mission={mission}
                       />
+                    </Suspense>
+                  </div>
+               </div>
+               <div className="flex basis-[22%] flex-col min-h-0">
+                  <h2 data-testid="header-agent-bus" className="border-b border-zinc-100 bg-zinc-50 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500 shrink-0">SAT/GND Dialogue Bus</h2>
+                  <div className="flex-1 overflow-hidden">
+                    <Suspense fallback={<LoadingPanel label="Agent Bus" />}>
+                      <AgentDialogue isOpen={true} onClose={() => {}} mission={mission} />
                     </Suspense>
                   </div>
                </div>
@@ -716,7 +952,7 @@ export default function App() {
             metricsSummary={metricsSummary}
             selectedCellId={selectedCellId}
             onClose={() => setProofModeActive(false)}
-            onStepChange={setDemoStepIndex}
+            onStepChange={(stepIndex) => setDemoStepIndex((currentStep) => Math.max(currentStep, stepIndex))}
           />
         </Suspense>
       )}

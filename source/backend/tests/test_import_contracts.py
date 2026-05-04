@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
+from pathlib import Path
 
 import core
 
@@ -12,7 +13,10 @@ SCRIPT_MODULES = (
     "scripts.decision_gate",
     "scripts.drift_simulator",
     "scripts.evaluate_model",
+    "scripts.evaluate_object_evidence",
     "scripts.export_orbit_dataset",
+    "scripts.build_docs_timelapse_highlight",
+    "scripts.build_visual_story_proofs",
     "scripts.fetch_satellite_model",
     "scripts.gee_auth",
     "scripts.import_boundaries",
@@ -23,6 +27,8 @@ SCRIPT_MODULES = (
     "scripts.smoke_satellite_model",
     "scripts.upload_orbit_dataset_hf",
 )
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
 MANUAL_ENTRYPOINTS = (
     "satellite_debug",
@@ -45,3 +51,33 @@ def test_supported_backend_modules_import_cleanly():
             failures.append(f"{module_name}: {type(exc).__name__}: {exc}")
 
     assert failures == []
+
+
+def test_supported_script_module_list_matches_scripts_directory():
+    """Keep the import guard in sync when adding backend scripts."""
+    expected = {
+        f"scripts.{path.stem}"
+        for path in (BACKEND_ROOT / "scripts").glob("*.py")
+        if not path.name.startswith("_")
+    }
+
+    assert set(SCRIPT_MODULES) == expected
+
+
+def test_launchers_keep_minimal_runtime_guards_documented():
+    """Keep cold-start launchers aligned with the documented Python/Node/uv contract."""
+    repo_root = BACKEND_ROOT.parents[1]
+    bash_launcher = (repo_root / "run.sh").read_text(encoding="utf-8")
+    ps_launcher = (repo_root / "run.ps1").read_text(encoding="utf-8")
+
+    assert "Python 3.10+" in bash_launcher
+    assert "Python 3.10+" in ps_launcher
+    assert "20.19.0" in bash_launcher
+    assert "22.12.0" in bash_launcher
+    assert "20.19.0" in ps_launcher
+    assert "22.12.0" in ps_launcher
+    assert "uv not found; bootstrapping repo-local uv" in bash_launcher
+    assert "uv not found; bootstrapping repo-local uv" in ps_launcher
+    assert "node.exe" in bash_launcher
+    assert "NPM_CMD" in bash_launcher
+    assert "NPX_CMD" in bash_launcher

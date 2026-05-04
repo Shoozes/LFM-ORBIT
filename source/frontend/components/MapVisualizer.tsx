@@ -1,10 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import maplibregl, { GeoJSONSource, LngLatBoundsLike, Map as MaplibreMap, Marker, type PointLike } from "maplibre-gl";
+import maplibregl, {
+  GeoJSONSource,
+  LngLatBoundsLike,
+  Map as MaplibreMap,
+  Marker,
+  type MapLayerMouseEvent,
+  type PointLike,
+} from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { OrbitalScanEventDetail } from "../types/telemetry";
 import { useMapPins } from "../hooks/useMapPins";
 import type { MapPin } from "../hooks/useMapPins";
 import type { VlmBox } from "./VlmPanel";
+import { colorForVlmBox, unitBoxToGeographicBbox } from "../utils/objectEvidence";
+import Map3DOverlay from "./Map3DOverlay";
+import type { MapCameraRequest } from "../types/mapCamera";
 
 type SpatialMenuState = {
   x: number;
@@ -28,6 +38,13 @@ type MapVisualizerProps = {
   onMenuGenerateTimelapse?: (bbox: number[]) => void;
   /** Active bounding boxes provided by optional visual evidence tools */
   vlmBoxes?: VlmBox[];
+  /** Active mission or replay timeline date shown as context in optional 3D view */
+  timelineDate?: string | null;
+  /** True only while a live mission scan is actively moving across cells */
+  scanAnimationActive?: boolean;
+  /** Programmatic camera target from Ground Agent or mission context */
+  cameraRequest?: MapCameraRequest | null;
+  onCameraRequestHandled?: (requestId: string) => void;
 };
 
 const LOCAL_MAP_STYLE = {
@@ -137,6 +154,46 @@ function getCellIdFromProperties(properties: unknown): string | null {
   if (!properties || typeof properties !== "object") return null;
   const value = (properties as { cell_id?: unknown }).cell_id;
   return typeof value === "string" || typeof value === "number" ? String(value) : null;
+}
+
+function formatConfidence(value: unknown): string {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(2) : "candidate";
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function isRecoverableMapRenderError(message: string): boolean {
+  return /could not compile .*shader|shader compile|webgl context|maplibre/i.test(message);
+}
+
+function buildVlmTooltipHtml(properties: Record<string, unknown>): string {
+  const label = escapeHtml(properties.label);
+  const confidence = formatConfidence(properties.confidence);
+  const bbox = escapeHtml(properties.bbox);
+  const prompt = escapeHtml(properties.prompt || "visual grounding");
+  const sourceModel = escapeHtml(properties.source_model || "candidate evidence");
+  const runtimeMode = escapeHtml(properties.runtime_truth_mode || "unknown");
+  const imageryOrigin = escapeHtml(properties.imagery_origin || "unknown");
+  const scoringBasis = escapeHtml(properties.scoring_basis || "visual_only");
+  return `
+    <div class="vlm-box-tooltip" data-testid="vlm-box-tooltip">
+      <div class="vlm-box-tooltip-title">${label}</div>
+      <div class="vlm-box-tooltip-row"><span>Confidence</span><strong>${confidence}</strong></div>
+      <div class="vlm-box-tooltip-row"><span>BBox</span><strong>${bbox}</strong></div>
+      <div class="vlm-box-tooltip-row"><span>Prompt</span><strong>${prompt}</strong></div>
+      <div class="vlm-box-tooltip-row"><span>Source</span><strong>${sourceModel}</strong></div>
+      <div class="vlm-box-tooltip-row"><span>Mode</span><strong>${runtimeMode}</strong></div>
+      <div class="vlm-box-tooltip-row"><span>Imagery</span><strong>${imageryOrigin}</strong></div>
+      <div class="vlm-box-tooltip-row"><span>Basis</span><strong>${scoringBasis}</strong></div>
+    </div>
+  `;
 }
 
 // ── Marker builders ──────────────────────────────────────────────────────────
@@ -257,6 +314,10 @@ export default function MapVisualizer({
   onMenuAgentVideoEval,
   onMenuGenerateTimelapse,
   vlmBoxes = [],
+  timelineDate = null,
+  scanAnimationActive = true,
+  cameraRequest = null,
+  onCameraRequestHandled,
 }: MapVisualizerProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MaplibreMap | null>(null);
@@ -266,15 +327,23 @@ export default function MapVisualizer({
   // Use a plain object as a map from pin id → Marker to avoid clash with MapLibre Map type
   const markerRefs = useRef<Record<number, Marker>>({});
   const pinTooltipTimeoutRef = useRef<number | null>(null);
+  const vlmPopupRef = useRef<maplibregl.Popup | null>(null);
+  const vlmHoverHandlersAttachedRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [shiftHeld, setShiftHeld] = useState(false);
   const [pinTooltip, setPinTooltip] = useState<string | null>(null);
+  const [map3DOpen, setMap3DOpen] = useState(false);
+  const [cameraHud, setCameraHud] = useState<MapCameraRequest | null>(null);
+  const [cameraMoveState, setCameraMoveState] = useState<"idle" | "moving" | "arrived">("idle");
 
   // Satellite sweeping effect
   const cellCentroidsRef = useRef<Record<string, [number, number]>>({});
   const sweepTimeoutRef = useRef<number | null>(null);
   const scanStateTimeoutsRef = useRef<Set<number>>(new Set());
+  const scanAnimationActiveRef = useRef(scanAnimationActive);
+  const handledCameraRequestRef = useRef<string | null>(null);
+  const cameraHudTimeoutRef = useRef<number | null>(null);
 
   // Bbox draw state
   const bboxStartRef = useRef<[number, number] | null>(null);
@@ -284,6 +353,40 @@ export default function MapVisualizer({
   const [contextMenu, setContextMenu] = useState<SpatialMenuState | null>(null);
 
   const { pins, dropPin, removePin, error: pinError } = useMapPins();
+
+  const clearSatelliteFootprint = useCallback((map: MaplibreMap | null = mapRef.current) => {
+    if (sweepTimeoutRef.current) {
+      window.clearTimeout(sweepTimeoutRef.current);
+      sweepTimeoutRef.current = null;
+    }
+    const source = getGeoJsonSource(map, "satellite-footprint");
+    source?.setData({ type: "FeatureCollection", features: [] });
+  }, []);
+
+  useEffect(() => {
+    const markBasemapDegraded = () => {
+      setMapError((current) => current ?? "Basemap rendering degraded. Scoring is unaffected.");
+    };
+    const onError = (event: ErrorEvent) => {
+      const message = event.error instanceof Error ? event.error.message : event.message;
+      if (!isRecoverableMapRenderError(message)) return;
+      markBasemapDegraded();
+      event.preventDefault();
+    };
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const message = event.reason instanceof Error ? event.reason.message : String(event.reason ?? "");
+      if (!isRecoverableMapRenderError(message)) return;
+      markBasemapDegraded();
+      event.preventDefault();
+    };
+
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
+    };
+  }, []);
 
   const showPinTooltip = useCallback((message: string) => {
     if (pinTooltipTimeoutRef.current) {
@@ -305,21 +408,38 @@ export default function MapVisualizer({
   }, []);
 
   useEffect(() => {
+    scanAnimationActiveRef.current = scanAnimationActive;
+    if (!scanAnimationActive) {
+      clearSatelliteFootprint();
+      for (const timeoutId of scanStateTimeoutsRef.current) {
+        window.clearTimeout(timeoutId);
+      }
+      scanStateTimeoutsRef.current.clear();
+    }
+  }, [clearSatelliteFootprint, scanAnimationActive]);
+
+  useEffect(() => {
     if (pinError) clearPinTooltip();
   }, [pinError, clearPinTooltip]);
+
+  useEffect(() => {
+    if (!drawnBbox) setMap3DOpen(false);
+  }, [drawnBbox]);
 
   // Mutable refs to resolve stale closures during single-mount map hooks
   const onCellClickRef = useRef(onCellClick);
   const dropPinRef = useRef(dropPin);
   const geoJsonGridRef = useRef(geoJsonGrid);
   const drawBboxActiveRef = useRef(drawBboxActive);
+  const shiftHeldRef = useRef(shiftHeld);
 
   useEffect(() => {
     onCellClickRef.current = onCellClick;
     dropPinRef.current = dropPin;
     geoJsonGridRef.current = geoJsonGrid;
     drawBboxActiveRef.current = drawBboxActive;
-  }, [onCellClick, dropPin, geoJsonGrid, drawBboxActive]);
+    shiftHeldRef.current = shiftHeld;
+  }, [onCellClick, dropPin, geoJsonGrid, drawBboxActive, shiftHeld]);
 
   const gridBounds = useMemo(() => {
     if (!geoJsonGrid) return null;
@@ -617,6 +737,12 @@ export default function MapVisualizer({
         window.clearTimeout(pinTooltipTimeoutRef.current);
         pinTooltipTimeoutRef.current = null;
       }
+      if (cameraHudTimeoutRef.current) {
+        window.clearTimeout(cameraHudTimeoutRef.current);
+        cameraHudTimeoutRef.current = null;
+      }
+      vlmPopupRef.current?.remove();
+      vlmPopupRef.current = null;
       for (const timeoutId of scanStateTimeoutsRef.current) {
         window.clearTimeout(timeoutId);
       }
@@ -676,6 +802,10 @@ export default function MapVisualizer({
       const scanEvent = event as CustomEvent<OrbitalScanEventDetail>;
       const map = mapRef.current;
       if (!map || !map.isStyleLoaded()) return;
+      if (!scanAnimationActiveRef.current) {
+        clearSatelliteFootprint(map);
+        return;
+      }
       const { cell_id: cellId, is_anomaly: isAnomaly } = scanEvent.detail;
       
       // Update cell visual
@@ -722,7 +852,7 @@ export default function MapVisualizer({
       }
       scanStateTimeoutsRef.current.clear();
     };
-  }, []);
+  }, [clearSatelliteFootprint]);
 
 
 
@@ -761,6 +891,55 @@ export default function MapVisualizer({
     const [west, south, east, north] = drawnBbox;
     map.fitBounds([[west, south], [east, north]], { padding: 96, duration: 0 });
   }, [drawnBbox, mapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || !cameraRequest) return;
+    if (handledCameraRequestRef.current === cameraRequest.id) return;
+    const [lng, lat] = cameraRequest.center;
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+
+    handledCameraRequestRef.current = cameraRequest.id;
+    setCameraHud(cameraRequest);
+    setCameraMoveState("moving");
+    if (cameraHudTimeoutRef.current) {
+      window.clearTimeout(cameraHudTimeoutRef.current);
+    }
+    cameraHudTimeoutRef.current = window.setTimeout(() => {
+      setCameraHud(null);
+      setCameraMoveState("idle");
+      cameraHudTimeoutRef.current = null;
+    }, 6500);
+
+    const bbox = Array.isArray(cameraRequest.bbox) && cameraRequest.bbox.length === 4
+      ? cameraRequest.bbox
+      : null;
+    if (bbox) {
+      const [west, south, east, north] = bbox;
+      map.fitBounds([[west, south], [east, north]], {
+        padding: 92,
+        duration: 700,
+      });
+    }
+
+    const moveCamera = () => {
+      if (mapRef.current !== map) return;
+      map.once("moveend", () => {
+        if (mapRef.current === map) setCameraMoveState("arrived");
+      });
+      map.easeTo({
+        center: [lng, lat],
+        zoom: cameraRequest.zoom ?? Math.max(map.getZoom(), 11.8),
+        pitch: cameraRequest.pitch ?? 58,
+        bearing: cameraRequest.bearing ?? -24,
+        duration: 950,
+      });
+    };
+
+    window.setTimeout(moveCamera, bbox ? 170 : 0);
+
+    onCameraRequestHandled?.(cameraRequest.id);
+  }, [cameraRequest, mapReady, onCameraRequestHandled]);
 
   // Sync pins → MapLibre markers
   useEffect(() => {
@@ -803,22 +982,24 @@ export default function MapVisualizer({
     if (!drawnBbox || vlmBoxes.length === 0) {
         return { type: "FeatureCollection", features } as GeoJSON.FeatureCollection;
     }
-    const [west, south, east, north] = drawnBbox;
-
     for (let i = 0; i < vlmBoxes.length; i++) {
         const box = vlmBoxes[i];
-        const [ymin, xmin, ymax, xmax] = box.bbox;
-        // Map normalized coords back to geographic coords relative to the drawnBox.
-        // Assuming normalized (0,0) is top-left -> (north, west).
-        const boxNorth = north - (north - south) * ymin;
-        const boxSouth = north - (north - south) * ymax;
-        const boxWest = west + (east - west) * xmin;
-        const boxEast = west + (east - west) * xmax;
+        const [boxWest, boxSouth, boxEast, boxNorth] = unitBoxToGeographicBbox(drawnBbox, box);
 
         features.push({
             type: "Feature",
             id: `vlm-box-${i}`,
-            properties: { label: box.label },
+            properties: {
+              label: box.label,
+              bbox: `[${box.bbox.map((entry) => entry.toFixed(2)).join(", ")}]`,
+              confidence: box.confidence ?? null,
+              color: colorForVlmBox(box),
+              prompt: box.prompt ?? "",
+              source_model: box.source_model ?? "",
+              runtime_truth_mode: box.runtime_truth_mode ?? "",
+              imagery_origin: box.imagery_origin ?? "",
+              scoring_basis: box.scoring_basis ?? "",
+            },
             geometry: {
                 type: "Polygon",
                 coordinates: [[
@@ -840,14 +1021,37 @@ export default function MapVisualizer({
     
     if (!map.getSource("vlm-boxes")) {
        map.addSource("vlm-boxes", { type: "geojson", data: vlmGeoJson });
+
+       map.addLayer({
+          id: "vlm-boxes-fill",
+          type: "fill",
+          source: "vlm-boxes",
+          paint: {
+            "fill-color": ["coalesce", ["get", "color"], "#00ff88"],
+            "fill-opacity": 0.14
+          }
+       });
+
+       map.addLayer({
+          id: "vlm-boxes-glow",
+          type: "line",
+          source: "vlm-boxes",
+          paint: {
+            "line-color": ["coalesce", ["get", "color"], "#00ff88"],
+            "line-opacity": 0.88,
+            "line-width": 12,
+            "line-blur": 6
+          }
+       });
        
        map.addLayer({
           id: "vlm-boxes-line",
           type: "line",
           source: "vlm-boxes",
           paint: {
-            "line-color": "#00ff88",
-            "line-width": 2
+            "line-color": ["coalesce", ["get", "color"], "#00ff88"],
+            "line-width": 3.2,
+            "line-opacity": 0.98
           }
        });
 
@@ -862,13 +1066,50 @@ export default function MapVisualizer({
              "text-size": 12,
           },
           paint: {
-             "text-color": "#012a14",
-             "text-halo-color": "#00ff88",
+             "text-color": "#ecfeff",
+             "text-halo-color": "#020617",
              "text-halo-width": 3
           }
        });
     } else {
        (map.getSource("vlm-boxes") as GeoJSONSource).setData(vlmGeoJson);
+    }
+
+    if (!vlmHoverHandlersAttachedRef.current) {
+      const showObjectTooltip = (event: MapLayerMouseEvent) => {
+        const feature = event.features?.[0];
+        if (!feature?.properties) return;
+        map.getCanvas().style.cursor = "help";
+        vlmPopupRef.current?.remove();
+        vlmPopupRef.current = new maplibregl.Popup({
+          closeButton: false,
+          closeOnClick: false,
+          className: "vlm-map-popup",
+          offset: 14,
+        })
+          .setLngLat(event.lngLat)
+          .setHTML(buildVlmTooltipHtml(feature.properties as Record<string, unknown>))
+          .addTo(map);
+      };
+
+      const moveObjectTooltip = (event: MapLayerMouseEvent) => {
+        if (vlmPopupRef.current) {
+          vlmPopupRef.current.setLngLat(event.lngLat);
+        }
+      };
+
+      const hideObjectTooltip = () => {
+        map.getCanvas().style.cursor = (shiftHeldRef.current || drawBboxActiveRef.current) ? "crosshair" : "";
+        vlmPopupRef.current?.remove();
+        vlmPopupRef.current = null;
+      };
+
+      for (const layerId of ["vlm-boxes-fill", "vlm-boxes-line"]) {
+        map.on("mouseenter", layerId, showObjectTooltip);
+        map.on("mousemove", layerId, moveObjectTooltip);
+        map.on("mouseleave", layerId, hideObjectTooltip);
+      }
+      vlmHoverHandlersAttachedRef.current = true;
     }
   }, [vlmGeoJson, mapReady]);
 
@@ -881,14 +1122,84 @@ export default function MapVisualizer({
   }, [shiftHeld, drawBboxActive]);
 
   return (
-    <div className="relative w-full h-full bg-[#05070b]">
+    <div data-testid="map-visualizer" className="relative w-full h-full bg-[#05070b]">
       <div ref={mapContainer} className="w-full h-full" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(56,189,248,0.12),_transparent_26%),linear-gradient(180deg,_rgba(2,6,23,0.12)_0%,_rgba(2,6,23,0.26)_100%)]" />
 
+      {cameraHud && (
+        <div
+          data-testid="map-camera-hud"
+          className="pointer-events-none absolute left-1/2 top-5 z-20 w-[min(430px,calc(100%-2rem))] -translate-x-1/2 rounded-lg border border-cyan-200/45 bg-zinc-950/82 px-4 py-3 text-cyan-50 shadow-[0_0_30px_rgba(34,211,238,0.24)] backdrop-blur-md"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-200">Camera Target</p>
+              <p className="mt-1 text-sm font-semibold text-white">{cameraHud.label}</p>
+              {cameraHud.locationType && (
+                <p className="mt-1 text-[11px] font-medium text-cyan-100">{cameraHud.locationType}</p>
+              )}
+            </div>
+            <span className="rounded border border-white/15 bg-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100">
+              {cameraMoveState === "arrived" ? "Arrived" : cameraHud.source ?? "Ground Agent"}
+            </span>
+          </div>
+          <div className="mt-2 grid grid-cols-3 gap-2 text-[10px] uppercase tracking-[0.14em] text-zinc-300">
+            <span>Lng {cameraHud.center[0].toFixed(4)}</span>
+            <span>Lat {cameraHud.center[1].toFixed(4)}</span>
+            <span>Pitch {Math.round(cameraHud.pitch ?? 58)} deg</span>
+          </div>
+          {cameraHud.reason && (
+            <p className="mt-2 text-[11px] leading-relaxed text-zinc-300">{cameraHud.reason}</p>
+          )}
+          {(cameraHud.terrainContext || cameraHud.missionContext) && (
+            <div className="mt-2 grid gap-2 text-[11px] leading-relaxed text-zinc-300 sm:grid-cols-2">
+              {cameraHud.terrainContext && (
+                <p>
+                  <span className="font-semibold text-cyan-100">Terrain: </span>
+                  {cameraHud.terrainContext}
+                </p>
+              )}
+              {cameraHud.missionContext && (
+                <p>
+                  <span className="font-semibold text-cyan-100">Use: </span>
+                  {cameraHud.missionContext}
+                </p>
+              )}
+            </div>
+          )}
+          {cameraHud.suggestedTargets && cameraHud.suggestedTargets.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {cameraHud.suggestedTargets.slice(0, 4).map((target) => (
+                <span
+                  key={target}
+                  className="rounded border border-cyan-200/20 bg-cyan-300/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-cyan-50"
+                >
+                  {target}
+                </span>
+              ))}
+            </div>
+          )}
+          {cameraHud.evidenceGuidance && (
+            <p className="mt-2 border-t border-white/10 pt-2 text-[10px] leading-relaxed text-amber-100">
+              {cameraHud.evidenceGuidance}
+            </p>
+          )}
+        </div>
+      )}
+
+      {!scanAnimationActive && drawnBbox && (
+        <div
+          data-testid="map-scan-paused-hint"
+          className="pointer-events-none absolute left-5 bottom-24 z-20 rounded border border-amber-200/45 bg-zinc-950/72 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-100 shadow-lg backdrop-blur-md"
+        >
+          Scan animation paused - selected area ready
+        </div>
+      )}
+
       {/* Grid legend */}
-      <div className="absolute right-5 top-5 rounded-2xl border border-white/10 bg-zinc-900/40 px-4 py-3 text-[10px] uppercase tracking-[0.28em] text-zinc-300 backdrop-blur-md shadow-lg pointer-events-none">
-        <p className="mb-2 text-gray-500">GRID LEGEND</p>
-        <div className="space-y-1.5 text-[10px] tracking-[0.22em]">
+      <div className="absolute right-5 top-5 max-w-[230px] rounded-lg border border-white/10 bg-zinc-950/52 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-zinc-300 shadow-lg backdrop-blur-md pointer-events-none">
+        <p className="mb-1.5 text-[9px] font-bold text-zinc-500">Legend</p>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[9px] tracking-[0.12em]">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-emerald-400" />
             <span>selected</span>
@@ -903,29 +1214,27 @@ export default function MapVisualizer({
           </div>
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-green-500" />
-            <span>recently scanned</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-white border border-gray-400" />
-            <span>unscanned</span>
+            <span>scanned</span>
           </div>
         </div>
-        <div className="mt-3 border-t border-gray-800/70 pt-2 space-y-1.5">
-          <p className="text-gray-600 mb-1">PINS</p>
-          <div className="flex items-center gap-2">
-            <span className="text-cyan-400 text-[11px]">◆</span>
-            <span className="text-gray-400">satellite flag</span>
+        {vlmBoxes.length > 0 && (
+          <div data-testid="vlm-object-box-legend" className="mt-2 border-t border-white/10 pt-2 space-y-1">
+            <p className="text-[9px] font-bold text-zinc-500">Evidence</p>
+            {vlmBoxes.slice(0, 4).map((box, index) => (
+              <div key={`${box.label}-${index}`} className="flex items-center gap-2">
+                <span
+                  className="h-2 w-3 rounded-full"
+                  style={{
+                    backgroundColor: colorForVlmBox(box),
+                    boxShadow: `0 0 12px ${colorForVlmBox(box)}`,
+                  }}
+                />
+                <span className="text-gray-400">{box.label}</span>
+              </div>
+            ))}
+            <p className="text-[9px] text-gray-400 mt-1">Hover boxes for details</p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-emerald-400 text-[11px]">●</span>
-            <span className="text-gray-400">ground truth</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-amber-400 text-[11px]">★</span>
-            <span className="text-gray-400">operator mark</span>
-          </div>
-          <p className="text-[9px] text-gray-700 mt-1">Shift+click to pin · Right-click to remove</p>
-        </div>
+        )}
       </div>
 
       <button
@@ -933,6 +1242,8 @@ export default function MapVisualizer({
         data-testid="map-actions-button"
         aria-label="Open spatial options at map center"
         title="Open spatial options at map center"
+        data-ui-tip="Spatial tools"
+        data-ui-tip-position="left"
         className="absolute bottom-5 right-5 z-20 rounded border border-white/15 bg-zinc-950/70 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100 shadow-lg backdrop-blur-md transition hover:border-cyan-300/60 hover:bg-cyan-950/70 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
         disabled={!mapReady}
         onMouseDown={(event) => event.stopPropagation()}
@@ -943,6 +1254,35 @@ export default function MapVisualizer({
       >
         Map Actions
       </button>
+
+      {drawnBbox && (
+        <button
+          type="button"
+          data-testid="map-3d-toggle"
+          aria-label={map3DOpen ? "3D context open" : "Open 3D context"}
+          aria-pressed={map3DOpen}
+          title="Open 3D context"
+          data-ui-tip="3D context"
+          data-ui-tip-position="left"
+          className="view-flip-button absolute bottom-20 right-5 z-20 flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-zinc-950/82 text-[15px] font-black tracking-tight text-white shadow-[0_8px_24px_rgba(0,0,0,0.34),0_0_18px_rgba(34,211,238,0.16)] backdrop-blur-md transition hover:border-cyan-200/70 hover:bg-cyan-950/80 focus:outline-none focus:ring-2 focus:ring-cyan-300 data-[active=true]:bg-white data-[active=true]:text-zinc-950"
+          data-active={map3DOpen}
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            setMap3DOpen(true);
+          }}
+        >
+          <span>3D</span>
+        </button>
+      )}
+
+      <Map3DOverlay
+        open={map3DOpen}
+        activeBbox={drawnBbox}
+        vlmBoxes={vlmBoxes}
+        timelineDate={timelineDate}
+        onClose={() => setMap3DOpen(false)}
+      />
 
       {/* Operator Right Click Context Menu */}
       {contextMenu && (
@@ -1055,11 +1395,7 @@ export default function MapVisualizer({
             context
           </span>
         </div>
-        <p>
-          {mapReady
-            ? "Esri World Imagery · Maxar · Earthstar Geographics. Context only."
-            : "Loading satellite imagery…"}
-        </p>
+        <p>Esri World Imagery · Maxar · Earthstar Geographics. Context only.</p>
         <p className="text-gray-600 mt-1 text-[10px]">© Esri · Not part of detection or scoring</p>
         {mapError && (
           <p className="mt-1 text-[10px] text-amber-300">{mapError}</p>

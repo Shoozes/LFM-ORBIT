@@ -129,7 +129,7 @@ export default function AgentDialogue({ isOpen, mission }: AgentDialogueProps) {
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-white">
         {/* Header */}
-        <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3">
+        <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-3 py-2">
           <div className="flex min-w-0 items-center gap-2">
             <div className={`h-2 w-2 rounded-full ${wsStatus === "open" ? "bg-emerald-500 animate-pulse" : "bg-zinc-300"}`} />
             <span className="truncate text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Agent Bus</span>
@@ -137,17 +137,17 @@ export default function AgentDialogue({ isOpen, mission }: AgentDialogueProps) {
               wsStatus === "open"
                 ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                 : "border-zinc-200 bg-zinc-50 text-zinc-500"
-            }`}>
+            }`} data-testid="agent-bus-status">
               {wsStatus}
             </span>
           </div>
 
           <div className="flex shrink-0 items-center gap-3">
             {stats && (
-              <div className="grid grid-cols-3 gap-2 text-center text-[10px] text-zinc-500 font-medium">
-                <span><span className="block text-xs text-zinc-700">{stats.from_satellite}</span>sat</span>
-                <span><span className="block text-xs text-zinc-700">{stats.from_ground}</span>gnd</span>
-                <span><span className="block text-xs text-zinc-700">{stats.total_messages}</span>total</span>
+              <div className="flex gap-2 text-[10px] font-medium text-zinc-500">
+                <span><span className="text-xs text-zinc-700">{stats.from_satellite}</span> sat</span>
+                <span><span className="text-xs text-zinc-700">{stats.from_ground}</span> gnd</span>
+                <span><span className="text-xs text-zinc-700">{stats.total_messages}</span> total</span>
               </div>
             )}
             {!stats && statsError && (
@@ -163,8 +163,17 @@ export default function AgentDialogue({ isOpen, mission }: AgentDialogueProps) {
           </div>
         </div>
 
+        <div className="grid grid-cols-2 gap-2 border-b border-zinc-100 bg-zinc-50 px-3 py-1.5" data-testid="agent-role-strip">
+          <div className="rounded border border-cyan-100 bg-white px-2 py-1">
+            <p className="truncate text-[10px] font-bold uppercase tracking-wider text-cyan-700">Satellite Pruner</p>
+          </div>
+          <div className="rounded border border-emerald-100 bg-white px-2 py-1">
+            <p className="truncate text-[10px] font-bold uppercase tracking-wider text-emerald-700">Ground Validator</p>
+          </div>
+        </div>
+
         {/* Legend */}
-        <div className="flex items-center gap-4 border-b border-zinc-100 px-5 py-2 text-[10px] font-semibold uppercase tracking-wider">
+        <div className="flex items-center gap-3 overflow-x-auto border-b border-zinc-100 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider">
           {[
             { icon: "⚑", label: "flag", cls: "text-amber-600" },
             { icon: "✓", label: "confirm", cls: "text-emerald-600" },
@@ -180,7 +189,7 @@ export default function AgentDialogue({ isOpen, mission }: AgentDialogueProps) {
         </div>
 
         {/* Message feed */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 font-mono text-sm space-y-2">
+        <div className="flex-1 overflow-y-auto px-3 py-2 font-mono text-sm space-y-2">
           {isReplayMission && (
             <div className="rounded border border-cyan-200 bg-cyan-50 px-4 py-3 text-xs leading-relaxed text-cyan-800">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-700">

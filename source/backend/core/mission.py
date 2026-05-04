@@ -20,6 +20,7 @@ from typing import Any
 
 from core.agent_bus import _connect, init_bus
 from core.grid import normalize_bbox
+from core.object_targets import get_target_pack, merge_custom_targets, normalize_object_targets
 from core.temporal_use_cases import classify_temporal_use_case
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,8 @@ def _ensure_missions_table() -> None:
                 replay_id    TEXT,
                 summary      TEXT,
                 use_case_id  TEXT,
+                target_pack_id TEXT,
+                object_targets TEXT,
                 use_case_confidence REAL,
                 use_case_decision TEXT,
                 cells_scanned INTEGER DEFAULT 0,
@@ -65,6 +68,10 @@ def _ensure_missions_table() -> None:
             conn.execute("ALTER TABLE missions ADD COLUMN summary TEXT")
         if "use_case_id" not in existing_cols:
             conn.execute("ALTER TABLE missions ADD COLUMN use_case_id TEXT")
+        if "target_pack_id" not in existing_cols:
+            conn.execute("ALTER TABLE missions ADD COLUMN target_pack_id TEXT")
+        if "object_targets" not in existing_cols:
+            conn.execute("ALTER TABLE missions ADD COLUMN object_targets TEXT")
         if "use_case_confidence" not in existing_cols:
             conn.execute("ALTER TABLE missions ADD COLUMN use_case_confidence REAL")
         if "use_case_decision" not in existing_cols:
@@ -95,6 +102,8 @@ def start_mission(
     replay_id: str | None = None,
     summary: str | None = None,
     use_case_id: str | None = None,
+    target_pack_id: str | None = None,
+    object_targets: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Create a new mission and set it as active. Deactivates any previous active mission."""
     task_text = task_text.strip()
@@ -103,6 +112,19 @@ def start_mission(
     bbox = normalize_bbox(bbox) if bbox is not None else None
     if mission_mode not in {"live", "replay"}:
         raise ValueError("mission_mode must be 'live' or 'replay'")
+    normalized_pack_id = target_pack_id.strip().lower() if target_pack_id else None
+    pack_targets: list[dict[str, Any]] = []
+    if normalized_pack_id:
+        pack = get_target_pack(normalized_pack_id)
+        if pack is None:
+            raise ValueError(f"Unknown target_pack_id: {normalized_pack_id}")
+        normalized_pack_id = pack["id"]
+        pack_targets = list(pack["targets"])
+    normalized_targets: list[dict[str, Any]] = []
+    if object_targets:
+        normalized_targets = normalize_object_targets(object_targets)
+    elif pack_targets:
+        normalized_targets = pack_targets
     use_case_decision = classify_temporal_use_case(
         {
             "task_text": task_text,
@@ -132,11 +154,13 @@ def start_mission(
                 replay_id,
                 summary,
                 use_case_id,
+                target_pack_id,
+                object_targets,
                 use_case_confidence,
                 use_case_decision,
                 created_at
             )
-            VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 task_text,
@@ -147,6 +171,8 @@ def start_mission(
                 replay_id,
                 summary,
                 use_case_decision["id"],
+                normalized_pack_id,
+                json.dumps(normalized_targets) if normalized_targets else None,
                 float(use_case_decision["confidence"]),
                 json.dumps(use_case_decision),
                 _now(),
@@ -202,6 +228,103 @@ def update_mission_progress(mission_id: int, cells_scanned: int, flags_found: in
         conn.commit()
 
 
+def _resolve_mission(mission_id: int | None) -> dict[str, Any]:
+    mission = get_mission(mission_id) if mission_id is not None else get_active_mission()
+    if mission is None:
+        raise LookupError("Mission not found")
+    return mission
+
+
+def get_mission_target_state(mission_id: int | None = None) -> dict[str, Any]:
+    mission = _resolve_mission(mission_id)
+    return {
+        "mission_id": mission["id"],
+        "target_pack_id": mission.get("target_pack_id"),
+        "object_targets": mission.get("object_targets") or [],
+        "mission": mission,
+    }
+
+
+def set_mission_target_pack(mission_id: int | None, target_pack_id: str) -> dict[str, Any]:
+    mission = _resolve_mission(mission_id)
+    pack = get_target_pack(target_pack_id)
+    if pack is None:
+        raise ValueError(f"Unknown target_pack_id: {target_pack_id}")
+    return _write_mission_targets(
+        int(mission["id"]),
+        target_pack_id=pack["id"],
+        object_targets=pack["targets"],
+    )
+
+
+def add_mission_targets(
+    mission_id: int | None,
+    targets: list[dict[str, Any] | str],
+) -> dict[str, Any]:
+    mission = _resolve_mission(mission_id)
+    existing = mission.get("object_targets") or []
+    normalized = merge_custom_targets(existing, targets)
+    return _write_mission_targets(
+        int(mission["id"]),
+        target_pack_id=mission.get("target_pack_id"),
+        object_targets=normalized,
+    )
+
+
+def remove_mission_targets(mission_id: int | None, labels: list[str]) -> dict[str, Any]:
+    mission = _resolve_mission(mission_id)
+    remove_labels = {" ".join(str(label).strip().lower().split()) for label in labels if str(label).strip()}
+    if not remove_labels:
+        raise ValueError("At least one target label is required")
+    existing = mission.get("object_targets") or []
+    remaining = [
+        target
+        for target in normalize_object_targets(existing)
+        if target["label"] not in remove_labels
+    ]
+    return _write_mission_targets(
+        int(mission["id"]),
+        target_pack_id=mission.get("target_pack_id"),
+        object_targets=remaining,
+    )
+
+
+def clear_mission_targets(mission_id: int | None) -> dict[str, Any]:
+    mission = _resolve_mission(mission_id)
+    return _write_mission_targets(int(mission["id"]), target_pack_id=None, object_targets=[])
+
+
+def _write_mission_targets(
+    mission_id: int,
+    *,
+    target_pack_id: str | None,
+    object_targets: list[dict[str, Any]],
+) -> dict[str, Any]:
+    normalized_targets = normalize_object_targets(object_targets) if object_targets else []
+    normalized_pack_id = target_pack_id.strip().lower() if target_pack_id else None
+    _ensure_missions_table()
+    with _connect() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE missions
+            SET target_pack_id=?, object_targets=?
+            WHERE id=?
+            """,
+            (
+                normalized_pack_id,
+                json.dumps(normalized_targets) if normalized_targets else None,
+                mission_id,
+            ),
+        )
+        conn.commit()
+    if cursor.rowcount == 0:
+        raise LookupError("Mission not found")
+    mission = get_mission(mission_id)
+    if mission is None:
+        raise LookupError("Mission not found")
+    return mission
+
+
 def list_missions(limit: int = 20) -> list[dict[str, Any]]:
     _ensure_missions_table()
     with _connect() as conn:
@@ -223,6 +346,16 @@ def _row_to_dict(row) -> dict[str, Any]:
     d["replay_id"] = str(d["replay_id"]) if d.get("replay_id") else None
     d["summary"] = str(d["summary"]) if d.get("summary") else None
     d["use_case_id"] = str(d["use_case_id"]) if d.get("use_case_id") else None
+    d["target_pack_id"] = str(d["target_pack_id"]) if d.get("target_pack_id") else None
+    if d.get("object_targets"):
+        try:
+            loaded_targets = json.loads(d["object_targets"])
+            d["object_targets"] = normalize_object_targets(loaded_targets)
+        except Exception as exc:
+            logger.debug("[MISSION] Invalid object target payload for mission %s: %s", d.get("id"), exc)
+            d["object_targets"] = []
+    else:
+        d["object_targets"] = []
     d["use_case_confidence"] = (
         float(d["use_case_confidence"]) if d.get("use_case_confidence") is not None else None
     )

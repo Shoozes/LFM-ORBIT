@@ -86,6 +86,7 @@ docs/COMPETITION_REFERENCES.md
 docs/*_COMPARE.md
 docs/competition-study/
 source/backend/sidecar_crash.txt
+source/backend/data/*.local.jsonl
 
 # Runtime data
 runtime-data/

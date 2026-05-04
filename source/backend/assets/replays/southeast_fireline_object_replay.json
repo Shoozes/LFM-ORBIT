@@ -1,0 +1,56 @@
+{
+  "replay_id": "southeast_fireline_object_replay",
+  "title": "Southeast Fireline Object Evidence Replay",
+  "description": "Deterministic object-evidence replay for fireline triage.",
+  "task_text": "Run Southeast Fireline Watch. Look for dark smoke, burn scar, road obstruction, buildings, and vehicle queues.",
+  "summary": "Object Evidence Mode replay with boxed fireline and lifeline candidates.",
+  "bbox": [-81.916, 31.143, -81.756, 31.303],
+  "target_pack_id": "fireline",
+  "object_targets": [
+    {"label": "dark smoke", "prompt": "Find dark smoke", "class_key": "hazard", "enabled": true},
+    {"label": "burn scar", "prompt": "Find burn scar", "class_key": "hazard", "enabled": true},
+    {"label": "road obstruction", "prompt": "Find road obstruction", "class_key": "lifeline", "enabled": true},
+    {"label": "buildings", "prompt": "Find buildings", "class_key": "structure", "enabled": true},
+    {"label": "vehicle queue", "prompt": "Find vehicle queue", "class_key": "mobility", "enabled": true}
+  ],
+  "cells_scanned": 4,
+  "flags_found": 1,
+  "primary_cell_id": "southeast_fireline_object_cell",
+  "alerts": [
+    {
+      "cell_id": "southeast_fireline_object_cell",
+      "lat": 31.223,
+      "lng": -81.836,
+      "event_id": "replay_southeast_fireline_object",
+      "change_score": 0.66,
+      "confidence": 0.82,
+      "priority": "high",
+      "reason_codes": ["object_evidence", "dark_smoke", "road_obstruction"],
+      "observation_source": "replay_fixture",
+      "runtime_truth_mode": "replay",
+      "imagery_origin": "cached_api",
+      "scoring_basis": "visual_only",
+      "before_window": {"label": "baseline"},
+      "after_window": {"label": "current"},
+      "detection_summary": {
+        "target_pack_id": "fireline",
+        "total_boxes": 2,
+        "counts_by_label": {"dark smoke": 1, "road obstruction": 1},
+        "top_boxes": [
+          {"id": "box_fireline_smoke_001", "label": "dark smoke", "bbox": [0.12, 0.18, 0.36, 0.44], "bbox_format": "unit_xyxy", "confidence": 0.78, "color_key": "hazard", "source_model": "replay_fixture", "prompt": "Find dark smoke", "runtime_truth_mode": "replay", "imagery_origin": "cached_api", "scoring_basis": "visual_only"},
+          {"id": "box_fireline_road_001", "label": "road obstruction", "bbox": [0.52, 0.58, 0.72, 0.7], "bbox_format": "unit_xyxy", "confidence": 0.71, "color_key": "lifeline", "source_model": "replay_fixture", "prompt": "Find road obstruction", "runtime_truth_mode": "replay", "imagery_origin": "cached_api", "scoring_basis": "visual_only"}
+        ],
+        "provenance": {"output_source": "replay_fixture", "heuristic_fallback": false}
+      },
+      "object_deltas": [
+        {"label": "dark smoke", "baseline_count": 0, "current_count": 1, "delta_count": 1, "delta_percent": 100.0, "action_hint": "defer"},
+        {"label": "road obstruction", "baseline_count": 0, "current_count": 1, "delta_count": 1, "delta_percent": 100.0, "action_hint": "defer"}
+      ],
+      "timelapse_analysis": "Replay fixture demonstrates compact object proof on retained fireline cells.",
+      "analysis_summary": "Candidate fireline evidence intersects a monitored mobility corridor.",
+      "satellite_note": "Object evidence layer retained smoke and road-obstruction candidates.",
+      "ground_note": "Ground review sees compact proof boxes with replay provenance.",
+      "ground_action": "DEFER — candidate fireline evidence near a monitored route."
+    }
+  ]
+}

@@ -7,6 +7,7 @@ import base64
 import hashlib
 import json
 import re
+import shutil
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,8 @@ from core.agent_bus import get_pin_for_cell, get_recent_messages
 from core.config import REGION
 from core.gallery import get_gallery_item, resolve_context_thumb
 from core.grid import cell_to_latlng
+from core.mission import list_missions
+from core.mission_archive import read_mission_archive
 from core.observation_store import list_observations
 from core.queue import get_recent_alerts
 from core.temporal_use_cases import build_api_prep_plan, build_training_jsonl_row, enrich_temporal_record
@@ -28,6 +31,7 @@ _MIME_SUFFIXES = {
     "video/mp4": ".mp4",
 }
 _DEFAULT_TASK = "deforestation_detection"
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 _SEEDED_DATA_DIR = Path(__file__).resolve().parent.parent / "assets" / "seeded_data"
 _MONITOR_REPORT_MODES = {
     "orbit_lifeline_monitoring_v1",
@@ -77,6 +81,19 @@ def _svg_to_png_placeholder(raw: bytes, size: int = 192) -> bytes:
     return buffer.getvalue()
 
 
+def _offline_context_thumbnail(lat: float, lng: float, size: int = 192) -> str:
+    r_val = int((lat * 100) % 50 + 20)
+    g_val = int((lng * 100) % 50 + 60)
+    b_val = int(((lat + lng) * 100) % 50 + 20)
+    svg = (
+        f'<svg width="{size}" height="{size}" xmlns="http://www.w3.org/2000/svg">'
+        f'<rect width="100%" height="100%" fill="rgb({r_val},{g_val},{b_val})"/>'
+        '<text x="10" y="20" fill="white" font-family="monospace" font-size="10">OFFLINE CHIP</text>'
+        "</svg>"
+    )
+    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+
+
 def _write_asset(sample_dir: Path, stem: str, data_url: str | None) -> str | None:
     if not data_url:
         return None
@@ -87,6 +104,23 @@ def _write_asset(sample_dir: Path, stem: str, data_url: str | None) -> str | Non
     asset_path = sample_dir / f"{stem}{suffix}"
     asset_path.write_bytes(raw)
     return asset_path.name
+
+
+def _file_to_data_url(path: Path) -> str | None:
+    if not path.exists() or not path.is_file():
+        return None
+    suffix = path.suffix.lower()
+    mime_type = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webm": "video/webm",
+        ".mp4": "video/mp4",
+    }.get(suffix)
+    if not mime_type:
+        return None
+    data_b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime_type};base64,{data_b64}"
 
 
 def _split_for_key(key: str, eval_ratio: float) -> str:
@@ -201,6 +235,19 @@ def _monitor_use_case(report: dict[str, Any], default_id: str) -> dict[str, Any]
     }
 
 
+def _monitor_asset_ref(source_path: Path, frame: dict[str, Any]) -> str | None:
+    asset_ref = str(frame.get("asset_ref") or "").strip()
+    if not asset_ref or asset_ref.startswith(("http://", "https://", "data:")):
+        return None
+
+    candidate = Path(asset_ref)
+    candidates = [candidate] if candidate.is_absolute() else [
+        source_path.parent / candidate,
+        Path.cwd() / candidate,
+    ]
+    return asset_ref if any(path.exists() and path.is_file() for path in candidates) else None
+
+
 def _build_lifeline_monitor_record(
     report: dict[str, Any],
     source_path: Path,
@@ -256,8 +303,8 @@ def _build_lifeline_monitor_record(
         "assets": {
             "context_thumb": None,
             "timelapse": None,
-            "baseline_frame": baseline.get("asset_ref"),
-            "current_frame": current.get("asset_ref"),
+            "baseline_frame": _monitor_asset_ref(source_path, baseline),
+            "current_frame": _monitor_asset_ref(source_path, current),
         },
     }
 
@@ -336,6 +383,115 @@ def _build_monitor_report_record(
     return None
 
 
+def _mission_key(mission: dict[str, Any]) -> str:
+    return "|".join(
+        [
+            str(mission.get("id") or ""),
+            str(mission.get("created_at") or ""),
+            str(mission.get("task_text") or ""),
+            str(mission.get("target_pack_id") or ""),
+        ]
+    )
+
+
+def _build_mission_metadata_record(
+    mission: dict[str, Any],
+    *,
+    eval_ratio: float,
+    confirmation_source: str,
+    archived_at: str | None = None,
+) -> dict[str, Any] | None:
+    if not isinstance(mission, dict):
+        return None
+    task_text = str(mission.get("task_text") or "").strip()
+    if not task_text:
+        return None
+    mission_id = str(mission.get("id") or _safe_name(task_text) or "mission")
+    sample_id = _sample_id(
+        f"mission_{mission_id}",
+        f"mission_{_safe_name(str(mission.get('created_at') or archived_at or mission_id))}",
+    )
+    bbox = mission.get("bbox") if isinstance(mission.get("bbox"), list) else None
+    lat, lng = _bbox_center(bbox)
+    use_case = mission.get("use_case_decision") if isinstance(mission.get("use_case_decision"), dict) else {}
+    object_targets = mission.get("object_targets") if isinstance(mission.get("object_targets"), list) else []
+    target_labels = [
+        str(target.get("label"))
+        for target in object_targets
+        if isinstance(target, dict) and target.get("label")
+    ]
+    target_pack_id = str(mission.get("target_pack_id") or "")
+    reason_codes = ["mission_intent"]
+    if target_pack_id:
+        reason_codes.append(f"target_pack:{target_pack_id}")
+    reason_codes.extend(target_labels[:12])
+
+    return {
+        "sample_id": sample_id,
+        "split": _split_for_key(sample_id, eval_ratio),
+        "record_type": "mission_metadata",
+        "review_state": f"mission_{mission.get('status') or 'planned'}",
+        "label_tier": "operator_intent",
+        "target_action": str(use_case.get("default_target_action") or "review"),
+        "target_category": str(use_case.get("target_category") or mission.get("use_case_id") or "mission"),
+        "target_task": str(use_case.get("target_task") or "mission_object_evidence"),
+        "region_id": REGION.region_id,
+        "event_id": f"mission_{mission_id}",
+        "cell_id": f"mission_{mission_id}",
+        "timestamp": str(mission.get("created_at") or archived_at or ""),
+        "change_score": 0.0,
+        "confidence": _coerce_number(mission.get("use_case_confidence") or use_case.get("confidence")),
+        "priority": "mission",
+        "reason_codes": reason_codes,
+        "observation_source": (
+            "operator_mission_archive"
+            if confirmation_source == "mission_archive"
+            else "operator_mission_state"
+        ),
+        "demo_forced_anomaly": False,
+        "before_window": None,
+        "after_window": None,
+        "bbox": bbox,
+        "task_text": task_text,
+        "target_pack_id": target_pack_id or None,
+        "object_targets": object_targets,
+        "object_target_labels": target_labels,
+        "mission": {
+            "id": mission.get("id"),
+            "status": mission.get("status"),
+            "mission_mode": mission.get("mission_mode"),
+            "replay_id": mission.get("replay_id"),
+            "summary": mission.get("summary"),
+            "use_case_id": mission.get("use_case_id"),
+            "target_pack_id": target_pack_id or None,
+            "object_targets": object_targets,
+            "cells_scanned": mission.get("cells_scanned"),
+            "flags_found": mission.get("flags_found"),
+            "created_at": mission.get("created_at"),
+            "completed_at": mission.get("completed_at"),
+        },
+        "confirmation_source": confirmation_source,
+        "timelapse_analysis": None,
+        "rejection_reason": None,
+        "lat": lat,
+        "lng": lng,
+        "assets": {
+            "context_thumb": None,
+            "timelapse": None,
+        },
+    }
+
+
+def _archived_mission_payload(row: dict[str, Any]) -> dict[str, Any] | None:
+    mission = row.get("mission") if isinstance(row.get("mission"), dict) else None
+    if mission is None:
+        return None
+    payload = dict(mission)
+    payload["_archived_at"] = row.get("archived_at")
+    payload["_archive_source"] = row.get("archive_source")
+    return payload
+
+
 def _training_contract(record: dict[str, Any]) -> dict[str, Any]:
     label_tier = str(record.get("label_tier") or "unlabeled")
     confirmation_source = str(record.get("confirmation_source") or "unknown")
@@ -344,6 +500,7 @@ def _training_contract(record: dict[str, Any]) -> dict[str, Any]:
     has_bbox = isinstance(record.get("bbox"), list) or isinstance(record.get("candidate_bbox"), list)
     reviewed = confirmation_source in {"ground_gallery", "ground_reject"}
     needs_review = label_tier in {"bronze", "weak_negative", "generated_monitor", "unlabeled"} and not reviewed
+    is_mission_metadata = record.get("record_type") == "mission_metadata"
     return {
         "schema": "orbit_training_contract_v1",
         "supervision_tier": label_tier,
@@ -360,13 +517,13 @@ def _training_contract(record: dict[str, Any]) -> dict[str, Any]:
         "evidence_requirements": {
             "temporal_pair_required": record.get("record_type") in {"positive", "control", "monitor_report", "seeded_cache"},
             "has_temporal_windows": bool(has_temporal_windows),
-            "context_thumb_required_for_nm_uni": True,
+            "context_thumb_required_for_nm_uni": not is_mission_metadata,
             "timelapse_optional": True,
             "spectral_bands_required": record.get("target_category") in {"deforestation", "cryosphere", "wildfire"},
         },
         "nm_uni_import": {
             "role": "satellite_vlm_training_bridge",
-            "requires_context_thumb": True,
+            "requires_context_thumb": not is_mission_metadata,
             "imports_context_thumb_as_image_path": True,
             "uses_ground_truth_payload": True,
         },
@@ -555,12 +712,94 @@ def _read_seeded_cache_records(*, eval_ratio: float) -> list[dict[str, Any]]:
     return records
 
 
+def _build_visual_story_record(story: dict[str, Any], *, eval_ratio: float) -> dict[str, Any] | None:
+    story_id = str(story.get("story_id") or "").strip()
+    if not story_id:
+        return None
+    output_path = str(story.get("output_path") or "").strip()
+    frame_path = str(story.get("frame_path") or "").strip()
+    if not output_path and not frame_path:
+        return None
+
+    sample_id = _sample_id(f"visual_story_{story_id}", story_id)
+    bbox = story.get("bbox")
+    lat, lng = _bbox_center(bbox)
+    targets = [str(item) for item in story.get("targets", []) if str(item).strip()] if isinstance(story.get("targets"), list) else []
+    training_ready = bool(story.get("training_ready", True))
+    return {
+        "sample_id": sample_id,
+        "split": _split_for_key(sample_id, eval_ratio),
+        "record_type": "visual_story_frame",
+        "review_state": "visual_story_training_ready" if training_ready else "visual_story_fixture",
+        "label_tier": "silver_fixture" if training_ready else "unlabeled",
+        "target_action": "review",
+        "target_category": "object_evidence",
+        "target_task": f"{_safe_name(story_id)}_object_evidence_review",
+        "region_id": REGION.region_id,
+        "event_id": f"visual_story_{story_id}",
+        "cell_id": f"visual_story_{story_id}",
+        "timestamp": str(story.get("fetched_at") or story.get("date_to") or ""),
+        "change_score": 0.0,
+        "confidence": 0.0,
+        "priority": "review",
+        "reason_codes": ["visual_story_fixture", "training_ready"] if training_ready else ["visual_story_fixture"],
+        "observation_source": str(story.get("source") or story.get("imagery_provider") or "visual_story_frame"),
+        "runtime_truth_mode": str(story.get("runtime_truth_mode") or "replay"),
+        "imagery_origin": str(story.get("imagery_origin") or "cached_api"),
+        "scoring_basis": str(story.get("scoring_basis") or "visual_only"),
+        "demo_forced_anomaly": False,
+        "before_window": {"label": str(story.get("date_from"))} if story.get("date_from") else None,
+        "after_window": {"label": str(story.get("date_to"))} if story.get("date_to") else None,
+        "bbox": bbox,
+        "visual_mode": story.get("visual_mode"),
+        "visual_story_id": story_id,
+        "visual_story_title": story.get("title"),
+        "visual_story_frame_path": frame_path or None,
+        "visual_story_output_path": output_path or None,
+        "object_targets": targets,
+        "box_source": story.get("box_source"),
+        "box_count": int(story.get("box_count") or 0),
+        "confirmation_source": "visual_story_manifest",
+        "timelapse_analysis": str(story.get("note") or "").strip() or None,
+        "rejection_reason": None,
+        "lat": lat,
+        "lng": lng,
+        "assets": {
+            "context_thumb": None,
+            "timelapse": None,
+        },
+    }
+
+
+def _read_visual_story_records(*, eval_ratio: float) -> list[dict[str, Any]]:
+    manifest_path = _SEEDED_DATA_DIR / "visual_story_frames" / "visual_story_manifest.json"
+    if not manifest_path.exists():
+        return []
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    stories = manifest.get("stories")
+    if not isinstance(stories, list):
+        return []
+    records: list[dict[str, Any]] = []
+    for story in stories:
+        if not isinstance(story, dict):
+            continue
+        record = _build_visual_story_record(story, eval_ratio=eval_ratio)
+        if record is not None:
+            records.append(record)
+    return records
+
+
 def build_export_records(
     limit: int = 200,
     eval_ratio: float = 0.2,
     include_rejects: bool = True,
     include_api_observations: bool = False,
     include_seeded_cache: bool = False,
+    include_missions: bool = True,
+    include_archived_missions: bool = True,
     monitor_reports_dir: Path | None = None,
 ) -> list[dict[str, Any]]:
     alerts = get_recent_alerts(limit=limit).get("alerts", [])
@@ -610,11 +849,42 @@ def build_export_records(
         for record in seeded_records:
             if str(record.get("chunk_signature") or "") not in seen_signatures:
                 records.append(record)
+        records.extend(_read_visual_story_records(eval_ratio=eval_ratio))
 
     for source_path, report in _read_monitor_reports(monitor_reports_dir):
         record = _build_monitor_report_record(report, source_path, eval_ratio=eval_ratio)
         if record is not None:
             records.append(record)
+
+    seen_mission_keys: set[str] = set()
+    if include_missions:
+        for mission in list_missions(limit=limit):
+            seen_mission_keys.add(_mission_key(mission))
+            record = _build_mission_metadata_record(
+                mission,
+                eval_ratio=eval_ratio,
+                confirmation_source="mission_state",
+            )
+            if record is not None:
+                records.append(record)
+
+    if include_archived_missions:
+        for archive_row in read_mission_archive(limit=limit):
+            mission = _archived_mission_payload(archive_row)
+            if mission is None:
+                continue
+            mission_key = _mission_key(mission)
+            if mission_key in seen_mission_keys:
+                continue
+            seen_mission_keys.add(mission_key)
+            record = _build_mission_metadata_record(
+                mission,
+                eval_ratio=eval_ratio,
+                confirmation_source="mission_archive",
+                archived_at=str(archive_row.get("archived_at") or ""),
+            )
+            if record is not None:
+                records.append(record)
 
     records.sort(key=lambda item: (str(item.get("timestamp") or ""), str(item.get("sample_id") or "")), reverse=True)
     enriched_records: list[dict[str, Any]] = []
@@ -625,12 +895,28 @@ def build_export_records(
     return enriched_records
 
 
-def _resolve_context_thumb_data(record: dict[str, Any], gallery_item: dict[str, Any] | None) -> str | None:
+def _resolve_context_thumb_data(
+    record: dict[str, Any],
+    gallery_item: dict[str, Any] | None,
+    *,
+    offline_context_thumbnails: bool = False,
+) -> str | None:
+    if record.get("record_type") == "visual_story_frame":
+        for key in ("visual_story_output_path", "visual_story_frame_path"):
+            rel_path = str(record.get(key) or "").strip()
+            if not rel_path:
+                continue
+            path = Path(rel_path)
+            data_url = _file_to_data_url(path if path.is_absolute() else _REPO_ROOT / path)
+            if data_url:
+                return data_url
     if gallery_item and gallery_item.get("context_thumb"):
         return str(gallery_item["context_thumb"])
     lat, lng = _resolve_record_coordinates(record)
     if lat is None or lng is None:
         return None
+    if offline_context_thumbnails:
+        return _offline_context_thumbnail(lat, lng)
     return resolve_context_thumb(lat, lng)
 
 
@@ -655,10 +941,15 @@ def write_dataset_export(
     include_rejects: bool = True,
     include_api_observations: bool = False,
     include_seeded_cache: bool = False,
+    include_missions: bool = True,
+    include_archived_missions: bool = True,
     monitor_reports_dir: Path | None = None,
+    offline_context_thumbnails: bool = False,
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     samples_dir = output_dir / "samples"
+    if samples_dir.exists():
+        shutil.rmtree(samples_dir)
     samples_dir.mkdir(parents=True, exist_ok=True)
 
     records = build_export_records(
@@ -667,6 +958,8 @@ def write_dataset_export(
         include_rejects=include_rejects,
         include_api_observations=include_api_observations,
         include_seeded_cache=include_seeded_cache,
+        include_missions=include_missions,
+        include_archived_missions=include_archived_missions,
         monitor_reports_dir=monitor_reports_dir,
     )
     train_count = 0
@@ -678,7 +971,9 @@ def write_dataset_export(
     positive_count = 0
     api_observation_count = 0
     seeded_cache_count = 0
+    visual_story_frame_count = 0
     monitor_report_count = 0
+    mission_metadata_count = 0
     use_case_counts: dict[str, int] = {}
 
     for record in records:
@@ -689,7 +984,11 @@ def write_dataset_export(
         if gallery_item:
             with_gallery += 1
 
-        context_thumb_data = _resolve_context_thumb_data(record, gallery_item)
+        context_thumb_data = _resolve_context_thumb_data(
+            record,
+            gallery_item,
+            offline_context_thumbnails=offline_context_thumbnails,
+        )
         record["assets"]["context_thumb"] = _write_asset(sample_dir, "context_thumb", context_thumb_data)
         if record["assets"]["context_thumb"]:
             with_context_thumb += 1
@@ -725,8 +1024,12 @@ def write_dataset_export(
             api_observation_count += 1
         elif record["record_type"] == "seeded_cache":
             seeded_cache_count += 1
+        elif record["record_type"] == "visual_story_frame":
+            visual_story_frame_count += 1
         elif record["record_type"] == "monitor_report":
             monitor_report_count += 1
+        elif record["record_type"] == "mission_metadata":
+            mission_metadata_count += 1
         else:
             positive_count += 1
 
@@ -779,7 +1082,9 @@ def write_dataset_export(
         "control_records": control_count,
         "api_observation_records": api_observation_count,
         "seeded_cache_records": seeded_cache_count,
+        "visual_story_frame_records": visual_story_frame_count,
         "monitor_report_records": monitor_report_count,
+        "mission_metadata_records": mission_metadata_count,
         "train_records": train_count,
         "eval_records": eval_count,
         "records_with_gallery": with_gallery,
@@ -802,10 +1107,13 @@ def write_dataset_export(
             "Each row is auto-classified against the temporal use-case catalog and mirrored into chat-style training JSONL.",
             "API observation rows can be included from the local observation store for near-autonomous data-prep refinement.",
             "Replay-cache rows can be included directly from the legacy assets/seeded_data folder for replay and timelapse training packs.",
+            "Visual story frames can be included from the cached manifest as object-evidence review examples without making new imagery API calls.",
             "Persisted maritime and lifeline monitor-report JSON files can be imported as generated monitor rows.",
+            "Mission metadata rows preserve operator task text, target packs, object targets, and bbox intent without making new satellite API calls.",
             "Ground rejections are weak negatives with explicit provenance rather than operator-reviewed gold controls.",
             "Every sample carries orbit_training_contract_v1 metadata for NM-UNI import, review gating, and localization follow-up.",
             "SVG fallback thumbnails are rasterized to PNG during export so vision tagging cycles receive image assets.",
+            "Offline context thumbnails can be forced for local refreshes that should not wait on Esri imagery.",
         ],
     }
     (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -833,10 +1141,25 @@ def _parse_args() -> argparse.Namespace:
         help="Include WebM timelapses and metadata directly from assets/seeded_data.",
     )
     parser.add_argument(
+        "--no-missions",
+        action="store_true",
+        help="Skip current mission metadata rows.",
+    )
+    parser.add_argument(
+        "--no-archived-missions",
+        action="store_true",
+        help="Skip reset-preserved mission archive rows.",
+    )
+    parser.add_argument(
         "--monitor-reports-dir",
         type=Path,
         default=None,
         help="Optional JSON file or directory of persisted maritime/lifeline monitor reports to include.",
+    )
+    parser.add_argument(
+        "--offline-context-thumbnails",
+        action="store_true",
+        help="Use deterministic offline context chips instead of fetching ESRI thumbnails for arbitrary coordinates.",
     )
     return parser.parse_args()
 
@@ -851,11 +1174,14 @@ def main() -> int:
         include_rejects=not args.no_rejects,
         include_api_observations=not args.no_api_observations,
         include_seeded_cache=args.include_seeded_cache,
+        include_missions=not args.no_missions,
+        include_archived_missions=not args.no_archived_missions,
         monitor_reports_dir=args.monitor_reports_dir,
+        offline_context_thumbnails=args.offline_context_thumbnails,
     )
     print(
         "[Orbit] Exported {records} samples to {path} "
-        "({positive_records} positives, {control_records} controls, {api_observation_records} api observations, {seeded_cache_records} replay cache, {monitor_report_records} monitor reports, {train_records} train / {eval_records} eval, {records_with_context_thumb} with context)".format(
+        "({positive_records} positives, {control_records} controls, {api_observation_records} api observations, {seeded_cache_records} replay cache, {visual_story_frame_records} visual stories, {monitor_report_records} monitor reports, {mission_metadata_records} mission metadata, {train_records} train / {eval_records} eval, {records_with_context_thumb} with context)".format(
             path=args.output_dir,
             **manifest,
         )

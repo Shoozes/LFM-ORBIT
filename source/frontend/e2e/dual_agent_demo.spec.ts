@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { gotoApp, resetRuntimeState, waitForLinkOpen } from "./runtime";
+import { gotoApp, resetRuntimeState, waitForLinkOpen, waitForNextPaint } from "./runtime";
 import {
   drawMapBbox,
   hideSubtitle,
@@ -30,6 +30,7 @@ test("Tutorial: Dual-Agent Architecture Demo", async ({ page, request }) => {
   await drawMapBbox(page, { x: 0.15, y: 0.2 }, { x: 0.42, y: 0.52 });
 
   await page.fill('textarea', "Scan this region for recent clear-cut deforestation.");
+  await page.getByTestId("mission-panel-tab-replay").click();
   const replayButtonSelector = "[data-testid='load-replay-rondonia_frontier_showcase']";
   const replayButton = page.locator(replayButtonSelector);
   await moveMouseToHighlight(page, replayButtonSelector);
@@ -46,7 +47,8 @@ test("Tutorial: Dual-Agent Architecture Demo", async ({ page, request }) => {
   await expect(page.getByText(/satellite|ground/i).first()).toBeVisible({ timeout: 20_000 });
   await showSubtitle(page, "Only actionable anomalies are escalated for ground validation.", 1800);
   await moveMouseToHighlight(page, "[data-testid='header-agent-bus']");
-  await page.waitForTimeout(1500);
+  await expect(page.getByTestId("header-agent-bus")).toBeVisible();
+  await waitForNextPaint(page, 3);
   await removeHighlight(page);
   await hideSubtitle(page);
 });

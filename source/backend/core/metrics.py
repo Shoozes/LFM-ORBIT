@@ -25,7 +25,7 @@ def _default_metrics_state() -> MetricsSummary:
     return {
         "region_id": REGION.region_id,
         "demo_mode_enabled": False,
-        "demo_mode_loop_scan": bool(getattr(REGION, "demo_mode_loop_scan", True)),
+        "demo_mode_loop_scan": bool(getattr(REGION, "demo_mode_loop_scan", False)),
         "runtime_truth_mode": runtime_truth_mode_for_source(REGION.observation_mode),
         "imagery_origin": imagery_origin_for_source(REGION.observation_mode),
         "scoring_basis": scoring_basis_for_source(REGION.observation_mode),

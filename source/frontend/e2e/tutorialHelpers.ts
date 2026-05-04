@@ -2,20 +2,48 @@ import { expect, type Page } from "@playwright/test";
 
 export async function showSubtitle(page: Page, text: string, durationMs = 3000) {
   await page.evaluate((msg) => {
+    const highlightTerms: Record<string, string> = {
+      "GROUND AGENT": "#34d399",
+      "SATELLITE AGENT": "#60a5fa",
+      "SELECT TOOL": "#facc15",
+      "TIMELAPSE": "#c084fc",
+      "STATIC FRAME": "#f97316",
+      "CV BOXES": "#22d3ee",
+      "COMPACT PROOF JSON": "#67e8f9",
+      "PROOF JSON": "#67e8f9",
+      "TAGGED TRAINING DATA": "#86efac",
+      "TRAINING DATA": "#86efac",
+      "3D CONTEXT": "#f0abfc",
+    };
+    const escapeHtml = (value: string) => value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+    const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const highlighted = Object.entries(highlightTerms)
+      .sort((left, right) => right[0].length - left[0].length)
+      .reduce((html, [term, color]) => (
+        html.replace(
+          new RegExp(escapeRegex(term), "g"),
+          `<span style="color:${color};font-weight:900">${term}</span>`,
+        )
+      ), escapeHtml(msg));
+
     let container = document.getElementById("tutorial-subtitle-container");
     if (!container) {
       container = document.createElement("div");
       container.id = "tutorial-subtitle-container";
       container.style.position = "fixed";
-      container.style.bottom = "40px";
+      container.style.bottom = "28px";
       container.style.left = "50%";
       container.style.transform = "translateX(-50%)";
       container.style.maxWidth = "80%";
-      container.style.backgroundColor = "rgba(0, 0, 0, 0.85)";
+      container.style.backgroundColor = "rgba(2, 6, 23, 0.88)";
       container.style.color = "#fff";
-      container.style.padding = "16px 24px";
-      container.style.borderRadius = "12px";
-      container.style.fontSize = "20px";
+      container.style.padding = "14px 22px";
+      container.style.borderRadius = "10px";
+      container.style.fontSize = "19px";
       container.style.fontWeight = "600";
       container.style.fontFamily = "system-ui, sans-serif";
       container.style.textAlign = "center";
@@ -24,12 +52,15 @@ export async function showSubtitle(page: Page, text: string, durationMs = 3000) 
       container.style.backdropFilter = "blur(8px)";
       container.style.transition = "opacity 0.3s ease-in-out, transform 0.3s ease-in-out";
       container.style.border = "1px solid rgba(255, 255, 255, 0.1)";
+      container.style.lineHeight = "1.35";
+      container.style.whiteSpace = "pre-line";
+      container.style.pointerEvents = "none";
       document.body.appendChild(container);
     }
 
     container.style.opacity = "0";
     container.style.transform = "translateX(-50%) translateY(10px)";
-    container.textContent = msg;
+    container.innerHTML = highlighted;
 
     void container.offsetWidth;
 
@@ -37,6 +68,44 @@ export async function showSubtitle(page: Page, text: string, durationMs = 3000) 
     container.style.transform = "translateX(-50%) translateY(0)";
   }, text);
 
+  await page.waitForTimeout(durationMs);
+}
+
+export async function showTutorialCard(
+  page: Page,
+  options: { title: string; body: string; tags: string[] },
+  durationMs = 5000,
+) {
+  await page.evaluate(({ title, body, tags }) => {
+    const escapeHtml = (value: string) => value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+    document.getElementById("tutorial-final-card")?.remove();
+    const card = document.createElement("div");
+    card.id = "tutorial-final-card";
+    card.setAttribute("data-testid", "tutorial-final-card");
+    card.style.position = "fixed";
+    card.style.inset = "0";
+    card.style.zIndex = "100000";
+    card.style.display = "flex";
+    card.style.alignItems = "center";
+    card.style.justifyContent = "center";
+    card.style.background = "rgba(2, 6, 23, 0.58)";
+    card.style.backdropFilter = "blur(4px)";
+    card.innerHTML = `
+      <section style="width:min(840px,78vw);border:1px solid rgba(103,232,249,0.35);background:rgba(15,23,42,0.96);box-shadow:0 24px 80px rgba(0,0,0,0.42);border-radius:12px;padding:28px 32px;color:white;font-family:system-ui,sans-serif">
+        <p style="margin:0 0 10px;color:#67e8f9;font-size:12px;font-weight:800;letter-spacing:0.22em;text-transform:uppercase">Mission Result</p>
+        <h2 style="margin:0;font-size:30px;line-height:1.12;font-weight:800">${escapeHtml(title)}</h2>
+        <p style="margin:16px 0 0;color:#d4d4d8;font-size:16px;line-height:1.5;font-weight:600">${escapeHtml(body)}</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:20px">
+          ${tags.map((tag) => `<span style="border:1px solid rgba(134,239,172,0.36);background:rgba(22,101,52,0.28);color:#bbf7d0;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase">${escapeHtml(tag)}</span>`).join("")}
+        </div>
+      </section>
+    `;
+    document.body.appendChild(card);
+  }, options);
   await page.waitForTimeout(durationMs);
 }
 

@@ -1,0 +1,35 @@
+{
+  "replay_id": "camp_shelter_count_replay",
+  "title": "Humanitarian Shelter Count Object Replay",
+  "description": "Deterministic object-evidence replay for shelter and aid-infrastructure counting.",
+  "task_text": "Run a humanitarian shelter count. Look for shelters, tents, vehicles, water tanks, and clinic roofs.",
+  "bbox": [34.24, 0.58, 34.29, 0.63],
+  "target_pack_id": "camp",
+  "object_targets": [
+    {"label": "shelter", "prompt": "Find shelters", "class_key": "structure", "enabled": true},
+    {"label": "tent", "prompt": "Find tents", "class_key": "structure", "enabled": true},
+    {"label": "vehicle", "prompt": "Find vehicles", "class_key": "vehicle", "enabled": true},
+    {"label": "water tank", "prompt": "Find water tanks", "class_key": "aid", "enabled": true},
+    {"label": "clinic roof", "prompt": "Find clinic roofs", "class_key": "aid", "enabled": true}
+  ],
+  "cells_scanned": 3,
+  "flags_found": 1,
+  "primary_cell_id": "camp_shelter_count_cell",
+  "alerts": [
+    {
+      "cell_id": "camp_shelter_count_cell",
+      "lat": 0.605,
+      "lng": 34.265,
+      "event_id": "replay_camp_shelter_count",
+      "change_score": 0.51,
+      "confidence": 0.76,
+      "priority": "medium",
+      "reason_codes": ["object_evidence", "shelter_count"],
+      "observation_source": "replay_fixture",
+      "before_window": {"label": "baseline"},
+      "after_window": {"label": "current"},
+      "detection_summary": {"target_pack_id": "camp", "total_boxes": 2, "counts_by_label": {"shelter": 2}, "top_boxes": [{"id": "box_shelter_001", "label": "shelter", "bbox": [0.18, 0.2, 0.29, 0.3], "bbox_format": "unit_xyxy", "confidence": 0.74, "color_key": "structure", "source_model": "replay_fixture", "prompt": "Find shelters", "runtime_truth_mode": "replay", "imagery_origin": "cached_api", "scoring_basis": "visual_only"}, {"id": "box_shelter_002", "label": "shelter", "bbox": [0.38, 0.34, 0.49, 0.44], "bbox_format": "unit_xyxy", "confidence": 0.7, "color_key": "structure", "source_model": "replay_fixture", "prompt": "Find shelters", "runtime_truth_mode": "replay", "imagery_origin": "cached_api", "scoring_basis": "visual_only"}], "provenance": {"output_source": "replay_fixture", "heuristic_fallback": false}},
+      "object_deltas": [{"label": "shelter", "baseline_count": 1, "current_count": 2, "delta_count": 1, "delta_percent": 100.0, "action_hint": "defer"}]
+    }
+  ]
+}

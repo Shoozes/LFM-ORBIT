@@ -69,6 +69,115 @@ def test_retag_dataset_dedupes_assets_and_preserves_references(tmp_path):
     assert {ref["sample_id"] for ref in rows[0]["references"]} == {"sample_a", "sample_b"}
     assert metadata[0]["file_name"].startswith("images/")
     assert (output / metadata[0]["file_name"]).exists()
+    assert manifest["dataset_dir"] == "dataset"
+    assert manifest["output_dir"] == "."
+    assert str(tmp_path) not in json.dumps(manifest)
+
+
+def test_retag_dataset_writes_mission_metadata_passthrough(tmp_path):
+    dataset = tmp_path / "dataset"
+    dataset.mkdir()
+    (dataset / "samples.jsonl").write_text(
+        json.dumps({
+            "sample_id": "mission_1",
+            "record_type": "mission_metadata",
+            "split": "train",
+            "target_task": "object_evidence_monitoring",
+            "target_category": "wildfire",
+            "target_action": "review",
+            "task_text": "Run Fireline Watch.",
+            "bbox": [-81.9, 31.1, -81.7, 31.3],
+            "target_pack_id": "fireline",
+            "object_targets": [{"label": "dark smoke", "enabled": True}],
+            "mission_mode": "replay",
+            "replay_id": "fireline",
+            "confirmation_source": "mission_state",
+            "training_contract": {"format": "orbit_training_contract_v1"},
+            "assets": {},
+        })
+        + "\n",
+        encoding="utf-8",
+    )
+
+    output = tmp_path / "retagged"
+    manifest = retag_training_assets.retag_dataset(
+        dataset,
+        output,
+        provider="heuristic",
+        scan_loose_assets=False,
+    )
+    rows = _read_jsonl(output / "mission_metadata.jsonl")
+
+    assert manifest["mission_metadata_rows"] == 1
+    assert rows[0]["format"] == "orbit_mission_metadata_v1"
+    assert rows[0]["target_pack_id"] == "fireline"
+    assert rows[0]["object_targets"][0]["label"] == "dark smoke"
+
+
+def test_retag_dataset_clears_stale_generated_assets_after_loading_reuse(tmp_path):
+    dataset = tmp_path / "dataset"
+    sample_dir = dataset / "samples" / "sample_a"
+    image_path = sample_dir / "context_thumb.png"
+    _write_png(image_path, (30, 90, 140))
+    image_sha = retag_training_assets._sha256(image_path)
+    (dataset / "samples.jsonl").write_text(
+        json.dumps({
+            "sample_id": "sample_a",
+            "record_type": "positive",
+            "target_task": "water_extent_review",
+            "target_category": "water_extent",
+            "target_action": "review",
+            "assets": {"context_thumb": "context_thumb.png"},
+        })
+        + "\n",
+        encoding="utf-8",
+    )
+
+    output = tmp_path / "retagged"
+    stale_image = output / "images" / "stale.png"
+    stale_frame = output / "frames" / "stale.jpg"
+    _write_png(stale_image, (250, 0, 0))
+    _write_png(stale_frame, (0, 250, 0))
+    output.mkdir(parents=True, exist_ok=True)
+    (output / "retagged_assets.jsonl").write_text(
+        json.dumps({
+            "asset_sha256": image_sha,
+            "provider": "ollama",
+            "model": "qwen3.6:27b",
+            "retag": {
+                "target_category": "water_extent",
+                "target_action": "review",
+                "visual_summary": "Previously tagged reusable water extent image.",
+                "labels": ["water_extent"],
+                "reason_codes": ["stored_retag"],
+                "confidence": 0.81,
+                "quality": "usable",
+                "temporal_evidence": "single frame only",
+                "needs_human_review": False,
+            },
+        })
+        + "\n",
+        encoding="utf-8",
+    )
+
+    manifest = retag_training_assets.retag_dataset(
+        dataset,
+        output,
+        provider="ollama",
+        model="qwen3.6:27b",
+        scan_loose_assets=False,
+        tag_temporal_sequences=False,
+        reuse_existing_dir=output,
+    )
+    metadata = _read_jsonl(output / "metadata.jsonl")
+    image_refs = {row["file_name"] for row in metadata}
+    image_files = {path.relative_to(output).as_posix() for path in (output / "images").iterdir()}
+
+    assert manifest["provider_asset_calls"] == 0
+    assert manifest["reused_asset_tags"] == 1
+    assert not stale_image.exists()
+    assert not stale_frame.exists()
+    assert image_files == image_refs
 
 
 def test_retag_dataset_extracts_timelapse_frames_and_sequence_rows(tmp_path, monkeypatch):
@@ -410,3 +519,58 @@ def test_retag_dataset_reuses_existing_tags_without_provider_call(tmp_path, monk
     assert manifest["reused_asset_tags"] == 1
     assert len(reused) == 1
     assert reused[0]["retag"]["visual_summary"] == "Previously reviewed water extent frame."
+
+
+def test_reuse_existing_only_cli_avoids_provider_calls_for_new_hashes(tmp_path, monkeypatch):
+    dataset = tmp_path / "dataset"
+    sample = dataset / "samples" / "sample_new"
+    _write_png(sample / "context_thumb.png", (200, 140, 40))
+    (dataset / "samples.jsonl").write_text(
+        json.dumps({
+            "sample_id": "sample_new",
+            "record_type": "seeded_cache",
+            "target_task": "wildfire_temporal_detection",
+            "target_category": "wildfire",
+            "target_action": "alert",
+            "observation_source": "sentinel",
+            "reason_codes": ["burn_scar"],
+            "assets": {"context_thumb": "context_thumb.png"},
+        })
+        + "\n",
+        encoding="utf-8",
+    )
+    existing = tmp_path / "existing"
+    existing.mkdir()
+    (existing / "retagged_assets.jsonl").write_text("", encoding="utf-8")
+    output = tmp_path / "retagged"
+
+    def fail_ollama_retag(*_args, **_kwargs):
+        raise AssertionError("reuse-only refresh should not call Ollama")
+
+    monkeypatch.setattr(retag_training_assets, "_ollama_retag", fail_ollama_retag)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "retag_training_assets.py",
+            "--dataset-dir",
+            str(dataset),
+            "--output-dir",
+            str(output),
+            "--provider",
+            "ollama",
+            "--reuse-existing-dir",
+            str(existing),
+            "--reuse-existing-only",
+            "--no-temporal-sequences",
+            "--no-loose-scan",
+        ],
+    )
+
+    assert retag_training_assets.main() == 0
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    rows = _read_jsonl(output / "retagged_assets.jsonl")
+
+    assert manifest["provider_asset_calls"] == 0
+    assert manifest["provider_budget_fallbacks"] == 1
+    assert rows[0]["requested_provider"] == "ollama"
+    assert rows[0]["provider"] == "heuristic"

@@ -47,6 +47,29 @@ def test_cors_defaults_to_localhost_allowlist(monkeypatch):
     assert "http://localhost:5173" in origins
 
 
+def test_watchlist_endpoints_start_mission_from_asset(tmp_path, monkeypatch):
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "watchlist.sqlite"))
+
+    listing = client.get("/api/watchlists")
+    assert listing.status_code == 200
+    assert any(item["watchlist_id"] == "southeast_fire_lifeline_watch" for item in listing.json()["watchlists"])
+
+    detail = client.get("/api/watchlists/southeast_fire_lifeline_watch")
+    assert detail.status_code == 200
+    assert detail.json()["watchlist"]["display_name"] == "Southeast Fireline Watch"
+
+    started = client.post(
+        "/api/watchlists/southeast_fire_lifeline_watch/assets/ga_highway82_fire_candidate/start-mission"
+    )
+    assert started.status_code == 200
+    mission = started.json()["mission"]
+    assert mission["target_pack_id"] == "fireline"
+    assert mission["bbox"] == [-81.916, 31.143, -81.756, 31.303]
+
+    missing = client.get("/api/watchlists/missing")
+    assert missing.status_code == 404
+
+
 def test_local_only_guard_rejects_remote_control_requests():
     class Client:
         host = "203.0.113.10"
@@ -80,6 +103,197 @@ def test_health_endpoint_returns_ok_status():
     assert data["status"] == "ok"
     assert "region_id" in data
     assert "display_name" in data
+
+
+def test_cold_start_runtime_supports_object_missions_without_external_api(monkeypatch, tmp_path):
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+    monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(tmp_path / "runtime-data"))
+
+    from core.runtime_state import ensure_runtime_state, reset_runtime_state
+
+    reset_summary = reset_runtime_state(archive_missions=False)
+    assert reset_summary["after"]["missions"] == 0
+    assert ensure_runtime_state()["missions"] == 0
+
+    packs_response = client.get("/api/object-targets/packs")
+    assert packs_response.status_code == 200
+    assert any(pack["id"] == "fireline" for pack in packs_response.json()["packs"])
+
+    mission_response = client.post(
+        "/api/mission/start",
+        json={"task_text": "Cold start Fireline Watch", "target_pack_id": "fireline"},
+    )
+    assert mission_response.status_code == 200
+    mission = mission_response.json()
+    assert mission["target_pack_id"] == "fireline"
+    assert any(target["label"] == "dark smoke" for target in mission["object_targets"])
+
+
+def test_object_target_packs_endpoint_returns_defaults(monkeypatch, tmp_path):
+    monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(tmp_path))
+
+    response = client.get("/api/object-targets/packs")
+
+    assert response.status_code == 200
+    pack_ids = {pack["id"] for pack in response.json()["packs"]}
+    assert {"fireline", "camp", "port", "plastic", "urban_expansion", "lifeline"} <= pack_ids
+
+
+def test_object_target_pack_endpoint_handles_missing_pack(monkeypatch, tmp_path):
+    monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(tmp_path))
+
+    response = client.get("/api/object-targets/packs/missing")
+
+    assert response.status_code == 404
+    assert response.json()["error"] == "Target pack not found"
+
+
+def test_object_target_custom_pack_create_and_delete(monkeypatch, tmp_path):
+    monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(tmp_path))
+
+    create_response = client.post(
+        "/api/object-targets/packs",
+        json={
+            "id": "disaster_mobility",
+            "name": "Disaster Mobility",
+            "description": "Custom mobility evidence terms.",
+            "targets": [
+                {
+                    "label": "vehicle queue",
+                    "prompt": "Find vehicle queues",
+                    "class_key": "mobility",
+                    "enabled": True,
+                }
+            ],
+        },
+    )
+
+    assert create_response.status_code == 200
+    assert create_response.json()["pack"]["targets"][0]["label"] == "vehicle queue"
+    assert client.get("/api/object-targets/packs/disaster_mobility").status_code == 200
+
+    delete_response = client.delete("/api/object-targets/packs/disaster_mobility")
+
+    assert delete_response.status_code == 200
+    assert client.get("/api/object-targets/packs/disaster_mobility").status_code == 404
+
+
+def test_object_target_custom_pack_rejects_unsafe_label(monkeypatch, tmp_path):
+    monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(tmp_path))
+
+    response = client.post(
+        "/api/object-targets/packs",
+        json={
+            "id": "unsafe_pack",
+            "name": "Unsafe Pack",
+            "targets": [{"label": "person", "prompt": "Find person", "class_key": "unsafe"}],
+        },
+    )
+
+    assert response.status_code == 400
+    assert "outside the civilian evidence scope" in response.json()["error"]
+
+
+def test_mission_target_endpoints_edit_active_mission(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.mission import init_missions
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+
+    start_response = client.post(
+        "/api/mission/start",
+        json={"task_text": "Run fireline watch", "target_pack_id": "fireline"},
+    )
+
+    assert start_response.status_code == 200
+    mission = start_response.json()
+    assert mission["target_pack_id"] == "fireline"
+    assert any(target["label"] == "dark smoke" for target in mission["object_targets"])
+
+    add_response = client.post(
+        "/api/mission/targets/add",
+        json={"targets": [{"label": "vehicle queue", "class_key": "mobility"}]},
+    )
+
+    assert add_response.status_code == 200
+    assert any(target["label"] == "vehicle queue" for target in add_response.json()["object_targets"])
+
+    remove_response = client.post(
+        "/api/mission/targets/remove",
+        json={"labels": ["DARK SMOKE"]},
+    )
+
+    assert remove_response.status_code == 200
+    assert "dark smoke" not in {target["label"] for target in remove_response.json()["object_targets"]}
+
+    set_pack_response = client.post(
+        "/api/mission/targets/set-pack",
+        json={"target_pack_id": "port"},
+    )
+
+    assert set_pack_response.status_code == 200
+    assert set_pack_response.json()["target_pack_id"] == "port"
+    assert any(target["label"] == "docked-vessel group" for target in set_pack_response.json()["object_targets"])
+
+    clear_response = client.post("/api/mission/targets/clear", json={})
+
+    assert clear_response.status_code == 200
+    assert clear_response.json()["target_pack_id"] is None
+    assert clear_response.json()["object_targets"] == []
+
+
+def test_mission_target_endpoints_report_missing_active_mission(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.mission import init_missions
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+
+    response = client.get("/api/mission/targets")
+
+    assert response.status_code == 404
+    assert response.json()["error"] == "Mission not found"
+
+
+def test_vlm_grounding_batch_endpoint_calls_object_evidence(monkeypatch):
+    def fake_batch(bbox, targets, *, target_pack_id=None, frame_ref=None):
+        return {
+            "results": [],
+            "summary": {
+                "target_pack_id": target_pack_id,
+                "total_boxes": 0,
+                "counts_by_label": {},
+                "top_boxes": [],
+                "provenance": {"output_source": "test"},
+            },
+            "target_count": len(targets),
+            "frame_ref": frame_ref,
+        }
+
+    monkeypatch.setattr("api.main.run_object_evidence_batch", fake_batch)
+
+    response = client.post(
+        "/api/vlm/grounding/batch",
+        json={
+            "bbox": [-60.50, -3.50, -60.40, -3.40],
+            "target_pack_id": "fireline",
+            "frame_ref": "current",
+            "targets": [{"label": "dark smoke", "class_key": "hazard"}],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["target_count"] == 1
+    assert payload["summary"]["target_pack_id"] == "fireline"
+    assert payload["frame_ref"] == "current"
 
 
 def test_health_endpoint_includes_alert_counts():
@@ -264,8 +478,10 @@ def test_analysis_status_endpoint_surfaces_manifest_metadata():
     assert model["image_conditioned_runtime_enabled"] is False
     assert model["image_conditioned_runtime_reason"] == "mmproj not present"
     assert data["image_training_verified"] is True
+    assert data["training_train_rows"] == 32
     assert data["training_multimodal_rows"] == 32
     assert data["training_image_blocks"] == 44
+    assert data["training_eval_rows"] == 0
     assert data["runtime_capabilities"]["runtime_backend"] == "none"
     assert model["readme_path"] == "C:/tmp/README.md"
     assert model["readme_present"] is True
@@ -527,6 +743,616 @@ def test_ground_agent_chat_proposes_link_offline_before_mutating(tmp_path, monke
         set_link_state(True)
 
 
+def test_ground_agent_chat_proposes_bull_creek_camera_with_stop(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.mission import get_active_mission, init_missions, start_mission
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+    mission = start_mission(
+        "Scan active mission before operator redirects camera.",
+        bbox=[-63.15, -10.15, -62.85, -9.85],
+        start_date="2024-01-01",
+        end_date="2024-12-31",
+        use_case_id="deforestation",
+    )
+
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "cancel the current mission and take us to bull creek fl"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "navigate_map_location"
+    assert proposal["details"]["location_id"] == "bull_creek_fl"
+    assert proposal["details"]["stop_active_mission"] is True
+    assert proposal["details"]["bbox"] == [-81.07, 28.02, -80.86, 28.18]
+    assert proposal["details"]["camera"]["pitch"] >= 55
+    assert proposal["details"]["location_type"] == "wetland / pine-flatwoods context"
+    assert "low_relief_terrain" in proposal["details"]["semantic_tags"]
+    assert "road or trail corridor" in proposal["details"]["suggested_targets"]
+    assert "3D view is a spatial context aid only" in proposal["details"]["evidence_guidance"]
+    assert get_active_mission()["id"] == mission["id"]
+
+    confirm = client.post("/api/agent/action/confirm", json={"proposal": proposal})
+
+    assert confirm.status_code == 200
+    confirmed = confirm.json()
+    action_names = [action["name"] for action in confirmed["actions"]]
+    assert action_names == ["stop_mission", "navigate_map"]
+    assert confirmed["actions"][0]["result"]["stopped_mission_id"] == mission["id"]
+    assert confirmed["actions"][1]["result"]["label"] == "Bull Creek, FL"
+    assert confirmed["actions"][1]["result"]["center"] == [-80.965, 28.095]
+    assert confirmed["actions"][1]["result"]["location_type"] == "wetland / pine-flatwoods context"
+    assert "water_vegetation_boundary" in confirmed["actions"][1]["result"]["semantic_tags"]
+    assert "surface moisture context" in confirmed["actions"][1]["result"]["suggested_targets"]
+    assert get_active_mission() is None
+
+
+def test_ground_agent_chat_asks_before_redirecting_active_mission_to_destination(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.mission import get_active_mission, init_missions, start_mission
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+    mission = start_mission(
+        "Run Florida Fire/Drought Readiness Watch over a North Florida corridor.",
+        bbox=[-83.2, 29.0, -81.3, 30.7],
+        start_date="2026-04-15",
+        end_date="2026-04-25",
+        use_case_id="wildfire",
+        target_pack_id="fireline",
+    )
+
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "take me to giza pyramid"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "active mission" in payload["reply"].lower()
+    assert "review before" in payload["reply"].lower()
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "navigate_map_location"
+    assert proposal["details"]["location_id"] == "giza_pyramid_complex"
+    assert proposal["details"]["stop_active_mission"] is True
+    assert proposal["details"]["active_mission_id"] == mission["id"]
+    assert proposal["details"]["bbox"] == [31.118, 29.965, 31.152, 29.993]
+    assert proposal["details"]["location_type"] == "archaeological heritage site context"
+    assert get_active_mission()["id"] == mission["id"]
+
+    confirm = client.post("/api/agent/action/confirm", json={"proposal": proposal})
+
+    assert confirm.status_code == 200
+    confirmed = confirm.json()
+    action_names = [action["name"] for action in confirmed["actions"]]
+    assert action_names == ["stop_mission", "navigate_map"]
+    assert confirmed["actions"][0]["result"]["stopped_mission_id"] == mission["id"]
+    assert confirmed["actions"][1]["result"]["label"] == "Giza Pyramid Complex"
+    assert confirmed["actions"][1]["result"]["center"] == [31.1342, 29.9792]
+    assert get_active_mission() is None
+
+
+def test_ground_agent_chat_proposes_bronx_map_navigation_without_active_mission(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.mission import get_active_mission, init_missions
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "tKe me to the bronx, ny"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "Bronx, NY" in payload["reply"]
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "navigate_map_location"
+    assert proposal["confirm_label"] == "Fly Map"
+    assert proposal["details"]["location_id"] == "bronx_ny"
+    assert proposal["details"]["provider"] == "local_registry"
+    assert proposal["details"]["feature_type"] == "urban borough context"
+    assert proposal["details"]["confidence"] >= 0.8
+    assert len(proposal["details"]["preview_tiles"]) == 9
+    assert proposal["details"]["stop_active_mission"] is False
+    assert proposal["details"]["bbox"] == [-73.9339, 40.7857, -73.7654, 40.9153]
+    assert proposal["details"]["center"] == [-73.8648, 40.8448]
+    assert proposal["details"]["location_type"] == "urban borough context"
+    assert "transport corridor" in proposal["details"]["suggested_targets"]
+    assert get_active_mission() is None
+
+    confirm = client.post("/api/agent/action/confirm", json={"proposal": proposal})
+
+    assert confirm.status_code == 200
+    confirmed = confirm.json()
+    assert [action["name"] for action in confirmed["actions"]] == ["navigate_map"]
+    assert confirmed["actions"][0]["result"]["label"] == "Bronx, NY"
+    assert confirmed["actions"][0]["result"]["center"] == [-73.8648, 40.8448]
+    assert confirmed["actions"][0]["result"]["location_type"] == "urban borough context"
+    assert get_active_mission() is None
+
+
+def test_location_resolve_returns_bronx_candidate_with_preview_tiles():
+    response = client.post(
+        "/api/location/resolve",
+        json={"query": "Bronx, ny", "country": "US", "limit": 3},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["query"] == "Bronx, ny"
+    candidate = payload["candidates"][0]
+    assert candidate["location_id"] == "bronx_ny"
+    assert candidate["label"] == "Bronx, NY"
+    assert candidate["provider"] == "local_registry"
+    assert candidate["bbox"] == [-73.9339, 40.7857, -73.7654, 40.9153]
+    assert len(candidate["preview_tiles"]) == 9
+    assert all(tile["url"].startswith("https://server.arcgisonline.com/") for tile in candidate["preview_tiles"])
+
+
+def test_location_resolve_returns_davenport_semantic_construction_candidate():
+    response = client.post(
+        "/api/location/resolve",
+        json={"query": "Davenport Florida new construction", "country": "US", "limit": 3},
+    )
+
+    assert response.status_code == 200
+    candidate = response.json()["candidates"][0]
+    assert candidate["location_id"] == "davenport_fl"
+    assert candidate["label"] == "Davenport, FL"
+    assert candidate["provider"] == "local_registry"
+    assert candidate["feature_type"] == "suburban growth / construction context"
+    assert candidate["bbox"] == [-81.7, 28.08, -81.48, 28.28]
+    assert candidate["confidence"] >= 0.8
+    assert len(candidate["preview_tiles"]) == 9
+
+
+def test_location_resolve_returns_north_pacific_debris_candidate():
+    response = client.post(
+        "/api/location/resolve",
+        json={"query": "Great Pacific Garbage Patch", "limit": 3},
+    )
+
+    assert response.status_code == 200
+    candidate = response.json()["candidates"][0]
+    assert candidate["location_id"] == "north_pacific_debris_context"
+    assert candidate["label"] == "North Pacific Debris Convergence Review Window"
+    assert candidate["provider"] == "local_registry"
+    assert candidate["feature_type"] == "open-ocean debris convergence context"
+    assert candidate["bbox"] == [-146.0, 34.0, -145.0, 35.0]
+    assert candidate["confidence"] >= 0.8
+    assert len(candidate["preview_tiles"]) == 9
+
+
+def test_ground_agent_chat_reports_unknown_destination_without_stopping_mission(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.mission import get_active_mission, init_missions, start_mission
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+    mission = start_mission("Keep current mission active.")
+
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "go to imaginary test destination"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"][0]["name"] == "navigate_map"
+    assert payload["actions"][0]["status"] == "error"
+    assert "known destinations" in payload["reply"].lower()
+    assert "Giza Pyramid Complex" in payload["reply"]
+    assert "Bronx, NY" in payload["reply"]
+    assert payload.get("proposals", []) == []
+    assert get_active_mission()["id"] == mission["id"]
+
+
+def test_ground_agent_chat_proposes_stop_mission_without_location(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.mission import get_active_mission, init_missions, start_mission
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+    mission = start_mission("Mission to stop")
+
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "stop the current mission"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "stop_mission"
+    assert proposal["details"]["mission_id"] == mission["id"]
+
+    confirm = client.post("/api/agent/action/confirm", json={"proposal": proposal})
+
+    assert confirm.status_code == 200
+    confirmed = confirm.json()
+    assert confirmed["actions"][0]["name"] == "stop_mission"
+    assert confirmed["actions"][0]["status"] == "ok"
+    assert confirmed["actions"][0]["result"]["stopped_mission_id"] == mission["id"]
+    assert get_active_mission() is None
+
+
+def test_ground_agent_chat_proposes_florida_fire_drought_pack(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.mission import get_active_mission, init_missions
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "run florida fire drought mission"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "start_mission_pack"
+    assert proposal["details"]["pack_id"] == "florida_fire_drought_watch"
+    assert proposal["details"]["target_pack_id"] == "fireline"
+    assert proposal["details"]["bbox"] == [-83.2, 29.0, -81.3, 30.7]
+    assert "candidate evidence" in proposal["details"]["task_text"]
+
+    confirm = client.post("/api/agent/action/confirm", json={"proposal": proposal})
+
+    assert confirm.status_code == 200
+    confirmed = confirm.json()
+    assert confirmed["actions"][0]["name"] == "start_mission_pack"
+    assert confirmed["actions"][0]["status"] == "ok"
+    assert confirmed["actions"][0]["result"]["mission"]["use_case_id"] == "wildfire"
+    assert confirmed["actions"][0]["result"]["mission"]["target_pack_id"] == "fireline"
+    assert get_active_mission()["target_pack_id"] == "fireline"
+
+
+def test_ground_agent_chat_agentic_planner_matches_flexible_pack_request(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.mission import init_missions
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "try looking for recent drought conditions and wildfires in florida"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "Planning pass complete" in payload["reply"]
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "start_mission_pack"
+    assert proposal["details"]["pack_id"] == "florida_fire_drought_watch"
+    assert proposal["details"]["planner_result"] == "curated_mission_pack_ready"
+    assert proposal["details"]["workflow_mode"] == "agentic_prompt_workflow"
+    assert proposal["details"]["target_pack_id"] == "fireline"
+    assert "No protected wildlife counts" in " ".join(proposal["details"]["evidence_limits"])
+
+
+def test_ground_agent_chat_agentic_planner_builds_custom_mission(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.mission import get_active_mission, init_missions
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "plan a mission to monitor bridge access disruption around a civilian corridor"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "Final result:" in payload["reply"]
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "start_custom_mission"
+    assert proposal["details"]["workflow_mode"] == "agentic_prompt_workflow"
+    assert proposal["details"]["use_case_id"] == "civilian_lifeline_disruption"
+    assert proposal["details"]["target_pack_id"] == "lifeline"
+    assert proposal["details"]["bbox"] is None
+    assert "planner_attempts" in proposal["details"]
+
+    confirm = client.post("/api/agent/action/confirm", json={"proposal": proposal})
+
+    assert confirm.status_code == 200
+    confirmed = confirm.json()
+    assert confirmed["actions"][0]["name"] == "start_custom_mission"
+    assert confirmed["actions"][0]["status"] == "ok"
+    mission = confirmed["actions"][0]["result"]["mission"]
+    assert mission["use_case_id"] == "civilian_lifeline_disruption"
+    assert mission["target_pack_id"] == "lifeline"
+    assert get_active_mission()["id"] == mission["id"]
+
+
+def test_ground_agent_chat_plans_semantic_construction_timelapse_for_named_area(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.mission import get_active_mission, init_missions
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+
+    response = client.post(
+        "/api/agent/chat",
+        json={
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "show me a timelapse of new construction in the last 10 years of Davenport Florida",
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "Planning pass complete" in payload["reply"]
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "start_custom_mission"
+    details = proposal["details"]
+    assert details["workflow_mode"] == "agentic_prompt_workflow"
+    assert details["use_case_id"] == "urban_expansion"
+    assert details["target_pack_id"] == "urban_expansion"
+    assert [target["label"] for target in details["object_targets"]][:3] == [
+        "construction footprint",
+        "new subdivision region",
+        "road expansion corridor",
+    ]
+    assert details["region_label"] == "Davenport, FL"
+    assert details["region_source"] == "known_location"
+    assert details["bbox"] == [-81.7, 28.08, -81.48, 28.28]
+    assert details["location_provider"] == "local_registry"
+    assert details["location_confidence"] >= 0.8
+    assert "construction_progression" in details["semantic_tags"]
+    assert "construction footprint" in details["suggested_targets"]
+    assert "Use dated multi-frame imagery" in details["evidence_guidance"]
+    assert int(details["end_date"][:4]) - int(details["start_date"][:4]) == 10
+    assert "new construction" in details["task_text"]
+    assert "permit claims" in " ".join(details["evidence_limits"])
+
+    confirm = client.post("/api/agent/action/confirm", json={"proposal": proposal})
+
+    assert confirm.status_code == 200
+    confirmed = confirm.json()
+    assert confirmed["actions"][0]["name"] == "start_custom_mission"
+    mission = confirmed["actions"][0]["result"]["mission"]
+    assert mission["use_case_id"] == "urban_expansion"
+    assert mission["target_pack_id"] == "urban_expansion"
+    assert mission["bbox"] == [-81.7, 28.08, -81.48, 28.28]
+    assert get_active_mission()["id"] == mission["id"]
+
+
+def test_ground_agent_chat_plans_garbage_patch_as_debris_candidate_mission(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.mission import get_active_mission, init_missions
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+
+    response = client.post(
+        "/api/agent/chat",
+        json={
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "show me one of the biggest garbage patches in the ocean and make a timelapse for every month in the last 10 years to current",
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "Planning pass complete" in payload["reply"]
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "start_custom_mission"
+    details = proposal["details"]
+    assert details["workflow_mode"] == "agentic_prompt_workflow"
+    assert details["target_pack_id"] == "plastic"
+    assert [target["label"] for target in details["object_targets"]][:3] == [
+        "coastal debris candidate",
+        "slick candidate area",
+        "foam line region",
+    ]
+    assert details["region_label"] == "North Pacific Debris Convergence Review Window"
+    assert details["region_source"] == "known_location"
+    assert details["bbox"] == [-145.6, 34.4, -145.4, 34.6]
+    assert details["location_context_bbox"] == [-146.0, 34.0, -145.0, 35.0]
+    assert details["location_provider"] == "local_registry"
+    assert details["location_confidence"] >= 0.8
+    assert details["temporal_cadence"] == "monthly"
+    assert details["requested_frame_count"] >= 120
+    assert "marine_debris_candidate" in details["semantic_tags"]
+    assert "slick candidate area" in details["suggested_targets"]
+    assert "Do not claim Great Pacific Garbage Patch mass" in details["evidence_guidance"]
+    assert int(details["end_date"][:4]) - int(details["start_date"][:4]) == 10
+    assert "candidate" in details["task_text"].lower()
+    assert "garbage-patch mass" in " ".join(details["evidence_limits"])
+
+    confirm = client.post("/api/agent/action/confirm", json={"proposal": proposal})
+
+    assert confirm.status_code == 200
+    confirmed = confirm.json()
+    assert confirmed["actions"][0]["name"] == "start_custom_mission"
+    mission = confirmed["actions"][0]["result"]["mission"]
+    assert mission["target_pack_id"] == "plastic"
+    assert mission["bbox"] == [-145.6, 34.4, -145.4, 34.6]
+    assert get_active_mission()["id"] == mission["id"]
+
+
+def test_ground_agent_chat_plans_lake_okeechobee_algae_bloom_candidate_mission(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.mission import get_active_mission, init_missions
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+
+    response = client.post(
+        "/api/agent/chat",
+        json={
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "check Lake Okeechobee for algae blooms",
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "Planning pass complete" in payload["reply"]
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "start_custom_mission"
+    details = proposal["details"]
+    assert details["workflow_mode"] == "agentic_prompt_workflow"
+    assert details["use_case_id"] == "harmful_algal_bloom"
+    assert details["target_pack_id"] == "algae_bloom"
+    assert [target["label"] for target in details["object_targets"]][:3] == [
+        "probable surface bloom",
+        "high chlorophyll signal",
+        "cyanobacteria-like signal",
+    ]
+    assert details["region_label"] == "Lake Okeechobee, FL"
+    assert details["region_source"] == "known_location"
+    assert details["bbox"] == [-81.16, 26.64, -80.55, 27.24]
+    assert details["location_provider"] == "local_registry"
+    assert details["location_confidence"] >= 0.7
+    assert "harmful_algal_bloom_candidate" in details["semantic_tags"]
+    assert "probable surface bloom" in details["suggested_targets"]
+    assert "Do not claim toxicity" in details["evidence_guidance"]
+    assert "probable bloom" in details["task_text"].lower()
+    assert "NOAA/FDEP or field confirmation" in " ".join(details["evidence_limits"])
+
+    confirm = client.post("/api/agent/action/confirm", json={"proposal": proposal})
+
+    assert confirm.status_code == 200
+    confirmed = confirm.json()
+    assert confirmed["actions"][0]["name"] == "start_custom_mission"
+    mission = confirmed["actions"][0]["result"]["mission"]
+    assert mission["target_pack_id"] == "algae_bloom"
+    assert mission["use_case_id"] == "harmful_algal_bloom"
+    assert mission["bbox"] == [-81.16, 26.64, -80.55, 27.24]
+    assert get_active_mission()["id"] == mission["id"]
+
+
+def test_ground_agent_chat_reframes_manatee_population_request(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.mission import init_missions
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "try looking for manatee populations in florida"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    reply = payload["reply"].lower()
+    assert "cannot count or locate manatee populations" in reply
+    assert "habitat/access proxy review" in reply
+    assert "do not box individual animals" in reply
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "start_mission_pack"
+    assert proposal["details"]["pack_id"] == "florida_manatee_habitat_review"
+    assert proposal["details"]["workflow_mode"] == "protected_wildlife_proxy_workflow"
+    assert proposal["details"]["planner_result"] == "protected wildlife habitat proxy ready"
+    assert proposal["details"]["target_pack_id"] == "waterline"
+    assert "Do not count or locate individual animals" in proposal["details"]["task_text"]
+
+    confirm = client.post("/api/agent/action/confirm", json={"proposal": proposal})
+
+    assert confirm.status_code == 200
+    confirmed = confirm.json()
+    assert confirmed["actions"][0]["name"] == "start_mission_pack"
+    assert confirmed["actions"][0]["status"] == "ok"
+    mission = confirmed["actions"][0]["result"]["mission"]
+    assert mission["use_case_id"] == "temporal_change_generic"
+    assert mission["target_pack_id"] == "waterline"
+
+
+def test_ground_agent_chat_handles_hard_manatee_water_search_by_region(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.mission import get_active_mission, init_missions
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "try looking for manatees in water around Banana River in winter"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    reply = payload["reply"].lower()
+    assert "hard protected-wildlife" in reply
+    assert "habitat/access proxy review" in reply
+    assert "banana river lagoon context" in reply
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "start_custom_mission"
+    assert proposal["details"]["workflow_mode"] == "agentic_prompt_workflow"
+    assert proposal["details"]["planner_result"] == "protected wildlife habitat proxy ready"
+    assert proposal["details"]["region_label"] == "Banana River lagoon context"
+    assert proposal["details"]["target_pack_id"] == "waterline"
+    assert proposal["details"]["bbox"] == [-80.78, 28.16, -80.55, 28.58]
+    assert "Do not count or locate individual animals" in proposal["details"]["task_text"]
+
+    confirm = client.post("/api/agent/action/confirm", json={"proposal": proposal})
+
+    assert confirm.status_code == 200
+    confirmed = confirm.json()
+    assert confirmed["actions"][0]["name"] == "start_custom_mission"
+    mission = confirmed["actions"][0]["result"]["mission"]
+    assert mission["target_pack_id"] == "waterline"
+    assert mission["bbox"] == [-80.78, 28.16, -80.55, 28.58]
+    assert get_active_mission()["id"] == mission["id"]
+
+
 def test_ground_agent_chat_launches_context_mission_pack(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
 
@@ -564,6 +1390,77 @@ def test_ground_agent_chat_launches_context_mission_pack(tmp_path, monkeypatch):
     assert confirmed["actions"][0]["name"] == "start_mission_pack"
     assert confirmed["actions"][0]["status"] == "ok"
     assert confirmed["actions"][0]["result"]["pack_id"] == "maritime_suez"
+    assert confirmed["actions"][0]["result"]["mission"]["target_pack_id"] == "port"
+
+
+def test_ground_agent_chat_proposes_and_applies_object_target_edits(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+
+    from core.agent_bus import init_bus
+    from core.mission import init_missions, start_mission
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+    mission = start_mission("Object edit mission")
+
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "Add dark smoke and road obstruction to the current mission."}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "update_mission_targets"
+    assert proposal["details"]["mission_id"] == mission["id"]
+    assert proposal["details"]["add"] == ["dark smoke", "road obstruction"]
+
+    confirm = client.post("/api/agent/action/confirm", json={"proposal": proposal})
+
+    assert confirm.status_code == 200
+    confirmed = confirm.json()
+    assert confirmed["actions"][0]["name"] == "update_mission_targets"
+    labels = {target["label"] for target in confirmed["actions"][0]["result"]["mission"]["object_targets"]}
+    assert {"dark smoke", "road obstruction"} <= labels
+
+
+def test_ground_agent_chat_proposes_target_pack_switch_and_save(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(tmp_path / "runtime"))
+
+    from core.agent_bus import init_bus
+    from core.mission import init_missions, start_mission
+
+    init_bus(reset=True)
+    init_missions(reset=True)
+    start_mission("Port target mission", target_pack_id="fireline")
+
+    switch = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "Switch this mission to the port target pack."}]},
+    )
+
+    assert switch.status_code == 200
+    switch_proposal = switch.json()["proposals"][0]
+    assert switch_proposal["kind"] == "set_target_pack"
+    assert switch_proposal["details"]["target_pack_id"] == "port"
+
+    confirmed_switch = client.post("/api/agent/action/confirm", json={"proposal": switch_proposal}).json()
+    assert confirmed_switch["actions"][0]["status"] == "ok"
+    assert confirmed_switch["actions"][0]["result"]["mission"]["target_pack_id"] == "port"
+
+    save = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "Save these objects as a new target pack called Disaster Mobility."}]},
+    )
+
+    assert save.status_code == 200
+    save_proposal = save.json()["proposals"][0]
+    assert save_proposal["kind"] == "save_target_pack"
+
+    confirmed_save = client.post("/api/agent/action/confirm", json={"proposal": save_proposal}).json()
+    assert confirmed_save["actions"][0]["status"] == "ok"
+    assert confirmed_save["actions"][0]["result"]["pack"]["id"] == "disaster_mobility"
 
 
 def test_ground_agent_chat_proposes_wildfire_replay_before_loading():
@@ -580,6 +1477,43 @@ def test_ground_agent_chat_proposes_wildfire_replay_before_loading():
     assert proposal["title"] == "Load replay: Highway 82 Wildfire Candidate Replay"
     assert proposal["confirm_label"] == "Run Replay"
     assert proposal["details"]["replay_id"] == "georgia_wildfire_replay"
+    assert proposal["details"]["runtime_truth_mode"] == "replay"
+    assert proposal["details"]["imagery_origin"] == "cached_api"
+
+
+def test_ground_agent_chat_proposes_rondonia_replay_with_proxy_band_basis():
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "load the Rondonia deforestation replay"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "load_replay"
+    assert proposal["details"]["replay_id"] == "rondonia_frontier_showcase"
+    assert proposal["details"]["use_case_id"] == "deforestation"
+    assert proposal["details"]["runtime_truth_mode"] == "replay"
+    assert proposal["details"]["imagery_origin"] == "cached_api"
+    assert proposal["details"]["scoring_basis"] == "proxy_bands"
+
+
+def test_ground_agent_chat_proposes_maritime_replay_from_traffic_request():
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "load the short term maritime traffic replay"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "load_replay"
+    assert proposal["title"] == "Load replay: Singapore Strait Maritime Replay"
+    assert proposal["confirm_label"] == "Run Replay"
+    assert proposal["details"]["replay_id"] == "singapore_maritime_replay"
+    assert proposal["details"]["use_case_id"] == "maritime_activity"
     assert proposal["details"]["runtime_truth_mode"] == "replay"
     assert proposal["details"]["imagery_origin"] == "cached_api"
 
@@ -706,6 +1640,61 @@ def test_ground_agent_chat_cautions_visual_evidence_candidates():
     reply = response.json()["reply"].lower()
     assert "candidate evidence" in reply
     assert "fallback vision never confirms" in reply
+
+
+def test_ground_agent_chat_returns_operator_playbook():
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "show operator playbook"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    reply = payload["reply"].lower()
+    assert "operator playbook" in reply
+    assert "mission object targets" in reply
+    assert "proof mode" in reply
+    assert "proposal-based" in reply
+    assert "Run Florida fire drought mission" in payload["suggestions"]
+    assert "List replays" in payload["suggestions"]
+
+
+def test_ground_agent_chat_returns_agent_status(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+
+    from core.agent_bus import init_bus, post_message
+    from core.link_state import set_link_state
+    from core.metrics import seed_metrics_summary
+
+    init_bus(reset=True)
+    set_link_state(False)
+    seed_metrics_summary(
+        {
+            "total_cells_scanned": 12,
+            "latest_discard_ratio": 0.75,
+        }
+    )
+    post_message(
+        sender="satellite",
+        recipient="ground",
+        msg_type="flag",
+        payload={"note": "queued while offline"},
+    )
+
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "agent status"}]},
+    )
+
+    assert response.status_code == 200
+    reply = response.json()["reply"].lower()
+    assert "satellite pruner" in reply
+    assert "ground validator" in reply
+    assert "link: offline" in reply
+    assert "12 cell evaluations" in reply
+
+    set_link_state(True)
 
 
 def test_temporal_use_cases_endpoint_returns_examples():

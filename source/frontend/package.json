@@ -14,6 +14,7 @@
     "test:e2e": "npx playwright test",
     "demo:record": "npx playwright test -c playwright.demo.config.ts e2e/demos",
     "demo:showcase": "npx playwright test -c playwright.demo.config.ts e2e/demos/showcase.demo.spec.ts",
+    "demo:object-evidence": "npx playwright test -c playwright.demo.config.ts e2e/demos/object-evidence.demo.spec.ts",
     "demo:payload": "npx playwright test -c playwright.demo.config.ts e2e/demos/payload-reduction.demo.spec.ts",
     "demo:tutorial": "npx playwright test e2e/tutorial_video.spec.ts",
     "demo:report": "npx playwright show-report"
@@ -21,7 +22,8 @@
   "dependencies": {
     "maplibre-gl": "^5.9.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "three": "^0.184.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
@@ -29,6 +31,7 @@
     "@types/geojson": "^7946.0.14",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
+    "@types/three": "^0.184.0",
     "@vitejs/plugin-react": "^6.0.1",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.6.2",

@@ -87,10 +87,15 @@
           "snow_ice_scl_support"
         ]
       },
-      "timelapse_analysis": "The existing Greenland WebM cache is intentionally not attached as timelapse proof because the integrity guard classifies it as structurally static. This replay starts the multispectral evidence lane with precomputed Green, SWIR1, NIR, and SCL metadata until a refreshed contextual sequence is seeded.",
+      "timelapse_analysis": "Proof Mode may show the README-safe Greenland context timelapse for operator orientation, but the replay score is driven by precomputed Green, SWIR1, NIR, NDSI, and SCL metadata. The raw cached WebM remains excluded from replay-gallery timelapse proof unless it passes the structural frame-change gate.",
       "analysis_summary": "NDSI-supported snow/ice extent increased across accepted frames; cloud/SCL rejection prevents a visual-only snow-versus-cloud claim.",
       "satellite_note": "SAT emitted compact ice/snow extent metadata: accepted frame dates, NDSI trend, snow/ice ratio delta, rejected cloud count, and provenance.",
       "ground_note": "GND should review the cached replay and treat the result as cryosphere extent evidence, not an RGB-only ice-growth conclusion.",
+      "development_seed_plan": {
+        "goal": "Seed a longer same-season Greenland Sentinel Hub close-look replay for 2016-05-01 through the current available window.",
+        "cache_policy": "Persist every accepted frame, rejected SCL/cloud window, metadata file, and generated WebM under source/backend/assets/seeded_data for training reuse and API cost control.",
+        "recommended_windows": "Use same-season May windows by year, then let SCL quality gates reject cloud/no-data frames before any trend label."
+      },
       "findings": [
         "14 accepted Sentinel-2 L2A frames",
         "5 cloudy/SCL-invalid frames rejected",

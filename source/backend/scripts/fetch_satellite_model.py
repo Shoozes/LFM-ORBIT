@@ -103,6 +103,15 @@ def _download_file(url: str, target_path: Path, token: str | None) -> None:
         raise
 
 
+def _require_nonempty_artifact(path: Path, *, label: str) -> None:
+    if not path.exists():
+        raise FileNotFoundError(f"{label} was not written: {path}")
+    if path.stat().st_size <= 0:
+        with suppress(OSError):
+            path.unlink()
+        raise ValueError(f"{label} download was empty: {path}")
+
+
 def _safe_relative_path(value: str | Path, *, label: str) -> Path:
     path = Path(str(value))
     if path.is_absolute():
@@ -378,7 +387,7 @@ def main() -> int:
     if remote_handoff_payload:
         print(f"[Orbit] Resolved canonical handoff manifest: {args.handoff_manifest_filename}")
 
-    if not args.force:
+    if not args.force and not args.dry_run:
         existing = [path for path in (model_target, mmproj_target) if path and path.exists()]
         if existing:
             print(
@@ -389,21 +398,29 @@ def main() -> int:
             return 1
 
     if args.dry_run:
+        existing = [path for path in (model_target, mmproj_target) if path and path.exists()]
+        if existing:
+            print("[Orbit] Existing artifact(s) would be preserved: " + ", ".join(str(path) for path in existing))
         return 0
 
     model_url = _build_resolve_url(str(repo_id), str(revision), Path(str(model_filename)).as_posix())
     try:
         _download_file(model_url, model_target, token)
+        _require_nonempty_artifact(model_target, label="model")
         print(f"[Orbit] Downloaded {model_target}")
         if mmproj_target and mmproj_filename:
             mmproj_url = _build_resolve_url(str(repo_id), str(revision), Path(str(mmproj_filename)).as_posix())
             _download_file(mmproj_url, mmproj_target, token)
+            _require_nonempty_artifact(mmproj_target, label="mmproj")
             print(f"[Orbit] Downloaded {mmproj_target}")
     except urllib.error.HTTPError as exc:
         print(f"[Orbit] Download failed: {exc.code} {exc.reason}", file=sys.stderr)
         return 1
     except urllib.error.URLError as exc:
         print(f"[Orbit] Network error: {exc}", file=sys.stderr)
+        return 1
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"[Orbit] Download failed: {exc}", file=sys.stderr)
         return 1
 
     provenance_files: dict[str, Path] = {}

@@ -1,19 +1,19 @@
 """
 Ground Validator Agent — autonomous ground station processing loop.
 
-This agent reads anomaly flags from the Satellite Pruner via the agent bus,
-runs the offline LFM analysis on each flagged cell, generates a timelapse
-for the cell's bounding box, analyzes the temporal sequence to confirm the
-deforestation signal, and posts validation results back to the satellite.
-It also persists confirmations and timelapse videos to the gallery DB.
+This agent reads candidate evidence packets from the Satellite Pruner via the
+agent bus, runs offline mission analysis on each flagged cell, generates
+timelapse context for the cell's bounding box, analyzes the temporal sequence,
+and posts validation results back to the satellite. It also persists
+confirmations and timelapse videos to the gallery DB.
 
 Pipeline (per flagged cell):
   SAT FLAG → spectral analysis → timelapse generation → temporal analysis →
   CONFIRM/REJECT → gallery entry with timelapse → bus notification
 
-In production this would run on ground station hardware with unconstrained
-internet access to pull high-res imagery. In demo mode it runs as an async
-task inside FastAPI alongside the satellite agent.
+In a deployed system this would run on ground-station hardware with controlled
+provider access. In this app it runs as an async task inside FastAPI alongside
+the satellite agent.
 """
 
 import asyncio
@@ -35,7 +35,7 @@ _POLL_INTERVAL = 1.2
 
 
 def _get_cell_bbox(cell_id: str, buffer_deg: float = 0.03) -> list[float]:
-    """Return [W, S, E, N] bounding box around an cell."""
+    """Return [W, S, E, N] bounding box around a cell."""
     boundary = cell_to_boundary(cell_id)
     lats = [p[0] for p in boundary]
     lngs = [p[1] for p in boundary]
@@ -51,7 +51,7 @@ def _severity_to_action(severity: str) -> str:
     if severity == "critical":
         return "ESCALATE — flagging for immediate tasking priority."
     if severity == "high":
-        return "CONFIRM — adding to active deforestation watch list."
+        return "CONFIRM — adding to active mission watch list."
     if severity == "moderate":
         return "MONITOR — logging for next pass comparison."
     return "ARCHIVE — change below escalation threshold."

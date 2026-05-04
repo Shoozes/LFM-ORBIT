@@ -1,6 +1,7 @@
 """Tests for SimSat API client."""
 
 import pytest
+import httpx
 
 from core.simsat_client import (
     DataSource,
@@ -161,6 +162,30 @@ class TestSimSatClient:
         assert response.success is False
         assert "token not configured" in response.error.lower()
         
+        client.close()
+
+    def test_fetch_imagery_rejects_empty_success_payload(self):
+        """A 200 response with no image bytes must not be accepted as imagery."""
+
+        class EmptyPayloadClient:
+            def get(self, endpoint, params):
+                return httpx.Response(
+                    200,
+                    content=b"",
+                    request=httpx.Request("GET", f"http://simsat.test{endpoint}"),
+                )
+
+            def close(self):
+                return None
+
+        client = SimSatClient(SimSatConfig(base_url="http://simsat.test"))
+        client._client = EmptyPayloadClient()
+
+        response = client.fetch_imagery(ImageryRequest(lat=1.0, lng=2.0, source=DataSource.MAPBOX))
+
+        assert response.success is False
+        assert "empty imagery payload" in response.error.lower()
+
         client.close()
     
     def test_context_manager(self):

@@ -1,0 +1,93 @@
+{
+  "story_id": "houses",
+  "title": "Roof Sample Areas",
+  "what": "Sample visible roof regions",
+  "where": "Orlando, Florida context imagery",
+  "when": {
+    "date_from": "2026-01-01",
+    "date_to": "2026-02-15"
+  },
+  "why": "mark sample roof candidates without claiming an exhaustive count",
+  "bbox": [
+    -81.458,
+    28.408,
+    -81.448,
+    28.418
+  ],
+  "date_from": "2026-01-01",
+  "date_to": "2026-02-15",
+  "visual_mode": "true_color",
+  "source": "cached visual story frame",
+  "imagery_provider": "esri_context",
+  "imagery_origin": "esri_context",
+  "runtime_truth_mode": "replay",
+  "scoring_basis": "visual_only",
+  "box_source": "visual_story_fixture",
+  "box_count": 4,
+  "boxes": [
+    {
+      "label": "roof candidate",
+      "bbox": [
+        0.045,
+        0.245,
+        0.105,
+        0.3
+      ],
+      "confidence": 0.86,
+      "color": "#2dd4bf"
+    },
+    {
+      "label": "roof candidate",
+      "bbox": [
+        0.139,
+        0.339,
+        0.2,
+        0.4
+      ],
+      "confidence": 0.84,
+      "color": "#2dd4bf"
+    },
+    {
+      "label": "roof candidate",
+      "bbox": [
+        0.706,
+        0.368,
+        0.764,
+        0.462
+      ],
+      "confidence": 0.82,
+      "color": "#2dd4bf"
+    },
+    {
+      "label": "roof-row sample",
+      "bbox": [
+        0.663,
+        0.753,
+        0.755,
+        0.876
+      ],
+      "confidence": 0.78,
+      "color": "#2dd4bf"
+    }
+  ],
+  "targets": [
+    "sample roof candidates",
+    "roof-row samples",
+    "large roof area"
+  ],
+  "crop": [
+    0.57,
+    0.12,
+    1.0,
+    0.55
+  ],
+  "frame_path": "source/backend/assets/seeded_data/visual_story_frames/houses_esri.png",
+  "output_path": "source/backend/assets/seeded_data/visual_story_frames/story_plates/story-object-evidence-houses.png",
+  "public_docs": false,
+  "visual_audit_status": "candidate",
+  "visual_audit_notes": [],
+  "fetched_at": null,
+  "fetch_error": "",
+  "training_ready": true,
+  "note": "Boxes are deterministic visual-story evidence fixtures over cached/fetched imagery, not a claim of live model-backed object detection."
+}

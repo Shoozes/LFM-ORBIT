@@ -5,6 +5,7 @@ import GroundAgentActionCard, {
   type ChatResponse,
   type GroundAgentProposal,
 } from "./GroundAgentActionCard";
+import type { Mission } from "../types/mission";
 
 type Message = {
   role: "user" | "assistant";
@@ -29,15 +30,30 @@ async function readAgentError(response: Response, fallback: string): Promise<str
 }
 
 type GroundAgentProps = {
-  onActionComplete?: () => void | Promise<void>;
+  onActionComplete?: (response: ChatResponse) => void | Promise<void>;
+  onNavigate?: (target: "mission" | "logs" | "settings" | "object_evidence" | "proof") => void | Promise<void>;
+  mission?: Mission | null;
 };
 
 const DEFAULT_COMMANDS = [
+  "Run Florida fire drought mission",
+  "Run critical minerals mission",
+  "Take me to the Bronx NY",
+  "Stop mission and fly to Bull Creek FL",
   "List replays",
-  "Load Manchar flood replay",
-  "Run maritime mission pack",
-  "Set link offline",
-  "Restore link",
+];
+
+const NAV_SHORTCUTS: Array<{
+  id: "mission" | "logs" | "settings" | "object_evidence" | "proof";
+  label: string;
+  target: "mission" | "logs" | "settings" | "object_evidence" | "proof";
+  requiresMission?: boolean;
+}> = [
+  { id: "mission", label: "Mission Control", target: "mission" },
+  { id: "object_evidence", label: "Object Evidence", target: "object_evidence", requiresMission: true },
+  { id: "logs", label: "Logs", target: "logs" },
+  { id: "proof", label: "Proof Mode", target: "proof" },
+  { id: "settings", label: "Settings", target: "settings" },
 ];
 
 function summarizeAction(action: AgentAction): string {
@@ -51,8 +67,21 @@ function summarizeAction(action: AgentAction): string {
   if (action.name === "start_mission_pack" && typeof result.pack_id === "string") {
     return result.pack_id;
   }
+  if (action.name === "start_custom_mission") {
+    const mission = result.mission;
+    if (mission && typeof mission === "object" && "id" in mission) {
+      return `mission #${String((mission as { id?: unknown }).id)}`;
+    }
+    return "custom plan";
+  }
   if (action.name === "set_link_state" && typeof result.connected === "boolean") {
     return result.connected ? "online" : "offline";
+  }
+  if (action.name === "stop_mission") {
+    return typeof result.stopped_mission_id === "number" ? `#${result.stopped_mission_id}` : "no active mission";
+  }
+  if (action.name === "navigate_map" && typeof result.label === "string") {
+    return result.label;
   }
   if (action.name === "list_replays" && Array.isArray(result.replays)) {
     return `${result.replays.length} available`;
@@ -63,7 +92,7 @@ function summarizeAction(action: AgentAction): string {
   return action.status;
 }
 
-export default function GroundAgent({ onActionComplete }: GroundAgentProps) {
+export default function GroundAgent({ onActionComplete, onNavigate, mission }: GroundAgentProps) {
   const [messages, setMessages] = useState<Message[]>([
     { role: "assistant", content: "Ground Agent initialized. Reading telemetry. Send an operations request." }
   ]);
@@ -71,6 +100,7 @@ export default function GroundAgent({ onActionComplete }: GroundAgentProps) {
   const [quickCommands, setQuickCommands] = useState(DEFAULT_COMMANDS);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const appendAgentResponse = async (data: ChatResponse) => {
     const reply = typeof data.reply === "string" && data.reply.trim() ? data.reply : "[Error: Empty reply]";
@@ -82,7 +112,7 @@ export default function GroundAgent({ onActionComplete }: GroundAgentProps) {
     setMessages((prev) => [...prev, { role: "assistant", content: reply, actions, proposals }]);
     if (actions.some((action) => action.status === "ok")) {
       try {
-        await onActionComplete?.();
+        await onActionComplete?.(data);
       } catch (err) {
         const message = err instanceof Error ? err.message : "UI refresh failed.";
         setMessages((prev) => [
@@ -143,9 +173,56 @@ export default function GroundAgent({ onActionComplete }: GroundAgentProps) {
     }
   }, [messages]);
 
+  useEffect(() => {
+    const element = inputRef.current;
+    if (!element) return;
+    element.style.height = "auto";
+    element.style.height = `${Math.min(element.scrollHeight, 160)}px`;
+  }, [input]);
+
   return (
     <div className="flex h-full w-full flex-col bg-white">
-      <div className="flex-1 overflow-y-auto p-4 space-y-3" data-testid="ground-agent-thread">
+      <div
+        className="border-b border-zinc-200 bg-zinc-50 px-3 py-1.5"
+        data-testid="ground-agent-operator-playbook"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Operator Playbook</p>
+              <p className="text-xs leading-tight text-zinc-600">Task, replay, tune.</p>
+            </div>
+          </div>
+          <span className={`shrink-0 rounded border px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${
+            mission?.status === "active"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-zinc-200 bg-white text-zinc-500"
+          }`}>
+            {mission?.status === "active" ? "Mission Active" : "No Mission"}
+          </span>
+        </div>
+        <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
+          {NAV_SHORTCUTS.map((shortcut) => {
+            const disabled = shortcut.requiresMission && !mission;
+            return (
+              <button
+                key={shortcut.id}
+                type="button"
+                data-testid={`ground-agent-nav-${shortcut.id}`}
+                onClick={() => void onNavigate?.(shortcut.target)}
+                disabled={disabled || !onNavigate}
+                title={disabled ? "Start or load a mission first." : `Open ${shortcut.label}`}
+                data-ui-tip={disabled ? "Needs mission" : shortcut.label}
+                className="shrink-0 rounded border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {shortcut.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-3 space-y-3" data-testid="ground-agent-thread">
         {messages.map((m, i) => (
           <div key={i} className={`text-sm leading-relaxed ${m.role === "user" ? "text-right" : "text-left"}`}>
             <div
@@ -189,33 +266,41 @@ export default function GroundAgent({ onActionComplete }: GroundAgentProps) {
       </div>
 
       <div className="border-t border-zinc-200 p-3">
-        <div className="mb-2 flex flex-wrap gap-1.5">
+        <div className="mb-2 flex gap-1.5 overflow-x-auto pb-0.5">
           {quickCommands.map((command) => (
             <button
               key={command}
               type="button"
               onClick={() => void sendMessage(command)}
               disabled={isLoading}
-              className="rounded border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-600 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="shrink-0 rounded border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-600 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {command}
             </button>
           ))}
         </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
+        <div className="flex items-end gap-2">
+          <textarea
+            ref={inputRef}
+            data-testid="ground-agent-chat-input"
+            aria-label="Ground Agent operations request"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && void sendMessage()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                void sendMessage();
+              }
+            }}
             placeholder="Request replay, mission pack, link action..."
             disabled={isLoading}
-            className="flex-1 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2 text-sm text-zinc-900 placeholder-zinc-400 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 disabled:opacity-60"
+            rows={2}
+            className="max-h-32 min-h-14 flex-1 resize-none rounded-lg border-2 border-zinc-300 bg-white px-3 py-2.5 text-sm leading-relaxed text-zinc-900 shadow-inner outline-none placeholder-zinc-400 focus:border-zinc-700 focus:ring-2 focus:ring-zinc-200 disabled:opacity-60"
           />
           <button
             onClick={() => void sendMessage()}
             disabled={isLoading || !input.trim()}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-11 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Send
           </button>

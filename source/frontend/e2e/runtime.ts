@@ -25,7 +25,7 @@ export async function gotoApp(page: Page, path = "/") {
 
 export async function resetRuntimeState(
   request: APIRequestContext,
-  options?: { clearObservationStoreFiles?: boolean },
+  options?: { clearObservationStoreFiles?: boolean; archiveMissions?: boolean },
 ) {
   let lastError: unknown;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -33,6 +33,7 @@ export async function resetRuntimeState(
       const response = await request.post(`${API_BASE}/api/runtime/reset`, {
         data: {
           clear_observation_store_files: options?.clearObservationStoreFiles ?? false,
+          archive_missions: options?.archiveMissions ?? false,
         },
       });
       expect(response.ok()).toBeTruthy();
@@ -75,8 +76,25 @@ export async function waitForLinkOpen(page: Page, timeoutMs = 30_000) {
 }
 
 export async function waitForBasemapReady(page: Page, timeoutMs = 20_000) {
-  await expect(page.getByText(/Esri World Imagery/)).toBeVisible({ timeout: timeoutMs });
-  await waitForNextPaint(page);
+  const mapRoot = page.getByTestId("map-visualizer");
+  const canvas = page.locator(".maplibregl-canvas").first();
+  await expect(mapRoot).toBeVisible({ timeout: timeoutMs });
+  await expect(canvas).toBeVisible({ timeout: timeoutMs });
+  await page.waitForFunction(
+    () => {
+      const root = document.querySelector("[data-testid='map-visualizer']");
+      const mapCanvas = document.querySelector(".maplibregl-canvas");
+      return (
+        root instanceof HTMLElement &&
+        mapCanvas instanceof HTMLCanvasElement &&
+        mapCanvas.clientWidth >= 320 &&
+        mapCanvas.clientHeight >= 240
+      );
+    },
+    undefined,
+    { timeout: timeoutMs },
+  );
+  await waitForNextPaint(page, 4);
 }
 
 export async function waitForNextPaint(page: Page, frames = 2) {

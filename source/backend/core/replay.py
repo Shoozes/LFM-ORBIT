@@ -17,7 +17,7 @@ from core.agent_bus import mark_messages_read, post_message, upsert_pin
 from core.gallery import add_gallery_item, resolve_seeded_thumbnail
 from core.metrics import seed_metrics_summary
 from core.mission import get_mission, start_mission, update_mission_progress
-from core.queue import estimate_payload_bytes, push_alert
+from core.queue import estimate_object_proof_payload_bytes, estimate_payload_bytes, push_alert
 from core.runtime_state import reset_runtime_state
 
 _REPLAYS_DIR = Path(__file__).resolve().parent.parent / "assets" / "replays"
@@ -266,6 +266,14 @@ def _severity_to_action(alert: dict[str, Any]) -> str:
 
 
 def _alert_payload_bytes(alert: dict[str, Any]) -> int:
+    if isinstance(alert.get("detection_summary"), dict):
+        return estimate_object_proof_payload_bytes(
+            event_id=str(alert["event_id"]),
+            cell_id=str(alert["cell_id"]),
+            action=str(alert.get("ground_action") or alert.get("priority") or "defer"),
+            detection_summary=alert.get("detection_summary"),
+            object_deltas=alert.get("object_deltas") if isinstance(alert.get("object_deltas"), list) else None,
+        )
     payload = {
         "event_id": alert["event_id"],
         "cell_id": alert["cell_id"],
@@ -353,6 +361,8 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
         replay_id=replay_id,
         summary=str(spec.get("summary") or spec.get("description") or ""),
         use_case_id=str(spec.get("use_case_id") or "") or None,
+        target_pack_id=str(spec.get("target_pack_id") or "") or None,
+        object_targets=spec.get("object_targets") if isinstance(spec.get("object_targets"), list) else None,
     )
     mission_id = int(mission["id"])
 
@@ -396,6 +406,8 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
             scoring_basis=runtime_metadata["scoring_basis"],
             before_window=dict(alert.get("before_window") or {}),
             after_window=dict(alert.get("after_window") or {}),
+            detection_summary=alert.get("detection_summary") if isinstance(alert.get("detection_summary"), dict) else None,
+            object_deltas=alert.get("object_deltas") if isinstance(alert.get("object_deltas"), list) else None,
             downlinked=True,
         )
 
@@ -452,6 +464,8 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
                 "scoring_basis": runtime_metadata["scoring_basis"],
                 "before_window": dict(alert.get("before_window") or {}),
                 "after_window": dict(alert.get("after_window") or {}),
+                "detection_summary": alert.get("detection_summary") if isinstance(alert.get("detection_summary"), dict) else None,
+                "object_deltas": alert.get("object_deltas") if isinstance(alert.get("object_deltas"), list) else None,
             },
         )
         post_message(
@@ -506,6 +520,8 @@ def rescan_seeded_replay(replay_id: str) -> dict[str, Any]:
         replay_id=None,
         summary=f"Rescan from replay {replay_id}. Uses the current runtime/model stack.",
         use_case_id=str(spec.get("use_case_id") or "") or None,
+        target_pack_id=str(spec.get("target_pack_id") or "") or None,
+        object_targets=spec.get("object_targets") if isinstance(spec.get("object_targets"), list) else None,
     )
     post_message(
         sender="operator",

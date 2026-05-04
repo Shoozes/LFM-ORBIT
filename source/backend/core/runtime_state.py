@@ -9,6 +9,7 @@ from core.gallery import init_gallery
 from core.link_state import set_link_state
 from core.metrics import init_metrics, read_metrics_summary
 from core.mission import init_missions
+from core.mission_archive import archive_current_missions
 from core.observation_store import clear_observations
 from core.queue import _connect as _queue_connect, init_db
 
@@ -56,9 +57,18 @@ def ensure_runtime_state() -> dict[str, int]:
     return snapshot_runtime_state()
 
 
-def reset_runtime_state(*, clear_observation_store_files: bool = False) -> dict[str, Any]:
+def reset_runtime_state(
+    *,
+    clear_observation_store_files: bool = False,
+    archive_missions: bool = True,
+) -> dict[str, Any]:
     """Reset mutable runtime stores used by live runs, demos, and replay fixtures."""
     before = snapshot_runtime_state()
+    archive_summary = (
+        archive_current_missions(source="runtime_reset")
+        if archive_missions and before.get("missions", 0) > 0
+        else {"mission_archive_path": None, "missions_archived": 0}
+    )
 
     init_db(reset=True)
     init_bus(reset=True)
@@ -77,4 +87,5 @@ def reset_runtime_state(*, clear_observation_store_files: bool = False) -> dict[
         "before": before,
         "after": after,
         "observation_store_files_removed": removed_observations,
+        **archive_summary,
     }

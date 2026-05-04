@@ -1,0 +1,96 @@
+{
+  "story_id": "port",
+  "title": "Port Activity Areas",
+  "what": "Supply-chain region evidence",
+  "where": "Suez channel port area",
+  "when": {
+    "date_from": "2025-11-01",
+    "date_to": "2025-12-20"
+  },
+  "why": "retain visible container clusters, berth context, and docked-vessel groups without claiming an exhaustive count",
+  "bbox": [
+    32.515,
+    29.9,
+    32.575,
+    29.955
+  ],
+  "date_from": "2025-11-01",
+  "date_to": "2025-12-20",
+  "visual_mode": "true_color",
+  "source": "cached visual story frame",
+  "imagery_provider": "esri_context",
+  "imagery_origin": "esri_context",
+  "runtime_truth_mode": "replay",
+  "scoring_basis": "visual_only",
+  "box_source": "visual_story_fixture",
+  "box_count": 4,
+  "boxes": [
+    {
+      "label": "shipping container cluster",
+      "bbox": [
+        0.46,
+        0.28,
+        0.55,
+        0.39
+      ],
+      "confidence": 0.82,
+      "color": "#2dd4bf"
+    },
+    {
+      "label": "container yard cluster",
+      "bbox": [
+        0.5,
+        0.42,
+        0.6,
+        0.54
+      ],
+      "confidence": 0.8,
+      "color": "#2dd4bf"
+    },
+    {
+      "label": "docked-vessel group",
+      "bbox": [
+        0.3,
+        0.64,
+        0.45,
+        0.75
+      ],
+      "confidence": 0.77,
+      "color": "#38bdf8"
+    },
+    {
+      "label": "berth basin context",
+      "bbox": [
+        0.15,
+        0.62,
+        0.27,
+        0.74
+      ],
+      "confidence": 0.72,
+      "color": "#facc15"
+    }
+  ],
+  "targets": [
+    "shipping container clusters",
+    "docked-vessel groups",
+    "berth context areas"
+  ],
+  "crop": [
+    0.6,
+    0.05,
+    0.96,
+    0.43
+  ],
+  "frame_path": "source/backend/assets/seeded_data/visual_story_frames/port_esri.png",
+  "output_path": "docs/media/story-plates/story-object-evidence-port.png",
+  "public_docs": true,
+  "visual_audit_status": "approved",
+  "visual_audit_notes": [
+    "Public plate uses area/group labels only; no singular vessel claim is promoted from this crop.",
+    "The previous channel-vessel box was rejected because visual review showed open water at the box location."
+  ],
+  "fetched_at": null,
+  "fetch_error": "",
+  "training_ready": true,
+  "note": "Boxes are deterministic visual-story evidence fixtures over cached/fetched imagery, not a claim of live model-backed object detection."
+}

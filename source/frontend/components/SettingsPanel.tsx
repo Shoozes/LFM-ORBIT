@@ -67,7 +67,7 @@ function runtimeModeLabel(mode?: string): string {
 function trainingModalityLabel(modality?: string, verified?: boolean): string {
   if (modality === "image_text" && verified) return "image-text VLM SFT";
   if (modality === "image_text") return "image-text rows detected";
-  if (modality === "text") return "text-only";
+  if (modality === "text") return "text evidence-packet SFT";
   return "unknown";
 }
 
@@ -254,6 +254,8 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
   const modelRuntime = analysisStatus?.runtime_capabilities;
   const trainingModality = analysisStatus?.training_modality ?? modelRuntime?.training_modality;
   const imageTrainingVerified = analysisStatus?.image_training_verified ?? modelRuntime?.image_training_verified ?? false;
+  const trainRows = analysisStatus?.training_train_rows ?? modelRuntime?.training_train_rows ?? 0;
+  const evalRows = analysisStatus?.training_eval_rows ?? modelRuntime?.training_eval_rows ?? 0;
   const multimodalRows = analysisStatus?.training_multimodal_rows ?? modelRuntime?.training_multimodal_rows ?? 0;
   const imageBlocks = analysisStatus?.training_image_blocks ?? modelRuntime?.training_image_blocks ?? 0;
   const mmprojPresent = analysisStatus?.mmproj_present ?? modelRuntime?.mmproj_present ?? false;
@@ -268,6 +270,8 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
     ?? modelRuntime?.image_conditioned_runtime_reason
     ?? "direct image runtime adapter is not wired"
   );
+  const activeProviderInfo = providerStatus?.providers[providerStatus.active_provider];
+  const activeProviderAvailable = activeProviderInfo?.available ?? false;
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-white">
@@ -296,8 +300,9 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <p className="text-zinc-500 font-semibold mb-1">Active Provider</p>
-                    <p className="text-emerald-700 font-bold">
+                    <p className={`font-bold ${activeProviderAvailable ? "text-emerald-700" : "text-amber-600"}`}>
                       {providerDisplayName(providerStatus.active_provider)}
+                      {!activeProviderAvailable && <span className="ml-1 text-[10px] uppercase tracking-wider">unavailable</span>}
                     </p>
                   </div>
                   <div>
@@ -313,26 +318,32 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
                 <div>
                   <p className="text-zinc-500 font-semibold text-[10px] uppercase tracking-wider mb-2">Provider Tiers</p>
                   <div className="space-y-2 text-xs">
-                    {Object.entries(providerStatus.providers).map(([key, info]) => (
-                      <div
-                        key={key}
-                        className={`flex items-center justify-between rounded border p-2 ${
-                          key === providerStatus.active_provider
-                            ? "border-emerald-200 bg-emerald-50"
-                            : "border-zinc-200 bg-white"
-                        }`}
-                      >
-                        <div>
-                          <span className="text-zinc-800 font-medium">{providerDisplayName(key)}</span>
-                          {key === providerStatus.active_provider && (
-                            <span className="ml-2 text-emerald-700 text-[10px] font-bold uppercase tracking-wider">● Active</span>
-                          )}
+                    {Object.entries(providerStatus.providers).map(([key, info]) => {
+                      const isActive = key === providerStatus.active_provider;
+                      const activeClass = info.available
+                        ? "border-emerald-200 bg-emerald-50"
+                        : "border-amber-200 bg-amber-50";
+                      return (
+                        <div
+                          key={key}
+                          className={`flex items-center justify-between rounded border p-2 ${
+                            isActive ? activeClass : "border-zinc-200 bg-white"
+                          }`}
+                        >
+                          <div>
+                            <span className="text-zinc-800 font-medium">{providerDisplayName(key)}</span>
+                            {isActive && (
+                              <span className={`ml-2 text-[10px] font-bold uppercase tracking-wider ${
+                                info.available ? "text-emerald-700" : "text-amber-700"
+                              }`}>● Active</span>
+                            )}
+                          </div>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider ${info.available ? "text-emerald-600" : "text-zinc-400"}`}>
+                            {info.available ? "Available" : "Unavailable"}
+                          </span>
                         </div>
-                        <span className={`text-[10px] font-bold uppercase tracking-wider ${info.available ? "text-emerald-600" : "text-zinc-400"}`}>
-                          {info.available ? "Available" : "Unavailable"}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -425,9 +436,15 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
                       </p>
                     </div>
                     <div>
-                      <p className="text-zinc-500 font-semibold mb-1">Image Proof</p>
+                      <p className="text-zinc-500 font-semibold mb-1">Train / Eval Rows</p>
                       <p className="text-zinc-700 font-medium">
-                        {multimodalRows} rows / {imageBlocks} blocks
+                        {trainRows} / {evalRows}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-zinc-500 font-semibold mb-1">Image Training Proof</p>
+                      <p className="text-zinc-700 font-medium">
+                        {multimodalRows} image rows / {imageBlocks} blocks
                       </p>
                     </div>
                     <div>

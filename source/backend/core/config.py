@@ -386,6 +386,7 @@ class RegionConfig:
     disturbance_seed_threshold: float
     cloud_seed_threshold: float
     map_zoom: float
+    demo_mode_loop_scan: bool
 
 
 
@@ -408,6 +409,7 @@ REGION = RegionConfig(
     disturbance_seed_threshold=0.955,
     cloud_seed_threshold=0.975,
     map_zoom=6.0,
+    demo_mode_loop_scan=os.getenv("ORBIT_DEMO_LOOP_SCAN", "false").lower() in ("true", "1", "yes"),
 )
 
 

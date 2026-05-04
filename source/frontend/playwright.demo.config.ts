@@ -27,7 +27,7 @@ export default defineConfig({
   use: {
     baseURL: APP_BASE,
     video: "on",
-    trace: "on",
+    trace: "off",
     screenshot: "on",
     launchOptions: {
       args: [

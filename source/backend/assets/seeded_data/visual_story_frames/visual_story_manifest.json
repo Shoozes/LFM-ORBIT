@@ -1,0 +1,694 @@
+{
+  "generated_at": "2026-05-04",
+  "stories": [
+    {
+      "story_id": "critical_minerals",
+      "title": "Critical Minerals Expansion Watch",
+      "what": "Extraction-site region evidence",
+      "where": "Salar de Atacama / Escondida / Atacama corridor",
+      "when": {
+        "date_from": "2024-01-15",
+        "date_to": "2025-12-15"
+      },
+      "why": "retain pond, tailings, pit, road, and facility regions without production or pollution claims",
+      "bbox": [
+        -69.115,
+        -24.29,
+        -69.035,
+        -24.21
+      ],
+      "date_from": "2024-01-15",
+      "date_to": "2025-12-15",
+      "visual_mode": "true_color",
+      "source": "cached visual story frame",
+      "imagery_provider": "sentinelhub",
+      "imagery_origin": "cached_api",
+      "runtime_truth_mode": "replay",
+      "scoring_basis": "visual_only",
+      "box_source": "visual_story_fixture",
+      "box_count": 5,
+      "boxes": [
+        {
+          "label": "open-pit expansion region",
+          "bbox": [
+            0.29,
+            0.18,
+            0.7,
+            0.82
+          ],
+          "confidence": 0.86,
+          "color": "#f97316"
+        },
+        {
+          "label": "tailings region",
+          "bbox": [
+            0.32,
+            0.02,
+            0.69,
+            0.25
+          ],
+          "confidence": 0.82,
+          "color": "#facc15"
+        },
+        {
+          "label": "evaporation pond region",
+          "bbox": [
+            0.03,
+            0.61,
+            0.2,
+            0.95
+          ],
+          "confidence": 0.79,
+          "color": "#22d3ee"
+        },
+        {
+          "label": "industrial road corridor",
+          "bbox": [
+            0.08,
+            0.18,
+            0.24,
+            0.65
+          ],
+          "confidence": 0.75,
+          "color": "#a3e635"
+        },
+        {
+          "label": "facility cluster region",
+          "bbox": [
+            0.65,
+            0.54,
+            0.78,
+            0.7
+          ],
+          "confidence": 0.72,
+          "color": "#2dd4bf"
+        }
+      ],
+      "targets": [
+        "evaporation pond regions",
+        "tailings regions",
+        "open-pit expansion",
+        "industrial roads",
+        "facility clusters"
+      ],
+      "crop": null,
+      "frame_path": "source/backend/assets/seeded_data/visual_story_frames/critical_minerals_sentinel.png",
+      "output_path": "docs/media/story-plates/story-critical-minerals-expansion.png",
+      "public_docs": true,
+      "visual_audit_status": "approved",
+      "visual_audit_notes": [
+        "Public plate uses region/corridor/cluster labels only; no illegal-mining, pollution, or output-volume claim is made.",
+        "The image is visually strong for extraction-site region evidence: benches, pond-like areas, roads, and facility clusters are legible."
+      ],
+      "fetched_at": null,
+      "fetch_error": "",
+      "training_ready": true,
+      "note": "Boxes are deterministic visual-story evidence fixtures over cached/fetched imagery, not a claim of live model-backed object detection."
+    },
+    {
+      "story_id": "houses",
+      "title": "Roof Sample Areas",
+      "what": "Sample visible roof regions",
+      "where": "Orlando, Florida context imagery",
+      "when": {
+        "date_from": "2026-01-01",
+        "date_to": "2026-02-15"
+      },
+      "why": "mark sample roof candidates without claiming an exhaustive count",
+      "bbox": [
+        -81.458,
+        28.408,
+        -81.448,
+        28.418
+      ],
+      "date_from": "2026-01-01",
+      "date_to": "2026-02-15",
+      "visual_mode": "true_color",
+      "source": "cached visual story frame",
+      "imagery_provider": "esri_context",
+      "imagery_origin": "esri_context",
+      "runtime_truth_mode": "replay",
+      "scoring_basis": "visual_only",
+      "box_source": "visual_story_fixture",
+      "box_count": 4,
+      "boxes": [
+        {
+          "label": "roof candidate",
+          "bbox": [
+            0.045,
+            0.245,
+            0.105,
+            0.3
+          ],
+          "confidence": 0.86,
+          "color": "#2dd4bf"
+        },
+        {
+          "label": "roof candidate",
+          "bbox": [
+            0.139,
+            0.339,
+            0.2,
+            0.4
+          ],
+          "confidence": 0.84,
+          "color": "#2dd4bf"
+        },
+        {
+          "label": "roof candidate",
+          "bbox": [
+            0.706,
+            0.368,
+            0.764,
+            0.462
+          ],
+          "confidence": 0.82,
+          "color": "#2dd4bf"
+        },
+        {
+          "label": "roof-row sample",
+          "bbox": [
+            0.663,
+            0.753,
+            0.755,
+            0.876
+          ],
+          "confidence": 0.78,
+          "color": "#2dd4bf"
+        }
+      ],
+      "targets": [
+        "sample roof candidates",
+        "roof-row samples",
+        "large roof area"
+      ],
+      "crop": [
+        0.57,
+        0.12,
+        1.0,
+        0.55
+      ],
+      "frame_path": "source/backend/assets/seeded_data/visual_story_frames/houses_esri.png",
+      "output_path": "source/backend/assets/seeded_data/visual_story_frames/story_plates/story-object-evidence-houses.png",
+      "public_docs": false,
+      "visual_audit_status": "candidate",
+      "visual_audit_notes": [],
+      "fetched_at": null,
+      "fetch_error": "",
+      "training_ready": true,
+      "note": "Boxes are deterministic visual-story evidence fixtures over cached/fetched imagery, not a claim of live model-backed object detection."
+    },
+    {
+      "story_id": "shelters",
+      "title": "Shelter Row Areas",
+      "what": "Humanitarian infrastructure regions",
+      "where": "Cox's Bazar camp context area",
+      "when": {
+        "date_from": "2025-01-01",
+        "date_to": "2025-03-01"
+      },
+      "why": "mark shelter-row clusters and aid-roof areas without person-level claims",
+      "bbox": [
+        92.153,
+        21.207,
+        92.159,
+        21.213
+      ],
+      "date_from": "2025-01-01",
+      "date_to": "2025-03-01",
+      "visual_mode": "true_color",
+      "source": "cached visual story frame",
+      "imagery_provider": "esri_context",
+      "imagery_origin": "esri_context",
+      "runtime_truth_mode": "replay",
+      "scoring_basis": "visual_only",
+      "box_source": "visual_story_fixture",
+      "box_count": 9,
+      "boxes": [
+        {
+          "label": "shelter-row cluster",
+          "bbox": [
+            0.13,
+            0.08,
+            0.23,
+            0.14
+          ],
+          "confidence": 0.84,
+          "color": "#2dd4bf"
+        },
+        {
+          "label": "shelter-row cluster",
+          "bbox": [
+            0.31,
+            0.08,
+            0.43,
+            0.15
+          ],
+          "confidence": 0.83,
+          "color": "#2dd4bf"
+        },
+        {
+          "label": "shelter-row cluster",
+          "bbox": [
+            0.57,
+            0.1,
+            0.72,
+            0.17
+          ],
+          "confidence": 0.82,
+          "color": "#2dd4bf"
+        },
+        {
+          "label": "shelter-row cluster",
+          "bbox": [
+            0.18,
+            0.31,
+            0.34,
+            0.39
+          ],
+          "confidence": 0.84,
+          "color": "#2dd4bf"
+        },
+        {
+          "label": "shelter-row cluster",
+          "bbox": [
+            0.43,
+            0.35,
+            0.57,
+            0.43
+          ],
+          "confidence": 0.81,
+          "color": "#2dd4bf"
+        },
+        {
+          "label": "shelter-row cluster",
+          "bbox": [
+            0.66,
+            0.36,
+            0.83,
+            0.44
+          ],
+          "confidence": 0.8,
+          "color": "#2dd4bf"
+        },
+        {
+          "label": "shelter-row cluster",
+          "bbox": [
+            0.29,
+            0.57,
+            0.47,
+            0.65
+          ],
+          "confidence": 0.8,
+          "color": "#2dd4bf"
+        },
+        {
+          "label": "shelter-row cluster",
+          "bbox": [
+            0.55,
+            0.61,
+            0.73,
+            0.69
+          ],
+          "confidence": 0.79,
+          "color": "#2dd4bf"
+        },
+        {
+          "label": "aid-roof area",
+          "bbox": [
+            0.44,
+            0.22,
+            0.55,
+            0.3
+          ],
+          "confidence": 0.72,
+          "color": "#38bdf8"
+        }
+      ],
+      "targets": [
+        "shelter-row clusters",
+        "aid-roof areas",
+        "access-lane context"
+      ],
+      "crop": null,
+      "frame_path": "source/backend/assets/seeded_data/visual_story_frames/shelters_esri.png",
+      "output_path": "source/backend/assets/seeded_data/visual_story_frames/story_plates/story-object-evidence-shelters.png",
+      "public_docs": false,
+      "visual_audit_status": "candidate",
+      "visual_audit_notes": [],
+      "fetched_at": null,
+      "fetch_error": "",
+      "training_ready": true,
+      "note": "Boxes are deterministic visual-story evidence fixtures over cached/fetched imagery, not a claim of live model-backed object detection."
+    },
+    {
+      "story_id": "port",
+      "title": "Port Activity Areas",
+      "what": "Supply-chain region evidence",
+      "where": "Suez channel port area",
+      "when": {
+        "date_from": "2025-11-01",
+        "date_to": "2025-12-20"
+      },
+      "why": "retain visible container clusters, berth context, and docked-vessel groups without claiming an exhaustive count",
+      "bbox": [
+        32.515,
+        29.9,
+        32.575,
+        29.955
+      ],
+      "date_from": "2025-11-01",
+      "date_to": "2025-12-20",
+      "visual_mode": "true_color",
+      "source": "cached visual story frame",
+      "imagery_provider": "esri_context",
+      "imagery_origin": "esri_context",
+      "runtime_truth_mode": "replay",
+      "scoring_basis": "visual_only",
+      "box_source": "visual_story_fixture",
+      "box_count": 4,
+      "boxes": [
+        {
+          "label": "shipping container cluster",
+          "bbox": [
+            0.46,
+            0.28,
+            0.55,
+            0.39
+          ],
+          "confidence": 0.82,
+          "color": "#2dd4bf"
+        },
+        {
+          "label": "container yard cluster",
+          "bbox": [
+            0.5,
+            0.42,
+            0.6,
+            0.54
+          ],
+          "confidence": 0.8,
+          "color": "#2dd4bf"
+        },
+        {
+          "label": "docked-vessel group",
+          "bbox": [
+            0.3,
+            0.64,
+            0.45,
+            0.75
+          ],
+          "confidence": 0.77,
+          "color": "#38bdf8"
+        },
+        {
+          "label": "berth basin context",
+          "bbox": [
+            0.15,
+            0.62,
+            0.27,
+            0.74
+          ],
+          "confidence": 0.72,
+          "color": "#facc15"
+        }
+      ],
+      "targets": [
+        "shipping container clusters",
+        "docked-vessel groups",
+        "berth context areas"
+      ],
+      "crop": [
+        0.6,
+        0.05,
+        0.96,
+        0.43
+      ],
+      "frame_path": "source/backend/assets/seeded_data/visual_story_frames/port_esri.png",
+      "output_path": "docs/media/story-plates/story-object-evidence-port.png",
+      "public_docs": true,
+      "visual_audit_status": "approved",
+      "visual_audit_notes": [
+        "Public plate uses area/group labels only; no singular vessel claim is promoted from this crop.",
+        "The previous channel-vessel box was rejected because visual review showed open water at the box location."
+      ],
+      "fetched_at": null,
+      "fetch_error": "",
+      "training_ready": true,
+      "note": "Boxes are deterministic visual-story evidence fixtures over cached/fetched imagery, not a claim of live model-backed object detection."
+    },
+    {
+      "story_id": "fireline",
+      "title": "Fireline Candidate Areas",
+      "what": "Smoke and burn-scar candidate regions",
+      "where": "Highway 82 fire corridor, Georgia",
+      "when": {
+        "date_from": "2026-04-01",
+        "date_to": "2026-04-28"
+      },
+      "why": "flag candidate smoke, burn-scar, and road-impact regions for review",
+      "bbox": [
+        -81.905,
+        31.17,
+        -81.785,
+        31.29
+      ],
+      "date_from": "2026-04-01",
+      "date_to": "2026-04-28",
+      "visual_mode": "burn_scar",
+      "source": "cached visual story frame",
+      "imagery_provider": "sentinelhub",
+      "imagery_origin": "cached_api",
+      "runtime_truth_mode": "replay",
+      "scoring_basis": "visual_only",
+      "box_source": "visual_story_fixture",
+      "box_count": 4,
+      "boxes": [
+        {
+          "label": "burn-scar candidate area",
+          "bbox": [
+            0.2,
+            0.22,
+            0.5,
+            0.45
+          ],
+          "confidence": 0.82,
+          "color": "#fb7185"
+        },
+        {
+          "label": "burn-scar candidate area",
+          "bbox": [
+            0.52,
+            0.4,
+            0.76,
+            0.58
+          ],
+          "confidence": 0.79,
+          "color": "#fb7185"
+        },
+        {
+          "label": "smoke-shadow area",
+          "bbox": [
+            0.31,
+            0.14,
+            0.61,
+            0.28
+          ],
+          "confidence": 0.74,
+          "color": "#f472b6"
+        },
+        {
+          "label": "road-impact area",
+          "bbox": [
+            0.55,
+            0.66,
+            0.74,
+            0.76
+          ],
+          "confidence": 0.69,
+          "color": "#22d3ee"
+        }
+      ],
+      "targets": [
+        "burn-scar candidate areas",
+        "smoke-shadow areas",
+        "road-impact area"
+      ],
+      "crop": null,
+      "frame_path": "source/backend/assets/seeded_data/visual_story_frames/fireline_sentinel.png",
+      "output_path": "source/backend/assets/seeded_data/visual_story_frames/story_plates/story-object-evidence-fireline.png",
+      "public_docs": false,
+      "visual_audit_status": "candidate",
+      "visual_audit_notes": [],
+      "fetched_at": null,
+      "fetch_error": "",
+      "training_ready": true,
+      "note": "Boxes are deterministic visual-story evidence fixtures over cached/fetched imagery, not a claim of live model-backed object detection."
+    },
+    {
+      "story_id": "road",
+      "title": "Road Lifeline",
+      "what": "Mobility disruption",
+      "where": "I-4 / SR-536 interchange, Florida",
+      "when": {
+        "date_from": "2025-01-01",
+        "date_to": "2025-03-01"
+      },
+      "why": "track road access and queue candidates for civilian lifeline review",
+      "bbox": [
+        -81.535,
+        28.36,
+        -81.505,
+        28.39
+      ],
+      "date_from": "2025-01-01",
+      "date_to": "2025-03-01",
+      "visual_mode": "true_color",
+      "source": "cached visual story frame",
+      "imagery_provider": "esri_context",
+      "imagery_origin": "esri_context",
+      "runtime_truth_mode": "replay",
+      "scoring_basis": "visual_only",
+      "box_source": "visual_story_fixture",
+      "box_count": 4,
+      "boxes": [
+        {
+          "label": "road corridor",
+          "bbox": [
+            0.28,
+            0.18,
+            0.39,
+            0.84
+          ],
+          "confidence": 0.82,
+          "color": "#22d3ee"
+        },
+        {
+          "label": "road corridor",
+          "bbox": [
+            0.48,
+            0.12,
+            0.59,
+            0.74
+          ],
+          "confidence": 0.8,
+          "color": "#22d3ee"
+        },
+        {
+          "label": "traffic queue area",
+          "bbox": [
+            0.35,
+            0.48,
+            0.52,
+            0.58
+          ],
+          "confidence": 0.72,
+          "color": "#facc15"
+        },
+        {
+          "label": "structure area",
+          "bbox": [
+            0.65,
+            0.3,
+            0.78,
+            0.44
+          ],
+          "confidence": 0.68,
+          "color": "#2dd4bf"
+        }
+      ],
+      "targets": [
+        "road corridors",
+        "traffic queue area",
+        "structure area"
+      ],
+      "crop": null,
+      "frame_path": "source/backend/assets/seeded_data/visual_story_frames/road_esri.png",
+      "output_path": "source/backend/assets/seeded_data/visual_story_frames/story_plates/story-object-evidence-road.png",
+      "public_docs": false,
+      "visual_audit_status": "candidate",
+      "visual_audit_notes": [],
+      "fetched_at": null,
+      "fetch_error": "",
+      "training_ready": true,
+      "note": "Boxes are deterministic visual-story evidence fixtures over cached/fetched imagery, not a claim of live model-backed object detection."
+    },
+    {
+      "story_id": "debris",
+      "title": "Coastal Debris / Slick Candidate Watch",
+      "what": "Environmental candidate evidence",
+      "where": "Singapore Strait coastal waterway",
+      "when": {
+        "date_from": "2025-01-01",
+        "date_to": "2025-11-01"
+      },
+      "why": "flag coastal slick, foam-line, and debris candidates, not garbage-patch mass or material ID",
+      "bbox": [
+        103.6,
+        1.12,
+        103.95,
+        1.38
+      ],
+      "date_from": "2025-01-01",
+      "date_to": "2025-11-01",
+      "visual_mode": "true_color",
+      "source": "cached visual story frame",
+      "imagery_provider": "sentinelhub",
+      "imagery_origin": "cached_api",
+      "runtime_truth_mode": "replay",
+      "scoring_basis": "visual_only",
+      "box_source": "visual_story_fixture",
+      "box_count": 3,
+      "boxes": [
+        {
+          "label": "slick candidate area",
+          "bbox": [
+            0.18,
+            0.22,
+            0.48,
+            0.34
+          ],
+          "confidence": 0.71,
+          "color": "#a3e635"
+        },
+        {
+          "label": "foam-line region",
+          "bbox": [
+            0.5,
+            0.4,
+            0.82,
+            0.5
+          ],
+          "confidence": 0.69,
+          "color": "#a3e635"
+        },
+        {
+          "label": "coastal debris review area",
+          "bbox": [
+            0.28,
+            0.62,
+            0.42,
+            0.73
+          ],
+          "confidence": 0.64,
+          "color": "#facc15"
+        }
+      ],
+      "targets": [
+        "slick candidate areas",
+        "foam-line regions",
+        "coastal debris review areas"
+      ],
+      "crop": null,
+      "frame_path": "source/backend/assets/seeded_data/visual_story_frames/debris_sentinel.png",
+      "output_path": "source/backend/assets/seeded_data/visual_story_frames/story_plates/story-object-evidence-debris.png",
+      "public_docs": false,
+      "visual_audit_status": "candidate",
+      "visual_audit_notes": [],
+      "fetched_at": null,
+      "fetch_error": "",
+      "training_ready": true,
+      "note": "Boxes are deterministic visual-story evidence fixtures over cached/fetched imagery, not a claim of live model-backed object detection."
+    }
+  ]
+}

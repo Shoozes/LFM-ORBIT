@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AlertAnalysis, AlertItem, CellImageryResponse, ScanWindow } from "../types/telemetry";
 import { getApiBaseUrl, formatSourceLabel, formatReasonCode } from "../utils/telemetry";
+import {
+  displayObjectEvidenceCount,
+  displayObjectEvidenceLabel,
+  objectEvidenceScopeNote,
+} from "../utils/objectEvidence";
 import { useAgentBus } from "../hooks/useAgentBus";
 import type { Mission } from "../types/mission";
 type GalleryFull = {
@@ -387,6 +392,9 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenTimelapse
 
   const hasResults = analysis !== null;
   const isReplayMission = mission?.mission_mode === "replay";
+  const detectionSummary = alert.detection_summary ?? null;
+  const detectionCounts = detectionSummary ? Object.entries(detectionSummary.counts_by_label) : [];
+  const objectDeltas = alert.object_deltas ?? [];
 
   return (
     <div>
@@ -430,8 +438,73 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenTimelapse
           </div>
         )}
 
+        {(detectionSummary || objectDeltas.length > 0) && (
+          <div data-testid="inspect-object-evidence" className="mb-3 rounded border border-cyan-200 bg-cyan-50 p-3 text-xs text-cyan-900">
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-700">Object Evidence</p>
+                {detectionSummary?.target_pack_id && (
+                  <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-cyan-600">
+                    Pack: {detectionSummary.target_pack_id}
+                  </p>
+                )}
+              </div>
+              {detectionSummary && (
+                <span className="rounded border border-cyan-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-cyan-700">
+                  {detectionSummary.total_boxes} boxes
+                </span>
+              )}
+            </div>
+
+            {detectionCounts.length > 0 && (
+              <div className="grid grid-cols-2 gap-2">
+                {detectionCounts.map(([label, count]) => {
+                  const sampleBox = detectionSummary?.top_boxes?.find((box) => box.label === label);
+                  return (
+                    <div key={label} className="rounded border border-cyan-100 bg-white px-2 py-1">
+                      <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-cyan-700">
+                        {displayObjectEvidenceLabel(sampleBox ?? label)}
+                      </p>
+                      <p className="text-sm font-bold text-zinc-900">{displayObjectEvidenceCount(label, count, sampleBox)}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {detectionSummary?.top_boxes?.length ? (
+              <div className="mt-2 space-y-1.5">
+                {detectionSummary.top_boxes.slice(0, 3).map((box, index) => (
+                  <div key={box.id ?? `${box.label}-${index}`} className="rounded border border-cyan-100 bg-white px-2 py-1">
+                    <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-cyan-700">
+                      {displayObjectEvidenceLabel(box)} · {box.confidence !== undefined ? box.confidence.toFixed(2) : "n/a"}
+                    </p>
+                    <p className="truncate text-[10px] text-zinc-500">
+                      {box.source_model ?? "unknown source"} · [{box.bbox.map((value) => value.toFixed(2)).join(", ")}]
+                    </p>
+                    <p className="truncate text-[10px] text-cyan-700">{objectEvidenceScopeNote(box)}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {objectDeltas.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {objectDeltas.slice(0, 3).map((delta) => (
+                  <div key={delta.label} className="flex items-center justify-between gap-2 rounded border border-cyan-100 bg-white px-2 py-1">
+                    <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-cyan-700">{delta.label}</span>
+                    <span className="shrink-0 text-[10px] font-semibold text-zinc-700">
+                      {delta.baseline_count} to {delta.current_count} ({delta.delta_count >= 0 ? "+" : ""}{delta.delta_count}) · {delta.action_hint}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="mb-3 rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 font-medium">
-          This panel shows temporal evidence only. It identifies suspected logging activity and does not claim final ground truth.
+          This panel shows mission evidence only. It identifies candidate satellite signals and does not claim final ground truth.
         </div>
 
         <div className="text-sm text-zinc-700 leading-relaxed space-y-1">

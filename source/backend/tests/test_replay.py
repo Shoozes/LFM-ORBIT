@@ -6,6 +6,7 @@ from api.main import mission_current, mission_stop, replay_catalog, replay_load,
 from core.agent_bus import get_recent_dialogue, get_recent_messages, list_pins
 from core.gallery import list_gallery
 from core.metrics import read_metrics_summary
+from core.object_targets import get_target_pack
 from core.queue import get_recent_alerts
 from core.replay_snapshot import SNAPSHOT_FORMAT, export_replay_snapshot, import_replay_snapshot
 from core.runtime_state import reset_runtime_state
@@ -18,10 +19,21 @@ EXPECTED_REPLAY_IDS = {
     "georgia_wildfire_replay",
     "delhi_urban_replay",
     "greenland_ice_snow_extent_replay",
+    "southeast_fireline_object_replay",
+    "camp_shelter_count_replay",
+    "port_supply_chain_replay",
+    "plastic_pollution_candidate_replay",
 }
 
 MULTISPECTRAL_REPLAY_IDS = {"greenland_ice_snow_extent_replay"}
+PROXY_REPLAY_IDS = {"rondonia_frontier_showcase"}
 METADATA_ONLY_REPLAY_IDS = {"greenland_ice_snow_extent_replay"}
+OBJECT_FIXTURE_REPLAY_IDS = {
+    "southeast_fireline_object_replay",
+    "camp_shelter_count_replay",
+    "port_supply_chain_replay",
+    "plastic_pollution_candidate_replay",
+}
 
 
 def _json_response_payload(response: JSONResponse) -> dict:
@@ -67,6 +79,12 @@ def test_replay_load_seeds_runtime_surfaces(tmp_path, monkeypatch):
     assert payload["alerts_loaded"] == 4
     assert payload["mission"]["mission_mode"] == "replay"
     assert payload["mission"]["summary"]
+    assert payload["mission"]["target_pack_id"] == "deforestation"
+    assert {target["label"] for target in payload["mission"]["object_targets"]} >= {
+        "clearing candidate",
+        "road expansion",
+        "canopy-loss boundary",
+    }
 
     current = mission_current()
     assert current["mission"] is not None
@@ -88,9 +106,14 @@ def test_replay_load_seeds_runtime_surfaces(tmp_path, monkeypatch):
     assert metrics["region_id"] == "replay"
     assert metrics["runtime_truth_mode"] == "replay"
     assert metrics["imagery_origin"] == "cached_api"
-    assert metrics["scoring_basis"] == "visual_only"
+    assert metrics["scoring_basis"] == "proxy_bands"
     assert metrics["total_cells_scanned"] == 9
     assert metrics["total_alerts_emitted"] == 4
+
+    center_alert = next(alert for alert in recent_alerts if alert["cell_id"] == "sq_-10.0_-63.0")
+    assert center_alert["detection_summary"]["target_pack_id"] == "deforestation"
+    assert center_alert["detection_summary"]["counts_by_label"]["clearing candidate"] == 2
+    assert center_alert["object_deltas"][0]["label"] == "clearing candidate"
 
     pins = list_pins()
     assert len(pins) == 8
@@ -107,6 +130,90 @@ def test_replay_load_seeds_runtime_surfaces(tmp_path, monkeypatch):
     assert all(msg["read"] is True for msg in confirmation_messages)
 
 
+def test_object_evidence_replay_loads_targets_and_detection_summary(tmp_path, monkeypatch):
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+    _reset_runtime_state()
+
+    payload = replay_load("southeast_fireline_object_replay")
+
+    assert payload["mission"]["target_pack_id"] == "fireline"
+    assert {target["label"] for target in payload["mission"]["object_targets"]} >= {"dark smoke", "road obstruction"}
+
+    alert = get_recent_alerts(limit=1)["alerts"][0]
+    assert alert["detection_summary"]["target_pack_id"] == "fireline"
+    assert alert["detection_summary"]["counts_by_label"]["dark smoke"] == 1
+    assert alert["object_deltas"][0]["label"] == "dark smoke"
+
+
+def test_object_evidence_replay_target_packs_and_top_boxes_are_consistent(tmp_path, monkeypatch):
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+    _reset_runtime_state()
+
+    for replay_id in sorted(OBJECT_FIXTURE_REPLAY_IDS):
+        payload = replay_load(replay_id)
+        mission = payload["mission"]
+        pack_id = mission["target_pack_id"]
+        pack = get_target_pack(pack_id)
+        assert pack is not None
+        assert {target["label"] for target in mission["object_targets"]} == {
+            target["label"] for target in pack["targets"]
+        }
+
+        alert = get_recent_alerts(limit=1)["alerts"][0]
+        summary = alert["detection_summary"]
+        assert summary["target_pack_id"] == pack_id
+        if summary["total_boxes"] <= 12:
+            assert len(summary["top_boxes"]) == summary["total_boxes"]
+
+
+def test_port_replay_matches_approved_docs_story_plate_bbox_and_labels(tmp_path, monkeypatch):
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+    _reset_runtime_state()
+
+    payload = replay_load("port_supply_chain_replay")
+
+    assert payload["mission"]["bbox"] == [32.515, 29.9, 32.575, 29.955]
+    assert payload["mission"]["target_pack_id"] == "port"
+    assert {target["label"] for target in payload["mission"]["object_targets"]} == {
+        "shipping container cluster",
+        "container yard cluster",
+        "docked-vessel group",
+        "berth basin context",
+    }
+    alert = get_recent_alerts(limit=1)["alerts"][0]
+    summary = alert["detection_summary"]
+    assert summary["counts_by_label"] == {
+        "shipping container cluster": 1,
+        "container yard cluster": 1,
+        "docked-vessel group": 1,
+        "berth basin context": 1,
+    }
+    assert all(box["count_quality"] == "activity_region" for box in summary["top_boxes"])
+    assert not any("channel vessel" in box["label"] for box in summary["top_boxes"])
+
+
+def test_maritime_replay_uses_area_level_activity_evidence(tmp_path, monkeypatch):
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+    _reset_runtime_state()
+
+    payload = replay_load("singapore_maritime_replay")
+
+    assert payload["mission"]["target_pack_id"] == "port"
+    alert = get_recent_alerts(limit=1)["alerts"][0]
+    summary = alert["detection_summary"]
+    assert summary["counts_by_label"]["vessel queue area"] == 2
+    assert summary["provenance"]["exact_object_count"] is False
+    assert all(box["count_quality"] == "activity_region" for box in summary["top_boxes"])
+
+
 def test_each_bundled_replay_loads_runtime_surfaces(tmp_path, monkeypatch):
     monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
     monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
@@ -121,12 +228,16 @@ def test_each_bundled_replay_loads_runtime_surfaces(tmp_path, monkeypatch):
         expected_scoring_basis = (
             "multispectral_bands" if replay["replay_id"] in MULTISPECTRAL_REPLAY_IDS else "visual_only"
         )
+        if replay["replay_id"] in PROXY_REPLAY_IDS:
+            expected_scoring_basis = "proxy_bands"
         expected_observation_source = (
             "seeded_sentinelhub_multispectral_replay"
             if replay["replay_id"] in MULTISPECTRAL_REPLAY_IDS
+            else "replay_fixture"
+            if replay["replay_id"] in OBJECT_FIXTURE_REPLAY_IDS
             else "seeded_sentinelhub_replay"
         )
-        expected_has_timelapse = replay["replay_id"] not in METADATA_ONLY_REPLAY_IDS
+        expected_has_timelapse = replay["replay_id"] not in METADATA_ONLY_REPLAY_IDS | OBJECT_FIXTURE_REPLAY_IDS
 
         assert isinstance(payload, dict)
         assert payload["replay_id"] == replay["replay_id"]
@@ -235,6 +346,16 @@ def test_replay_snapshot_export_import_round_trips_runtime_surfaces(tmp_path, mo
     assert len(snapshot["gallery"]) == 4
     assert snapshot["active_mission"]["mission_mode"] == "replay"
 
+    snapshot["active_mission"]["target_pack_id"] = "fireline"
+    snapshot["active_mission"]["object_targets"] = [
+        {
+            "label": "dark smoke",
+            "prompt": "Find dark smoke",
+            "class_key": "hazard",
+            "enabled": True,
+        }
+    ]
+
     _reset_runtime_state()
     payload = import_replay_snapshot(snapshot)
 
@@ -246,3 +367,6 @@ def test_replay_snapshot_export_import_round_trips_runtime_surfaces(tmp_path, mo
     assert len(get_recent_alerts(limit=10)["alerts"]) == 4
     assert len(list_gallery(limit=10)) == 4
     assert read_metrics_summary()["runtime_truth_mode"] == "replay"
+    current = mission_current()["mission"]
+    assert current["target_pack_id"] == "fireline"
+    assert current["object_targets"][0]["label"] == "dark smoke"

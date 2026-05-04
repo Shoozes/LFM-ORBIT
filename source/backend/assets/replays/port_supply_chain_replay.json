@@ -1,0 +1,33 @@
+{
+  "replay_id": "port_supply_chain_replay",
+  "title": "Port Supply Chain Object Replay",
+  "description": "Deterministic replay for visually audited Suez port area evidence.",
+  "task_text": "Run a port activity scan. Look for shipping container clusters, docked-vessel groups, and berth basin context without claiming exact vessel counts.",
+  "bbox": [32.515, 29.9, 32.575, 29.955],
+  "target_pack_id": "port",
+  "object_targets": [
+    {"label": "shipping container cluster", "prompt": "Find shipping container clusters", "class_key": "cargo", "enabled": true},
+    {"label": "container yard cluster", "prompt": "Find container yard clusters", "class_key": "cargo", "enabled": true},
+    {"label": "docked-vessel group", "prompt": "Find docked-vessel groups along berth edges", "class_key": "vessel", "enabled": true},
+    {"label": "berth basin context", "prompt": "Find berth basin context areas", "class_key": "infrastructure", "enabled": true}
+  ],
+  "cells_scanned": 3,
+  "flags_found": 1,
+  "primary_cell_id": "port_supply_chain_cell",
+  "alerts": [
+    {
+      "cell_id": "port_supply_chain_cell",
+      "lat": 29.9275,
+      "lng": 32.545,
+      "event_id": "replay_port_supply_chain",
+      "change_score": 0.48,
+      "confidence": 0.8,
+      "priority": "medium",
+      "reason_codes": ["object_evidence", "port_activity_area"],
+      "observation_source": "replay_fixture",
+      "before_window": {"label": "baseline"},
+      "after_window": {"label": "current"},
+      "detection_summary": {"target_pack_id": "port", "total_boxes": 4, "counts_by_label": {"shipping container cluster": 1, "container yard cluster": 1, "docked-vessel group": 1, "berth basin context": 1}, "top_boxes": [{"id": "box_shipping_container_cluster_001", "label": "shipping container cluster", "bbox": [0.46, 0.28, 0.55, 0.39], "bbox_format": "unit_xyxy", "confidence": 0.82, "color_key": "cargo", "source_model": "visual_story_fixture", "prompt": "Find shipping container clusters", "runtime_truth_mode": "replay", "imagery_origin": "esri_context", "scoring_basis": "visual_only", "count_quality": "activity_region"}, {"id": "box_container_yard_cluster_002", "label": "container yard cluster", "bbox": [0.5, 0.42, 0.6, 0.54], "bbox_format": "unit_xyxy", "confidence": 0.8, "color_key": "cargo", "source_model": "visual_story_fixture", "prompt": "Find container yard clusters", "runtime_truth_mode": "replay", "imagery_origin": "esri_context", "scoring_basis": "visual_only", "count_quality": "activity_region"}, {"id": "box_docked_vessel_group_003", "label": "docked-vessel group", "bbox": [0.3, 0.64, 0.45, 0.75], "bbox_format": "unit_xyxy", "confidence": 0.77, "color_key": "vessel", "source_model": "visual_story_fixture", "prompt": "Find docked-vessel groups along berth edges", "runtime_truth_mode": "replay", "imagery_origin": "esri_context", "scoring_basis": "visual_only", "count_quality": "activity_region"}, {"id": "box_berth_basin_context_004", "label": "berth basin context", "bbox": [0.15, 0.62, 0.27, 0.74], "bbox_format": "unit_xyxy", "confidence": 0.72, "color_key": "infrastructure", "source_model": "visual_story_fixture", "prompt": "Find berth basin context areas", "runtime_truth_mode": "replay", "imagery_origin": "esri_context", "scoring_basis": "visual_only", "count_quality": "activity_region"}], "provenance": {"output_source": "visual_story_fixture", "heuristic_fallback": false, "exact_object_count": false, "visual_audit_status": "approved"}}
+    }
+  ]
+}

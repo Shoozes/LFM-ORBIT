@@ -1,15 +1,27 @@
 /**
- * Screenshot capture spec for README documentation.
+ * Screenshot capture spec for local review and selected README documentation.
  * Captures: satellite agent heartbeat, agent dialogue bus, alert analysis, provider settings.
  * Run with: npx playwright test capture_screenshots.spec.ts --headed
  */
 import { test, expect, type Page } from "@playwright/test";
-import { gotoApp, loadSeededReplay, resetRuntimeState, waitForBasemapReady, waitForLinkOpen } from "./runtime";
+import {
+  gotoApp,
+  loadSeededReplay,
+  resetRuntimeState,
+  waitForBasemapReady,
+  waitForLinkOpen,
+  waitForNextPaint,
+} from "./runtime";
 
 const SHOT_DIR = "e2e/screenshots";
 
 async function waitForAgentDialogue(page: Page) {
-  await expect(page.getByText("Agent Dialogue Bus").first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("header-agent-bus")).toContainText("SAT/GND Dialogue Bus", { timeout: 15_000 });
+  await expect(page.getByTestId("agent-bus-status")).toContainText(/open/i, { timeout: 15_000 });
+}
+
+async function settleScreenshotFrame(page: Page) {
+  await waitForNextPaint(page, 3);
 }
 
 async function waitForAlerts(page: Page, min = 1) {
@@ -32,8 +44,8 @@ test("screenshot: satellite agent heartbeat + scan HUD", async ({ page, request 
   await page.locator("[data-testid='tab-agents']").click();
   await waitForAgentDialogue(page);
 
-  // Let a few heartbeat cycles accumulate
-  await page.waitForTimeout(12_000);
+  await expect(page.getByText(/heartbeat/i).first()).toBeVisible({ timeout: 15_000 });
+  await settleScreenshotFrame(page);
 
   await page.screenshot({
     path: `${SHOT_DIR}/01-satellite-heartbeat.png`,
@@ -87,7 +99,7 @@ test("screenshot: alert analysis — offline LFM verdict", async ({ page, reques
   await page.getByText("AI Analysis", { exact: true }).evaluate((element) => {
     element.scrollIntoView({ block: "start", inline: "nearest" });
   });
-  await page.waitForTimeout(1_000);
+  await settleScreenshotFrame(page);
   await page.screenshot({
     path: `${SHOT_DIR}/03-alert-analysis-verdict.png`,
     fullPage: false,
@@ -98,6 +110,7 @@ test("screenshot: alert analysis — offline LFM verdict", async ({ page, reques
 
 test("screenshot: settings panel — provider + local model status", async ({ page, request }) => {
   test.setTimeout(30_000);
+  await page.setViewportSize({ width: 1440, height: 1040 });
   await resetRuntimeState(request);
   await gotoApp(page);
   await waitForLinkOpen(page);
@@ -108,7 +121,7 @@ test("screenshot: settings panel — provider + local model status", async ({ pa
   await expect(page.getByText("Local Model")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText("Model Tiers")).toBeVisible({ timeout: 20_000 });
 
-  await page.waitForTimeout(500);
+  await settleScreenshotFrame(page);
   await page.screenshot({
     path: `${SHOT_DIR}/04-settings-provider-model.png`,
     fullPage: false,
@@ -134,9 +147,27 @@ test("screenshot: full mission control — replay ready", async ({ page, request
 
 // ── 6. Ground Agent chat-driven operation proposal ─────────────────────────
 
-test("screenshot: Ground Agent proposes wildfire replay from chat", async ({ page, request }) => {
+test("screenshot: Ground Agent operator playbook", async ({ page, request }) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 1440, height: 1400 });
+  await resetRuntimeState(request);
+  await gotoApp(page);
+  await waitForLinkOpen(page);
+  await waitForBasemapReady(page);
+  await page.locator("[data-testid='tab-agents']").click();
+  await waitForAgentDialogue(page);
+  await expect(page.getByTestId("agent-role-strip")).toContainText("Satellite Pruner");
+  await expect(page.getByTestId("ground-agent-operator-playbook")).toContainText("Operator Playbook");
+
+  await page.screenshot({
+    path: "../../docs/media/readme/readme-ground-agent-playbook.png",
+    fullPage: false,
+  });
+});
+
+test("screenshot: Ground Agent proposes wildfire replay from chat", async ({ page, request }) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 1440, height: 1600 });
   await resetRuntimeState(request);
   await gotoApp(page);
   await waitForLinkOpen(page);
@@ -160,13 +191,49 @@ test("screenshot: Ground Agent proposes wildfire replay from chat", async ({ pag
   await expect(proposal.getByText("cached_api")).toBeVisible();
   await expect(proposal.getByText("State Impact")).toBeVisible();
   await expect(proposal.getByRole("button", { name: "Run Replay" })).toBeVisible();
+  await proposal.evaluate((element) => {
+    element.scrollIntoView({ block: "center", inline: "nearest" });
+  });
+  await settleScreenshotFrame(page);
 
   await page.screenshot({
-    path: "../../docs/readme-ground-agent-chat-action.png",
+    path: "../../docs/media/readme/readme-ground-agent-chat-action.png",
     fullPage: false,
   });
 
   await page.getByTestId("ground-agent-run-proposal").click();
   await expect(page.getByText("Loaded replay `georgia_wildfire_replay`")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("load replay - georgia_wildfire_replay")).toBeVisible({ timeout: 10_000 });
+});
+
+test("screenshot: Ground Agent semantic location camera context", async ({ page, request }) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await resetRuntimeState(request);
+  await gotoApp(page);
+  await waitForLinkOpen(page);
+  await waitForBasemapReady(page);
+  await page.locator("[data-testid='tab-agents']").click();
+  await waitForAgentDialogue(page);
+
+  const chatInput = page.getByPlaceholder("Request replay, mission pack, link action...");
+  await chatInput.fill("cancel the current mission and take us to bull creek fl");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const proposal = page.getByTestId("ground-agent-proposal-card");
+  await expect(proposal).toContainText("Bull Creek, FL", { timeout: 15_000 });
+  await expect(proposal).toContainText("wetland / pine-flatwoods context");
+  await proposal.getByRole("button", { name: "Stop & Fly Map" }).click();
+
+  const hud = page.getByTestId("map-camera-hud");
+  await expect(hud).toContainText("Bull Creek, FL", { timeout: 15_000 });
+  await expect(hud).toContainText("Terrain:");
+  await expect(hud).toContainText("road or trail corridor");
+  await expect(page.getByTestId("map-scan-paused-hint")).toBeVisible({ timeout: 15_000 });
+  await settleScreenshotFrame(page);
+
+  await page.screenshot({
+    path: "../../docs/media/readme/readme-location-camera-context.png",
+    fullPage: false,
+  });
 });

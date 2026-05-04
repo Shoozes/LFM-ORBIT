@@ -1,4 +1,9 @@
-from typing import Literal, NotRequired, TypedDict
+from typing import Literal, TypedDict
+
+try:
+    from typing import NotRequired
+except ImportError:  # Python 3.10 compatibility
+    from typing_extensions import NotRequired
 
 
 class RegionInfo(TypedDict):
@@ -75,6 +80,61 @@ class BoundaryContext(TypedDict):
     distance_to_boundary_m: float
 
 
+class ObjectTarget(TypedDict):
+    label: str
+    prompt: str
+    class_key: str
+    enabled: bool
+
+
+class TargetPack(TypedDict):
+    id: str
+    name: str
+    description: str
+    targets: list[ObjectTarget]
+
+
+class DetectionBox(TypedDict):
+    id: str
+    label: str
+    bbox: list[float]
+    bbox_format: Literal["unit_xyxy"]
+    confidence: float
+    color_key: str
+    source_model: str
+    prompt: str
+    runtime_truth_mode: str
+    imagery_origin: str
+    scoring_basis: str
+    frame_ref: NotRequired[str]
+    timestamp: NotRequired[str]
+    count_quality: NotRequired[str]
+
+
+class DetectionSummary(TypedDict):
+    target_pack_id: str | None
+    total_boxes: int
+    counts_by_label: dict[str, int]
+    top_boxes: list[DetectionBox]
+    provenance: dict[str, str | bool]
+
+
+class ObjectDelta(TypedDict):
+    label: str
+    baseline_count: int
+    current_count: int
+    delta_count: int
+    delta_percent: float
+    action_hint: Literal["discard", "defer", "downlink_now"]
+
+
+class ObjectEvidencePayload(TypedDict):
+    target_pack_id: str | None
+    object_targets: list[ObjectTarget]
+    detection_summary: DetectionSummary
+    object_deltas: NotRequired[list[ObjectDelta]]
+
+
 class AlertRecord(TypedDict):
     event_id: str
     region_id: str
@@ -94,6 +154,8 @@ class AlertRecord(TypedDict):
     after_window: NotRequired[WindowObservation]
     demo_forced_anomaly: NotRequired[bool]
     boundary_context: NotRequired[list[BoundaryContext]]
+    detection_summary: NotRequired[DetectionSummary]
+    object_deltas: NotRequired[list[ObjectDelta]]
 
 
 class MetricsFlaggedExample(TypedDict):
@@ -166,6 +228,8 @@ class ScanResultMessage(TypedDict):
     cycle_index: int
     demo_forced_anomaly: bool
     boundary_context: NotRequired[list[BoundaryContext]]
+    detection_summary: NotRequired[DetectionSummary]
+    object_deltas: NotRequired[list[ObjectDelta]]
 
 
 class HealthResponse(TypedDict):

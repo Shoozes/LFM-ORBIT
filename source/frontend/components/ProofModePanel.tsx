@@ -1,9 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import type { Mission } from "../types/mission";
 import type { AlertItem, ApiMetricsSummary, RecentAlertsResponse } from "../types/telemetry";
 import { formatReasonCode, formatSourceLabel } from "../utils/telemetry";
+import {
+  colorForVlmBox,
+  displayObjectEvidenceCount,
+  displayObjectEvidenceLabel,
+  objectEvidenceScopeNote,
+} from "../utils/objectEvidence";
 
-type DemoCase = "showcase" | "payload" | "provenance" | "abstain" | "eclipse";
+type DemoCase = "showcase" | "payload" | "provenance" | "abstain" | "eclipse" | "ice" | "forest";
 
 type GalleryItem = {
   context_thumb: string | null;
@@ -16,6 +22,14 @@ type GalleryItem = {
 type VlmBoxResult = {
   label: string;
   bbox: number[];
+  bbox_format?: "unit_xyxy" | "unit_yxyx";
+  confidence?: number;
+  color_key?: string;
+  source_model?: string;
+  count_quality?: string;
+  runtime_truth_mode?: string;
+  imagery_origin?: string;
+  scoring_basis?: string;
 };
 
 type VlmGroundingResponse = {
@@ -62,6 +76,14 @@ type ProofJson = {
   };
 };
 
+type ConfidenceContributor = {
+  signal: string;
+  weight: number;
+  score: number;
+  weighted: number;
+  evidence: string;
+};
+
 type DtnProof = {
   link_state_before: string;
   link_state_after: string;
@@ -83,14 +105,13 @@ type ProofModePanelProps = {
   onStepChange?: (stepIndex: number) => void;
 };
 
-const SHOWCASE_REPLAY_ID = "rondonia_frontier_showcase";
+const SHOWCASE_REPLAY_ID = "atacama_mining_replay";
 const SHOWCASE_MODEL = "Liquid evidence reviewer (LFM2.5-VL-450M handoff-ready)";
-const SHOWCASE_BBOX = [-63.15, -10.15, -62.85, -9.85];
+const SHOWCASE_BBOX = [-69.115, -24.29, -69.035, -24.21];
 const RAW_FRAME_BYTES = 1_840_000;
 const ALERT_JSON_BYTES = 1_240;
 const SEEDED_LATENCY_MS = 842;
-const FALLBACK_CAPTURE_TIME = "2025-01-15";
-const SHOWCASE_PROMPT = "Find fresh clearing and road-edge canopy loss.";
+const SHOWCASE_PROMPT = "Find critical minerals expansion regions: evaporation ponds, tailings, open-pit growth, industrial roads, facility clusters, exposed soil, and surface color change.";
 const COUNTED_ALERT_FIELDS = [
   "status",
   "result",
@@ -102,6 +123,9 @@ const COUNTED_ALERT_FIELDS = [
   "grounding",
   "vqa",
   "caption",
+  "object_targets",
+  "detections",
+  "object_deltas",
 ];
 const EXCLUDED_PAYLOAD_FIELDS = [
   "proof wrapper",
@@ -111,19 +135,66 @@ const EXCLUDED_PAYLOAD_FIELDS = [
   "payload_accounting metadata",
 ];
 const DEMO_TITLES: Record<DemoCase, string> = {
-  showcase: "Showcase proof",
+  showcase: "Critical minerals expansion proof",
   payload: "Pakistan flood payload reduction proof",
-  provenance: "Atacama provenance proof",
+  provenance: "Critical minerals provenance proof",
   abstain: "Greenland abstain safety proof",
   eclipse: "Maritime orbital eclipse proof",
+  ice: "Greenland ice/snow extent proof",
+  forest: "Rondonia land-use-change proof",
+};
+
+const DEMO_CONTEXT: Record<DemoCase, { what: string; where: string; when: string; why: string }> = {
+  showcase: {
+    what: "Critical Minerals Expansion Watch promotes one extraction-site evidence packet",
+    where: "Salar de Atacama / Escondida / Atacama mining corridor, Chile",
+    when: "2024-01-15 to 2025-12-15 replay window",
+    why: "show long-term industrial land-change evidence becoming compact proof JSON and training tags",
+  },
+  payload: {
+    what: "Flood-overflow bbox becomes a compact alert packet",
+    where: "Manchar Lake, Pakistan",
+    when: "2022-06-15 to 2022-09-15",
+    why: "show raw flood imagery stays local while kilobytes downlink",
+  },
+  provenance: {
+    what: "Critical Minerals proof keeps source, bbox, prompt, and model attached",
+    where: "Salar de Atacama / Escondida / Atacama mining corridor, Chile",
+    when: "2024-01-15 to 2025-12-15",
+    why: "make the evidence chain auditable without narration",
+  },
+  abstain: {
+    what: "Ice/snow quality gate blocks an unsupported answer",
+    where: "Greenland coastal ice edge",
+    when: "2024-01-15 to 2025-10-15",
+    why: "show bad imagery does not become a confident downlink",
+  },
+  eclipse: {
+    what: "Maritime vessel-queue alert survives a simulated link outage",
+    where: "Suez channel",
+    when: "2025-03-01 to 2025-12-15",
+    why: "prove compact JSON queues locally and flushes on restore",
+  },
+  ice: {
+    what: "Ground Agent validates a cached Sentinel Hub ice/snow replay",
+    where: "Greenland Ilulissat ice edge",
+    when: "2024-01-15 to 2025-12-15",
+    why: "show NDSI, SCL cloud rejection, temporal persistence, and visual context combining into one confidence score",
+  },
+  forest: {
+    what: "Deforestation / Land-Use Change Watch promotes one retained evidence packet",
+    where: "Rondonia western frontier, Brazil",
+    when: "2023-01-15 to 2025-01-15 replay window",
+    why: "show selected-area workflow, temporal evidence, CV region boxes, compact proof JSON, and training tags",
+  },
 };
 
 const DEMO_STORY_LINES: Record<DemoCase, string[]> = {
   showcase: [
-    "Satellite saw too much data.",
-    "Edge triage ignored noise.",
-    "Liquid reasoning checked the retained evidence packet.",
-    "Compact evidence JSON was downlinked.",
+    "The Atacama mining corridor is visually legible from orbit.",
+    "Satellite Pruner keeps expansion-region evidence instead of raw frames.",
+    "Ground Validator reviews ponds, tailings, pits, roads, and facility regions.",
+    "Proof JSON and training tags preserve source, bbox, confidence, and safe labels.",
   ],
   payload: [
     "The Manchar Lake flood frame stayed local.",
@@ -132,7 +203,7 @@ const DEMO_STORY_LINES: Record<DemoCase, string[]> = {
     "The downlink sent kilobytes, not megabytes.",
   ],
   provenance: [
-    "Provider, capture time, mine bbox, and task stay attached.",
+    "Provider, capture time, corridor bbox, and task stay attached.",
     "The prompt and model name are recorded.",
     "The output JSON is visible for audit.",
     "Reviewers can verify the chain without narration.",
@@ -149,14 +220,28 @@ const DEMO_STORY_LINES: Record<DemoCase, string[]> = {
     "Raw imagery is not pushed over a broken link.",
     "Restoring the link flushes JSON evidence.",
   ],
+  ice: [
+    "Satellite Pruner kept the ice-edge replay packet.",
+    "Ground Validator checked NDSI, SWIR/NIR, and SCL support.",
+    "Cloud windows were rejected before scoring.",
+    "Proof Mode exposes the weighted confidence stack.",
+  ],
+  forest: [
+    "The operator selects a Rondonia frontier mission bbox.",
+    "Satellite Pruner keeps persistent canopy-loss evidence and discards lower-value cells.",
+    "Ground Validator reviews dates, source, proxy bands, and CV region boxes.",
+    "Proof JSON carries bbox, confidence, provenance, safe labels, and training tags.",
+  ],
 };
 
 const DEMO_REASON_CODES: Record<DemoCase, string[]> = {
-  showcase: ["ndvi_drop", "nbr_drop", "soil_exposure_spike"],
+  showcase: ["bare_ground_expansion", "tailings_change", "excavation_growth", "provider_bound"],
   payload: ["flood_extent", "compact_json", "downlink_saved"],
   provenance: ["provider_bound", "capture_time", "bbox_bound"],
   abstain: ["quality_gate_failed", "low_confidence", "no_transmit"],
   eclipse: ["link_offline", "queue_local", "flush_on_restore"],
+  ice: ["ndsi_increase", "multi_frame_persistence", "cloud_rejected"],
+  forest: ["ndvi_drop", "nbr_drop", "soil_exposure_spike", "proxy_band_review"],
 };
 
 type DemoProfile = {
@@ -175,6 +260,8 @@ type DemoProfile = {
   vqa: string;
   caption: string;
   visualAsset?: string;
+  visualVideo?: string;
+  visualVideoSource?: string;
 };
 
 const DEMO_PROFILES: Record<DemoCase, DemoProfile> = {
@@ -182,17 +269,18 @@ const DEMO_PROFILES: Record<DemoCase, DemoProfile> = {
     replayId: SHOWCASE_REPLAY_ID,
     provider: "Replay (Cached API Imagery)",
     bbox: SHOWCASE_BBOX,
-    result: "forest boundary disturbance detected",
-    mission: "Rondonia frontier canopy-loss replay",
-    captureTime: FALLBACK_CAPTURE_TIME,
+    result: "critical minerals expansion region packet ready",
+    mission: "Critical Minerals Expansion Watch over the Salar de Atacama / Escondida / Atacama mining corridor.",
+    captureTime: "2025-12-15",
     prompt: SHOWCASE_PROMPT,
-    confidence: 0.82,
+    confidence: 0.86,
     latencyMs: SEEDED_LATENCY_MS,
-    cellId: "sq_-10.0_-63.0",
-    groundingLabel: "clearing",
-    groundingBox: [0.24, 0.18, 0.74, 0.76],
-    vqa: "Mixed vegetation, exposed clearing, and road context.",
-    caption: "Deforested clearing beside intact canopy.",
+    cellId: "mining_atacama_open_pit",
+    groundingLabel: "mining expansion region",
+    groundingBox: [0.28, 0.20, 0.72, 0.80],
+    vqa: "Open-pit benches, tailings-like surfaces, industrial roads, and facility clusters are visible inside the retained bbox.",
+    caption: "Atacama critical-minerals extraction region with expansion evidence and provenance attached.",
+    visualAsset: "/demo-assets/atacama-mining.png",
   },
   payload: {
     replayId: "flood_extent",
@@ -215,17 +303,17 @@ const DEMO_PROFILES: Record<DemoCase, DemoProfile> = {
     replayId: "mining_expansion",
     provider: "Sentinel Hub Sentinel-2 L2A",
     bbox: [-69.115, -24.29, -69.035, -24.21],
-    result: "open-pit mining expansion review packet ready",
-    mission: "Detect Atacama open-pit mining expansion and separate persistent bare earth from seasonal vegetation loss.",
+    result: "critical minerals expansion review packet ready",
+    mission: "Run Critical Minerals Expansion Watch over the Salar de Atacama / Escondida / Atacama mining corridor.",
     captureTime: "2025-12-15",
-    prompt: "Track Atacama open-pit expansion with provider, capture time, bbox, prompt, and model attached.",
+    prompt: "Track evaporation pond regions, tailings regions, open-pit expansion, industrial roads, facility clusters, exposed soil, and surface color change with provider, capture time, bbox, prompt, and model attached.",
     confidence: 0.81,
     latencyMs: 731,
     cellId: "atacama_open_pit_candidate",
-    groundingLabel: "mine expansion",
+    groundingLabel: "critical minerals region",
     groundingBox: [0.34, 0.24, 0.68, 0.68],
-    vqa: "Open-pit benches, tailings, and access roads are visible inside the mine bbox.",
-    caption: "Atacama mining footprint with provenance fields bound to the output JSON.",
+    vqa: "Open-pit benches, tailings-like regions, pond-like areas, roads, and facility clusters are visible inside the bbox.",
+    caption: "Atacama critical-minerals footprint with provenance fields bound to the output JSON.",
     visualAsset: "/demo-assets/atacama-mining.png",
   },
   abstain: {
@@ -262,6 +350,41 @@ const DEMO_PROFILES: Record<DemoCase, DemoProfile> = {
     caption: "Maritime queue candidate held for compact downlink.",
     visualAsset: "/demo-assets/suez-maritime.png",
   },
+  ice: {
+    replayId: "greenland_ice_snow_extent_replay",
+    provider: "Sentinel Hub Sentinel-2 L2A",
+    bbox: [-51.13, 69.1, -50.97, 69.26],
+    result: "NDSI-supported snow/ice extent increased across accepted frames",
+    mission: "Review Greenland edge snow and ice extent using NDSI, SCL cloud rejection, and multi-frame persistence before any extent-change label.",
+    captureTime: "2025 accepted-frame current",
+    prompt: "Compare Greenland ice/snow extent with NDSI, SWIR/NIR, SCL cloud rejection, and persistence gates.",
+    confidence: 0.78,
+    latencyMs: 842,
+    cellId: "greenland_ice_snow_extent",
+    groundingLabel: "ice/snow extent area",
+    groundingBox: [0.22, 0.18, 0.78, 0.74],
+    vqa: "Accepted frames show persistent ice/snow signal; cloud and no-data windows are rejected before scoring.",
+    caption: "Greenland ice/snow extent replay with spectral confidence stack.",
+    visualAsset: "/demo-assets/greenland-ice.png",
+    visualVideo: "/demo-assets/greenland-ice-timelapse.webm",
+    visualVideoSource: "Sentinel Hub contextual timelapse",
+  },
+  forest: {
+    replayId: "rondonia_frontier_showcase",
+    provider: "Replay (Cached API Imagery)",
+    bbox: [-63.15, -10.15, -62.85, -9.85],
+    result: "persistent canopy-loss candidate retained for review and training",
+    mission: "Run a Deforestation / Land-Use Change Watch over the Rondonia western frontier.",
+    captureTime: "2025-01-15",
+    prompt: "Find persistent canopy-loss change, clearing candidate regions, road expansion corridors, exposed soil, and canopy-loss boundaries.",
+    confidence: 0.86,
+    latencyMs: SEEDED_LATENCY_MS,
+    cellId: "sq_-10.0_-63.0",
+    groundingLabel: "clearing candidate region",
+    groundingBox: [0.24, 0.22, 0.64, 0.72],
+    vqa: "The retained cell shows a persistent clearing candidate with road-edge expansion and exposed soil after the baseline window.",
+    caption: "Rondonia frontier land-use-change replay with region boxes, proxy-band deltas, and proof metadata attached.",
+  },
 };
 
 function demoName(demoCase: DemoCase): string {
@@ -269,6 +392,8 @@ function demoName(demoCase: DemoCase): string {
   if (demoCase === "provenance") return "provenance";
   if (demoCase === "abstain") return "abstain-safety";
   if (demoCase === "eclipse") return "orbital-eclipse";
+  if (demoCase === "ice") return "ice-snow-extent";
+  if (demoCase === "forest") return "deforestation-tutorial";
   return "showcase";
 }
 
@@ -361,6 +486,87 @@ function buildFallbackProof(demoCase: DemoCase): ProofJson {
   };
 }
 
+function rounded(value: number): number {
+  return Number(value.toFixed(3));
+}
+
+function weighted(signal: string, weight: number, score: number, evidence: string): ConfidenceContributor {
+  return {
+    signal,
+    weight,
+    score,
+    weighted: rounded(weight * score),
+    evidence,
+  };
+}
+
+function buildConfidenceContributors(
+  demoCase: DemoCase,
+  evidenceAlert: AlertItem | null,
+  hasObjectEvidence: boolean,
+): ConfidenceContributor[] {
+  const normalized = `${demoCase} ${evidenceAlert?.cell_id ?? ""} ${evidenceAlert?.reason_codes?.join(" ") ?? ""} ${evidenceAlert?.scoring_basis ?? ""}`.toLowerCase();
+  if (normalized.includes("ice") || normalized.includes("ndsi") || evidenceAlert?.scoring_basis === "multispectral_bands") {
+    return [
+      weighted("spectral bands", 0.4, 0.9, "Green, NIR, SWIR1, and NDSI support the snow/ice signal."),
+      weighted("SCL scene quality", 0.2, 0.82, "Cloud/no-data windows are rejected before scoring."),
+      weighted("temporal persistence", 0.2, 0.78, "Accepted frames persist across the replay window."),
+      weighted("visual context", 0.12, 0.66, "Context timelapse is used for review, not as the scoring basis."),
+      weighted("CV/depth context", 0.08, 0.26, "No object-count or depth claim is used for this ice proof."),
+    ];
+  }
+
+  if (normalized.includes("maritime") || normalized.includes("vessel") || normalized.includes("ship")) {
+    return [
+      weighted("temporal context", 0.3, 0.82, "Accepted maritime frames changed after cloudy windows were rejected."),
+      weighted("scene quality", 0.2, 0.78, "Cloud-gated replay metadata stays attached."),
+      weighted("area evidence", 0.22, hasObjectEvidence ? 0.72 : 0.6, "Vessel-like cues are treated as maritime activity areas."),
+      weighted("source provenance", 0.18, 0.86, "Replay source, bbox, and provider metadata are bound to the alert."),
+      weighted("CV/depth context", 0.1, hasObjectEvidence ? 0.48 : 0.22, "Visual boxes support review but do not become exact counts."),
+    ];
+  }
+
+  if (
+    normalized.includes("deforestation")
+    || normalized.includes("canopy")
+    || normalized.includes("clearing")
+    || normalized.includes("ndvi_drop")
+    || normalized.includes("soil_exposure")
+  ) {
+    return [
+      weighted("temporal persistence", 0.28, 0.88, "The clearing signal persists from baseline to current replay windows."),
+      weighted("proxy band signal", 0.24, 0.84, "NDVI, NBR, NDMI, and soil-ratio deltas support canopy-loss review."),
+      weighted("scene quality", 0.16, 0.9, "Cached same-season frames are high quality and cloud/no-data flags are absent."),
+      weighted("CV region evidence", 0.18, hasObjectEvidence ? 0.82 : 0.58, "Clearing, road, exposed-soil, and boundary boxes stay region-level."),
+      weighted("Ground Agent review", 0.14, 0.76, "Ground Validator recommends defer/review and preserves source provenance."),
+    ];
+  }
+
+  if (
+    normalized.includes("mining")
+    || normalized.includes("tailings")
+    || normalized.includes("excavation")
+    || normalized.includes("bare_ground")
+    || normalized.includes("bare ground")
+  ) {
+    return [
+      weighted("temporal expansion", 0.3, 0.86, "Open-pit and exposed-surface regions persist across the replay window."),
+      weighted("industrial morphology", 0.22, hasObjectEvidence ? 0.82 : 0.72, "Pond/tailings/pit/road regions are treated as area evidence, not production estimates."),
+      weighted("scene quality", 0.16, 0.9, "Arid same-season frames preserve clear visual structure."),
+      weighted("source provenance", 0.18, 0.88, "Provider, capture dates, bbox, prompt, and replay id stay attached."),
+      weighted("review safety", 0.14, 0.74, "The packet avoids illegal-mining, pollution, or resource-output claims without external validation."),
+    ];
+  }
+
+  return [
+    weighted("temporal signal", 0.34, 0.78, "Before/after windows support the retained packet."),
+    weighted("scene quality", 0.18, 0.74, "Quality metadata stays with the replay."),
+    weighted("visual grounding", 0.2, hasObjectEvidence ? 0.76 : 0.62, "Grounding is candidate evidence pending review."),
+    weighted("source provenance", 0.18, 0.86, "Provider, bbox, task, and replay id are carried into proof JSON."),
+    weighted("depth/context", 0.1, 0.34, "Depth/3D context is optional and only assists review."),
+  ];
+}
+
 function ProofRow({
   label,
   value,
@@ -386,6 +592,92 @@ function proofString(value: unknown, fallback = "unknown"): string {
   if (typeof value === "string" && value.trim()) return value;
   if (typeof value === "number" && Number.isFinite(value)) return value.toLocaleString();
   return fallback;
+}
+
+function clampUnit(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
+}
+
+function proofOverlayStyle(box: VlmBoxResult): CSSProperties {
+  const [a = 0, b = 0, c = 0, d = 0] = box.bbox;
+  const [xminRaw, yminRaw, xmaxRaw, ymaxRaw] = box.bbox_format === "unit_yxyx"
+    ? [b, a, d, c]
+    : [a, b, c, d];
+  const xmin = Math.min(clampUnit(xminRaw), clampUnit(xmaxRaw));
+  const xmax = Math.max(clampUnit(xminRaw), clampUnit(xmaxRaw));
+  const ymin = Math.min(clampUnit(yminRaw), clampUnit(ymaxRaw));
+  const ymax = Math.max(clampUnit(yminRaw), clampUnit(ymaxRaw));
+  const color = colorForVlmBox(box);
+  return {
+    left: `${xmin * 100}%`,
+    top: `${ymin * 100}%`,
+    width: `${Math.max(0.01, xmax - xmin) * 100}%`,
+    height: `${Math.max(0.01, ymax - ymin) * 100}%`,
+    borderColor: color,
+    backgroundColor: `${color}1f`,
+    boxShadow: `0 0 0 1px rgba(2,6,23,0.65), 0 0 18px ${color}99`,
+  };
+}
+
+function proofOverlayLabel(box: VlmBoxResult): string {
+  const confidence = typeof box.confidence === "number" ? ` ${box.confidence.toFixed(2)}` : "";
+  return `${displayObjectEvidenceLabel(box)}${confidence}`;
+}
+
+function replayDisplayName(replayId: string): string {
+  return replayId
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function isReplayOverride(demoCase: DemoCase, mission: Mission | null): boolean {
+  return Boolean(mission?.replay_id && mission.replay_id !== DEMO_PROFILES[demoCase].replayId);
+}
+
+function missionReplayContext(
+  mission: Mission | null,
+  proof: ProofJson,
+): { what: string; where: string; when: string; why: string } {
+  const task = mission?.task_text?.trim() || proof.mission;
+  const replayId = mission?.replay_id ?? proof.replay_id;
+  const dateRange = [mission?.start_date, mission?.end_date].filter(Boolean).join(" to ") || proof.source_capture_time;
+  const normalized = `${task} ${replayId} ${mission?.use_case_id ?? ""}`.toLowerCase();
+
+  if (normalized.includes("maritime") || normalized.includes("vessel") || normalized.includes("singapore")) {
+    return {
+      what: "Ground Agent loads short-term maritime traffic replay evidence",
+      where: normalized.includes("singapore") ? "Singapore Strait anchorage" : "maritime focus area",
+      when: dateRange,
+      why: "review vessel and port activity with source metadata, rejected windows, and bbox context attached",
+    };
+  }
+
+  return {
+    what: task,
+    where: "operator-selected mission bbox",
+    when: dateRange,
+    why: "keep the replay claim bound to its evidence, source, model output, and compact proof JSON",
+  };
+}
+
+function missionReplayStoryLines(mission: Mission | null): string[] {
+  const normalized = `${mission?.task_text ?? ""} ${mission?.replay_id ?? ""} ${mission?.use_case_id ?? ""}`.toLowerCase();
+  if (normalized.includes("maritime") || normalized.includes("vessel") || normalized.includes("singapore")) {
+    return [
+      "Operator selected a maritime focus bbox.",
+      "Ground Agent proposed the cached replay before changing state.",
+      "Cloud rejects and source metadata stay attached.",
+      "Proof Mode shows bbox-bound evidence and compact JSON.",
+    ];
+  }
+
+  return [
+    "Operator selected a mission focus bbox.",
+    "Ground Agent loaded replay evidence after confirmation.",
+    "The proof keeps task, source, model, and bbox attached.",
+    "Compact JSON is reviewable without raw-frame downlink.",
+  ];
 }
 
 export default function ProofModePanel({
@@ -511,9 +803,37 @@ export default function ProofModePanel({
   useEffect(() => {
     const isAbstain = demoCase === "abstain";
     const profile = DEMO_PROFILES[demoCase];
-    const ratio = isAbstain ? null : Number((RAW_FRAME_BYTES / ALERT_JSON_BYTES).toFixed(2));
     const bbox = usesReplayEvidence ? mission?.bbox ?? profile.bbox : profile.bbox;
     const evidenceAlert = usesReplayEvidence ? activeAlert : null;
+    const alertBytes = isAbstain ? 0 : usesReplayEvidence ? evidenceAlert?.payload_bytes ?? ALERT_JSON_BYTES : ALERT_JSON_BYTES;
+    const ratio = isAbstain || alertBytes <= 0 ? null : Number((RAW_FRAME_BYTES / alertBytes).toFixed(2));
+    const missionObjectTargets = mission?.object_targets?.filter((target) => target.enabled).map((target) => target.label) ?? [];
+    const compactDetectionSummary = evidenceAlert?.detection_summary
+      ? {
+          target_pack_id: evidenceAlert.detection_summary.target_pack_id ?? mission?.target_pack_id ?? null,
+          total_boxes: evidenceAlert.detection_summary.total_boxes,
+          counts_by_label: evidenceAlert.detection_summary.counts_by_label,
+          top_boxes: evidenceAlert.detection_summary.top_boxes.slice(0, 8).map((box) => ({
+            label: box.label,
+            bbox: box.bbox,
+            confidence: box.confidence,
+            source_model: box.source_model,
+            count_quality: box.count_quality,
+            scoring_basis: box.scoring_basis,
+            imagery_origin: box.imagery_origin,
+          })),
+          provenance: evidenceAlert.detection_summary.provenance ?? {},
+        }
+      : null;
+    const compactObjectDeltas = evidenceAlert?.object_deltas?.length
+      ? evidenceAlert.object_deltas.map((delta) => ({
+          label: delta.label,
+          baseline_count: delta.baseline_count,
+          current_count: delta.current_count,
+          delta_count: delta.delta_count,
+          action_hint: delta.action_hint,
+        }))
+      : [];
     const provider = isAbstain
       ? profile.provider
       : demoCase === "eclipse"
@@ -535,6 +855,7 @@ export default function ProofModePanel({
       ? evidenceAlert?.analysis_summary ?? evidenceAlert?.ground_action ?? profile.result
       : profile.result;
     const prompt = usesReplayEvidence ? mission?.task_text ?? profile.prompt : profile.prompt;
+    const confidenceStack = buildConfidenceContributors(demoCase, evidenceAlert, Boolean(compactDetectionSummary));
     const outputJson = isAbstain
       ? {
           status: "abstained",
@@ -550,9 +871,13 @@ export default function ProofModePanel({
           cell_id: usesReplayEvidence ? evidenceAlert?.cell_id ?? profile.cellId : profile.cellId,
           reason_codes: evidenceAlert?.reason_codes ?? DEMO_REASON_CODES[demoCase],
           use_case_id: usesReplayEvidence ? mission?.use_case_id ?? null : profile.replayId,
+          confidence_stack: confidenceStack,
           grounding: groundingResults,
           vqa: vqaAnswer,
           caption,
+          ...(missionObjectTargets.length > 0 ? { object_targets: missionObjectTargets } : {}),
+          ...(compactDetectionSummary ? { detections: compactDetectionSummary } : {}),
+          ...(compactObjectDeltas.length > 0 ? { object_deltas: compactObjectDeltas } : {}),
           ...(demoCase === "eclipse"
             ? {
                 link_state_before: dtnProof?.link_state_before ?? (linkOffline ? "offline" : "online"),
@@ -567,14 +892,16 @@ export default function ProofModePanel({
         };
 
     setProof({
-      demo: demoName(demoCase),
+      demo: isReplayOverride(demoCase, mission)
+        ? replayDisplayName(mission?.replay_id ?? "mission_replay")
+        : demoName(demoCase),
       replay_id: usesReplayEvidence ? mission?.replay_id ?? mission?.use_case_id ?? profile.replayId : profile.replayId,
       model: SHOWCASE_MODEL,
       provider,
       bbox,
       latency_ms: usesReplayEvidence ? SEEDED_LATENCY_MS : profile.latencyMs,
       raw_payload_bytes: RAW_FRAME_BYTES,
-      alert_payload_bytes: isAbstain ? 0 : ALERT_JSON_BYTES,
+      alert_payload_bytes: alertBytes,
       payload_reduction_ratio: ratio,
       confidence,
       abstained: isAbstain,
@@ -623,10 +950,28 @@ export default function ProofModePanel({
   const proofJson = useMemo(() => JSON.stringify(proof, null, 2), [proof]);
   const sourceText = `${proof.provider} / ${proof.source_capture_time}`;
   const evidenceAlert = usesReplayEvidence ? activeAlert : null;
-  const imageSource = usesReplayEvidence ? galleryItem?.context_thumb : DEMO_PROFILES[demoCase].visualAsset ?? null;
-  const timelapseSource = proof.abstained || !usesReplayEvidence ? null : galleryItem?.timelapse_b64;
+  const activeObjectTargets = mission?.object_targets?.filter((target) => target.enabled).map((target) => target.label) ?? [];
+  const detectionSummary = evidenceAlert?.detection_summary ?? null;
+  const objectDeltas = evidenceAlert?.object_deltas ?? [];
+  const detectionCounts = detectionSummary ? Object.entries(detectionSummary.counts_by_label) : [];
+  const proofOverlayBoxes = detectionSummary?.top_boxes?.length
+    ? detectionSummary.top_boxes.slice(0, 6)
+    : groundingResults.slice(0, 6);
+  const profile = DEMO_PROFILES[demoCase];
+  const fallbackVideoSource = proof.abstained ? null : profile.visualVideo ?? null;
+  const imageSource = usesReplayEvidence
+    ? galleryItem?.context_thumb ?? profile.visualAsset ?? null
+    : profile.visualAsset ?? null;
+  const timelapseSource = proof.abstained
+    ? null
+    : usesReplayEvidence
+      ? galleryItem?.timelapse_b64 ?? fallbackVideoSource
+      : fallbackVideoSource;
+  const usingFallbackVideo = Boolean(fallbackVideoSource && timelapseSource === fallbackVideoSource);
   const visualSourceLabel = timelapseSource
-    ? formatSourceLabel(galleryItem?.timelapse_source ?? "replay")
+    ? usingFallbackVideo
+      ? profile.visualVideoSource ?? "Context Timelapse"
+      : formatSourceLabel(galleryItem?.timelapse_source ?? "replay")
     : imageSource
       ? usesReplayEvidence
         ? formatSourceLabel(galleryItem?.context_thumb_source ?? evidenceAlert?.observation_source)
@@ -640,16 +985,42 @@ export default function ProofModePanel({
           : "Mission BBox";
   const reasonCodes = evidenceAlert?.reason_codes ?? DEMO_REASON_CODES[demoCase];
   const cellsScanned = metrics?.total_cells_scanned ?? mission?.cells_scanned ?? 9;
-  const alertsEmitted = metrics?.total_alerts_emitted ?? mission?.flags_found ?? 4;
+  const alertsEmitted =
+    demoCase === "eclipse"
+      ? Math.max(
+          queueCount,
+          flushedQueueCount,
+          dtnProof?.queued_alerts_before_restore ?? 0,
+          dtnProof?.flushed_alerts ?? 0,
+          metrics?.total_alerts_emitted ?? 0,
+          mission?.flags_found ?? 0,
+        )
+      : metrics?.total_alerts_emitted ?? mission?.flags_found ?? 4;
+  const alertMetricLabel = demoCase === "eclipse" ? "Packets" : "Alerts";
+  const replayOverride = isReplayOverride(demoCase, mission);
+  const context = replayOverride ? missionReplayContext(mission, proof) : DEMO_CONTEXT[demoCase];
+  const storyLines = replayOverride ? missionReplayStoryLines(mission) : DEMO_STORY_LINES[demoCase];
+  const proofTitle = replayOverride
+    ? `${replayDisplayName(mission?.replay_id ?? proof.replay_id)} proof`
+    : DEMO_TITLES[demoCase];
+  const confidenceStack = Array.isArray(proof.output_json.confidence_stack)
+    ? (proof.output_json.confidence_stack as ConfidenceContributor[])
+    : buildConfidenceContributors(demoCase, evidenceAlert, Boolean(detectionSummary));
 
   return (
     <div data-testid="proof-mode-panel" className="absolute inset-0 z-40 flex flex-col bg-zinc-950 text-zinc-100">
       <header className="flex shrink-0 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-5 py-3">
-        <div>
+        <div className="min-w-0 pr-4">
           <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-300">Proof Mode</p>
           <h1 data-testid="demo-title" className="text-xl font-semibold text-white">
-            {DEMO_TITLES[demoCase]}
+            {proofTitle}
           </h1>
+          <p
+            data-testid="demo-context-caption"
+            className="mt-1 max-w-[980px] text-[11px] font-medium leading-snug text-zinc-300"
+          >
+            What: {context.what}. Where: {context.where}. When: {context.when}. Why: {context.why}.
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-200">
@@ -698,12 +1069,12 @@ export default function ProofModePanel({
               <p className="mt-1 text-lg font-semibold text-white">{cellsScanned}</p>
             </div>
             <div className="rounded border border-zinc-800 bg-zinc-950 p-3">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">Alerts</p>
+              <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">{alertMetricLabel}</p>
               <p className="mt-1 text-lg font-semibold text-white">{alertsEmitted}</p>
             </div>
           </div>
           <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300">
-            {DEMO_STORY_LINES[demoCase].map((line) => (
+            {storyLines.map((line) => (
               <p key={line}>{line}</p>
             ))}
           </div>
@@ -816,6 +1187,21 @@ export default function ProofModePanel({
             <div className="absolute left-[24%] top-[calc(28%-28px)] rounded bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
               evidence bbox
             </div>
+            {!proof.abstained && proofOverlayBoxes.map((box, index) => (
+              <div
+                key={`${box.label}-${index}`}
+                data-testid="proof-cv-box"
+                className="pointer-events-none absolute border-2"
+                style={proofOverlayStyle(box)}
+              >
+                <span
+                  className="absolute left-0 top-0 max-w-[190px] -translate-y-full rounded-t px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-950 shadow"
+                  style={{ backgroundColor: colorForVlmBox(box) }}
+                >
+                  {proofOverlayLabel(box)}
+                </span>
+              </div>
+            ))}
             <div className="absolute bottom-4 left-4 right-4 grid grid-cols-3 gap-2">
               {reasonCodes.slice(0, 3).map((code) => (
                 <span
@@ -831,7 +1217,9 @@ export default function ProofModePanel({
               className="absolute right-4 top-4 rounded border border-zinc-900/40 bg-zinc-950/85 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-100"
             >
               {timelapseSource
-                ? "Replay WebM evidence: 25 contextual frames"
+                ? usingFallbackVideo
+                  ? "Context timelapse: spectral metadata is scoring basis"
+                  : "Replay WebM evidence: contextual frames"
                 : proof.abstained
                   ? "Static local frame: no alert transmitted"
                   : demoCase === "eclipse"
@@ -880,6 +1268,135 @@ export default function ProofModePanel({
             <ProofRow label="Reduction ratio" value={formatRatio(proof.payload_reduction_ratio)} testId="proof-reduction-ratio" />
             <ProofRow label="Abstain status" value={proof.abstained ? "status: abstained" : "status: transmitted"} />
           </div>
+
+          <div
+            data-testid="proof-confidence-stack"
+            className="mt-3 rounded border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-50"
+          >
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-200">
+                Confidence Stack
+              </p>
+              <span className="rounded border border-emerald-300/30 bg-zinc-950/60 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-100">
+                total {proof.abstained ? "low" : proof.confidence.toFixed(2)}
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              {confidenceStack.map((item) => (
+                <div key={item.signal} className="rounded border border-emerald-300/20 bg-zinc-950/45 px-2 py-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-100">
+                      {item.signal}
+                    </span>
+                    <span className="shrink-0 text-[10px] font-semibold text-white">
+                      {(item.weight * 100).toFixed(0)}% x {item.score.toFixed(2)} = {item.weighted.toFixed(2)}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 truncate text-[10px] text-emerald-200/70">{item.evidence}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {(activeObjectTargets.length > 0 || detectionSummary || objectDeltas.length > 0) && (
+            <div
+              data-testid="proof-object-evidence"
+              className="mt-3 space-y-3 rounded border border-cyan-500/30 bg-cyan-500/10 p-3 text-xs text-cyan-50"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200">
+                    Object Evidence
+                  </p>
+                  {detectionSummary?.target_pack_id && (
+                    <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-cyan-300/80">
+                      Pack: {detectionSummary.target_pack_id}
+                    </p>
+                  )}
+                </div>
+                {detectionSummary && (
+                  <span className="rounded border border-cyan-300/30 bg-zinc-950/60 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-cyan-100">
+                    {detectionSummary.total_boxes} boxes
+                  </span>
+                )}
+              </div>
+
+              {activeObjectTargets.length > 0 && (
+                <div>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-300/80">
+                    Searched
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {activeObjectTargets.map((target) => (
+                      <span key={target} className="rounded border border-cyan-300/25 bg-zinc-950/50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.1em]">
+                        {target}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {detectionCounts.length > 0 && (
+                <div>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-300/80">
+                    Found
+                  </p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {detectionCounts.map(([label, count]) => {
+                      const sampleBox = detectionSummary?.top_boxes?.find((box) => box.label === label);
+                      return (
+                        <div key={label} className="rounded border border-cyan-300/20 bg-zinc-950/45 px-2 py-1">
+                          <p className="truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-cyan-100">
+                            {displayObjectEvidenceLabel(sampleBox ?? label)}
+                          </p>
+                          <p className="text-sm font-bold text-white">{displayObjectEvidenceCount(label, count, sampleBox)}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {detectionSummary?.top_boxes?.length ? (
+                <div>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-300/80">
+                    Top Boxes
+                  </p>
+                  <div className="space-y-1.5">
+                    {detectionSummary.top_boxes.slice(0, 4).map((box, index) => (
+                      <div key={box.id ?? `${box.label}-${index}`} className="rounded border border-cyan-300/20 bg-zinc-950/45 px-2 py-1">
+                        <p className="truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-cyan-100">
+                          {displayObjectEvidenceLabel(box)} · {box.confidence !== undefined ? box.confidence.toFixed(2) : "n/a"}
+                        </p>
+                        <p className="truncate text-[10px] text-cyan-200/70">
+                          {box.source_model ?? "unknown source"} · [{box.bbox.map((value) => value.toFixed(2)).join(", ")}]
+                        </p>
+                        <p className="truncate text-[10px] text-cyan-200/80">{objectEvidenceScopeNote(box)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {objectDeltas.length > 0 && (
+                <div>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-300/80">
+                    Count Delta
+                  </p>
+                  <div className="space-y-1.5">
+                    {objectDeltas.slice(0, 4).map((delta) => (
+                      <div key={delta.label} className="flex items-center justify-between gap-2 rounded border border-cyan-300/20 bg-zinc-950/45 px-2 py-1">
+                        <span className="truncate text-[10px] font-semibold uppercase tracking-[0.1em]">{delta.label}</span>
+                        <span className="shrink-0 text-[10px] font-semibold text-cyan-100">
+                          {delta.baseline_count} to {delta.current_count} ({delta.delta_count >= 0 ? "+" : ""}{delta.delta_count}) · {delta.action_hint}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {demoCase === "payload" && (
             <div className="mt-3 rounded border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm font-semibold text-emerald-100">

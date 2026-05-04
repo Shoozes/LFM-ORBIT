@@ -22,11 +22,17 @@ MODEL_FILE="$MODEL_DIR/LFM2.5-VL-450M-Q4_0.gguf"
 MODEL_MANIFEST="$MODEL_DIR/model_manifest.json"
 TOOLS_DIR="$RUNTIME_DIR/tools"
 UV_BOOTSTRAP_BIN="$TOOLS_DIR/uv/bin/uv"
+UV_VENV_DIR="$TOOLS_DIR/uv-venv"
+UV_VENV_BIN="$UV_VENV_DIR/bin/uv"
+UV_VENV_WIN_BIN="$UV_VENV_DIR/Scripts/uv.exe"
 DEFAULT_MODEL_REPO_ID="Shoozes/lfm2.5-450m-vl-orbit-satellite"
 DEFAULT_MODEL_REVISION="main"
 SIMSAT_DIR="$BACKEND_DIR/SimSat-main"
 UV_CMD=""
 PYTHON_CMD=""
+NODE_CMD=""
+NPM_CMD=""
+NPX_CMD=""
 
 INSTALL=false
 INSTALL_ONLY=false
@@ -119,6 +125,16 @@ find_existing_uv() {
         return 0
     fi
 
+    if [[ -x "$UV_VENV_BIN" ]]; then
+        printf '%s\n' "$UV_VENV_BIN"
+        return 0
+    fi
+
+    if [[ -x "$UV_VENV_WIN_BIN" ]]; then
+        printf '%s\n' "$UV_VENV_WIN_BIN"
+        return 0
+    fi
+
     if ! is_wsl && command -v uv.exe >/dev/null 2>&1; then
         command -v uv.exe
         return 0
@@ -137,20 +153,32 @@ ensure_uv() {
     fi
 
     if [[ "${LFM_ORBIT_SKIP_UV_BOOTSTRAP:-}" == "1" ]]; then
-        echo "[!] uv not found. Install uv from https://docs.astral.sh/uv/ to honor source/backend/uv.lock." >&2
+        echo "[!] uv not found. Install uv or unset LFM_ORBIT_SKIP_UV_BOOTSTRAP so the launcher can bootstrap repo-local uv." >&2
         exit 1
     fi
 
-    require_command curl "Install curl or install uv manually from https://docs.astral.sh/uv/."
-    echo "[*] uv not found; bootstrapping repo-local uv into runtime-data/tools/uv..."
-    mkdir -p "$TOOLS_DIR/uv/bin"
-    curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$TOOLS_DIR/uv/bin" sh
+    ensure_python
+    echo "[*] uv not found; bootstrapping repo-local uv into runtime-data/tools/uv-venv..."
+    mkdir -p "$TOOLS_DIR"
+    "$PYTHON_CMD" -m venv "$UV_VENV_DIR"
 
-    if [[ ! -x "$UV_BOOTSTRAP_BIN" ]]; then
-        echo "[!] uv bootstrap did not produce $UV_BOOTSTRAP_BIN" >&2
+    local venv_python="$UV_VENV_DIR/bin/python"
+    if [[ ! -x "$venv_python" && -x "$UV_VENV_DIR/Scripts/python.exe" ]]; then
+        venv_python="$UV_VENV_DIR/Scripts/python.exe"
+    fi
+    if [[ ! -x "$venv_python" ]]; then
+        echo "[!] uv bootstrap virtualenv did not contain a Python executable." >&2
         exit 1
     fi
-    UV_CMD="$UV_BOOTSTRAP_BIN"
+
+    "$venv_python" -m pip install --upgrade pip uv
+
+    if UV_CMD="$(find_existing_uv)"; then
+        return
+    fi
+
+    echo "[!] uv bootstrap did not produce a usable uv executable under $UV_VENV_DIR" >&2
+    exit 1
 }
 
 ensure_python() {
@@ -159,11 +187,50 @@ ensure_python() {
     fi
 
     if PYTHON_CMD="$(resolve_command python python3 python.exe)"; then
+        if "$PYTHON_CMD" - <<'PY'
+import sys
+raise SystemExit(0 if sys.version_info >= (3, 10) else 1)
+PY
+        then
+            return
+        fi
+        echo "[!] Python 3.10+ is required. Found an older Python at $PYTHON_CMD." >&2
+        exit 1
+    fi
+
+    echo "[!] Python 3.10+ not found. Install Python before running the launcher." >&2
+    exit 1
+}
+
+ensure_node() {
+    if [[ -n "$NODE_CMD" && -n "$NPM_CMD" && -n "$NPX_CMD" ]]; then
         return
     fi
 
-    echo "[!] Python 3.12+ not found. Install Python before fetching the optional GGUF model." >&2
-    exit 1
+    if ! NODE_CMD="$(resolve_command node node.exe)"; then
+        echo "[!] Node.js 20.19.0 or newer 22.12.0+ not found. Install Node.js; .nvmrc pins 20.19.0." >&2
+        if is_wsl; then
+            echo "    In WSL, install Node inside WSL or ensure Windows node.exe is visible on PATH." >&2
+        fi
+        exit 1
+    fi
+    if ! NPM_CMD="$(resolve_command npm npm.cmd)"; then
+        echo "[!] npm not found. Install Node.js 20.19.0 or newer 22.12.0+; npm ships with Node.js." >&2
+        exit 1
+    fi
+    if ! NPX_CMD="$(resolve_command npx npx.cmd)"; then
+        echo "[!] npx not found. Install Node.js 20.19.0 or newer 22.12.0+; npx ships with npm." >&2
+        exit 1
+    fi
+
+    if ! "$NODE_CMD" -e "const [maj,min,patch]=process.versions.node.split('.').map(Number); const ok=(maj===20 && (min>19 || (min===19 && patch>=0))) || (maj>22) || (maj===22 && min>=12); process.exit(ok?0:1);"; then
+        echo "[!] Unsupported Node.js version $("$NODE_CMD" --version). Use Node.js 20.19.0, or Node.js 22.12.0 or newer." >&2
+        exit 1
+    fi
+    if ! "$NPM_CMD" --version >/dev/null 2>&1; then
+        echo "[!] npm is present but failed to run. Reinstall Node.js or repair PATH so npm matches the active Node runtime." >&2
+        exit 1
+    fi
 }
 
 can_attempt_model_runtime_install() {
@@ -227,11 +294,11 @@ install_backend_deps() {
 }
 
 install_frontend_deps() {
-    require_command npm "Install Node.js using the version pinned in .nvmrc."
+    ensure_node
     echo "[*] Installing frontend dependencies from package-lock.json..."
     (
         cd "$FRONTEND_DIR"
-        npm ci
+        "$NPM_CMD" ci
     )
 }
 
@@ -326,11 +393,11 @@ install_deps() {
 }
 
 install_playwright_browser() {
-    require_command npm "Install Node.js using the version pinned in .nvmrc."
+    ensure_node
     echo "[*] Ensuring Playwright Chromium is installed..."
     (
         cd "$FRONTEND_DIR"
-        npx playwright install chromium
+        "$NPX_CMD" playwright install chromium
     )
 }
 
@@ -349,18 +416,18 @@ run_verify() {
     (
         cd "$FRONTEND_DIR"
         echo "[*] Frontend typecheck..."
-        npm run lint
+        "$NPM_CMD" run lint
         echo "[*] Frontend production build..."
-        npm run build
+        "$NPM_CMD" run build
         echo "[*] Playwright E2E..."
-        npm run test:e2e
+        "$NPM_CMD" run test:e2e
     )
 
     echo "[+] Verification complete."
 }
 
 run_app() {
-    require_command npm "Install Node.js using the version pinned in .nvmrc."
+    ensure_node
     echo "[*] Starting LFM Orbit..."
     write_simsat_status
 
@@ -415,7 +482,7 @@ run_app() {
     echo "[*] Launching frontend on http://127.0.0.1:5173 ..."
     (
         cd "$FRONTEND_DIR"
-        npm run dev -- --host 127.0.0.1
+        "$NPM_CMD" run dev -- --host 127.0.0.1
     )
 }
 

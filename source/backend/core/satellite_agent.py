@@ -5,8 +5,8 @@ This agent runs continuously, scanning cells, scoring spectral deltas,
 and posting anomaly flags to the agent bus when thresholds are exceeded.
 It also reads replies from the Ground Validator and acknowledges them.
 
-In production this would run on the NVIDIA Orin in orbit.
-In demo mode it runs as an async task inside FastAPI.
+In a deployed system this would run on edge orbital hardware.
+In this app it runs as an async task inside FastAPI.
 """
 
 import asyncio

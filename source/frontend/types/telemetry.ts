@@ -49,6 +49,40 @@ export type BoundaryContext = {
   distance_to_boundary_m: number;
 };
 
+export type DetectionBox = {
+  id?: string;
+  label: string;
+  bbox: number[];
+  bbox_format?: "unit_xyxy" | "unit_yxyx";
+  confidence?: number;
+  color_key?: string;
+  source_model?: string;
+  prompt?: string;
+  runtime_truth_mode?: string;
+  imagery_origin?: string;
+  scoring_basis?: string;
+  frame_ref?: string;
+  timestamp?: string;
+  count_quality?: string;
+};
+
+export type DetectionSummary = {
+  target_pack_id?: string | null;
+  total_boxes: number;
+  counts_by_label: Record<string, number>;
+  top_boxes: DetectionBox[];
+  provenance?: Record<string, string | boolean>;
+};
+
+export type ObjectDelta = {
+  label: string;
+  baseline_count: number;
+  current_count: number;
+  delta_count: number;
+  delta_percent: number;
+  action_hint: "discard" | "defer" | "downlink_now";
+};
+
 export type ScanResultMessage = {
   type: "scan_result";
   event_id: string;
@@ -71,6 +105,8 @@ export type ScanResultMessage = {
   cycle_index: number;
   demo_forced_anomaly?: boolean;
   boundary_context?: BoundaryContext[];
+  detection_summary?: DetectionSummary;
+  object_deltas?: ObjectDelta[];
 };
 
 export type ScanCompleteMessage = {
@@ -100,6 +136,8 @@ export type AlertItem = {
   downlinked?: boolean;
   demo_forced_anomaly?: boolean;
   boundary_context?: BoundaryContext[];
+  detection_summary?: DetectionSummary;
+  object_deltas?: ObjectDelta[];
 };
 
 export type ApiHealth = {
@@ -245,8 +283,10 @@ export type AnalysisStatus = {
   runtime_capabilities?: ModelRuntimeCapabilities;
   training_modality?: string;
   image_training_verified?: boolean;
+  training_train_rows?: number;
   training_multimodal_rows?: number;
   training_image_blocks?: number;
+  training_eval_rows?: number;
   mmproj_present?: boolean;
   runtime_inference_mode?: string;
   image_conditioned_runtime_enabled?: boolean;

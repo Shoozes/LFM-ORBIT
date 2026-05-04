@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from fastapi import WebSocket
 
-from core.mission import get_active_mission
+from core.mission import get_active_mission, update_mission_progress
 from core.config import (
     REGION,
     imagery_origin_for_source,
@@ -137,9 +137,16 @@ async def stream_region_scan(websocket: WebSocket):
         alerts_emitted = 0
         cells_scanned = 0
         latest_discard_ratio = 0.0
+        mission_changed_during_cycle = False
 
         try:
             for feature in features:
+                latest_mission = get_active_mission()
+                latest_mission_id = latest_mission["id"] if latest_mission else None
+                if latest_mission_id != current_mission_id:
+                    mission_changed_during_cycle = True
+                    break
+
                 cell_id = str(feature["id"])
 
                 observer = RuntimeObserver(run_id=f"run_{cycle_index}_{cell_id}", cell_id=cell_id)
@@ -296,6 +303,8 @@ async def stream_region_scan(websocket: WebSocket):
                         discard_ratio=latest_discard_ratio,
                         flagged_example=flagged_example,
                     )
+                    if current_mission_id is not None:
+                        update_mission_progress(int(current_mission_id), cells_scanned, current_alerts_emitted)
 
                     telemetry_message = build_scan_result_message(
                         alert_payload=alert_payload,
@@ -327,6 +336,16 @@ async def stream_region_scan(websocket: WebSocket):
         finally:
             record_cycle_complete(cycle_index, latest_discard_ratio)
 
-        if not getattr(REGION, 'demo_mode_loop_scan', True):
+        if mission_changed_during_cycle:
+            continue
+
+        if not getattr(REGION, 'demo_mode_loop_scan', False):
             await websocket.send_text(json.dumps({"type": "scan_complete"}))
-            break
+            completed_mission_id = current_mission_id
+            while True:
+                await asyncio.sleep(1.0)
+                latest_mission = get_active_mission()
+                latest_mission_id = latest_mission["id"] if latest_mission else None
+                if latest_mission_id != completed_mission_id:
+                    break
+            continue

@@ -1,6 +1,6 @@
 # Orbit Model Handoff
 
-Updated April 30, 2026.
+Updated May 3, 2026.
 
 ## Purpose
 
@@ -22,7 +22,7 @@ Orbit's current local satellite inference path is still GGUF chat-style reasonin
 That means:
 
 - Orbit can resolve a trained artifact through a manifest instead of one hardcoded file path
-- Orbit can prove whether the NM-UNI training manifest contains image-backed rows through `/api/analysis/status`
+- Orbit can report whether the NM-UNI training manifest contains image rows through `/api/analysis/status`; the current fetched bundle reports image-text training rows and image blocks
 - Orbit does not yet run a fully image-conditioned multimodal `mmproj` inference path in production
 - a published `mmproj` can still be carried in a future handoff manifest so the artifact chain is ready for the next adapter step
 - the current NM-UNI Orbit bundle is a trained GGUF handoff without an `mmproj` file
@@ -131,8 +131,10 @@ Current expected fields for the published NM-UNI handoff are:
 {
   "training_modality": "image_text",
   "image_training_verified": true,
-  "training_multimodal_rows": 32,
-  "training_image_blocks": 44,
+  "training_train_rows": 1611,
+  "training_multimodal_rows": 1611,
+  "training_image_blocks": 1878,
+  "training_eval_rows": 179,
   "mmproj_present": false,
   "runtime_inference_mode": "text_evidence_packet",
   "image_conditioned_runtime_enabled": false
@@ -142,7 +144,7 @@ Current expected fields for the published NM-UNI handoff are:
 The correct operator wording is:
 
 ```text
-Training modality: image-text VLM SFT
+Training modality: image-text SFT in the fetched handoff
 Runtime mode: text evidence-packet reasoning
 Direct image inference: unavailable until mmproj/native VLM runtime is present
 ```
@@ -170,15 +172,16 @@ Orbit is responsible for consuming that bundle and validating it against SimSat/
 Current published bundle:
 
 - repo: `Shoozes/lfm2.5-450m-vl-orbit-satellite`
-- generated at: `2026-04-29T23:47:02.448081Z`
+- generated at: `2026-05-03T17:44:11.333888Z`
 - training method: `vlm_sft`
-- train rows: `32`
-- multimodal rows: `32`
-- image blocks: `44`
-- eval rows: `0`
-- promotion gate: not required / not attached
+- task: `orbit-satellite-triage`
+- train rows: `1611`
+- multimodal rows: `1611`
+- image blocks: `1878`
+- eval rows: `179`
+- promotion gate: not required in `training_result_manifest.json`
 
-Treat this as the trained runtime artifact for the hackathon handoff. Do not overstate it as held-out-evaluated lift until a comparison report is attached.
+Treat this as the trained runtime artifact for evidence-packet and bbox JSON reasoning. Its training manifest now includes image-text rows, but Orbit still must not describe runtime inference as image-conditioned until a runtime adapter passes pixels into the model and a smoke test proves image-sensitive output.
 
 Do not move NM-UNI's training UI or provider management into Orbit. Keep Orbit's hackathon path centered on DPhi SimSat (`simsat_sentinel`), bundled replay fixtures, and manifest-driven model consumption.
 
@@ -245,26 +248,34 @@ Orbit also stores timestamped watch manifests under `source/backend/assets/watch
 
 Current local export after including replay cache:
 
-- `56` current-cycle Orbit samples
-- `24` replay-cache rows
-- `25` rows with timelapse references
-- `179` deduplicated retagged image/frame assets
-- `26` temporal sequence rows
-- `40` bounded Qwen/Ollama image calls plus `6` sequence calls with deterministic heuristic fallback for remaining assets
-- `74` image tags reused from the previous retag folder to avoid rescanning already-tagged assets
+- `200` current-cycle Orbit samples
+- `0` cached API observation rows
+- `11` replay-cache rows
+- `0` visual story frame rows
+- `0` monitor-report rows
+- `185` mission metadata rows
+- `15` rows with timelapse references
+- `163` deduplicated retagged image/frame assets
+- `15` temporal sequence rows
+- `0` external provider calls in the latest refresh
+- `163` image tags and `15` sequence tags reused from the previous retag folder to avoid rescanning already-tagged assets
+- `0` skipped assets, `0` tagger failures, and `0` orphan or missing uploaded image files
 
-Hugging Face upload is wired and completed locally for the current retagged training export. The dataset is published at `Shoozes/LFM-Orbit-SatData`, with latest data/card commit `1ebd19065e8a8124372425c4c0df9c0332275c9c` and `mission_metadata=1` for the metadata-only Greenland ice/snow extent replay. The trained model handoff bundle is published at `Shoozes/lfm2.5-450m-vl-orbit-satellite`.
+Hugging Face upload is wired and completed locally for the current retagged training export. The dataset is published at `Shoozes/LFM-Orbit-SatData`, with latest data/card commit `2d5c5c400b61e869a1154881743ac6f1c1f77e3b` and `mission_metadata=185` for operator task text, target packs, object targets, bbox intent, and metadata-only replay missions.
+
+The trained model handoff bundle is published at `Shoozes/lfm2.5-450m-vl-orbit-satellite`. Latest checked revision: `560b0c6e4eb68696527630b8e652cc34850a82b9`. Local fetch with `--force` refreshed `runtime-data/models/lfm2.5-vlm-450m/`; `scripts/smoke_satellite_model.py --require-present --max-tokens 8` passed with `loaded=true`. The manifest reports task `orbit-satellite-triage`, base model `LiquidAI/LFM2.5-VL-450M`, GGUF runtime, `training_modality=image_text`, `image_training_verified=true`, `1611` train rows, `1611` multimodal rows, `1878` image blocks, and `179` eval rows. Runtime remains `text_evidence_packet` because no `mmproj` or direct image-conditioned adapter is wired.
 
 ## Integration Sequence
 
-1. Export Orbit samples with `source/backend/scripts/export_orbit_dataset.py --include-seeded-cache`.
-2. Import, train, and package the model in an external training workspace.
-3. Generate `orbit_model_handoff.json`.
-4. Upload the staged folder to Hugging Face.
-5. Run Orbit's fetch script against the handoff manifest or the default `Shoozes/lfm2.5-450m-vl-orbit-satellite` repo.
-6. Verify Orbit status at `/api/inference/status` or `/api/analysis/status`, including `image_training_verified`, `training_image_blocks`, `mmproj_present`, and `image_conditioned_runtime_enabled`.
-7. When a real GGUF is installed, run `python scripts\smoke_satellite_model.py --require-present` from `source/backend`.
-8. Use `scripts/evaluate_model.py --baseline-summary ...` to write `comparison.json` and `promotion.json` before promoting a tuned bundle.
+1. Export Orbit samples with `source/backend/scripts/export_orbit_dataset.py --include-seeded-cache --offline-context-thumbnails`.
+2. Retag and deduplicate with `source/backend/scripts/retag_training_assets.py --reuse-existing-dir <previous-retagged-folder> --reuse-existing-only` for normal upload refreshes.
+3. Import, train, and package the model in an external training workspace.
+4. Generate `orbit_model_handoff.json`.
+5. Upload the staged folder to Hugging Face.
+6. Run Orbit's fetch script against the handoff manifest or the default `Shoozes/lfm2.5-450m-vl-orbit-satellite` repo.
+7. Verify Orbit status at `/api/inference/status` or `/api/analysis/status`, including `image_training_verified`, `training_image_blocks`, `mmproj_present`, and `image_conditioned_runtime_enabled`.
+8. When a real GGUF is installed, run `python scripts\smoke_satellite_model.py --require-present` from `source/backend`.
+9. Use `scripts/evaluate_model.py --baseline-summary ...` to write `comparison.json` and `promotion.json` before promoting a tuned bundle.
 
 ## Tracked Runtime Gaps
 

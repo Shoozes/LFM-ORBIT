@@ -70,18 +70,19 @@ Then export and retag:
 uv run --no-sync python scripts\export_orbit_dataset.py `
   --output-dir ..\..\runtime-data\modeling\orbit-export `
   --include-seeded-cache `
-  --monitor-reports-dir ..\..\runtime-data\monitor-reports
+  --monitor-reports-dir ..\..\runtime-data\monitor-reports `
+  --offline-context-thumbnails
 
 uv run --no-sync python scripts\retag_training_assets.py `
   --dataset-dir ..\..\runtime-data\modeling\orbit-export `
   --provider ollama `
   --model qwen3.6:27b `
-  --max-provider-assets 40 `
-  --max-provider-sequences 6 `
-  --reuse-existing-dir ..\..\runtime-data\modeling\orbit-export\retagged_training_reuse_prev `
-  --no-reuse-existing-sequences `
+  --reuse-existing-dir ..\..\runtime-data\modeling\orbit-export\retagged_training `
+  --reuse-existing-only `
   --timeout 180
 ```
+
+Use `--reuse-existing-only` for normal upload refreshes: existing Qwen/Ollama tags are preserved by hash, while new hashes get deterministic heuristic labels instead of blocking on local model latency. Remove that flag and set positive `--max-provider-assets` / `--max-provider-sequences` only when intentionally running a fresh visual-model retag pass.
 
 Upload:
 
@@ -96,27 +97,33 @@ uv run --no-sync python scripts\upload_orbit_dataset_hf.py `
 
 | Output | Value |
 |---|---|
-| Exported Orbit samples | `56` |
-| Replay-cache rows | `24` |
-| Records with timelapse references | `25` |
-| Deduplicated training assets | `179` |
-| Temporal sequences | `26` |
-| Qwen image calls | `40` |
-| Qwen sequence calls | `6` |
-| Reused existing image tags | `74` |
-| Deterministic image fallbacks | `65` |
-| Deterministic sequence fallbacks | `20` |
-| Skipped assets | `9` historical SVG placeholders |
+| Exported Orbit samples | `200` |
+| Cached API observation rows | `0` |
+| Replay-cache rows | `11` |
+| Visual story frame rows | `0` |
+| Monitor-report rows | `0` |
+| Mission metadata rows | `185` |
+| Records with timelapse references | `15` |
+| Deduplicated training assets | `163` |
+| Temporal sequences | `15` |
+| External image calls | `0` |
+| External sequence calls | `0` |
+| Reused existing image tags | `163` |
+| Reused existing sequence tags | `15` |
+| Skipped assets | `0` |
 | Tagger failures | `0` |
+| Orphan or missing uploaded image files | `0` |
 
-The sample count is a current runtime-cycle export, not a claim of total possible mission history. The durable replay cache increased and now includes seven newer temporal missions.
+The sample count is a current runtime-cycle export, not a claim of total possible mission history. The durable replay cache is joined with cached API observations, visual story frames, persisted monitor reports, and mission metadata so new CV/object evidence work can train without spending provider quota.
 
 ## Integrity Rules
 
 - Clouds and no-data are quality gates before frames enter replay WebMs.
 - A valid timelapse needs multiple contextual satellite slices.
 - Static image recolors are invalid temporal evidence.
-- New exports rasterize offline SVG placeholder chips to PNG before retagging; the `9` SVG skips above are historical from the previous published cycle.
+- New exports rasterize offline SVG placeholder chips to PNG before retagging.
+- `--offline-context-thumbnails` keeps local refreshes from waiting on ESRI thumbnail requests, and generated sample folders are cleared before each export so loose scans do not see stale sample assets.
+- Monitor before/after frame references are exported only when their image files are resolvable, so retagging does not chase dead local paths.
 - Unsupported non-raster assets should still be skipped rather than forced into vision tagging.
 - Already-tagged image hashes are reused from the previous retag folder when `--reuse-existing-dir` is set.
 - Extracted video frames are namespaced by video SHA-256 so different `timelapse.webm` files cannot overwrite each other.
@@ -128,8 +135,8 @@ Dataset: [Shoozes/LFM-Orbit-SatData](https://huggingface.co/datasets/Shoozes/LFM
 
 Current refresh:
 
-- Data/card commit: `1ebd19065e8a8124372425c4c0df9c0332275c9c`
-- Remote config verification: `default=179`, `temporal_sft=26`, `asset_metadata=179`, `retagged_assets=179`, `temporal_metadata=26`, `review_queue=179`, `mission_metadata=1`
+- Data/card commit: `2d5c5c400b61e869a1154881743ac6f1c1f77e3b`
+- Remote config verification: `default=163`, `temporal_sft=15`, `asset_metadata=163`, `retagged_assets=163`, `temporal_metadata=15`, `review_queue=163`, `mission_metadata=185`
 
 The Hub card keeps schemas separate:
 

@@ -39,6 +39,20 @@ def test_download_file_streams_large_artifacts_to_disk(tmp_path, monkeypatch):
     ]
 
 
+def test_require_nonempty_artifact_removes_empty_download(tmp_path):
+    target_path = tmp_path / "empty.gguf"
+    target_path.write_bytes(b"")
+
+    try:
+        fetch_satellite_model._require_nonempty_artifact(target_path, label="model")
+    except ValueError as exc:
+        assert "download was empty" in str(exc)
+    else:  # pragma: no cover - explicit failure path
+        raise AssertionError("empty model artifact was accepted")
+
+    assert not target_path.exists()
+
+
 def test_copy_local_bundle_metadata_preserves_provenance_files(tmp_path):
     bundle_dir = tmp_path / "bundle"
     bundle_dir.mkdir()
@@ -100,6 +114,31 @@ def test_main_defaults_to_published_orbit_handoff_repo(tmp_path, monkeypatch, ca
     assert exit_code == 0
     assert "Shoozes/lfm2.5-450m-vl-orbit-satellite@main" in output
     assert "LFM2.5-VL-450M-Q4_0.gguf" in output
+
+
+def test_dry_run_allows_existing_artifacts(tmp_path, monkeypatch, capsys):
+    runtime_dir = tmp_path / "runtime-data"
+    model_dir = runtime_dir / "models" / "lfm2.5-vlm-450m"
+    model_dir.mkdir(parents=True)
+    (model_dir / "LFM2.5-VL-450M-Q4_0.gguf").write_bytes(b"existing")
+    monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(runtime_dir))
+    monkeypatch.setattr(sys, "argv", ["fetch_satellite_model.py", "--dry-run"])
+    monkeypatch.setattr(
+        fetch_satellite_model,
+        "_try_load_remote_handoff_manifest",
+        lambda repo_id, revision, filename, token: {
+            "repo_id": "Shoozes/lfm2.5-450m-vl-orbit-satellite",
+            "revision": "main",
+            "model_subdir": "lfm2.5-vlm-450m",
+            "model_filename": "LFM2.5-VL-450M-Q4_0.gguf",
+        },
+    )
+
+    exit_code = fetch_satellite_model.main()
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "Existing artifact(s) would be preserved" in output
 
 
 def test_main_prefers_remote_handoff_manifest_and_preserves_repo_metadata(tmp_path, monkeypatch):

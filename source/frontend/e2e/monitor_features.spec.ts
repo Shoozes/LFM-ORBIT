@@ -84,6 +84,7 @@ test.describe("Monitor Feature Visual Proof", () => {
     await waitForLinkOpen(page);
     await waitForBasemapReady(page);
     await page.locator("[data-testid='tab-mission']").click();
+    await page.getByTestId("mission-panel-tab-monitors").click();
 
     await expect(page.locator("[data-testid='monitor-template-panel']")).toBeVisible();
     await page.locator("[data-testid='lifeline-monitor-button']").click();
@@ -107,6 +108,7 @@ test.describe("Monitor Feature Visual Proof", () => {
     await waitForLinkOpen(page);
     await waitForBasemapReady(page);
     await page.locator("[data-testid='tab-mission']").click();
+    await page.getByTestId("mission-panel-tab-monitors").click();
 
     await expect(page.locator("[data-testid='monitor-template-panel']")).toBeVisible();
     await page.locator("[data-testid='maritime-monitor-button']").click();
@@ -116,6 +118,7 @@ test.describe("Monitor Feature Visual Proof", () => {
     await expect(proofCard).toContainText("Maritime Monitor");
     await expect(proofCard).toContainText("directions");
     await expect(proofCard).toContainText("STAC optional");
+    await page.getByTestId("mission-panel-tab-plan").click();
     await expect(page.locator("[data-testid='bbox-badge']")).toContainText("Active Area", { timeout: 10_000 });
     await waitForNextPaint(page);
 
@@ -163,6 +166,28 @@ test.describe("Monitor Feature Visual Proof", () => {
 
     await page.screenshot({
       path: `${SHOT_DIR}/09-highway-82-wildfire-preview.png`,
+      fullPage: false,
+    });
+  });
+
+  test("visual proof: Florida drought and wildfire readiness preset", async ({ page, request }) => {
+    test.setTimeout(45_000);
+    await resetRuntimeState(request);
+    await gotoApp(page);
+    await waitForLinkOpen(page);
+    await waitForBasemapReady(page);
+    await page.locator("[data-testid='tab-mission']").click();
+
+    await page.locator("[data-testid='mission-preset-fire_drought_florida_2026']").click();
+    await expect(page.locator("[data-testid='selected-mission-preset']")).toContainText("North Florida corridor");
+    await expect(page.locator("[data-testid='selected-mission-preset']")).toContainText("candidate triage only");
+    await expect(page.locator("textarea")).toHaveValue(/Florida Fire\/Drought Readiness Watch/);
+    await expect(page.locator("[data-testid='bbox-badge']")).toContainText("-83.20", { timeout: 10_000 });
+    await page.locator("[data-testid='selected-mission-preset']").scrollIntoViewIfNeeded();
+    await waitForNextPaint(page);
+
+    await page.screenshot({
+      path: `${SHOT_DIR}/09a-florida-fire-drought-preview.png`,
       fullPage: false,
     });
   });

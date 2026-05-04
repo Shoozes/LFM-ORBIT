@@ -64,8 +64,25 @@ from core.maritime_monitoring import (
     normalize_maritime_timestamp,
 )
 from core.metrics import read_metrics_summary
-from core.mission import get_active_mission, list_missions, start_mission, stop_mission
+from core.mission import (
+    add_mission_targets,
+    clear_mission_targets,
+    get_active_mission,
+    get_mission_target_state,
+    list_missions,
+    remove_mission_targets,
+    set_mission_target_pack,
+    start_mission,
+    stop_mission,
+)
 from core.monitor_reports import list_monitor_report_files, persist_monitor_report
+from core.object_evidence import run_object_evidence_batch
+from core.object_targets import (
+    delete_custom_target_pack,
+    get_target_pack,
+    list_target_packs,
+    save_custom_target_pack,
+)
 from core.queue import get_alert_counts, get_recent_alerts
 from core.replay import list_seeded_replays, load_seeded_replay, rescan_seeded_replay
 from core.replay_snapshot import export_replay_snapshot, import_replay_snapshot
@@ -81,6 +98,7 @@ from core.temporal_use_cases import (
 from core.timelapse import generate_timelapse_frames
 from core.multimodal_inference import generate_with_image
 from core.vlm import explain_vlm_caption, explain_vlm_grounding, explain_vlm_vqa
+from core.watchlists import build_mission_from_watchlist_asset, get_watchlist, list_watchlists
 
 logger = logging.getLogger(__name__)
 
@@ -248,7 +266,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="LFM Orbit API",
-    description="Satellite-first forest and infrastructure intelligence system",
+    description="Satellite-first mission evidence and infrastructure intelligence system",
     version="0.4.0",
     lifespan=lifespan,
 )
@@ -274,6 +292,125 @@ def recent_alerts(limit: int = Query(default=50, ge=1, le=200)):
 @app.get("/api/metrics/summary")
 def metrics_summary():
     return read_metrics_summary()
+
+
+class ObjectTargetBody(BaseModel):
+    label: str = Field(min_length=1, max_length=120)
+    prompt: str | None = Field(default=None, max_length=200)
+    class_key: str | None = Field(default=None, max_length=80)
+    enabled: bool = True
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def _strip_required_label(cls, value: str) -> str:
+        if not isinstance(value, str):
+            return value
+        return _strip_required_text(value, "label")
+
+    @field_validator("prompt", "class_key", mode="before")
+    @classmethod
+    def _strip_optional_target_text(cls, value: str | None, info):
+        return _strip_optional_text(value, info.field_name)
+
+
+class TargetPackBody(BaseModel):
+    id: str = Field(min_length=1, max_length=80)
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=400)
+    targets: list[ObjectTargetBody] = Field(min_length=1, max_length=50)
+
+    @field_validator("id", "name", mode="before")
+    @classmethod
+    def _strip_required_pack_text(cls, value: str, info):
+        if not isinstance(value, str):
+            return value
+        return _strip_required_text(value, info.field_name)
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def _strip_optional_description(cls, value: str | None) -> str:
+        return _strip_optional_text(value, "description") or ""
+
+
+def _target_state_payload(mission: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "mission_id": mission["id"],
+        "target_pack_id": mission.get("target_pack_id"),
+        "object_targets": mission.get("object_targets") or [],
+        "mission": mission,
+    }
+
+
+@app.get("/api/object-targets/packs")
+def object_target_packs():
+    """Return default and runtime custom object target packs."""
+    return {"packs": list_target_packs()}
+
+
+@app.get("/api/object-targets/packs/{pack_id}")
+def object_target_pack(pack_id: str = Path(..., min_length=1, max_length=120)):
+    pack = get_target_pack(pack_id)
+    if pack is None:
+        return JSONResponse(status_code=404, content={"error": "Target pack not found"})
+    return {"pack": pack}
+
+
+@app.post("/api/object-targets/packs")
+def create_object_target_pack(body: TargetPackBody, request: Request = None):
+    """Save a runtime custom target pack without modifying versioned defaults."""
+    _require_local_request(request)
+    try:
+        pack = save_custom_target_pack(body.model_dump())
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
+    return {"pack": pack, "status": "saved"}
+
+
+@app.delete("/api/object-targets/packs/{pack_id}")
+def delete_object_target_pack(
+    pack_id: str = Path(..., min_length=1, max_length=120),
+    request: Request = None,
+):
+    """Delete a runtime custom target pack. Versioned defaults are read-only."""
+    _require_local_request(request)
+    try:
+        removed = delete_custom_target_pack(pack_id)
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
+    if not removed:
+        return JSONResponse(status_code=404, content={"error": "Custom target pack not found"})
+    return {"status": "removed", "pack_id": pack_id}
+
+
+@app.get("/api/watchlists")
+def api_watchlists():
+    """Return JSON-backed operational watchlists."""
+    return {"watchlists": list_watchlists()}
+
+
+@app.get("/api/watchlists/{watchlist_id}")
+def api_watchlist(watchlist_id: str = Path(..., min_length=1, max_length=160)):
+    watchlist = get_watchlist(watchlist_id)
+    if watchlist is None:
+        return JSONResponse(status_code=404, content={"error": "Watchlist not found"})
+    return {"watchlist": watchlist}
+
+
+@app.post("/api/watchlists/{watchlist_id}/assets/{asset_id}/start-mission")
+def api_watchlist_start_mission(
+    watchlist_id: str = Path(..., min_length=1, max_length=160),
+    asset_id: str = Path(..., min_length=1, max_length=160),
+    request: Request = None,
+):
+    """Start a mission from a watchlist asset without external provider calls."""
+    _require_local_request(request)
+    try:
+        mission = build_mission_from_watchlist_asset(watchlist_id, asset_id)
+    except LookupError as exc:
+        return JSONResponse(status_code=404, content={"error": str(exc)})
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
+    return {"mission": mission}
 
 
 class LinkStateBody(BaseModel):
@@ -788,7 +925,7 @@ def analysis_timelapse(body: BboxRequest):
 @app.post("/api/analysis/alert")
 def analyze_alert_endpoint(body: AlertAnalysisBody):
     """
-    Analyze a deforestation alert using AI.
+    Analyze a mission alert using offline evidence reasoning.
 
     Production path: Uses offline LFM signal analysis (CPU-only, deterministic).
     The offline path is always available and requires no external services.
@@ -814,6 +951,8 @@ class MissionStartBody(BaseModel):
     start_date: str | None = None
     end_date: str | None = None
     use_case_id: str | None = None
+    target_pack_id: str | None = Field(default=None, max_length=80)
+    object_targets: list[ObjectTargetBody] | None = Field(default=None, max_length=50)
 
     @field_validator("task_text")
     @classmethod
@@ -828,6 +967,11 @@ class MissionStartBody(BaseModel):
     def _valid_optional_bbox(cls, value: list[float] | None) -> list[float] | None:
         return _normalize_bbox_for_request(value)
 
+    @field_validator("target_pack_id", mode="before")
+    @classmethod
+    def _strip_optional_target_pack(cls, value: str | None) -> str | None:
+        return _strip_optional_text(value, "target_pack_id")
+
     @model_validator(mode="after")
     def _valid_date_order(self) -> "MissionStartBody":
         _validate_date_order(self.start_date, self.end_date)
@@ -836,19 +980,25 @@ class MissionStartBody(BaseModel):
 
 class RuntimeResetBody(BaseModel):
     clear_observation_store_files: bool = False
+    archive_missions: bool = True
 
 
 @app.post("/api/mission/start")
 def mission_start(body: MissionStartBody, request: Request = None):
     """Start a new autonomous scan mission. Agents will restrict scanning to bbox if provided."""
     _require_local_request(request)
-    mission = start_mission(
-        task_text=body.task_text,
-        bbox=body.bbox,
-        start_date=body.start_date,
-        end_date=body.end_date,
-        use_case_id=body.use_case_id,
-    )
+    try:
+        mission = start_mission(
+            task_text=body.task_text,
+            bbox=body.bbox,
+            start_date=body.start_date,
+            end_date=body.end_date,
+            use_case_id=body.use_case_id,
+            target_pack_id=body.target_pack_id,
+            object_targets=[target.model_dump() for target in body.object_targets or []] or None,
+        )
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
     # Announce the mission on the agent bus
     bus_post(
         sender="operator",
@@ -859,6 +1009,8 @@ def mission_start(body: MissionStartBody, request: Request = None):
             "task": mission["task_text"],
             "bbox": mission["bbox"],
             "temporal_use_case": mission.get("use_case_decision"),
+            "target_pack_id": mission.get("target_pack_id"),
+            "object_targets": mission.get("object_targets") or [],
             "note": f"[MISSION #{mission['id']}] Operator tasked: {mission['task_text']}",
         },
     )
@@ -870,6 +1022,94 @@ def mission_current():
     """Return the currently active mission, or null."""
     m = get_active_mission()
     return {"mission": m}
+
+
+class MissionTargetsBaseBody(BaseModel):
+    mission_id: int | None = Field(default=None, ge=1)
+
+
+class MissionTargetsAddBody(MissionTargetsBaseBody):
+    targets: list[ObjectTargetBody] = Field(min_length=1, max_length=50)
+
+
+class MissionTargetsRemoveBody(MissionTargetsBaseBody):
+    labels: list[str] = Field(min_length=1, max_length=50)
+
+    @field_validator("labels")
+    @classmethod
+    def _strip_labels(cls, value: list[str]) -> list[str]:
+        labels = [_strip_required_text(label, "label") for label in value]
+        return labels
+
+
+class MissionTargetPackBody(MissionTargetsBaseBody):
+    target_pack_id: str = Field(min_length=1, max_length=80)
+
+    @field_validator("target_pack_id", mode="before")
+    @classmethod
+    def _strip_pack_id(cls, value: str) -> str:
+        if not isinstance(value, str):
+            return value
+        return _strip_required_text(value, "target_pack_id")
+
+
+@app.get("/api/mission/targets")
+def mission_targets(mission_id: int | None = Query(default=None, ge=1)):
+    """Return object targets for the selected or active mission."""
+    try:
+        return get_mission_target_state(mission_id)
+    except LookupError as exc:
+        return JSONResponse(status_code=404, content={"error": str(exc)})
+
+
+@app.post("/api/mission/targets/add")
+def mission_targets_add(body: MissionTargetsAddBody, request: Request = None):
+    """Add or update mission object targets by label."""
+    _require_local_request(request)
+    try:
+        mission = add_mission_targets(body.mission_id, [target.model_dump() for target in body.targets])
+    except LookupError as exc:
+        return JSONResponse(status_code=404, content={"error": str(exc)})
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
+    return _target_state_payload(mission)
+
+
+@app.post("/api/mission/targets/remove")
+def mission_targets_remove(body: MissionTargetsRemoveBody, request: Request = None):
+    """Remove mission object targets by label, case-insensitively."""
+    _require_local_request(request)
+    try:
+        mission = remove_mission_targets(body.mission_id, body.labels)
+    except LookupError as exc:
+        return JSONResponse(status_code=404, content={"error": str(exc)})
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
+    return _target_state_payload(mission)
+
+
+@app.post("/api/mission/targets/set-pack")
+def mission_targets_set_pack(body: MissionTargetPackBody, request: Request = None):
+    """Replace mission targets with a reusable target pack."""
+    _require_local_request(request)
+    try:
+        mission = set_mission_target_pack(body.mission_id, body.target_pack_id)
+    except LookupError as exc:
+        return JSONResponse(status_code=404, content={"error": str(exc)})
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
+    return _target_state_payload(mission)
+
+
+@app.post("/api/mission/targets/clear")
+def mission_targets_clear(body: MissionTargetsBaseBody, request: Request = None):
+    """Clear mission object targets and target pack id."""
+    _require_local_request(request)
+    try:
+        mission = clear_mission_targets(body.mission_id)
+    except LookupError as exc:
+        return JSONResponse(status_code=404, content={"error": str(exc)})
+    return _target_state_payload(mission)
 
 
 @app.post("/api/mission/stop")
@@ -885,9 +1125,9 @@ def mission_stop(request: Request = None):
         payload={
             "task": "IDLE",
             "note": (
-                "[REPLAY] Operator exited replay. Resuming realtime sweep."
+                "[REPLAY] Operator exited replay. Scan animation paused until a new live mission starts."
                 if active and active.get("mission_mode") == "replay"
-                else "[MISSION] Operator stopped mission. Resuming full-grid sweep."
+                else "[MISSION] Operator stopped mission. Scan animation paused until a new live mission starts."
             ),
         },
     )
@@ -960,6 +1200,7 @@ def runtime_reset(body: RuntimeResetBody | None = None, request: Request = None)
     payload = body or RuntimeResetBody()
     summary = reset_runtime_state(
         clear_observation_store_files=payload.clear_observation_store_files,
+        archive_missions=payload.archive_missions,
     )
     return {
         "status": "reset",
@@ -1118,8 +1359,10 @@ def analysis_status():
     gguf_name = ms.get("name", "LFM2.5-VL-450M-Q4_0.gguf")
     training_modality = ms.get("training_modality", "unknown")
     image_training_verified = ms.get("image_training_verified", False)
+    training_train_rows = ms.get("training_train_rows", 0)
     training_multimodal_rows = ms.get("training_multimodal_rows", 0)
     training_image_blocks = ms.get("training_image_blocks", 0)
+    training_eval_rows = ms.get("training_eval_rows", 0)
     runtime_inference_mode = capabilities.get("runtime_inference_mode", "text_evidence_packet")
     image_conditioned_runtime_enabled = capabilities.get("image_conditioned_runtime_enabled", False)
     image_conditioned_runtime_reason = capabilities.get(
@@ -1133,8 +1376,10 @@ def analysis_status():
         "runtime_capabilities": capabilities,
         "training_modality": training_modality,
         "image_training_verified": image_training_verified,
+        "training_train_rows": training_train_rows,
         "training_multimodal_rows": training_multimodal_rows,
         "training_image_blocks": training_image_blocks,
+        "training_eval_rows": training_eval_rows,
         "mmproj_present": ms.get("mmproj_present", False),
         "runtime_inference_mode": runtime_inference_mode,
         "image_conditioned_runtime_enabled": image_conditioned_runtime_enabled,
@@ -1163,10 +1408,10 @@ def analysis_status():
                 "training_base_model": ms.get("training_base_model", ""),
                 "training_modality": training_modality,
                 "image_training_verified": image_training_verified,
-                "training_train_rows": ms.get("training_train_rows", 0),
+                "training_train_rows": training_train_rows,
                 "training_multimodal_rows": training_multimodal_rows,
                 "training_image_blocks": training_image_blocks,
-                "training_eval_rows": ms.get("training_eval_rows", 0),
+                "training_eval_rows": training_eval_rows,
                 "hf_checkpoint_path": ms.get("hf_checkpoint_path", ""),
                 "hf_checkpoint_present": ms.get("hf_checkpoint_present", False),
                 "lora_adapter_path": ms.get("lora_adapter_path", ""),
@@ -1215,6 +1460,17 @@ class VlmCaptionBody(BboxRequest):
     """Caption request for a validated bbox."""
 
 
+class VlmGroundingBatchBody(BboxRequest):
+    targets: list[ObjectTargetBody] = Field(default_factory=list, max_length=50)
+    target_pack_id: str | None = Field(default=None, max_length=80)
+    frame_ref: str | None = Field(default=None, max_length=120)
+
+    @field_validator("target_pack_id", "frame_ref", mode="before")
+    @classmethod
+    def _strip_optional_batch_text(cls, value: str | None, info):
+        return _strip_optional_text(value, info.field_name)
+
+
 class DepthAnythingSettingsBody(BaseModel):
     enabled: bool
 
@@ -1225,6 +1481,20 @@ class DepthEstimateBody(BaseModel):
 @app.post("/api/vlm/grounding")
 def vlm_grounding(body: VlmGroundingBody):
     return explain_vlm_grounding(body.bbox, body.prompt)
+
+
+@app.post("/api/vlm/grounding/batch")
+def vlm_grounding_batch(body: VlmGroundingBatchBody):
+    try:
+        return run_object_evidence_batch(
+            body.bbox,
+            [target.model_dump() for target in body.targets],
+            target_pack_id=body.target_pack_id,
+            frame_ref=body.frame_ref,
+        )
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
+
 
 @app.post("/api/vlm/vqa")
 def vlm_vqa(body: VlmVqaBody):
@@ -1274,6 +1544,28 @@ class AgentActionConfirmBody(BaseModel):
     proposal: dict[str, Any]
 
 
+class LocationResolveBody(BaseModel):
+    query: str
+    country: str | None = "US"
+    current_bbox: list[float] | None = None
+    limit: int = Field(default=5, ge=1, le=10)
+
+    @field_validator("query")
+    @classmethod
+    def validate_query(cls, value: str) -> str:
+        return _strip_required_text(value, "query")
+
+    @field_validator("country")
+    @classmethod
+    def validate_country(cls, value: str | None) -> str | None:
+        return _strip_optional_text(value, "country")
+
+    @field_validator("current_bbox")
+    @classmethod
+    def validate_current_bbox(cls, value: list[float] | None) -> list[float] | None:
+        return _normalize_bbox_for_request(value)
+
+
 @app.post("/api/agent/chat")
 def ground_agent_chat(request: ChatRequest, http_request: Request = None):
     """
@@ -1294,6 +1586,22 @@ def ground_agent_action_confirm(body: AgentActionConfirmBody, http_request: Requ
     _require_local_request(http_request)
     from core.ground_agent_knowledge import execute_ground_agent_proposal
     return execute_ground_agent_proposal(body.proposal)
+
+
+@app.post("/api/location/resolve")
+def location_resolve(body: LocationResolveBody, http_request: Request = None):
+    """Resolve operator place text into vetted local map candidates."""
+    _require_local_request(http_request)
+    from core.ground_agent_knowledge import LOCATION_TARGETS
+    from core.location_resolver import resolve_location_candidates
+
+    candidates = resolve_location_candidates(body.query, LOCATION_TARGETS, limit=body.limit)
+    return {
+        "query": body.query,
+        "country": body.country,
+        "current_bbox": body.current_bbox,
+        "candidates": candidates,
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 import json
+import base64
 
 from core.agent_bus import init_bus, post_message, upsert_pin
 from core.gallery import add_gallery_item
@@ -11,6 +12,10 @@ def _png_data_url() -> str:
         "data:image/png;base64,"
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z6xQAAAAASUVORK5CYII="
     )
+
+
+def _png_bytes() -> bytes:
+    return base64.b64decode(_png_data_url().split(",", 1)[1])
 
 
 def _webm_data_url() -> str:
@@ -230,6 +235,58 @@ def test_write_dataset_export_rasterizes_svg_context_placeholders(tmp_path, monk
     assert not (sample_dir / "context_thumb.svg").exists()
 
 
+def test_write_dataset_export_can_force_offline_context_thumbnails(tmp_path, monkeypatch):
+    db_path = tmp_path / "alerts.sqlite"
+    bus_path = tmp_path / "agent_bus.sqlite"
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(db_path))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(bus_path))
+
+    def fail_network_thumb(_lat, _lng):
+        raise AssertionError("offline export should not call thumbnail resolver")
+
+    monkeypatch.setattr(export_orbit_dataset, "resolve_context_thumb", fail_network_thumb)
+
+    init_db(reset=True)
+    init_bus(reset=True)
+    push_alert(
+        event_id="evt_offline_thumb",
+        region_id="amazonas_region_alpha",
+        cell_id="offline_thumb_cell",
+        change_score=0.51,
+        confidence=0.88,
+        priority="high",
+        reason_codes=["ndvi_drop"],
+        payload_bytes=123,
+    )
+    upsert_pin(
+        pin_type="satellite",
+        lat=-3.12,
+        lng=-60.01,
+        label="SAT offline",
+        note="Needs local chip.",
+        cell_id="offline_thumb_cell",
+    )
+
+    output_dir = tmp_path / "export"
+    stale_dir = output_dir / "samples" / "stale_sample"
+    stale_dir.mkdir(parents=True)
+    (stale_dir / "context_thumb.png").write_bytes(b"stale")
+
+    manifest = export_orbit_dataset.write_dataset_export(
+        output_dir,
+        limit=10,
+        eval_ratio=0.5,
+        offline_context_thumbnails=True,
+    )
+    record = json.loads((output_dir / "samples.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    sample_dir = output_dir / "samples" / record["sample_id"]
+
+    assert manifest["records_with_context_thumb"] == 1
+    assert record["assets"]["context_thumb"] == "context_thumb.png"
+    assert (sample_dir / "context_thumb.png").read_bytes().startswith(b"\x89PNG")
+    assert not stale_dir.exists()
+
+
 def test_write_dataset_export_auto_classifies_wildfire_training_rows(tmp_path, monkeypatch):
     db_path = tmp_path / "alerts.sqlite"
     bus_path = tmp_path / "agent_bus.sqlite"
@@ -333,6 +390,8 @@ def test_write_dataset_export_includes_persisted_monitor_reports(tmp_path, monke
 
     (monitor_dir / "lifeline.json").write_text(json.dumps(lifeline_report), encoding="utf-8")
     (monitor_dir / "maritime.json").write_text(json.dumps(maritime_report), encoding="utf-8")
+    (monitor_dir / "before.png").write_bytes(base64.b64decode(_png_data_url().split(",", 1)[1]))
+    (monitor_dir / "after.png").write_bytes(base64.b64decode(_png_data_url().split(",", 1)[1]))
 
     output_dir = tmp_path / "export"
     manifest = export_orbit_dataset.write_dataset_export(
@@ -591,3 +650,136 @@ def test_seeded_cache_record_replaces_duplicate_api_observation(tmp_path, monkey
     assert records[0]["record_type"] == "seeded_cache"
     assert records[0]["target_task"] == "flood_temporal_detection"
     assert records[0]["timelapse_analysis"] == "richer seeded metadata"
+
+
+def test_dataset_export_can_recycle_visual_story_frames(tmp_path, monkeypatch):
+    db_path = tmp_path / "alerts.sqlite"
+    bus_path = tmp_path / "agent_bus.sqlite"
+    seeded_dir = tmp_path / "seeded_data"
+    story_dir = seeded_dir / "visual_story_frames"
+    story_dir.mkdir(parents=True)
+    story_image = story_dir / "story_houses.png"
+    story_image.write_bytes(_png_bytes())
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(db_path))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(bus_path))
+    monkeypatch.setattr(export_orbit_dataset, "_SEEDED_DATA_DIR", seeded_dir)
+
+    init_db(reset=True)
+    init_bus(reset=True)
+
+    (story_dir / "visual_story_manifest.json").write_text(
+        json.dumps(
+            {
+                "stories": [
+                    {
+                        "story_id": "houses",
+                        "title": "Buildings / Houses",
+                        "bbox": [-81.458, 28.408, -81.448, 28.418],
+                        "date_from": "2026-01-01",
+                        "date_to": "2026-02-15",
+                        "source": "Esri World Imagery context",
+                        "imagery_origin": "esri_context",
+                        "runtime_truth_mode": "replay",
+                        "scoring_basis": "visual_only",
+                        "box_source": "visual_story_fixture",
+                        "box_count": 3,
+                        "targets": ["houses", "roof rows"],
+                        "frame_path": str(story_image),
+                        "output_path": str(story_image),
+                        "training_ready": True,
+                        "note": "Boxes are deterministic visual-story evidence fixtures, not a claim of live model-backed object detection.",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "export"
+    manifest = export_orbit_dataset.write_dataset_export(
+        output_dir,
+        limit=10,
+        include_rejects=False,
+        include_seeded_cache=True,
+    )
+    records = [
+        json.loads(line)
+        for line in (output_dir / "samples.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    assert manifest["records"] == 1
+    assert manifest["visual_story_frame_records"] == 1
+    assert manifest["records_with_context_thumb"] == 1
+    record = records[0]
+    assert record["record_type"] == "visual_story_frame"
+    assert record["confirmation_source"] == "visual_story_manifest"
+    assert record["box_source"] == "visual_story_fixture"
+    assert record["object_targets"] == ["houses", "roof rows"]
+    assert record["assets"]["context_thumb"] == "context_thumb.png"
+    assert (output_dir / "samples" / record["sample_id"] / "context_thumb.png").read_bytes() == _png_bytes()
+
+
+def test_dataset_export_preserves_current_and_archived_mission_metadata(tmp_path, monkeypatch):
+    db_path = tmp_path / "alerts.sqlite"
+    bus_path = tmp_path / "agent_bus.sqlite"
+    runtime_dir = tmp_path / "runtime-data"
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(db_path))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(bus_path))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+    monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(runtime_dir))
+
+    init_db(reset=True)
+    init_bus(reset=True)
+
+    from core.mission import init_missions, start_mission
+    from core.mission_archive import read_mission_archive
+    from core.runtime_state import reset_runtime_state
+
+    init_missions(reset=True)
+    start_mission(
+        "Run Southeast Fireline Watch. Look for dark smoke and road obstruction.",
+        bbox=[-81.916, 31.143, -81.756, 31.303],
+        target_pack_id="fireline",
+    )
+
+    current_manifest = export_orbit_dataset.write_dataset_export(
+        tmp_path / "current-export",
+        limit=10,
+        include_rejects=False,
+    )
+    current_records = [
+        json.loads(line)
+        for line in (tmp_path / "current-export" / "samples.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    assert current_manifest["mission_metadata_records"] == 1
+    current = current_records[0]
+    assert current["record_type"] == "mission_metadata"
+    assert current["confirmation_source"] == "mission_state"
+    assert current["target_pack_id"] == "fireline"
+    assert "dark smoke" in current["object_target_labels"]
+    assert current["training_contract"]["evidence_requirements"]["context_thumb_required_for_nm_uni"] is False
+
+    reset_summary = reset_runtime_state()
+    assert reset_summary["missions_archived"] == 1
+    assert read_mission_archive(limit=5)
+
+    archived_manifest = export_orbit_dataset.write_dataset_export(
+        tmp_path / "archived-export",
+        limit=10,
+        include_rejects=False,
+    )
+    archived_records = [
+        json.loads(line)
+        for line in (tmp_path / "archived-export" / "samples.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    assert archived_manifest["mission_metadata_records"] == 1
+    archived = archived_records[0]
+    assert archived["record_type"] == "mission_metadata"
+    assert archived["confirmation_source"] == "mission_archive"
+    assert archived["target_pack_id"] == "fireline"
+    assert "road obstruction" in archived["object_target_labels"]

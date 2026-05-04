@@ -61,19 +61,22 @@ The default viewer config is `training_assets.jsonl`, which contains single-imag
 
 ## Current Export
 
-- 56 exported Orbit samples in the current runtime cycle
-- 24 replay-cache rows
-- 25 records with timelapse references
-- 179 deduplicated image/frame assets
-- 26 temporal sequences
-- 1 metadata-only scored mission row for Greenland ice/snow extent
-- 40 bounded Qwen/Ollama image calls
-- 6 bounded Qwen/Ollama temporal-sequence calls
-- 74 reused existing image tags
-- 65 deterministic image fallbacks
-- 20 deterministic sequence fallbacks
-- 9 historical skipped SVG placeholder assets; current exporter rasterizes SVG fallback chips to PNG before future retag runs
+- 200 exported Orbit samples in the current runtime cycle
+- 0 cached API observation rows
+- 11 replay-cache rows
+- 0 visual object-evidence story frames
+- 0 persisted monitor-report rows
+- 15 records with timelapse references
+- 163 deduplicated image/frame assets
+- 15 temporal sequences
+- 185 metadata-only mission rows preserving operator task text, target packs, object targets, and bbox intent
+- 0 external provider image calls in the final cleanup rerun
+- 0 external provider temporal-sequence calls in this refresh
+- 163 reused existing image tags
+- 15 reused existing temporal-sequence tags
+- 0 skipped assets after stale SVG cleanup, stale generated-sample cleanup, stale generated-image cleanup, and monitor-frame asset validation
 - 0 tagger failures
+- 0 orphan or missing image files after validating `metadata.jsonl` against `images/`
 
 Latest replay-cache additions:
 
@@ -87,6 +90,8 @@ Latest replay-cache additions:
 - Greenland ice/snow extent review, `ice_snow_extent`, Sentinel-2 L2A NDSI/SCL metadata-only replay. The legacy static Greenland WebM is intentionally not used as timelapse proof.
 
 Frame extraction now namespaces sampled frames by video SHA-256 so different `timelapse.webm` files cannot overwrite each other in the generated training folder.
+
+Exported `samples/` are cleared before each export. Generated `images/` and `frames/` outputs are cleared before each retag run after reusable prior tags are loaded, so removed source assets cannot leave stale files in the upload folder. This refresh used offline context thumbnails so large local packaging runs do not wait on ESRI thumbnail requests.
 
 Images are stored under `images/`. Sampled frame artifacts are stored under `frames/`. Empty failure logs remain downloadable for audit but are not part of the Dataset Viewer configs.
 

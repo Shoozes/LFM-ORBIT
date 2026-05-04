@@ -94,6 +94,12 @@ def _migrate_alerts_schema(connection: sqlite3.Connection):
     if "boundary_context" not in columns:
         connection.execute("ALTER TABLE alerts ADD COLUMN boundary_context TEXT")
 
+    if "detection_summary" not in columns:
+        connection.execute("ALTER TABLE alerts ADD COLUMN detection_summary TEXT")
+
+    if "object_deltas" not in columns:
+        connection.execute("ALTER TABLE alerts ADD COLUMN object_deltas TEXT")
+
     connection.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_alerts_event_id
@@ -149,6 +155,8 @@ def push_alert(
     before_window: dict | None = None,
     after_window: dict | None = None,
     boundary_context: list[dict] | None = None,
+    detection_summary: dict | None = None,
+    object_deltas: list[dict] | None = None,
     downlinked: bool = False,
 ):
     with _connect() as connection:
@@ -172,8 +180,10 @@ def push_alert(
                 scoring_basis,
                 before_window,
                 after_window,
-                boundary_context
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                boundary_context,
+                detection_summary,
+                object_deltas
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event_id,
@@ -197,6 +207,8 @@ def push_alert(
                 json.dumps(before_window) if before_window else None,
                 json.dumps(after_window) if after_window else None,
                 json.dumps(boundary_context) if boundary_context else None,
+                json.dumps(_compact_detection_summary(detection_summary)) if detection_summary else None,
+                json.dumps(object_deltas) if object_deltas else None,
             ),
         )
         connection.commit()
@@ -204,6 +216,59 @@ def push_alert(
 
 def estimate_payload_bytes(payload: dict[str, Any]) -> int:
     return len(json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8"))
+
+
+def estimate_object_proof_payload_bytes(
+    *,
+    event_id: str,
+    cell_id: str,
+    action: str,
+    detection_summary: dict | None = None,
+    object_deltas: list[dict] | None = None,
+    provenance: dict | None = None,
+) -> int:
+    payload: dict[str, Any] = {
+        "event_id": event_id,
+        "cell_id": cell_id,
+        "action": action,
+    }
+    compact_summary = _compact_detection_summary(detection_summary)
+    if compact_summary:
+        payload["detections"] = compact_summary
+    if object_deltas:
+        payload["object_deltas"] = object_deltas
+    if provenance:
+        payload["provenance"] = provenance
+    return estimate_payload_bytes(payload)
+
+
+def _compact_detection_summary(summary: dict | None) -> dict | None:
+    if not isinstance(summary, dict):
+        return None
+    compact: dict[str, Any] = {
+        "target_pack_id": summary.get("target_pack_id"),
+        "total_boxes": int(summary.get("total_boxes") or 0),
+        "counts_by_label": summary.get("counts_by_label") if isinstance(summary.get("counts_by_label"), dict) else {},
+        "top_boxes": [],
+        "provenance": summary.get("provenance") if isinstance(summary.get("provenance"), dict) else {},
+    }
+    for box in summary.get("top_boxes") or []:
+        if not isinstance(box, dict):
+            continue
+        compact["top_boxes"].append({
+            "id": box.get("id"),
+            "label": box.get("label"),
+            "bbox": box.get("bbox"),
+            "bbox_format": box.get("bbox_format"),
+            "confidence": box.get("confidence"),
+            "color_key": box.get("color_key"),
+            "source_model": box.get("source_model"),
+            "runtime_truth_mode": box.get("runtime_truth_mode"),
+            "imagery_origin": box.get("imagery_origin"),
+            "scoring_basis": box.get("scoring_basis"),
+            "count_quality": box.get("count_quality"),
+        })
+    return compact
 
 
 def get_alert_counts() -> dict[str, int]:
@@ -257,7 +322,9 @@ def get_recent_alerts(limit: int = 50) -> RecentAlertsResponse:
                 scoring_basis,
                 before_window,
                 after_window,
-                boundary_context
+                boundary_context,
+                detection_summary,
+                object_deltas
             FROM alerts
             ORDER BY id DESC
             LIMIT ?
@@ -311,6 +378,8 @@ def get_recent_alerts(limit: int = 50) -> RecentAlertsResponse:
                 "before_window": json.loads(row["before_window"]) if "before_window" in row.keys() and row["before_window"] else None,
                 "after_window": json.loads(row["after_window"]) if "after_window" in row.keys() and row["after_window"] else None,
                 "boundary_context": json.loads(row["boundary_context"]) if "boundary_context" in row.keys() and row["boundary_context"] else None,
+                "detection_summary": json.loads(row["detection_summary"]) if "detection_summary" in row.keys() and row["detection_summary"] else None,
+                "object_deltas": json.loads(row["object_deltas"]) if "object_deltas" in row.keys() and row["object_deltas"] else None,
             }
         )
 

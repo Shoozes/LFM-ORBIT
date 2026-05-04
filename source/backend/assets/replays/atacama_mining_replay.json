@@ -1,9 +1,19 @@
 {
   "replay_id": "atacama_mining_replay",
-  "title": "Atacama Mining Expansion Replay",
-  "description": "Completed mining-expansion mission replay with provider, bbox, and prompt provenance attached.",
-  "task_text": "Detect Atacama open-pit mining expansion and separate persistent bare earth from seasonal vegetation loss.",
-  "summary": "A provenance-focused replay for open-pit mining review, using seeded Sentinel-2 frames and a compact alert packet.",
+  "title": "Critical Minerals Expansion Watch",
+  "description": "Completed critical-minerals expansion replay with provider, bbox, prompt provenance, region boxes, and compact proof JSON attached.",
+  "task_text": "Run Critical Minerals Expansion Watch over the Salar de Atacama / Escondida / Atacama mining corridor. Compare historical and current satellite imagery for evaporation pond regions, tailings regions, open-pit expansion, industrial roads, facility clusters, exposed soil, and surface color change without claiming illegal mining, pollution confirmation, or production output.",
+  "summary": "A centerpiece replay for long-term industrial extraction change: visually clear region evidence, commercial relevance, environmental relevance, and safe region-level CV labels.",
+  "target_pack_id": "critical_minerals",
+  "object_targets": [
+    {"label": "evaporation pond region", "prompt": "Find evaporation pond regions", "class_key": "water_industrial", "enabled": true},
+    {"label": "tailings region", "prompt": "Find tailings regions", "class_key": "industrial_surface", "enabled": true},
+    {"label": "open-pit expansion", "prompt": "Find open-pit expansion", "class_key": "excavation", "enabled": true},
+    {"label": "industrial road", "prompt": "Find industrial roads", "class_key": "infrastructure", "enabled": true},
+    {"label": "facility cluster", "prompt": "Find facility clusters", "class_key": "infrastructure", "enabled": true},
+    {"label": "exposed soil", "prompt": "Find exposed soil regions", "class_key": "surface_change", "enabled": true},
+    {"label": "surface color change", "prompt": "Find surface color change regions", "class_key": "surface_change", "enabled": true}
+  ],
   "bbox": [-69.115, -24.29, -69.035, -24.21],
   "start_date": "2024-01-15",
   "end_date": "2025-12-15",
@@ -24,14 +34,38 @@
       "observation_source": "seeded_sentinelhub_replay",
       "before_window": {"label": "2024-01-15", "quality": 0.96, "bare_ground": "baseline_open_pit", "flags": []},
       "after_window": {"label": "2025-12-15", "quality": 0.97, "bare_ground": "expanded_open_pit_edges", "flags": ["excavation_growth"]},
-      "timelapse_analysis": "The Atacama sequence keeps arid terrain stable while the open-pit footprint and access/tailings surfaces remain the focus of review.",
-      "analysis_summary": "The replay is useful for provenance training because the source, capture window, bbox, and mission prompt stay attached to the mining output JSON.",
+      "timelapse_analysis": "The Atacama sequence keeps arid terrain stable while open-pit, tailings-like, pond-like, road, and facility regions remain the focus of review.",
+      "analysis_summary": "Critical mineral extraction activity changed over time; retained evidence shows expansion of pond-like and tailings-like industrial regions plus road/facility growth around the monitored site.",
       "satellite_note": "Orbital triage detected persistent bare-earth expansion at the open-pit target.",
-      "ground_note": "Ground review keeps this as an auditable mining-expansion packet with explicit provenance.",
-      "ground_action": "CONFIRM — mining expansion candidate is ready for provenance-bound review JSON.",
+      "ground_note": "Ground review keeps this as an auditable critical-minerals expansion packet with explicit provenance and region-level labels.",
+      "ground_action": "DEFER — critical-minerals expansion packet is ready for review JSON and tagged training data; no illegal-mining, pollution, or production-output claim is made.",
+      "detection_summary": {
+        "target_pack_id": "critical_minerals",
+        "total_boxes": 5,
+        "counts_by_label": {
+          "open-pit expansion": 1,
+          "tailings region": 1,
+          "evaporation pond region": 1,
+          "industrial road": 1,
+          "facility cluster": 1
+        },
+        "top_boxes": [
+          {"id": "box_mining_open_pit_001", "label": "open-pit expansion", "bbox": [0.29, 0.18, 0.70, 0.82], "bbox_format": "unit_xyxy", "confidence": 0.86, "color_key": "excavation", "source_model": "replay_fixture", "prompt": "Find open-pit expansion", "runtime_truth_mode": "replay", "imagery_origin": "cached_api", "scoring_basis": "visual_only", "count_quality": "region"},
+          {"id": "box_mining_tailings_001", "label": "tailings region", "bbox": [0.32, 0.02, 0.69, 0.25], "bbox_format": "unit_xyxy", "confidence": 0.82, "color_key": "industrial_surface", "source_model": "replay_fixture", "prompt": "Find tailings regions", "runtime_truth_mode": "replay", "imagery_origin": "cached_api", "scoring_basis": "visual_only", "count_quality": "region"},
+          {"id": "box_mining_pond_001", "label": "evaporation pond region", "bbox": [0.03, 0.61, 0.20, 0.95], "bbox_format": "unit_xyxy", "confidence": 0.79, "color_key": "water_industrial", "source_model": "replay_fixture", "prompt": "Find evaporation pond regions", "runtime_truth_mode": "replay", "imagery_origin": "cached_api", "scoring_basis": "visual_only", "count_quality": "region"},
+          {"id": "box_mining_road_001", "label": "industrial road", "bbox": [0.08, 0.18, 0.24, 0.65], "bbox_format": "unit_xyxy", "confidence": 0.75, "color_key": "infrastructure", "source_model": "replay_fixture", "prompt": "Find industrial roads", "runtime_truth_mode": "replay", "imagery_origin": "cached_api", "scoring_basis": "visual_only", "count_quality": "corridor"},
+          {"id": "box_mining_facility_001", "label": "facility cluster", "bbox": [0.65, 0.54, 0.78, 0.70], "bbox_format": "unit_xyxy", "confidence": 0.72, "color_key": "infrastructure", "source_model": "replay_fixture", "prompt": "Find facility clusters", "runtime_truth_mode": "replay", "imagery_origin": "cached_api", "scoring_basis": "visual_only", "count_quality": "region"}
+        ],
+        "provenance": {"output_source": "replay_fixture", "heuristic_fallback": false, "scope_note": "Region boxes support review; they do not prove illegal mining, pollution, or production output."}
+      },
+      "object_deltas": [
+        {"label": "open-pit expansion", "baseline_count": 0, "current_count": 1, "delta_count": 1, "action_hint": "review"},
+        {"label": "evaporation pond region", "baseline_count": 0, "current_count": 1, "delta_count": 1, "action_hint": "review"}
+      ],
       "findings": [
-        "Open-pit and tailings surfaces are visible across the sequence",
-        "Bare-earth context is persistent rather than a seasonal vegetation artifact"
+        "Open-pit, tailings-like, pond-like, road, and facility regions are visible across the sequence",
+        "Bare-earth context is persistent rather than a seasonal vegetation artifact",
+        "The retained packet is appropriate for review and training tags, not for production-output or pollution confirmation"
       ]
     }
   ]

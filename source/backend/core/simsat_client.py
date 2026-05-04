@@ -192,6 +192,15 @@ class SimSatClient:
             response = self.client.get(endpoint, params=params)
             
             if response.status_code == 200:
+                if not response.content:
+                    return ImageryResponse(
+                        success=False,
+                        source=request.source.value,
+                        endpoint_type=request.endpoint_type.value,
+                        lat=request.lat,
+                        lng=request.lng,
+                        error="SimSat API returned an empty imagery payload.",
+                    )
                 return ImageryResponse(
                     success=True,
                     source=request.source.value,
