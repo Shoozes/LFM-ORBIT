@@ -66,7 +66,7 @@
   },
   "groups": {
     "docs_state_and_tracking": {
-      "note": "README is the compact, infographic-led product surface with the live GitHub shape preserved: pitch, one hero visual, showcase command, highlights, proof gallery, validation snapshot, model handoff, runtime limits, explicit scope lock, and docs links. README_GUIDELINES captures that shape so future updates add proof without moving the run path down the page, and test_docs_artifacts.py now enforces the section order plus repo-wide local markdown links, promoted image nonblank checks, public WebM temporal checks, documented media existence, and summary-bank file references. ARCHITECTURE carries stable system shape and guard-suite design instead of run-by-run progress history. TODO is the current backlog, edge-case watchlist, and latest validation ledger. QA_PITFALLS is the Q&A regression guide for generated media, mission-story scope, agent handoff claims, model-capability boundaries, and dataset/Hugging Face handoff pitfalls such as stale generated image orphans, absolute local manifest paths, mission metadata split handling, secret-safe token use, and remote revision readback, offline thumbnail/export timeout handling, reuse-only retag refreshes, Ollama fallback handling, plus headless MapLibre shader/WebGL warnings that should remain recoverable basemap issues rather than scoring failures. docs/media/README.md describes organized media folders. AGENT_GROWTH_LOOP documents the app-usage to semantics/tests/docs improvement method. DATASET_CYCLE_TUTORIAL and MODEL_HANDOFF carry repeatable workflow detail without duplicating progress history. Docs are now explicitly split by reading path without moving stable canonical filenames: docs/README.md is the root index, docs/user/README.md points judges/operators to the product/demo docs, and docs/dev/README.md points maintainers to architecture, QA, model handoff, dataset, and backlog docs. Nested markdown links are now covered by test_docs_artifacts.py so user/dev indexes cannot rot.",
+      "note": "README is the compact, infographic-led product surface with the live GitHub shape preserved: pitch, one hero visual, showcase command, highlights, proof gallery, validation snapshot, model handoff, runtime limits, explicit scope lock, and docs links. test_docs_artifacts.py enforces section order plus repo-wide local markdown links, promoted image nonblank checks, public WebM temporal checks, documented media existence, and summary-bank file references. ARCHITECTURE carries stable system shape and guard-suite design instead of run-by-run progress history. TODO is now a compact active backlog and verification checklist, not a changelog. QA_PITFALLS is the detailed regression guide and now also carries the short README-update rule. docs/media/README.md describes organized media folders. AGENT_GROWTH_LOOP documents the app-usage to semantics/tests/docs improvement method. DATASET_CYCLE_TUTORIAL, MODEL_HANDOFF, and FUTURE_SENTINEL_LANES carry repeatable workflow detail without duplicating progress history. docs/README.md is the single docs index; separate user/dev mini-indexes were pruned to keep the docs surface short.",
       "files": [
         "README.md",
         "docs/ARCHITECTURE.md",
@@ -111,8 +111,7 @@
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json",
         "docs/README.md",
-        "docs/user/README.md",
-        "docs/dev/README.md"
+        "docs/FUTURE_SENTINEL_LANES.md"
       ]
     },
     "docs_model_runtime_and_handoff": {
@@ -121,7 +120,6 @@
         "README.md",
         "docs/ARCHITECTURE.md",
         "docs/DEMO_GUIDE.md",
-        "docs/FINE_TUNING_PLAN.md",
         "docs/MODEL_HANDOFF.md",
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
@@ -155,7 +153,7 @@
       ]
     },
     "issue_group_docs_artifact_integrity": {
-      "note": "Docs/media artifact integrity lane: public docs media is organized under docs/media, referenced markdown links are checked relative to each owning file, promoted README images are checked as nonblank, explicit public WebMs are checked as nonblank and temporal, and summary_bank file references must remain repo-relative and existing. May 4 refreshed README screenshots, recorded demo WebMs, tutorial WebM, object-evidence audit media, and Greenland timelapse GIF/WebM; contact-sheet review confirmed app content first frames, grouped port candidates, proof panels, and distinct timelapse slices. Object-evidence video is now held long enough to clear the public temporal duration guard. Docs artifact integrity now covers nested docs/**/*.md links in addition to README/root docs/source data docs. Added user/dev docs indexes and cleaned stale docs-root media wording so promoted videos point at docs/media/videos/.",
+      "note": "Docs/media artifact integrity lane: public docs media is organized under docs/media, referenced markdown links are checked relative to each owning file, promoted README images are checked as nonblank, explicit public WebMs are checked as nonblank and temporal, and summary_bank file references must remain repo-relative and existing. May 4 refreshed README screenshots, recorded demo WebMs, tutorial WebM, object-evidence audit media, and Greenland timelapse GIF/WebM; contact-sheet review confirmed app content first frames, grouped port candidates, proof panels, and distinct timelapse slices. Object-evidence video is now held long enough to clear the public temporal duration guard. Docs artifact integrity covers nested docs/**/*.md links in addition to README/root docs/source data docs. The docs surface was later pruned back to one root index plus focused docs, and stale docs-root media wording points at docs/media/videos/.",
       "files": [
         "README.md",
         "docs/DEMO_GUIDE.md",
@@ -176,9 +174,7 @@
         "docs/media/timelapse/highlight-greenland-ice-timelapse.gif",
         "docs/media/timelapse/highlight-greenland-ice-timelapse.webm",
         "source/backend/tests/test_docs_artifacts.py",
-        "docs/README.md",
-        "docs/user/README.md",
-        "docs/dev/README.md"
+        "docs/README.md"
       ]
     },
     "issue_group_demo_media_terminal_state": {
@@ -440,9 +436,7 @@
         "docs/media/videos/object-evidence-demo.webm",
         "docs/media/videos/tutorial_video.webm",
         "docs/media/timelapse/highlight-greenland-ice-timelapse.webm",
-        "docs/README.md",
-        "docs/user/README.md",
-        "docs/dev/README.md"
+        "docs/README.md"
       ]
     },
     "issue_group_context_menu_vlm_and_visual_polish": {
@@ -827,7 +821,6 @@
         "README.md",
         "docs/ARCHITECTURE.md",
         "docs/DEMO_GUIDE.md",
-        "docs/FINE_TUNING_PLAN.md",
         "docs/MODEL_HANDOFF.md",
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
@@ -1267,9 +1260,7 @@
         "docs/media/videos/showcase-demo.webm",
         "docs/media/videos/object-evidence-demo.webm",
         "docs/media/videos/tutorial_video.webm",
-        "docs/README.md",
-        "docs/user/README.md",
-        "docs/dev/README.md"
+        "docs/README.md"
       ]
     },
     "runtime_entrypoints_and_tools": {

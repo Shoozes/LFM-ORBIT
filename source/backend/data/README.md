@@ -73,7 +73,7 @@ If a context thumbnail falls back to an offline SVG chip, the exporter rasterize
 
 The file must stay local to the repo and should not be uploaded to Hugging Face. It is too small and product-specific for public training value. It also must not become a hidden gazetteer: location names still resolve through explicit vetted targets or a future geocoding provider behind `/api/location/resolve`.
 
-Future marine-debris examples should stay out of the active fixture until `start_marine_debris_scan` exists in the backend whitelist, scan path, and UI. Prototype those rows in `ground_agent_tool_semantics.local.jsonl` only; the future implementation plan lives in `../../../docs/MARINE_DEBRIS_SENTINEL_HUB_PLAN.md`.
+Future marine-debris examples should stay out of the active fixture until `start_marine_debris_scan` exists in the backend whitelist, scan path, and UI. Prototype those rows in `ground_agent_tool_semantics.local.jsonl` only; future Sentinel lane boundaries live in `../../../docs/FUTURE_SENTINEL_LANES.md`.
 
 ## Optional Sentinel Replay Data
 

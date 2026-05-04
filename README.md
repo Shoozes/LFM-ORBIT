@@ -4,7 +4,7 @@ Satellites capture more imagery than they can downlink. LFM-ORBIT runs onboard t
 
 A 1-2 KB alert with bbox, confidence, provenance, model output, and payload accounting can move during a narrow contact window. Raw imagery can wait, or never be sent.
 
-[Hackathon event](https://luma.com/n9cw58h0) | [Docs](docs/README.md) | [User docs](docs/user/README.md) | [Dev docs](docs/dev/README.md) | [Demo guide](docs/DEMO_GUIDE.md)
+[Hackathon event](https://luma.com/n9cw58h0) | [Docs](docs/README.md) | [Demo guide](docs/DEMO_GUIDE.md) | [Tutorial video](docs/media/videos/tutorial_video.webm)
 
 ![What is LFM-ORBIT?](docs/media/infographics/what-is-lfm-orbit-info.png)
 
@@ -189,18 +189,14 @@ API: `http://127.0.0.1:8000`
 
 | Doc | Purpose |
 |---|---|
+| [docs/README.md](docs/README.md) | Compact docs index |
 | [docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md) | Demo commands, artifacts, and replay assets |
-| [docs/user/README.md](docs/user/README.md) | User-facing reading path for demos and operator review |
-| [docs/dev/README.md](docs/dev/README.md) | Developer reading path for reproducibility, QA, and handoff work |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Runtime map and design notes |
 | [docs/OBJECT_EVIDENCE_MODE.md](docs/OBJECT_EVIDENCE_MODE.md) | Object target packs, CV boxes, safety scope, and remaining integration work |
-| [docs/SENTINEL_CLOSE_LOOKS.md](docs/SENTINEL_CLOSE_LOOKS.md) | Sentinel Hub close-look and README timelapse workflow |
-| [docs/MARINE_DEBRIS_SENTINEL_HUB_PLAN.md](docs/MARINE_DEBRIS_SENTINEL_HUB_PLAN.md) | Future Sentinel Hub marine-debris candidate lane and evidence limits |
-| [docs/README_GUIDELINES.md](docs/README_GUIDELINES.md) | README shape, visual rules, and proof-promotion checklist |
-| [docs/AGENT_GROWTH_LOOP.md](docs/AGENT_GROWTH_LOOP.md) | Usage-to-semantics/test/docs loop for autonomous app improvement |
-| [docs/TODO.md](docs/TODO.md) | Active backlog and edge-case watchlist |
 | [docs/DATASET_CYCLE_TUTORIAL.md](docs/DATASET_CYCLE_TUTORIAL.md) | Seed, export, retag, and Hugging Face cycle |
 | [docs/MODEL_HANDOFF.md](docs/MODEL_HANDOFF.md) | Model bundle and dataset handoff contract |
+| [docs/FUTURE_SENTINEL_LANES.md](docs/FUTURE_SENTINEL_LANES.md) | Post-handoff Sentinel lane boundaries |
+| [docs/TODO.md](docs/TODO.md) | Compact active backlog and verification checklist |
 
 ## Usage To Training Loop
 

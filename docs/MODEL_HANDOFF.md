@@ -67,6 +67,15 @@ Default trained Orbit bundle:
 - Primary GGUF: `LFM2.5-VL-450M-Q4_0.gguf`
 - Handoff manifest: `orbit_model_handoff.json`
 - Training manifest: `training_result_manifest.json`
+- Base model: `LFM2.5-VL-450M`
+- Training method: `vlm_sft`
+- Task: `orbit-satellite-triage`
+- Training rows: `1611`
+- Multimodal rows: `1611`
+- Image blocks: `1878`
+- Eval rows: `179`
+
+The training target is reviewed Orbit evidence tuples with image chip, bbox, task, model answer, confidence, provenance, and abstain labels. Promotion metrics should cover downlink decision precision/recall, abstain precision, and grounded bbox agreement.
 
 The normal launcher path is:
 

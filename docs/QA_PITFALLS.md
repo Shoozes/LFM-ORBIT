@@ -30,6 +30,10 @@ It can support text evidence-packet and bbox JSON reasoning from the NM-UNI hand
 
 ## Generated Media Gates
 
+### How should the README stay short?
+
+Keep one hero visual, the run command near the top, proof images inside the proof gallery, and progress history out of public copy. Public visuals must live under `docs/media/`, be linked from markdown, and pass `test_docs_artifacts.py`. Use `docs/TODO.md` for current backlog and `summary_bank.json` for detailed history.
+
 ### When can generated screenshots or story plates enter `docs/media/`?
 
 Only after they pass visual review and metadata checks. A generated file starts as a candidate. Public story plates must have `public_docs=true`, `visual_audit_status=approved`, visible `box_source=visual_story_fixture`, and labels scoped as areas, groups, zones, samples, regions, corridors, clusters, or candidates unless a true object-scale model path supports a singular-object label.
