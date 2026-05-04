@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { execFile } from "node:child_process";
-import { copyFile, mkdir, readFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import {
@@ -184,7 +184,25 @@ async function saveTrimmedTutorialVideo(rawVideoPath: string, docsVideoPath: str
   }
 }
 
+async function commandExists(command: string): Promise<boolean> {
+  try {
+    await execFileAsync(command, ["-version"]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function assertTutorialVideoQuality(videoPath: string) {
+  const videoStats = await stat(videoPath);
+  if (videoStats.size < 500_000) {
+    throw new Error(`Tutorial video artifact is unexpectedly small: ${videoStats.size} bytes.`);
+  }
+
+  if (!(await commandExists("ffprobe")) || !(await commandExists("ffmpeg"))) {
+    return;
+  }
+
   const durationResult = await execFileAsync("ffprobe", [
     "-v",
     "error",

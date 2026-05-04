@@ -170,6 +170,7 @@ jobs:
         working-directory: source/frontend
         env:
           CI: "true"
+          UV_PROJECT_ENVIRONMENT: .venv-linux
         run: npm run test:e2e
 
       - name: Upload Playwright artifacts

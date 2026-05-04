@@ -7,6 +7,13 @@ import { gotoApp, openMapContextMenu, resetRuntimeState, waitForBasemapReady, wa
 
 const execFileAsync = promisify(execFile);
 
+function backendCommandEnv(): NodeJS.ProcessEnv {
+  if (process.env.CI && !process.env.UV_PROJECT_ENVIRONMENT) {
+    return { ...process.env, UV_PROJECT_ENVIRONMENT: ".venv-linux" };
+  }
+  return process.env;
+}
+
 type VisualStory = {
   presetId: string;
   expectedPresetText: string;
@@ -186,7 +193,10 @@ test.describe("visual overlay fixture stories", () => {
     test.setTimeout(120_000);
     const backendDir = path.resolve("..", "backend");
     const repoRoot = path.resolve("..", "..");
-    await execFileAsync("python", ["scripts/build_visual_story_proofs.py", "--offline"], { cwd: backendDir });
+    await execFileAsync("uv", ["run", "--no-sync", "python", "scripts/build_visual_story_proofs.py", "--offline"], {
+      cwd: backendDir,
+      env: backendCommandEnv(),
+    });
 
     const expectedOutputs = [
       path.join(repoRoot, "docs", "media", "story-plates", "story-object-evidence-port.png"),
