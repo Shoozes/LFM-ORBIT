@@ -107,7 +107,6 @@
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
         "source/frontend/e2e/map3d.spec.ts",
-        "source/frontend/e2e/screenshots/map-3d-context-view.png",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json",
@@ -218,7 +217,6 @@
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
         "source/frontend/e2e/map3d.spec.ts",
-        "source/frontend/e2e/screenshots/map-3d-context-view.png",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json"
@@ -390,8 +388,7 @@
         "source/frontend/components/MapVisualizer.tsx",
         "source/frontend/components/MissionControl.tsx",
         "source/frontend/e2e/bbox.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
-        "source/frontend/e2e/screenshots/map-3d-context-view.png"
+        "source/frontend/e2e/map3d.spec.ts"
       ]
     },
     "issue_group_e2e_state_isolation_and_run_conditions": {
@@ -700,7 +697,6 @@
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
         "source/frontend/e2e/map3d.spec.ts",
-        "source/frontend/e2e/screenshots/map-3d-context-view.png",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts"
       ]
@@ -1222,7 +1218,6 @@
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
         "source/frontend/e2e/map3d.spec.ts",
-        "source/frontend/e2e/screenshots/map-3d-context-view.png",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "source/frontend/package.json",
@@ -1250,7 +1245,6 @@
         "source/frontend/components/VlmPanel.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/map3d.spec.ts",
-        "source/frontend/e2e/screenshots/map-3d-context-view.png",
         "source/frontend/utils/depthMapStats.ts"
       ]
     },
@@ -1287,8 +1281,6 @@
         ".github/workflows/ci.yml",
         ".gitignore",
         ".nvmrc",
-        ".tools/_gen_bank.py",
-        ".tools/get-context.ps1",
         "README.md",
         "docs/ARCHITECTURE.md",
         "docs/DEMO_GUIDE.md",
