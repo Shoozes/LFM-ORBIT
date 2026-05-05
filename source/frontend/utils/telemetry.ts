@@ -342,6 +342,13 @@ export function getWebSocketUrl(apiBaseUrl?: string): string {
   return `${wsBase}/ws/telemetry`;
 }
 
+function formatSquareGridCoord(value: number): string {
+  return Number(value.toFixed(4))
+    .toFixed(4)
+    .replace(/0+$/, "")
+    .replace(/\.$/, ".0");
+}
+
 export function generateGridForBbox(bbox: number[]): GeoJSON.FeatureCollection {
   const [west, south, east, north] = bbox;
   const STEP_SIZE = 0.1;
@@ -362,7 +369,7 @@ export function generateGridForBbox(bbox: number[]): GeoJSON.FeatureCollection {
     for (let lng = minLng; lng <= maxLng + 0.0001; lng += STEP_SIZE) {
         const c_lat = Number(lat.toFixed(4));
         const c_lng = Number(lng.toFixed(4));
-        const cell_id = `sq_${c_lat}_${c_lng}`;
+        const cell_id = `sq_${formatSquareGridCoord(c_lat)}_${formatSquareGridCoord(c_lng)}`;
 
         const w = (lng - STEP_SIZE / 2);
         const e = (lng + STEP_SIZE / 2);

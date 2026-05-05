@@ -11,6 +11,7 @@ from api.main import (
     _cors_allow_origins,
     _is_windows_transport_disconnect_noise,
     _require_local_request,
+    _should_resume_active_mission_on_boot,
     _should_run_agent_pair_on_boot,
     app,
 )
@@ -25,6 +26,33 @@ def test_agent_pair_boot_can_be_disabled_for_recorded_demos(monkeypatch):
 
     monkeypatch.setenv("RUN_AGENT_PAIR_ON_BOOT", "true")
     assert _should_run_agent_pair_on_boot() is True
+
+
+def test_active_mission_resume_on_boot_is_opt_in(monkeypatch):
+    monkeypatch.delenv("RESUME_ACTIVE_MISSION_ON_BOOT", raising=False)
+    assert _should_resume_active_mission_on_boot() is False
+
+    monkeypatch.setenv("RESUME_ACTIVE_MISSION_ON_BOOT", "true")
+    assert _should_resume_active_mission_on_boot() is True
+
+
+def test_lifespan_closes_persisted_active_mission_by_default(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("RUN_AGENT_PAIR_ON_BOOT", "false")
+    monkeypatch.delenv("RESUME_ACTIVE_MISSION_ON_BOOT", raising=False)
+
+    from core.mission import get_active_mission, init_missions, start_mission
+
+    init_missions(reset=True)
+    started = start_mission("Persisted mission should not auto-resume on boot")
+    assert get_active_mission()["id"] == started["id"]
+
+    with TestClient(app) as scoped_client:
+        response = scoped_client.get("/api/mission/current")
+
+    assert response.status_code == 200
+    assert response.json()["mission"] is None
+    assert get_active_mission() is None
 
 
 def test_windows_transport_disconnect_filter_is_narrow():

@@ -155,6 +155,10 @@ def _should_reset_on_boot() -> bool:
     return os.getenv("RESET_RUNTIME_STATE_ON_BOOT", "false").lower() in ("true", "1", "yes")
 
 
+def _should_resume_active_mission_on_boot() -> bool:
+    return os.getenv("RESUME_ACTIVE_MISSION_ON_BOOT", "false").lower() in ("true", "1", "yes")
+
+
 def _should_run_agent_pair_on_boot() -> bool:
     return os.getenv("RUN_AGENT_PAIR_ON_BOOT", "true").lower() not in ("false", "0", "no")
 
@@ -233,6 +237,11 @@ async def lifespan(_: FastAPI):
         reset_runtime_state()
     else:
         ensure_runtime_state()
+        if _should_resume_active_mission_on_boot():
+            logger.info("Persisted active mission resume enabled by RESUME_ACTIVE_MISSION_ON_BOOT=true")
+        else:
+            stop_mission()
+            logger.info("Persisted active missions closed on boot; mission history preserved")
 
     mode = get_runtime_mode_summary()
     logger.info(
