@@ -16,6 +16,7 @@ See `docs/QA_PITFALLS.md` for the detailed guardrail checklist.
 - Cloud, no-data, malformed spectral bands, and RGB-only inputs must abstain instead of fabricating indices.
 - Ground Agent mutating actions use proposal cards before state changes.
 - Mission target packs remain backend/proof metadata and appear through alerts, replays, dataset rows, and Proof Mode; the normal Mission tab stays focused on plan, replay, progress, and timelapse.
+- Mission date windows are use-case aware: long-term change missions can keep annual/history windows, while operational Fire Watch presets default to the last 30 days through current date.
 - The retired target/monitor subtabs and visual-evidence tools panel must stay out of the submission UI unless deliberately reintroduced after review.
 - Frontend reloads must not restart an active mission from the first scan cell or let stale demo query params override a live mission.
 - Public README proof currently centers on Critical Minerals, target-pack proof, payload reduction, orbital eclipse queueing, provenance, abstain safety, Greenland timelapse context, Ground Agent flow, and semantic map context.
@@ -82,6 +83,7 @@ Maps and missions:
 - The app must not auto-play the last replay on normal startup.
 - Stopped missions, replay contexts, and camera-only navigation show paused/idle scan state.
 - Live missions show explicit starting, scanning, and complete status while cells arrive.
+- Fire Watch and similar operational readiness missions use a recent 30-day default unless the operator explicitly requests historical trend analysis.
 - Basemap render/tile/WebGL failures must stay visible and must not alter scoring or provenance.
 
 Safety wording:

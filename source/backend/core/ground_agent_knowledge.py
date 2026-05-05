@@ -77,8 +77,7 @@ MISSION_PACKS: dict[str, dict[str, Any]] = {
         "target_pack_id": "fireline",
         "task_text": "Review the Highway 82 wildfire near Atkinson and Waynesville, Georgia for smoke, burn scar, and vegetation stress.",
         "bbox": [-81.916, 31.143, -81.756, 31.303],
-        "start_date": "2026-04-01",
-        "end_date": "2026-04-28",
+        "date_window_days": 30,
     },
     "southeast_fireline_watch": {
         "label": "Southeast Fireline Watch",
@@ -87,8 +86,7 @@ MISSION_PACKS: dict[str, dict[str, Any]] = {
         "target_pack_id": "fireline",
         "task_text": "Run Southeast Fireline Watch. Triage wildfire candidate evidence, drought-like vegetation stress controls, and civilian lifeline exposure. Downlink only compact proof packets for smoke, burn-scar, road-obstruction, or access-risk candidates.",
         "bbox": [-81.916, 31.143, -81.756, 31.303],
-        "start_date": "2026-04-01",
-        "end_date": "2026-04-28",
+        "date_window_days": 30,
     },
     "florida_fire_drought_watch": {
         "label": "Florida Fire/Drought Readiness Watch",
@@ -109,8 +107,7 @@ MISSION_PACKS: dict[str, dict[str, Any]] = {
         "target_pack_id": "fireline",
         "task_text": "Run Florida Fire/Drought Readiness Watch over a North Florida corridor. Triage drought-stressed vegetation, smoke candidates, burn-scar candidates, road or trail access, firebreak context, water/vegetation boundaries, and civilian lifeline exposure. Treat this as candidate evidence until source-backed imagery confirms smoke, active fire, or burn scar.",
         "bbox": [-83.2, 29.0, -81.3, 30.7],
-        "start_date": "2026-04-15",
-        "end_date": "2026-04-25",
+        "date_window_days": 30,
     },
     "florida_manatee_habitat_review": {
         "label": "Florida Manatee Habitat Review",
@@ -761,6 +758,7 @@ def _mission_pack_proposal(pack_id: str, pack: dict[str, Any]) -> dict[str, Any]
 
     target_pack_id = pack.get("target_pack_id")
     target_pack = get_target_pack(str(target_pack_id)) if target_pack_id else None
+    start_date, end_date = _mission_pack_dates(pack)
     return _proposal(
         kind="start_mission_pack",
         title=f"Launch Mission Pack: {pack['label']}",
@@ -772,8 +770,8 @@ def _mission_pack_proposal(pack_id: str, pack: dict[str, Any]) -> dict[str, Any]
             "target_pack_id": target_pack["id"] if target_pack else None,
             "object_targets": target_pack["targets"] if target_pack else [],
             "bbox": pack["bbox"],
-            "start_date": pack["start_date"],
-            "end_date": pack["end_date"],
+            "start_date": start_date,
+            "end_date": end_date,
             "task_text": pack["task_text"],
             "expected_reset": False,
             "state_impact": [
@@ -789,6 +787,23 @@ def _mission_pack_proposal(pack_id: str, pack: dict[str, Any]) -> dict[str, Any]
     )
 
 
+def _today_utc():
+    return datetime.now(timezone.utc).date()
+
+
+def _recent_date_range(days: int) -> tuple[str, str]:
+    today = _today_utc()
+    start = today - timedelta(days=max(1, days))
+    return start.isoformat(), today.isoformat()
+
+
+def _mission_pack_dates(pack: dict[str, Any]) -> tuple[str, str]:
+    window_days = pack.get("date_window_days")
+    if isinstance(window_days, int):
+        return _recent_date_range(window_days)
+    return str(pack["start_date"]), str(pack["end_date"])
+
+
 def _clean_operator_request(user_msg: str, *, limit: int = 260) -> str:
     request = re.sub(r"\s+", " ", user_msg).strip(" .")
     if len(request) <= limit:
@@ -797,7 +812,7 @@ def _clean_operator_request(user_msg: str, *, limit: int = 260) -> str:
 
 
 def _default_planner_dates(text: str) -> tuple[str, str]:
-    today = datetime.now(timezone.utc).date()
+    today = _today_utc()
     year_window = re.search(r"\b(?:last|past|previous)\s+(\d{1,2})\s+years?\b", text)
     if year_window:
         years = max(1, min(int(year_window.group(1)), 40))
@@ -2017,11 +2032,12 @@ def execute_ground_agent_proposal(proposal: dict[str, Any]) -> dict[str, Any]:
                 "suggestions": _suggestions(),
             }
         try:
+            start_date, end_date = _mission_pack_dates(pack)
             mission = start_mission(
                 task_text=pack["task_text"],
                 bbox=pack["bbox"],
-                start_date=pack["start_date"],
-                end_date=pack["end_date"],
+                start_date=start_date,
+                end_date=end_date,
                 use_case_id=pack["use_case_id"],
                 target_pack_id=pack.get("target_pack_id"),
             )

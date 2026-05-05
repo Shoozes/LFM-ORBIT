@@ -436,7 +436,7 @@
       ]
     },
     "issue_group_operator_input_validation_and_timing": {
-      "note": "Shared bbox/date validation, unsupported cell-id rejection, readiness-gated map action tests, bounded timelapse frame fetches, and UI-visible mission validation errors for safer operator-facing APIs.",
+      "note": "Shared bbox/date validation, unsupported cell-id rejection, readiness-gated map action tests, bounded timelapse frame fetches, use-case-aware mission date defaults, and UI-visible mission validation errors for safer operator-facing APIs.",
       "files": [
         "README.md",
         "docs/ARCHITECTURE.md",
@@ -474,7 +474,10 @@
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
-        "summary_bank.json"
+        "summary_bank.json",
+        "source/frontend/utils/dateRange.ts",
+        "source/frontend/e2e/qa_verification.spec.ts",
+        "source/backend/core/ground_agent_knowledge.py"
       ]
     },
     "issue_group_lifeline_frame_gate_and_eval_validation": {
@@ -1465,6 +1468,17 @@
         "docs/TODO.md",
         "docs/QA_PITFALLS.md",
         "summary_bank.json"
+      ]
+    },
+    "issue_group_mission_date_window_defaults": {
+      "note": "Mission date-window defaults are now use-case aware: long-horizon temporal-change missions can keep explicit annual/history windows, while operational wildfire/fireline readiness presets and Ground Agent mission packs resolve a rolling 30-day window through the current date at proposal and confirmation time. This keeps Fire Watch fast and current without removing historical windows when an operator explicitly asks for trend analysis.",
+      "files": [
+        "docs/TODO.md",
+        "source/frontend/utils/dateRange.ts",
+        "source/frontend/components/MissionControl.tsx",
+        "source/frontend/e2e/qa_verification.spec.ts",
+        "source/backend/core/ground_agent_knowledge.py",
+        "source/backend/tests/test_api.py"
       ]
     }
   },

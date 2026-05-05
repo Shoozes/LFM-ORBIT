@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getApiBaseUrl } from "../utils/telemetry";
 import { Mission } from "../types/mission";
-import { getDefaultMissionDateRange } from "../utils/dateRange";
+import { getDefaultMissionDateRange, getRecentMissionDateRange } from "../utils/dateRange";
 
 type ReplayCatalogItem = {
   replay_id: string;
@@ -65,7 +65,7 @@ const MARITIME_PREVIEW_TARGET = {
   taskText: "Review Suez channel port activity areas: visible shipping container clusters, docked-vessel groups, and berth basin context without claiming exact vessel or boat counts.",
 };
 
-const DEFAULT_MISSION_DATE_RANGE = getDefaultMissionDateRange();
+const FIRE_WATCH_DATE_RANGE = getRecentMissionDateRange(30);
 
 const MISSION_LOCATION_PRESETS: MissionPreset[] = [
   {
@@ -111,8 +111,8 @@ const MISSION_LOCATION_PRESETS: MissionPreset[] = [
     useCaseId: "wildfire",
     taskText: "Run Florida Fire/Drought Readiness Watch over a North Florida corridor. Triage drought-stressed vegetation, smoke candidates, burn-scar candidates, road or trail access, firebreak context, water/vegetation boundaries, and civilian lifeline exposure. Treat this as candidate evidence until source-backed imagery confirms smoke, active fire, or burn scar.",
     bbox: [-83.2, 29.0, -81.3, 30.7],
-    startDate: DEFAULT_MISSION_DATE_RANGE.startDate,
-    endDate: DEFAULT_MISSION_DATE_RANGE.endDate,
+    startDate: FIRE_WATCH_DATE_RANGE.startDate,
+    endDate: FIRE_WATCH_DATE_RANGE.endDate,
     tone: "fire",
     targetPackId: "fireline",
     sourceNote: "Official April/May 2026 context: Drought.gov Southeast update and NIFC National Fire News; candidate triage only.",
@@ -148,8 +148,8 @@ const MISSION_LOCATION_PRESETS: MissionPreset[] = [
     useCaseId: "wildfire",
     taskText: "Review the Highway 82 wildfire near Atkinson and Waynesville, Georgia for smoke, burn scar, and vegetation stress.",
     bbox: [-81.916, 31.143, -81.756, 31.303],
-    startDate: "2026-04-01",
-    endDate: "2026-04-28",
+    startDate: FIRE_WATCH_DATE_RANGE.startDate,
+    endDate: FIRE_WATCH_DATE_RANGE.endDate,
     tone: "fire",
     targetPackId: "fireline",
   },
@@ -160,8 +160,8 @@ const MISSION_LOCATION_PRESETS: MissionPreset[] = [
     useCaseId: "wildfire",
     taskText: "Review the SPC Day 2 critical fire-weather corridor and the incident-reported Sparks Fire in Quay County for post-event smoke plume, active-fire, or burn-scar evidence. Keep the result as candidate evidence until satellite frames support it.",
     bbox: [-104.9, 31.0, -101.1, 35.5],
-    startDate: "2026-04-28",
-    endDate: "2026-04-29",
+    startDate: FIRE_WATCH_DATE_RANGE.startDate,
+    endDate: FIRE_WATCH_DATE_RANGE.endDate,
     tone: "fire",
     targetPackId: "fireline",
   },

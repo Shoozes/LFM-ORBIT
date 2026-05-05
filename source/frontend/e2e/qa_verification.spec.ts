@@ -1,6 +1,21 @@
 import { test, expect } from "@playwright/test";
 import { gotoApp, resetRuntimeState, startMission } from "./runtime";
 
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function recentDateRange(days: number) {
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const start = new Date(end);
+  start.setDate(start.getDate() - days);
+  return { startDate: formatDateInput(start), endDate: formatDateInput(end) };
+}
+
 test.describe("QA Verification — Single Page Architecture", () => {
   test.beforeEach(async ({ page, request }) => {
     await resetRuntimeState(request);
@@ -180,6 +195,15 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await expect(page.getByTestId("mission-preset-panel")).not.toBeVisible();
     await expect(page.getByTestId("mission-panel-tab-targets")).toHaveCount(0);
     await expect(page.getByTestId("mission-panel-tab-monitors")).toHaveCount(0);
+  });
+
+  test("verify Fire Watch presets use a recent operational date window", async ({ page }) => {
+    await page.getByTestId("tab-mission").click();
+    await page.getByTestId("mission-preset-fire_drought_florida_2026").click();
+
+    const expected = recentDateRange(30);
+    await expect(page.locator('input[type="date"]').nth(0)).toHaveValue(expected.startDate);
+    await expect(page.locator('input[type="date"]').nth(1)).toHaveValue(expected.endDate);
   });
 
   test("verify Ground Agent can confirm a replay fetch action", async ({ page }) => {

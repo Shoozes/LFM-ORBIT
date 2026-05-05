@@ -1045,6 +1045,12 @@ def test_ground_agent_chat_proposes_florida_fire_drought_pack(tmp_path, monkeypa
     assert proposal["details"]["pack_id"] == "florida_fire_drought_watch"
     assert proposal["details"]["target_pack_id"] == "fireline"
     assert proposal["details"]["bbox"] == [-83.2, 29.0, -81.3, 30.7]
+    from datetime import datetime, timezone
+
+    start = datetime.fromisoformat(proposal["details"]["start_date"]).date()
+    end = datetime.fromisoformat(proposal["details"]["end_date"]).date()
+    assert (end - start).days == 30
+    assert end == datetime.now(timezone.utc).date()
     assert "candidate evidence" in proposal["details"]["task_text"]
 
     confirm = client.post("/api/agent/action/confirm", json={"proposal": proposal})
@@ -1055,6 +1061,8 @@ def test_ground_agent_chat_proposes_florida_fire_drought_pack(tmp_path, monkeypa
     assert confirmed["actions"][0]["status"] == "ok"
     assert confirmed["actions"][0]["result"]["mission"]["use_case_id"] == "wildfire"
     assert confirmed["actions"][0]["result"]["mission"]["target_pack_id"] == "fireline"
+    assert confirmed["actions"][0]["result"]["mission"]["start_date"] == proposal["details"]["start_date"]
+    assert confirmed["actions"][0]["result"]["mission"]["end_date"] == proposal["details"]["end_date"]
     assert get_active_mission()["target_pack_id"] == "fireline"
 
 
@@ -1561,6 +1569,11 @@ def test_ground_agent_chat_proposes_wildfire_mission_pack_without_replay_keyword
     assert proposal["confirm_label"] == "Launch Mission"
     assert proposal["details"]["pack_id"] == "wildfire_highway82"
     assert proposal["details"]["use_case_id"] == "wildfire"
+    from datetime import datetime
+
+    start = datetime.fromisoformat(proposal["details"]["start_date"]).date()
+    end = datetime.fromisoformat(proposal["details"]["end_date"]).date()
+    assert (end - start).days == 30
 
 
 def test_ground_agent_chat_proposes_rescan_before_runtime_reset(tmp_path, monkeypatch):
