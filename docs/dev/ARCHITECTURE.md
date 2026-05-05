@@ -232,7 +232,7 @@ Cached replay imagery can still carry `scoring_basis=multispectral_bands` when t
 
 ## Verification Model
 
-Architecture docs describe the guard suite; run-by-run totals live in `README.md` and `docs/TODO.md` to avoid duplicating progress history.
+Architecture docs describe the guard suite; run-by-run totals live in `README.md` and `TODO.md` to avoid duplicating progress history.
 
 - Backend guard: import contracts, API contracts, replay/object evidence, docs/media references, queue/persistence, provider fallbacks, and dataset export tests.
 - Frontend guard: TypeScript typecheck, production build, normal Playwright E2E, targeted CV/map specs, and separate recorded-demo specs.
@@ -242,7 +242,7 @@ Architecture docs describe the guard suite; run-by-run totals live in `README.md
 
 ## Known Constraints
 
-- The satellite path is still metadata/evidence-packet GGUF reasoning over scored signals. Production image-conditioned `mmproj` or native VLM inference is not wired into runtime yet.
+- The Satellite Pruner and Ground Validator share the same manifest-resolved GGUF for text evidence-packet reasoning when it is loaded. Ground validation keeps deterministic severity gates and falls back to `offline_lfm_v1` only if the GGUF runtime is unavailable. Production image-conditioned `mmproj` or native VLM inference is not wired into runtime yet.
 - The current trained Orbit bundle includes image-text training rows, but it should not be described as direct image-conditioned runtime inference unless `/api/analysis/status` reports `image_conditioned_runtime_enabled=true`.
 - The mission-evidence grounding path works with available dependencies; broader visual helper APIs stay backend-compatible but are not exposed as primary operator controls.
 - Depth Anything V3 is integrated as an optional adapter and Settings toggle. Depth statistics are not part of the live alert scoring or promotion gate, and per-frame timelapse inference remains opt-in due runtime cost.
@@ -251,7 +251,7 @@ Architecture docs describe the guard suite; run-by-run totals live in `README.md
 - The eval lane now writes baseline-vs-candidate promotion artifacts, but it still depends on exported labels and should not be treated as a substitute for operator-reviewed gold benchmarks.
 - The runtime supports curated replay loading, dynamic cached-API Fast Replay entries with rescan, and portable snapshot export/import. Bundled replay packs remain the stable showcase path.
 - Proof Mode is intentionally app-level demo UI, not a correctness substitute. Correctness remains covered by backend tests, frontend type checks, and normal Playwright specs.
-- Satellite GGUF reasoning is only active when a manifest-resolved model artifact is installed locally.
+- Satellite/Ground GGUF reasoning is only active when a manifest-resolved model artifact and `llama-cpp-python` runtime are installed locally.
 - Normal startup opens on the known Atacama mining context but does not start a mission, auto-play the last replay, or scan the legacy default region. Live scanning begins only after operator-confirmed mission state exists.
 - Florida Fire/Drought Readiness Watch uses a recent 30-day operational window by default and rejects proxy-only vegetation changes before downlink, so it remains readiness/candidate triage rather than unsupported fire confirmation.
 - The current scan grid is the repo-local square-cell compatibility layer, which is sufficient for the SimSat hackathon demo. Production geospatial scale-out is intentionally parked outside the active scope.

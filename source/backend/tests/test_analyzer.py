@@ -1,9 +1,9 @@
-"""Tests for the offline alert analyzer module.
+"""Tests for the alert analyzer module.
 
 Covers:
   - Offline LFM deterministic analysis output structure and content
   - Severity label computation
-  - analyze_alert() routing (always offline, no external API)
+  - analyze_alert() routing with deterministic fallback and shared-GGUF review
   - Finding generation from band deltas
 """
 
@@ -13,8 +13,15 @@ from core.analyzer import (
     _offline_analysis,
     _severity_label,
     analyze_alert,
+    ground_model_status,
     is_proxy_only_firewatch_signal,
 )
+
+
+@pytest.fixture(autouse=True)
+def disable_ground_gguf_by_default(monkeypatch):
+    """Keep deterministic unit tests fast; specific tests opt into GGUF review."""
+    monkeypatch.setenv("ORBIT_GROUND_GGUF_ANALYSIS", "false")
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +228,51 @@ class TestOfflineAnalysis:
 
         assert result["severity"] == "critical"
         assert any("Firewatch evidence" in finding for finding in result["findings"])
+
+    def test_shared_gguf_review_updates_model_when_enabled(self, monkeypatch):
+        monkeypatch.setenv("ORBIT_GROUND_GGUF_ANALYSIS", "true")
+        monkeypatch.setattr(
+            "core.analyzer.llm_model_status",
+            lambda: {
+                "loaded": True,
+                "name": "LFM2.5-VL-450M-Q4_0.gguf",
+                "path": "runtime-data/models/lfm2.5-vlm-450m/LFM2.5-VL-450M-Q4_0.gguf",
+                "runtime_inference_mode": "text_evidence_packet",
+            },
+        )
+        monkeypatch.setattr(
+            "core.analyzer.llm_generate",
+            lambda prompt, max_tokens=120: {
+                "response": "Confirm as candidate evidence. Keep provenance attached for human review.",
+                "thinking": "",
+                "tool_calls": [],
+                "raw": "",
+            },
+        )
+
+        result = analyze_alert(**_make_alert(change_score=0.72, confidence=0.92))
+
+        assert result["model"] == "LFM2.5-VL-450M-Q4_0.gguf"
+        assert result["deterministic_model"] == "offline_lfm_v1"
+        assert result["model_runtime"] == "shared_trained_gguf_text_evidence_packet"
+        assert "Ground GGUF review" in result["summary"]
+
+    def test_ground_model_status_reports_shared_model_when_loaded(self, monkeypatch):
+        monkeypatch.setattr(
+            "core.analyzer.llm_model_status",
+            lambda: {
+                "loaded": True,
+                "name": "LFM2.5-VL-450M-Q4_0.gguf",
+                "path": "runtime-data/models/lfm2.5-vlm-450m/LFM2.5-VL-450M-Q4_0.gguf",
+                "runtime_inference_mode": "text_evidence_packet",
+            },
+        )
+
+        status = ground_model_status()
+
+        assert status["model"] == "LFM2.5-VL-450M-Q4_0.gguf"
+        assert status["shared_gguf_model"] == "LFM2.5-VL-450M-Q4_0.gguf"
+        assert status["shared_with_satellite"] is True
 
     def test_firewatch_proxy_guard_is_mission_scoped(self):
         assert is_proxy_only_firewatch_signal(

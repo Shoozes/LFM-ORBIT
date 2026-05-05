@@ -107,6 +107,22 @@ def test_build_confirmation_structure():
     assert confirmation["action"]  # non-empty
 
 
+def test_operator_query_ack_reports_ground_model(monkeypatch):
+    from core.ground_agent import _build_operator_query_ack
+
+    monkeypatch.setattr(
+        "core.ground_agent.ground_model_status",
+        lambda: {"model": "LFM2.5-VL-450M-Q4_0.gguf"},
+    )
+
+    ack = _build_operator_query_ack("  check   sat/gnd bus  ")
+
+    assert ack["status"] == "acknowledged"
+    assert ack["model"] == "LFM2.5-VL-450M-Q4_0.gguf"
+    assert ack["message"] == "check sat/gnd bus"
+    assert "Ground Validator received" in ack["note"]
+
+
 def test_build_confirmation_uses_action_for_severity():
     from core.ground_agent import _build_confirmation
     analysis = {"severity": "critical", "model": "m", "summary": "s", "findings": []}
@@ -146,3 +162,140 @@ def test_build_confirmation_missing_payload_fields_defaults():
     assert c["change_score"] == pytest.approx(0.0)
     assert c["confidence"] == pytest.approx(0.0)
     assert c["reason_codes"] == []
+
+
+@pytest.mark.asyncio
+async def test_ground_agent_bus_query_round_trip(tmp_path, monkeypatch):
+    import asyncio
+
+    from core.agent_bus import get_recent_messages, init_bus, post_message
+    from core.ground_agent import run_ground_agent
+
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setattr("core.ground_agent._POLL_INTERVAL", 0.01)
+    monkeypatch.setattr("core.ground_agent.get_active_mission", lambda: None)
+    monkeypatch.setattr(
+        "core.ground_agent.warm_ground_model",
+        lambda: {
+            "model": "LFM2.5-VL-450M-Q4_0.gguf",
+            "shared_gguf_model": "LFM2.5-VL-450M-Q4_0.gguf",
+            "shared_with_satellite": True,
+            "runtime_inference_mode": "text_evidence_packet",
+        },
+    )
+    monkeypatch.setattr(
+        "core.ground_agent.ground_model_status",
+        lambda: {
+            "model": "LFM2.5-VL-450M-Q4_0.gguf",
+            "shared_gguf_model": "LFM2.5-VL-450M-Q4_0.gguf",
+            "shared_with_satellite": True,
+            "runtime_inference_mode": "text_evidence_packet",
+        },
+    )
+
+    init_bus(reset=True)
+    stop_event = asyncio.Event()
+    task = asyncio.create_task(run_ground_agent(stop_event))
+    try:
+        post_message(
+            "satellite",
+            "ground",
+            "query",
+            {"message": "check SAT/GND link"},
+            cell_id="sq_test_001",
+        )
+
+        ack = None
+        for _ in range(80):
+            for msg in get_recent_messages(limit=20, sender="ground", msg_type="status"):
+                payload = msg["payload"]
+                if payload.get("status") == "acknowledged":
+                    ack = msg
+                    break
+            if ack:
+                break
+            await asyncio.sleep(0.02)
+
+        assert ack is not None
+        assert ack["cell_id"] == "sq_test_001"
+        assert ack["payload"]["model"] == "LFM2.5-VL-450M-Q4_0.gguf"
+        assert "Ground Validator received" in ack["payload"]["note"]
+    finally:
+        stop_event.set()
+        await asyncio.wait_for(task, timeout=1)
+
+
+@pytest.mark.asyncio
+async def test_ground_agent_confirms_satellite_flag_to_satellite(tmp_path, monkeypatch):
+    import asyncio
+
+    from core.agent_bus import get_recent_messages, init_bus, post_message
+    from core.ground_agent import run_ground_agent
+
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("ORBIT_GROUND_GGUF_ANALYSIS", "false")
+    monkeypatch.setattr("core.ground_agent._POLL_INTERVAL", 0.01)
+    monkeypatch.setattr("core.ground_agent.get_active_mission", lambda: None)
+    monkeypatch.setattr(
+        "core.ground_agent.warm_ground_model",
+        lambda: {
+            "model": "offline_lfm_v1",
+            "shared_gguf_model": "LFM2.5-VL-450M-Q4_0.gguf",
+            "shared_with_satellite": False,
+            "runtime_inference_mode": "text_evidence_packet",
+        },
+    )
+    monkeypatch.setattr(
+        "core.ground_agent.analyze_alert",
+        lambda **kwargs: {
+            "model": "offline_lfm_v1",
+            "severity": "high",
+            "summary": "Candidate evidence packet is review-worthy.",
+            "findings": ["strong temporal signal"],
+            "confidence_note": "test",
+            "source_note": "test",
+        },
+    )
+    monkeypatch.setattr(
+        "core.ground_agent._generate_cell_timelapse",
+        lambda cell_id, mission=None: (None, "Temporal context reviewed.", "test_cache"),
+    )
+    monkeypatch.setattr("core.ground_agent.cell_to_latlng", lambda cell_id: (28.5, -81.5))
+    monkeypatch.setattr("core.ground_agent.upsert_pin", lambda **kwargs: None)
+    monkeypatch.setattr("core.ground_agent.add_gallery_item", lambda **kwargs: None)
+
+    init_bus(reset=True)
+    stop_event = asyncio.Event()
+    task = asyncio.create_task(run_ground_agent(stop_event))
+    try:
+        post_message(
+            "satellite",
+            "ground",
+            "flag",
+            {
+                "change_score": 0.86,
+                "confidence": 0.91,
+                "reason_codes": ["burn_scar_candidate"],
+                "before_window": {"ndvi": 0.72},
+                "after_window": {"ndvi": 0.35},
+                "observation_source": "simsat_fireline",
+            },
+            cell_id="sq_flag_001",
+        )
+
+        confirmation = None
+        for _ in range(80):
+            matches = get_recent_messages(limit=20, sender="ground", recipient="satellite", msg_type="confirmation")
+            if matches:
+                confirmation = matches[-1]
+                break
+            await asyncio.sleep(0.02)
+
+        assert confirmation is not None
+        assert confirmation["cell_id"] == "sq_flag_001"
+        assert confirmation["payload"]["model"] == "offline_lfm_v1"
+        assert confirmation["payload"]["severity"] == "high"
+        assert "CONFIRM" in confirmation["payload"]["action"]
+    finally:
+        stop_event.set()
+        await asyncio.wait_for(task, timeout=1)

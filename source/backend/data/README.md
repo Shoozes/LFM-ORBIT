@@ -11,7 +11,7 @@ Orbit's data cycle is:
 3. `scripts/export_orbit_dataset.py` packages those records into an Orbit dataset export with JSONL manifests and local assets.
 4. `scripts/retag_training_assets.py` walks the export, deduplicates images and frames by SHA-256, extracts timelapse frames, preserves temporal sequence context, and retags assets with a chosen provider.
 5. The retagged folder can be reviewed locally, loaded as a Hugging Face ImageFolder dataset, uploaded to Hugging Face, or used by external fine-tuning jobs.
-6. Trained artifacts can come back through the model handoff/fetch path documented in `docs/MODEL_HANDOFF.md`.
+6. Trained artifacts can come back through the model handoff/fetch path documented in `../../../docs/dev/MODEL_HANDOFF.md`.
 
 The goal is a closed loop: collect evidence in Orbit, package it cleanly, retag it with a stronger vision model when useful, train or evaluate externally, then bring model artifacts back into Orbit.
 

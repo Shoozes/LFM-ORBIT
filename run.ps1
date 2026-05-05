@@ -220,11 +220,7 @@ function Install-BackendDeps {
         $syncExit = $LASTEXITCODE
         if ($syncExit -ne 0) {
             if ($installModelRuntime) {
-                Write-Host "[!] llama-cpp model runtime failed to install. Retrying core backend install without local GGUF runtime." -ForegroundColor Yellow
-                & $uv sync --extra dev --locked
-                if ($LASTEXITCODE -ne 0) {
-                    throw "Backend dependency sync failed with exit code $LASTEXITCODE."
-                }
+                throw "llama-cpp model runtime failed to install. The production/hackathon path requires the trained GGUF runtime; repair compiler/Python wheel support and rerun option 1."
             } else {
                 throw "Backend dependency sync failed with exit code $syncExit."
             }
@@ -337,11 +333,32 @@ function Ensure-TrainedModel {
     Write-Host "[+] Trained Orbit GGUF model ready ($([Math]::Round($fileSize / 1MB, 1)) MB)." -ForegroundColor Green
 }
 
+function Assert-TrainedModelRuntime {
+    if (-not (Test-Path $ModelFile)) {
+        throw "Trained GGUF model is required for this path but was not found: $ModelFile"
+    }
+
+    $uv = Ensure-Uv
+    Write-Host "[*] Verifying trained GGUF runtime..." -ForegroundColor Cyan
+    Push-Location $BackendDir
+    try {
+        & $uv run --no-sync python scripts\smoke_satellite_model.py --require-present --max-tokens 8
+        if ($LASTEXITCODE -ne 0) {
+            throw "Trained GGUF runtime smoke failed. Confirm llama-cpp-python is installed in $BackendVenvDir."
+        }
+    } finally {
+        Pop-Location
+    }
+}
+
 function Install-Deps {
     Install-BackendDeps
     Write-SimSatStatus
     Install-FrontendDeps
     Ensure-TrainedModel
+    if ($FetchModel) {
+        Assert-TrainedModelRuntime
+    }
     Write-Host "[+] Install/repair complete." -ForegroundColor Green
 }
 
@@ -367,6 +384,9 @@ function Run-Verify {
         Write-Host "[*] Backend tests..." -ForegroundColor Cyan
         $uv = Ensure-Uv
         & $uv run --no-sync pytest -q
+        if (Test-Path $ModelFile) {
+            Assert-TrainedModelRuntime
+        }
     } finally {
         Pop-Location
     }

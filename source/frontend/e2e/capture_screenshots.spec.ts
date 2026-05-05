@@ -94,7 +94,7 @@ test("screenshot: alert analysis — offline LFM verdict", async ({ page, reques
 
   // Run the offline analysis
   await page.locator("[data-testid='analyze-button']").click();
-  await expect(page.getByText("offline_lfm_v1", { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/offline_lfm_v1|LFM2\.5-VL-450M-Q4_0\.gguf/).first()).toBeVisible({ timeout: 30_000 });
 
   await page.getByText("AI Analysis", { exact: true }).evaluate((element) => {
     element.scrollIntoView({ block: "start", inline: "nearest" });

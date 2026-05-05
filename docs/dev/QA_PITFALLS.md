@@ -32,7 +32,7 @@ It can support text evidence-packet and bbox JSON reasoning from the NM-UNI hand
 
 ### How should the README stay short?
 
-Keep one hero visual, the run command near the top, proof images inside the proof gallery, and progress history out of public copy. Public visuals must live under `docs/media/`, be linked from markdown, and pass `test_docs_artifacts.py`. Use `docs/TODO.md` for current backlog and `summary_bank.json` for detailed history.
+Keep one hero visual, the run command near the top, proof images inside the proof gallery, and progress history out of public copy. Public visuals must live under `docs/media/`, be linked from markdown, and pass `test_docs_artifacts.py`. Use `TODO.md` for current backlog and `summary_bank.json` for detailed history.
 
 ### When can generated screenshots or story plates enter `docs/media/`?
 
@@ -142,7 +142,7 @@ Do not print or paste tokens. Use `scripts/upload_orbit_dataset_hf.py` so the to
 
 ### How do we verify a Hub refresh?
 
-Upload only after local JSONL parsing and image inventory pass. Then read back the exact Hub revision and verify row counts for every config, the card counts, and manifest portability. Update `docs/DATASET_CYCLE_TUTORIAL.md`, `source/backend/data/README.md`, `docs/MODEL_HANDOFF.md`, `docs/TODO.md`, and `summary_bank.json` with the final Hub commit, not an intermediate upload commit.
+Upload only after local JSONL parsing and image inventory pass. Then read back the exact Hub revision and verify row counts for every config, the card counts, and manifest portability. Update `../DATASET_CYCLE_TUTORIAL.md`, `source/backend/data/README.md`, `MODEL_HANDOFF.md`, `TODO.md`, and `summary_bank.json` with the final Hub commit, not an intermediate upload commit.
 
 ## Cold-Start QA
 

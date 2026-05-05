@@ -485,14 +485,16 @@ test.describe("Phase 7 – AI analysis", () => {
     const res = await request.get(`${API_BASE}/api/analysis/status`);
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
-    expect(body.default_model).toBe("offline_lfm_v1");
+    expect(typeof body.default_model).toBe("string");
+    expect(body.default_model.length).toBeGreaterThan(0);
+    expect(body.ground_validator_model.fallback_model).toBe("offline_lfm_v1");
     expect(body.models).toBeTruthy();
     expect(body.models["offline_lfm_v1"]).toBeTruthy();
     expect(body.models["offline_lfm_v1"].available).toBe(true);
     expect(typeof body.satellite_inference_loaded).toBe("boolean");
   });
 
-  test("analysis alert endpoint returns offline LFM result", async ({ request }) => {
+  test("analysis alert endpoint returns ground analysis result", async ({ request }) => {
     const res = await request.post(`${API_BASE}/api/analysis/alert`, {
       data: {
         change_score: 0.52,
@@ -524,7 +526,8 @@ test.describe("Phase 7 – AI analysis", () => {
     });
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
-    expect(body.model).toBe("offline_lfm_v1");
+    expect(typeof body.model).toBe("string");
+    expect(body.model.length).toBeGreaterThan(0);
     expect(body.severity).toBeTruthy();
     expect(body.summary).toBeTruthy();
     expect(body.findings).toBeInstanceOf(Array);
@@ -550,7 +553,7 @@ test.describe("Phase 7 – AI analysis", () => {
     await firstAlert.click();
     await expect(page.locator("[data-testid='analyze-button']")).toBeVisible({ timeout: 5_000 });
     await page.locator("[data-testid='analyze-button']").click();
-    await expect(page.getByText("offline_lfm_v1", { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/offline_lfm_v1|LFM2\.5-VL-450M-Q4_0\.gguf/).first()).toBeVisible({ timeout: 30_000 });
   });
 });
 

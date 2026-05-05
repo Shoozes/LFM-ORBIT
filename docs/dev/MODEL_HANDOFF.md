@@ -5,7 +5,7 @@ Updated May 3, 2026.
 ## Purpose
 
 This document defines Orbit's external model-bundle contract for trained satellite artifacts.
-It is a contract/reference doc; the active backlog lives in `docs/TODO.md` to keep progress tracking centralized.
+It is a contract/reference doc; the active backlog lives in `TODO.md` to keep progress tracking centralized.
 
 The immediate goal is operational:
 
@@ -17,7 +17,7 @@ The immediate goal is operational:
 
 ## Current Runtime Constraint
 
-Orbit's current local satellite inference path is still GGUF chat-style reasoning over scored metadata in [inference.py](../source/backend/core/inference.py).
+Orbit's current local satellite inference path is still GGUF chat-style reasoning over scored metadata in [inference.py](../../source/backend/core/inference.py).
 
 That means:
 
@@ -29,7 +29,7 @@ That means:
 
 ## Orbit Runtime Contract
 
-Orbit resolves the trained satellite model through [model_manifest.py](../source/backend/core/model_manifest.py).
+Orbit resolves the trained satellite model through [model_manifest.py](../../source/backend/core/model_manifest.py).
 
 Default runtime location:
 
@@ -59,7 +59,7 @@ Important fields:
 
 Orbit includes a fetch utility:
 
-[fetch_satellite_model.py](../source/backend/scripts/fetch_satellite_model.py)
+[fetch_satellite_model.py](../../source/backend/scripts/fetch_satellite_model.py)
 
 Default trained Orbit bundle:
 
@@ -88,7 +88,7 @@ cd C:\Users\jc816\OneDrive\Desktop\Gen-App\LFM Orbit
 ./run.sh --install
 ```
 
-The production launcher path downloads the trained handoff and opportunistically installs the `model` extra (`llama-cpp-python`). If Linux/WSL compiler support is missing, the launcher falls back to the core locked backend install so the app still boots and the model files remain available for a host that can run the GGUF.
+The production launcher path downloads the trained handoff, installs the `model` extra (`llama-cpp-python`), and runs `scripts/smoke_satellite_model.py --require-present --max-tokens 8`. If the GGUF runtime cannot load, option 1 fails before the app starts; fallback analysis is development-only, not the hackathon path.
 
 Direct script usage:
 
@@ -272,7 +272,7 @@ Current local export after including replay cache:
 
 Hugging Face upload is wired and completed locally for the current retagged training export. The dataset is published at `Shoozes/LFM-Orbit-SatData`, with latest data/card commit `2d5c5c400b61e869a1154881743ac6f1c1f77e3b` and `mission_metadata=185` for operator task text, target packs, object targets, bbox intent, and metadata-only replay missions.
 
-The trained model handoff bundle is published at `Shoozes/lfm2.5-450m-vl-orbit-satellite`. Latest checked revision: `560b0c6e4eb68696527630b8e652cc34850a82b9`. Local fetch with `--force` refreshed `runtime-data/models/lfm2.5-vlm-450m/`; `scripts/smoke_satellite_model.py --require-present --max-tokens 8` passed with `loaded=true`. The manifest reports task `orbit-satellite-triage`, base model `LiquidAI/LFM2.5-VL-450M`, GGUF runtime, `training_modality=image_text`, `image_training_verified=true`, `1611` train rows, `1611` multimodal rows, `1878` image blocks, and `179` eval rows. Runtime remains `text_evidence_packet` because no `mmproj` or direct image-conditioned adapter is wired.
+The trained model handoff bundle is published at `Shoozes/lfm2.5-450m-vl-orbit-satellite`. Latest checked revision: `560b0c6e4eb68696527630b8e652cc34850a82b9`. Local fetch with `--force` refreshed `runtime-data/models/lfm2.5-vlm-450m/`; `scripts/smoke_satellite_model.py --require-present --max-tokens 8` passed with `loaded=true` in the launcher-managed Windows backend environment. The manifest reports task `orbit-satellite-triage`, base model `LiquidAI/LFM2.5-VL-450M`, GGUF runtime, `training_modality=image_text`, `image_training_verified=true`, `1611` train rows, `1611` multimodal rows, `1878` image blocks, and `179` eval rows. Runtime remains `text_evidence_packet` because no `mmproj` or direct image-conditioned adapter is wired.
 
 ## Integration Sequence
 
@@ -288,7 +288,7 @@ The trained model handoff bundle is published at `Shoozes/lfm2.5-450m-vl-orbit-s
 
 ## Tracked Runtime Gaps
 
-This handoff closes artifact resolution and publication flow. The runtime gaps below are tracked in `docs/TODO.md`:
+This handoff closes artifact resolution and publication flow. The runtime gaps below are tracked in `TODO.md`:
 
 - a production multimodal image-input adapter inside Orbit
 - automatic `mmproj` use in the current `llama_cpp` path when a compatible projector exists

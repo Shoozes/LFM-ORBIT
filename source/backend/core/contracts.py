@@ -273,6 +273,8 @@ class AlertAnalysisResponse(TypedDict):
     findings: list[str]
     confidence_note: str
     source_note: str
+    model_runtime: NotRequired[str]
+    deterministic_model: NotRequired[str]
 
 
 class AnalysisModelInfo(TypedDict):

@@ -425,7 +425,9 @@ def test_analysis_status_endpoint_returns_model_info():
     data = response.json()
 
     assert "default_model" in data
-    assert data["default_model"] == "offline_lfm_v1"
+    assert data["default_model"]
+    assert "ground_validator_model" in data
+    assert data["ground_validator_model"]["fallback_model"] == "offline_lfm_v1"
     assert "satellite_inference_loaded" in data
     assert isinstance(data["satellite_inference_loaded"], bool)
     assert "models" in data
@@ -564,8 +566,9 @@ def test_image_inference_endpoint_rejects_missing_image_payload():
     assert response.status_code == 422
 
 
-def test_analysis_alert_endpoint_returns_offline_result():
-    """Analysis alert endpoint must return offline LFM result for valid input."""
+def test_analysis_alert_endpoint_returns_ground_result(monkeypatch):
+    """Analysis alert endpoint must return a ground model result for valid input."""
+    monkeypatch.setenv("ORBIT_GROUND_GGUF_ANALYSIS", "false")
     response = client.post(
         "/api/analysis/alert",
         json={
@@ -601,6 +604,7 @@ def test_analysis_alert_endpoint_returns_offline_result():
     data = response.json()
 
     assert data["model"] == "offline_lfm_v1"
+    assert data["model_runtime"] == "deterministic_fallback"
     assert data["severity"] in ("low", "moderate", "high", "critical")
     assert isinstance(data["summary"], str)
     assert len(data["summary"]) > 0
@@ -621,8 +625,9 @@ def test_analysis_alert_validates_change_score_range():
     assert response.status_code == 422
 
 
-def test_analysis_alert_handles_empty_windows():
+def test_analysis_alert_handles_empty_windows(monkeypatch):
     """Analysis alert endpoint handles empty before/after window dicts."""
+    monkeypatch.setenv("ORBIT_GROUND_GGUF_ANALYSIS", "false")
     response = client.post(
         "/api/analysis/alert",
         json={

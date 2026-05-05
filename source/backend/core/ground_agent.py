@@ -22,7 +22,7 @@ from datetime import datetime, timedelta, timezone
 from core.agent_bus import post_message, pull_messages, upsert_pin
 from core.grid import cell_to_boundary, cell_to_latlng
 from core.mission import get_active_mission
-from core.analyzer import analyze_alert, analyze_timelapse
+from core.analyzer import analyze_alert, analyze_timelapse, ground_model_status, warm_ground_model
 from core.gallery import add_gallery_item
 from core.link_state import is_link_connected
 
@@ -110,6 +110,20 @@ def _build_reject(cell_id: str, reason: str, flag_payload: dict | None = None) -
     }
 
 
+def _build_operator_query_ack(message: str) -> dict:
+    clean_message = " ".join(str(message or "").split())
+    return {
+        "status": "acknowledged",
+        "action": "QUERY ACK — Ground Validator is monitoring the SAT/GND bus.",
+        "message": clean_message,
+        "model": ground_model_status()["model"],
+        "note": (
+            "Ground Validator received the operator bus message. "
+            "Mission-changing requests should still go through Ground Agent chat proposals."
+        ),
+    }
+
+
 def _recent_date_range(days: int = 30) -> tuple[str, str]:
     today = datetime.now(timezone.utc).date()
     return (today - timedelta(days=max(1, days))).isoformat(), today.isoformat()
@@ -170,16 +184,34 @@ async def run_ground_agent(stop_event: asyncio.Event | None = None) -> None:
     """
     logger.info("[GND] Ground Validator Agent booted.")
 
+    try:
+        model_state = await asyncio.get_running_loop().run_in_executor(None, warm_ground_model)
+    except Exception as exc:
+        logger.warning("[GND] Shared GGUF warmup failed: %s", exc)
+        model_state = ground_model_status()
+
+    if model_state.get("shared_with_satellite"):
+        ready_note = (
+            "Ground Station online. Shared Orbit GGUF analyzer + timelapse pipeline ready. "
+            "Monitoring satellite bus for anomaly flags."
+        )
+    else:
+        ready_note = (
+            "Ground Station online. Deterministic fallback analyzer + timelapse pipeline ready. "
+            "Shared Orbit GGUF is not loaded yet."
+        )
+
     post_message(
         sender=_GROUND_SENDER,
         recipient="broadcast",
         msg_type="status",
         payload={
             "status": "online",
-            "note": (
-                "Ground Station online. LFM offline analyzer + timelapse pipeline ready. "
-                "Monitoring satellite bus for anomaly flags."
-            ),
+            "model": model_state["model"],
+            "shared_gguf_model": model_state["shared_gguf_model"],
+            "shared_with_satellite": model_state["shared_with_satellite"],
+            "runtime_inference_mode": model_state["runtime_inference_mode"],
+            "note": ready_note,
         },
     )
 
@@ -207,6 +239,17 @@ async def run_ground_agent(stop_event: asyncio.Event | None = None) -> None:
         flags = pull_messages(recipient=_GROUND_SENDER, limit=5)
 
         for msg in flags:
+            if msg["msg_type"] == "query":
+                payload = msg.get("payload", {})
+                post_message(
+                    sender=_GROUND_SENDER,
+                    recipient="broadcast",
+                    msg_type="status",
+                    cell_id=msg.get("cell_id"),
+                    payload=_build_operator_query_ack(str(payload.get("message") or payload.get("note") or "")),
+                )
+                continue
+
             if msg["msg_type"] != "flag":
                 continue
 

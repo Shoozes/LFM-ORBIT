@@ -281,9 +281,9 @@ install_backend_deps() {
             sync_args+=(--extra model)
             echo "[i] Attempting llama-cpp model runtime install for GGUF inference."
         else
-            include_model_runtime=false
-            echo "[i] Skipping llama-cpp model runtime install because no Linux C/C++ compiler was found."
-            echo "    Install build-essential, gcc/g++, or clang, then rerun with LFM_ORBIT_INSTALL_MODEL_RUNTIME=1 if local GGUF inference is required."
+            echo "[!] llama-cpp model runtime is required for the production/hackathon path but no Linux C/C++ compiler was found." >&2
+            echo "    Install build-essential, gcc/g++, or clang, then rerun option 1." >&2
+            exit 1
         fi
     fi
 
@@ -291,8 +291,8 @@ install_backend_deps() {
         cd "$BACKEND_DIR"
         if ! "$UV_CMD" "${sync_args[@]}"; then
             if [[ "$include_model_runtime" == true ]]; then
-                echo "[!] llama-cpp model runtime failed to install. Retrying core backend install without local GGUF runtime." >&2
-                "$UV_CMD" sync --extra dev --locked
+                echo "[!] llama-cpp model runtime failed to install. The trained GGUF runtime is required for production/hackathon runs." >&2
+                exit 1
             else
                 exit 1
             fi
@@ -391,11 +391,27 @@ PY
     echo "[+] Trained Orbit GGUF model ready."
 }
 
+assert_trained_model_runtime() {
+    if [[ ! -f "$MODEL_FILE" ]]; then
+        echo "[!] Trained GGUF model is required for this path but was not found: $MODEL_FILE" >&2
+        exit 1
+    fi
+    ensure_uv
+    echo "[*] Verifying trained GGUF runtime..."
+    (
+        cd "$BACKEND_DIR"
+        "$UV_CMD" run --no-sync python scripts/smoke_satellite_model.py --require-present --max-tokens 8
+    )
+}
+
 install_deps() {
     install_backend_deps
     write_simsat_status
     install_frontend_deps
     ensure_trained_model
+    if [[ "$FETCH_MODEL" == true ]]; then
+        assert_trained_model_runtime
+    fi
     echo "[+] Install/repair complete."
 }
 
@@ -418,6 +434,9 @@ run_verify() {
         cd "$BACKEND_DIR"
         echo "[*] Backend tests..."
         "$UV_CMD" run --no-sync pytest -q
+        if [[ -f "$MODEL_FILE" ]]; then
+            assert_trained_model_runtime
+        fi
     )
 
     (

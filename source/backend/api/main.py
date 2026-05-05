@@ -21,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from core.analyzer import analyze_alert
+from core.analyzer import analyze_alert, ground_model_status
 from core.agent_bus import (
     count_unread_message_ids,
     get_bus_stats,
@@ -951,10 +951,11 @@ def analysis_timelapse(body: BboxRequest):
 @app.post("/api/analysis/alert")
 def analyze_alert_endpoint(body: AlertAnalysisBody):
     """
-    Analyze a mission alert using offline evidence reasoning.
+    Analyze a mission alert using ground evidence reasoning.
 
-    Production path: Uses offline LFM signal analysis (CPU-only, deterministic).
-    The offline path is always available and requires no external services.
+    Production path keeps deterministic signal gates, then uses the shared
+    manifest-resolved Orbit GGUF when it is loaded. The offline path remains
+    available as the safe fallback.
     """
     return analyze_alert(
         change_score=body.change_score,
@@ -1378,11 +1379,13 @@ def analysis_status():
     """
     AI analysis model availability status.
 
-    The satellite can optionally use a locally resolved GGUF artifact for
-    live triage reasoning. Ground analysis uses the offline LFM signal
-    analyzer which is always available.
+    Satellite triage and Ground validation share the same locally resolved
+    GGUF artifact when it is loaded. Ground validation preserves deterministic
+    severity gates and falls back to the offline signal analyzer if the GGUF is
+    unavailable.
     """
     ms = llm_model_status()
+    gnd = ground_model_status()
     capabilities = runtime_capabilities()
     gguf_name = ms.get("name", "LFM2.5-VL-450M-Q4_0.gguf")
     training_modality = ms.get("training_modality", "unknown")
@@ -1398,7 +1401,8 @@ def analysis_status():
         "direct image runtime adapter is not wired",
     )
     return {
-        "default_model": "offline_lfm_v1",
+        "default_model": gnd["model"],
+        "ground_validator_model": gnd,
         "optional_model": gguf_name,
         "satellite_inference_loaded": ms.get("loaded", False),
         "runtime_capabilities": capabilities,
@@ -1415,7 +1419,7 @@ def analysis_status():
         "models": {
             "offline_lfm_v1": {
                 "available": True,
-                "description": "Offline LFM signal analysis -- production, CPU-only",
+                "description": "Deterministic signal analysis fallback for ground validation",
                 "requires": "none",
             },
             gguf_name: {
@@ -1454,8 +1458,8 @@ def analysis_status():
             },
         },
         "note": (
-            "Satellite triage can use a resolved GGUF artifact for live reasoning. "
-            "Ground validation always uses offline_lfm_v1."
+            "Satellite triage and Ground validation share the resolved GGUF artifact when loaded. "
+            "Ground validation keeps deterministic severity gates and falls back to offline_lfm_v1 if needed."
         ),
     }
 

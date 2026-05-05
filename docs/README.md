@@ -4,22 +4,22 @@ LFM-ORBIT is the satellite-image timelapse scanner: mission chat and map selecti
 
 Start with the product README, then use only the focused doc you need.
 
-## Demo And Review
+## User Docs
 
 - [Product README](../README.md)
 - [Demo guide](DEMO_GUIDE.md)
 - [Target-pack proof contracts](OBJECT_EVIDENCE_MODE.md)
 - [Sentinel close-look workflow](SENTINEL_CLOSE_LOOKS.md)
-- [Hackathon criteria](Liquid_AI_x_DPhi_Space_Hackathon_Criteria.md)
-
-## Engineering
-
-- [Architecture](ARCHITECTURE.md)
-- [Dataset cycle tutorial](DATASET_CYCLE_TUTORIAL.md)
-- [Model handoff](MODEL_HANDOFF.md)
-- [QA pitfalls](QA_PITFALLS.md)
 - [Future Sentinel lanes](FUTURE_SENTINEL_LANES.md)
-- [Current backlog](TODO.md)
+
+## Dev Docs
+
+- [Hackathon criteria](dev/Liquid_AI_x_DPhi_Space_Hackathon_Criteria.md)
+- [Architecture](dev/ARCHITECTURE.md)
+- [Dataset cycle tutorial](DATASET_CYCLE_TUTORIAL.md)
+- [Model handoff](dev/MODEL_HANDOFF.md)
+- [QA pitfalls](dev/QA_PITFALLS.md)
+- [Current backlog](dev/TODO.md)
 
 ## Media
 

@@ -120,7 +120,7 @@ flowchart LR
   H --> I[Audit UI + dataset export]
 ```
 
-Current runtime: SimSat-first imagery lane, deterministic replay fixtures for repeatable demos, and Liquid evidence-packet reasoning when a manifest-resolved local model runtime is available. NM-UNI training proof is surfaced from `training_result_manifest.json`; production image-conditioned inference is not claimed unless `mmproj` or native VLM runtime support is present and wired.
+Current runtime: SimSat-first imagery lane, deterministic replay fixtures for repeatable demos, and shared Satellite/Ground Liquid evidence-packet reasoning when the manifest-resolved local GGUF runtime is available. NM-UNI training proof is surfaced from `training_result_manifest.json`; production image-conditioned inference is not claimed unless `mmproj` or native VLM runtime support is present and wired.
 
 ## Validation Snapshot
 
@@ -159,7 +159,7 @@ Runtime mode: text evidence-packet reasoning
 Direct image inference: unavailable until mmproj/native VLM runtime is present
 ```
 
-The launchers install the optional `llama-cpp-python` runtime when supported; Linux/WSL hosts without compiler support still complete the core install and boot safely.
+The production launcher path installs `llama-cpp-python` and runs the trained-model smoke check. If the GGUF runtime cannot load, option 1 fails before the app starts instead of silently running the hackathon path without the trained model.
 
 Dataset export, retagging, and Hugging Face upload details live in [docs/DATASET_CYCLE_TUTORIAL.md](docs/DATASET_CYCLE_TUTORIAL.md).
 
@@ -191,12 +191,12 @@ API: `http://127.0.0.1:8000`
 |---|---|
 | [docs/README.md](docs/README.md) | Compact docs index |
 | [docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md) | Demo commands, artifacts, and replay assets |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Runtime map and design notes |
+| [docs/dev/ARCHITECTURE.md](docs/dev/ARCHITECTURE.md) | Runtime map and design notes |
 | [docs/OBJECT_EVIDENCE_MODE.md](docs/OBJECT_EVIDENCE_MODE.md) | Target-pack proof contracts, safety scope, and current UI boundaries |
 | [docs/DATASET_CYCLE_TUTORIAL.md](docs/DATASET_CYCLE_TUTORIAL.md) | Seed, export, retag, and Hugging Face cycle |
-| [docs/MODEL_HANDOFF.md](docs/MODEL_HANDOFF.md) | Model bundle and dataset handoff contract |
+| [docs/dev/MODEL_HANDOFF.md](docs/dev/MODEL_HANDOFF.md) | Model bundle and dataset handoff contract |
 | [docs/FUTURE_SENTINEL_LANES.md](docs/FUTURE_SENTINEL_LANES.md) | Post-handoff Sentinel lane boundaries |
-| [docs/TODO.md](docs/TODO.md) | Compact active backlog and verification checklist |
+| [docs/dev/TODO.md](docs/dev/TODO.md) | Compact active backlog and verification checklist |
 
 ## Usage To Training Loop
 

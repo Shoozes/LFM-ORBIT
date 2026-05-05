@@ -1,17 +1,150 @@
 """
 AI-powered alert analysis for LFM Orbit.
 
-This path uses offline LFM deterministic signal-based analysis 
-suitable for CPU-only inference, producing structured natural-language summaries.
+Ground validation keeps deterministic signal gates for severity and safety, then
+uses the same manifest-resolved Orbit GGUF as the Satellite Pruner when that
+model is loaded. If the GGUF is unavailable, the deterministic offline analyzer
+remains the safe fallback.
 """
 
 import logging
 import os
 from core.config import DETECTION, REGION
 from core.contracts import AlertAnalysisResponse
+from core.inference import generate as llm_generate
+from core.inference import model_status as llm_model_status
 
 logger = logging.getLogger(__name__)
 
+_FALLBACK_MODEL_NAME = "offline_lfm_v1"
+_GROUND_GGUF_MODE_ENV = "ORBIT_GROUND_GGUF_ANALYSIS"
+
+
+def _ground_gguf_mode() -> str:
+    mode = os.getenv(_GROUND_GGUF_MODE_ENV, "auto").strip().lower()
+    if mode in {"1", "true", "yes", "on"}:
+        return "true"
+    if mode in {"0", "false", "no", "off"}:
+        return "false"
+    return "auto"
+
+
+def _usable_llm_response(result: dict) -> str | None:
+    response = str(result.get("response") or "").strip()
+    if not response:
+        return None
+    lowered = response.lower()
+    if "lfm model not loaded" in lowered or lowered.startswith("[inference error:"):
+        return None
+    return response
+
+
+def ground_model_status() -> dict:
+    """Return the Ground Validator model status without forcing a model load."""
+    status = llm_model_status()
+    loaded = bool(status.get("loaded", False))
+    model_name = str(status.get("name") or "LFM2.5-VL-450M-Q4_0.gguf")
+    return {
+        "role": "ground_validator",
+        "model": model_name if loaded else _FALLBACK_MODEL_NAME,
+        "shared_gguf_model": model_name,
+        "shared_with_satellite": loaded,
+        "loaded": loaded,
+        "fallback_model": _FALLBACK_MODEL_NAME,
+        "mode": _ground_gguf_mode(),
+        "reason": status.get("reason", ""),
+        "path": status.get("path", ""),
+        "runtime_inference_mode": status.get("runtime_inference_mode", "text_evidence_packet"),
+    }
+
+
+def warm_ground_model() -> dict:
+    """
+    Warm the shared GGUF for Ground Validator use when the artifact is present.
+
+    This runs from the background ground-agent task, not API startup. It keeps
+    the app responsive while making later ground confirmations use the same
+    singleton model object as satellite triage.
+    """
+    if _ground_gguf_mode() == "false":
+        return ground_model_status()
+    status = llm_model_status()
+    model_path = str(status.get("path") or "")
+    if not model_path or not os.path.exists(model_path):
+        return ground_model_status()
+    llm_generate(
+        (
+            "[SYSTEM] You are the Ground Validator Agent for LFM-ORBIT.\n"
+            "[TASK] Reply with a short readiness acknowledgement for evidence-packet review."
+        ),
+        max_tokens=24,
+    )
+    return ground_model_status()
+
+
+def _ground_gguf_review(
+    *,
+    severity: str,
+    change_score: float,
+    confidence: float,
+    reason_codes: list[str],
+    findings: list[str],
+    confidence_note: str,
+    source_note: str,
+) -> tuple[str | None, str | None]:
+    mode = _ground_gguf_mode()
+    if mode == "false":
+        return None, None
+    status = llm_model_status()
+    if mode == "auto" and not bool(status.get("loaded", False)):
+        return None, None
+
+    prompt = (
+        "[SYSTEM] You are the Ground Validator Agent for LFM-ORBIT. "
+        "Use the provided evidence packet only. Keep candidate language and do not overclaim.\n\n"
+        "[EVIDENCE]\n"
+        f"severity: {severity}\n"
+        f"change_score: {change_score:.4f}\n"
+        f"confidence: {confidence:.4f}\n"
+        f"reason_codes: {', '.join(reason_codes) or 'none'}\n"
+        f"findings: {' | '.join(findings)}\n"
+        f"confidence_note: {confidence_note}\n"
+        f"source_note: {source_note}\n\n"
+        "[TASK] Write two short sentences for the human reviewer. "
+        "Mention whether to confirm, monitor, or reject the packet."
+    )
+    response = _usable_llm_response(llm_generate(prompt, max_tokens=120))
+    if not response:
+        return None, None
+    model_name = str(llm_model_status().get("name") or status.get("name") or "LFM2.5-VL-450M-Q4_0.gguf")
+    return model_name, response
+
+
+def _with_ground_model_review(
+    payload: AlertAnalysisResponse,
+    *,
+    change_score: float,
+    confidence: float,
+    reason_codes: list[str],
+) -> AlertAnalysisResponse:
+    model_name, review = _ground_gguf_review(
+        severity=payload["severity"],
+        change_score=change_score,
+        confidence=confidence,
+        reason_codes=reason_codes,
+        findings=payload["findings"],
+        confidence_note=payload["confidence_note"],
+        source_note=payload["source_note"],
+    )
+    if not model_name or not review:
+        payload["model_runtime"] = "deterministic_fallback"
+        return payload
+
+    payload["deterministic_model"] = payload["model"]
+    payload["model"] = model_name
+    payload["model_runtime"] = "shared_trained_gguf_text_evidence_packet"
+    payload["summary"] = f"{payload['summary']}\n\nGround GGUF review:\n{review}"
+    return payload
 
 
 # ---------------------------------------------------------------------------
@@ -122,14 +255,20 @@ def _offline_analysis(
         source_note,
     ]
 
-    return {
-        "model": "offline_lfm_v1",
+    payload: AlertAnalysisResponse = {
+        "model": _FALLBACK_MODEL_NAME,
         "severity": severity,
         "summary": "\n".join(summary_lines),
         "findings": findings,
         "confidence_note": confidence_note,
         "source_note": source_note,
     }
+    return _with_ground_model_review(
+        payload,
+        change_score=change_score,
+        confidence=confidence,
+        reason_codes=reason_codes,
+    )
 
 
 def _source_is_proxy_only(observation_source: str) -> bool:
@@ -241,14 +380,20 @@ def _wildfire_analysis(
         confidence_note,
         source_note,
     ]
-    return {
-        "model": "offline_lfm_v1",
+    payload: AlertAnalysisResponse = {
+        "model": _FALLBACK_MODEL_NAME,
         "severity": severity,
         "summary": "\n".join(summary_lines),
         "findings": findings,
         "confidence_note": confidence_note,
         "source_note": source_note,
     }
+    return _with_ground_model_review(
+        payload,
+        change_score=change_score,
+        confidence=confidence,
+        reason_codes=reason_codes,
+    )
 
 
 # ---------------------------------------------------------------------------

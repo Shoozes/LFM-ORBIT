@@ -4,7 +4,7 @@ Updated **May 5, 2026**.
 
 This is the compact backlog and integrity checklist. Keep run-by-run history in `summary_bank.json`; keep product proof in `README.md`; keep implementation contracts in focused docs.
 
-See `docs/QA_PITFALLS.md` for the detailed guardrail checklist.
+See `QA_PITFALLS.md` for the detailed guardrail checklist.
 
 ## Current State
 

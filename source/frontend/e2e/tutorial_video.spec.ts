@@ -383,7 +383,7 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
   await moveMouseToHighlight(page, "[data-testid='analyze-button']");
   await page.locator("[data-testid='analyze-button']").click();
   await removeHighlight(page);
-  await expect(page.getByText("offline_lfm_v1", { exact: true }).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/offline_lfm_v1|LFM2\.5-VL-450M-Q4_0\.gguf/).first()).toBeVisible({ timeout: 15_000 });
   await showVoiceoverSubtitle(
     page,
     "The local model summarizes the finding without overclaiming. This matters for HIGH-STAKES review.",
