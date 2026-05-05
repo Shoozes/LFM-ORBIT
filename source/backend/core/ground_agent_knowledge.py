@@ -93,8 +93,12 @@ MISSION_PACKS: dict[str, dict[str, Any]] = {
         "aliases": [
             "florida",
             "florida fire",
+            "florida firewatch",
+            "florida fire watch",
             "florida wildfire",
             "florida wildfires",
+            "firewatch",
+            "fire watch",
             "wildfires in florida",
             "florida drought",
             "drought conditions",

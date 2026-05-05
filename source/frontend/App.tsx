@@ -950,8 +950,8 @@ export default function App() {
                         isOpen={true}
                         onClose={() => {}}
                         bbox={drawnBbox}
-                        startDate={defaultMissionDateRange.startDate}
-                        endDate={defaultMissionDateRange.endDate}
+                        startDate={mission?.start_date || defaultMissionDateRange.startDate}
+                        endDate={mission?.end_date || defaultMissionDateRange.endDate}
                       />
                   </Suspense>
                 </div>

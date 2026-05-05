@@ -1047,7 +1047,7 @@ def test_ground_agent_chat_proposes_florida_fire_drought_pack(tmp_path, monkeypa
 
     response = client.post(
         "/api/agent/chat",
-        json={"messages": [{"role": "user", "content": "run florida fire drought mission"}]},
+        json={"messages": [{"role": "user", "content": "run florida firewatch mission"}]},
     )
 
     assert response.status_code == 200
@@ -1103,6 +1103,12 @@ def test_ground_agent_chat_agentic_planner_matches_flexible_pack_request(tmp_pat
     assert proposal["details"]["planner_result"] == "curated_mission_pack_ready"
     assert proposal["details"]["workflow_mode"] == "agentic_prompt_workflow"
     assert proposal["details"]["target_pack_id"] == "fireline"
+    from datetime import datetime, timezone
+
+    start = datetime.fromisoformat(proposal["details"]["start_date"]).date()
+    end = datetime.fromisoformat(proposal["details"]["end_date"]).date()
+    assert (end - start).days == 30
+    assert end == datetime.now(timezone.utc).date()
     assert "No protected wildlife counts" in " ".join(proposal["details"]["evidence_limits"])
 
 

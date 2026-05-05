@@ -18,6 +18,7 @@ the satellite agent.
 
 import asyncio
 import logging
+from datetime import datetime, timedelta, timezone
 from core.agent_bus import post_message, pull_messages, upsert_pin
 from core.grid import cell_to_boundary, cell_to_latlng
 from core.mission import get_active_mission
@@ -109,22 +110,40 @@ def _build_reject(cell_id: str, reason: str, flag_payload: dict | None = None) -
     }
 
 
-def _generate_cell_timelapse(cell_id: str) -> tuple[str | None, str | None, str | None]:
+def _recent_date_range(days: int = 30) -> tuple[str, str]:
+    today = datetime.now(timezone.utc).date()
+    return (today - timedelta(days=max(1, days))).isoformat(), today.isoformat()
+
+
+def _mission_timelapse_dates(mission: dict | None) -> tuple[str, str]:
+    from core.config import REGION
+
+    if mission:
+        start_date = str(mission.get("start_date") or "").strip()
+        end_date = str(mission.get("end_date") or "").strip()
+        if start_date and end_date:
+            return start_date, end_date
+        if str(mission.get("use_case_id") or "").strip().lower() == "wildfire":
+            return _recent_date_range(30)
+    return REGION.before_label, REGION.after_label
+
+
+def _generate_cell_timelapse(cell_id: str, mission: dict | None = None) -> tuple[str | None, str | None, str | None]:
     """
     Generate a timelapse WebM for the cell's bounding box and run temporal analysis.
 
     Returns (video_b64, analysis_text, source). Values can be None on failure.
     This is run in a thread pool since timelapse generation is I/O-heavy.
     """
-    from core.config import REGION
     from core.timelapse import generate_timelapse_frames
 
     try:
         bbox = _get_cell_bbox(cell_id)
+        start_date, end_date = _mission_timelapse_dates(mission)
         result = generate_timelapse_frames(
             bbox=bbox,
-            start_date=REGION.before_label,
-            end_date=REGION.after_label,
+            start_date=start_date,
+            end_date=end_date,
             steps=12,
         )
         video_b64 = result.get("video_b64")
@@ -233,7 +252,7 @@ async def run_ground_agent(stop_event: asyncio.Event | None = None) -> None:
                 if severity in ("critical", "high", "moderate"):
                     # Run blocking timelapse generation in threadpool so we don't stall the event loop
                     video_b64, timelapse_analysis, timelapse_source = await loop.run_in_executor(
-                        None, _generate_cell_timelapse, cell_id
+                        None, _generate_cell_timelapse, cell_id, dict(mission) if mission else None
                     )
 
                     # Post timelapse-generated notification to bus with analysis
