@@ -66,15 +66,13 @@ Payload proof: `1.84 MB` raw frame -> `1.24 KB` alert JSON, a `1,483x` reduction
 
 During link loss, alerts queue locally and flush after contact returns. Proof JSON exposes `link_state_before`, `queued_alerts_before_restore`, `flushed_alerts`, and `queue_source=agent_bus_unread_messages`.
 
-### 05. Object Evidence
+### 05. Target-Pack Proof
 
 ![Port activity CV object evidence](docs/media/story-plates/story-object-evidence-port.png)
 
-Operators choose what matters. LFM-ORBIT boxes retained object or area evidence onboard and keeps confidence, bbox, prompt, model, and runtime provenance attached. The public proof uses the visually audited port plate: group boxes on visible shipping container clusters, docked-vessel groups, and berth context.
+Mission target packs define what retained evidence should preserve. The normal Mission tab stays focused on plan, progress, and timelapse; target-pack details travel with alerts, replay snapshots, dataset rows, and Proof Mode. The public port plate is a visually audited fixture with group/area boxes on visible shipping container clusters, docked-vessel groups, and berth context.
 
-![Object Evidence runtime audit](docs/media/readme/cv-object-evidence-local-audit.png)
-
-The runtime audit capture uses the audited port review bbox and records the operator flow without promoting exact-object boat/home claims. The recorded pass is `docs/media/videos/object-evidence-demo.webm`.
+The legacy recorded pass is retained in `docs/media/videos/object-evidence-demo.webm` as audit history, not a current Mission-tab tool.
 
 ### 06. Provenance And Audit
 
@@ -191,7 +189,7 @@ API: `http://127.0.0.1:8000`
 | [docs/README.md](docs/README.md) | Compact docs index |
 | [docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md) | Demo commands, artifacts, and replay assets |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Runtime map and design notes |
-| [docs/OBJECT_EVIDENCE_MODE.md](docs/OBJECT_EVIDENCE_MODE.md) | Object target packs, CV boxes, safety scope, and remaining integration work |
+| [docs/OBJECT_EVIDENCE_MODE.md](docs/OBJECT_EVIDENCE_MODE.md) | Target-pack proof contracts, safety scope, and current UI boundaries |
 | [docs/DATASET_CYCLE_TUTORIAL.md](docs/DATASET_CYCLE_TUTORIAL.md) | Seed, export, retag, and Hugging Face cycle |
 | [docs/MODEL_HANDOFF.md](docs/MODEL_HANDOFF.md) | Model bundle and dataset handoff contract |
 | [docs/FUTURE_SENTINEL_LANES.md](docs/FUTURE_SENTINEL_LANES.md) | Post-handoff Sentinel lane boundaries |

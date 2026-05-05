@@ -136,24 +136,28 @@ def test_public_demo_videos_are_temporal_and_nonblank():
 
     for rel_path in video_paths:
         path = REPO_ROOT / rel_path
-        duration_seconds, unique_hashes = _video_duration_and_sample_hashes(path)
+        duration_seconds, unique_hashes, visible_samples = _video_duration_and_sample_hashes(path)
         minimum_unique = 3 if "abstain-safety" in rel_path else 5
-        if duration_seconds < 8 or len(unique_hashes) < minimum_unique:
-            failures.append(f"{rel_path}: duration={duration_seconds:.2f}, unique_frames={len(unique_hashes)}")
+        if duration_seconds < 8 or len(unique_hashes) < minimum_unique or visible_samples < minimum_unique:
+            failures.append(
+                f"{rel_path}: duration={duration_seconds:.2f}, "
+                f"unique_frames={len(unique_hashes)}, visible_samples={visible_samples}"
+            )
 
     assert failures == []
 
 
-def _video_duration_and_sample_hashes(path: Path) -> tuple[float, set[str]]:
+def _video_duration_and_sample_hashes(path: Path) -> tuple[float, set[str], int]:
     """Sample video frames without requiring system ffmpeg/ffprobe binaries."""
     hashes: set[str] = set()
+    visible_samples = 0
     with av.open(str(path)) as container:
         video_stream = next((stream for stream in container.streams if stream.type == "video"), None)
         assert video_stream is not None, f"{path} has no video stream"
 
         duration_seconds = 0.0
         if container.duration:
-            duration_seconds = float(container.duration * av.time_base)
+            duration_seconds = _duration_to_seconds(container.duration)
         elif video_stream.duration and video_stream.time_base:
             duration_seconds = float(video_stream.duration * video_stream.time_base)
 
@@ -168,12 +172,24 @@ def _video_duration_and_sample_hashes(path: Path) -> tuple[float, set[str]]:
             last_sample_second = sample_second
 
             image = frame.to_image().convert("L").resize((96, 54))
+            mean = float(ImageStat.Stat(image).mean[0])
+            y_min, y_max = image.getextrema()
+            if 8 <= mean <= 247 and (y_max - y_min) >= 20:
+                visible_samples += 1
             hashes.add(hashlib.md5(image.tobytes(), usedforsecurity=False).hexdigest())
 
         if duration_seconds <= 0 and decoded_frames and video_stream.average_rate:
             duration_seconds = float(decoded_frames / video_stream.average_rate)
 
-    return duration_seconds, hashes
+    return duration_seconds, hashes, visible_samples
+
+
+def _duration_to_seconds(raw_duration: int | float) -> float:
+    """PyAV exposes some container durations as microseconds and others as time-base units."""
+    seconds = float(raw_duration * av.time_base)
+    if seconds > 24 * 60 * 60:
+        return float(raw_duration) / 1_000_000.0
+    return seconds
 
 
 def test_docs_media_is_organized_under_media_subfolders():
@@ -218,6 +234,26 @@ def test_docs_media_files_are_referenced_by_markdown():
             orphans.append(repo_rel)
 
     assert orphans == []
+
+
+def test_docs_do_not_reintroduce_retired_mission_evidence_ui():
+    docs_paths = [
+        REPO_ROOT / "README.md",
+        *sorted((REPO_ROOT / "docs").rglob("*.md")),
+    ]
+    combined = "\n".join(path.read_text(encoding="utf-8", errors="ignore") for path in docs_paths if path.exists())
+    retired_active_claims = [
+        "npm run demo:object-evidence",
+        "Mission Control shows a target-pack selector",
+        "VLM tools can run all enabled mission targets",
+        "Visual evidence boxes now render with glowing semantic outlines",
+        "the flow is wired through mission state, Mission Control",
+        "target-pack selector, object chips",
+    ]
+
+    leaked = [claim for claim in retired_active_claims if claim in combined]
+
+    assert leaked == []
 
 
 def test_readme_timelapse_gif_fits_github_inline_limit():

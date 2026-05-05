@@ -6,7 +6,7 @@ Start with the product README, then use only the focused doc you need.
 
 - [Product README](../README.md)
 - [Demo guide](DEMO_GUIDE.md)
-- [Object Evidence Mode](OBJECT_EVIDENCE_MODE.md)
+- [Target-pack proof contracts](OBJECT_EVIDENCE_MODE.md)
 - [Sentinel close-look workflow](SENTINEL_CLOSE_LOOKS.md)
 - [Hackathon criteria](Liquid_AI_x_DPhi_Space_Hackathon_Criteria.md)
 

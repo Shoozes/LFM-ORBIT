@@ -77,7 +77,6 @@
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
@@ -120,7 +119,6 @@
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
         "source/backend/assets/evals/object_evidence_gold.jsonl",
@@ -153,7 +151,6 @@
         "docs/TODO.md",
         "docs/QA_PITFALLS.md",
         "docs/media/README.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/readme/readme-ground-agent-chat-action.png",
         "docs/media/readme/readme-location-camera-context.png",
@@ -179,7 +176,6 @@
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
@@ -216,7 +212,6 @@
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
         "source/backend/assets/evals/object_evidence_gold.jsonl",
@@ -239,7 +234,7 @@
       ]
     },
     "feature_group_object_evidence_mode": {
-      "note": "Object Evidence Mode productization layer: official object target/detection contracts, versioned default target packs, Critical Minerals Expansion Watch target pack, Deforestation / Land-Use Change Watch target pack, Urban Expansion / Construction Watch target pack, Glacier/Waterline packs, cautious Coastal Debris/Slick Candidate wording, runtime custom-pack registry, mission-bound target_pack_id/object_targets, mission target mutation APIs, Ground Agent target proposals, VLM batch grounding, disabled-target skipping, zero-area box rejection after normalization/clamping, unsafe target rejection including common plurals and protected-wildlife population labels such as manatee/manatees/population, semantic backend color-key preservation for current target-pack families, mixed batch-provenance reporting when target calls disagree, frontend evidence types, Mission Control chips, glowing semantic CV boxes, object legend, provenance tooltips, local-only Object Evidence app capture, public docs expose the audited Critical Minerals and port plates, roof/shelter/fire/road/debris story plates are local fixture/training assets with area/cluster labels instead of single-object claims, app-map visual-story tests use truthful overlay fixture labels, alert detection_summary/object_deltas persistence with compact object-proof byte estimation, deterministic boxed replays for Rondonia deforestation, Atacama mining, Southeast Fireline, shelter count, port supply chain, and coastal debris/slick candidates, object count delta helpers, frozen object-evidence eval fixtures/runner, JSON-backed Southeast Fireline watchlist mission starts with repo-relative path disclosure, replay snapshot target preservation, reset-safe mission archive, mission metadata plus visual-story frame export for training/cost control, and focused backend/Playwright coverage.",
+      "note": "Target-pack proof contract lane: object target/detection contracts, versioned default packs, runtime custom-pack registry, mission-bound target_pack_id/object_targets, unsafe-label rejection, disabled-target skipping, bbox normalization/clamping, detection_summary/object_deltas persistence, replay snapshot preservation, reset-safe mission archive, dataset export metadata, frozen eval fixtures, and cautious public story plates remain wired. The normal submission UI no longer exposes target/monitor subtabs or visual-evidence tool panels; target packs now surface through curated Ground Agent mission launches, alerts, replay metadata, Inspect, Proof Mode, and dataset rows.",
       "files": [
         "README.md",
         "docs/ARCHITECTURE.md",
@@ -247,35 +242,25 @@
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
-        "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
         "source/backend/assets/evals/object_evidence_gold.jsonl",
         "source/backend/assets/object_targets/default_target_packs.json",
-        "source/backend/assets/replays/port_supply_chain_replay.json",
-        "source/backend/assets/seeded_data/visual_story_frames/port_esri_meta.json",
-        "source/backend/assets/seeded_data/visual_story_frames/visual_story_manifest.json",
         "source/backend/core/object_evidence.py",
+        "source/backend/core/object_targets.py",
+        "source/backend/core/mission.py",
         "source/backend/core/vlm.py",
         "source/backend/scripts/build_visual_story_proofs.py",
-        "source/backend/tests/test_api.py",
-        "source/backend/tests/test_evaluate_object_evidence.py",
+        "source/backend/tests/test_docs_artifacts.py",
         "source/backend/tests/test_object_evidence.py",
-        "source/backend/tests/test_replay.py",
+        "source/backend/tests/test_object_targets.py",
         "source/backend/tests/test_vlm.py",
-        "source/frontend/App.tsx",
-        "source/frontend/components/AgentDialogue.tsx",
-        "source/frontend/components/GroundAgent.tsx",
-        "source/frontend/components/MissionControl.tsx",
-        "source/frontend/e2e/bbox.spec.ts",
-        "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json"
       ]
     },
     "feature_group_3d_context_view": {
-      "note": "Map simplification: the unreliable 3D popup was removed; MapVisualizer stays focused on the 2D operator map, active/paused scan hints, bbox review, and glowing CV evidence boxes.",
+      "note": "Map simplification lane: the unreliable 3D terrain popup and 2D/3D button were removed, keeping MapVisualizer focused on the 2D operator map, selected bbox, scan progress, paused/idle hints, basemap degradation notices, and retained proof overlays only when alert/replay data carries them.",
       "files": [
         "source/frontend/components/MapVisualizer.tsx",
         "source/frontend/index.css",
@@ -295,7 +280,6 @@
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
         "run.ps1",
@@ -364,7 +348,7 @@
       ]
     },
     "issue_group_e2e_state_isolation_and_run_conditions": {
-      "note": "Playwright state reset, replay determinism, shared retryable app navigation, readiness-gated map actions, basemap-ready and paint-settled screenshot captures, non-recording fixed-wait cleanup, artifact-based HTML dumps, normal-test/demo-test separation, deliberate demo/tutorial pacing isolated in recording helpers, cached-API WebM proof recording, proof-frame luminance guards, scroll-safe demo launch actions, subtab-aware recorded-demo helpers that open Monitors before monitor actions and return to Plan before launch, semantic proof-copy assertions for volatile labels such as timelapse frame counts, and explicit opt-in server reuse to avoid stale local runtime leakage.",
+      "note": "Playwright state reset, replay determinism, shared retryable app navigation, readiness-gated map actions, basemap-ready and paint-settled screenshot captures, non-recording fixed-wait cleanup, artifact-based HTML dumps, normal-test/demo-test separation, deliberate demo/tutorial pacing isolated in recording helpers, cached-API WebM proof recording, proof-frame luminance guards, scroll-safe demo launch actions for the current lean Mission plan/replay UI, semantic proof-copy assertions for volatile labels such as timelapse frame counts, and explicit opt-in server reuse to avoid stale local runtime leakage.",
       "files": [
         "README.md",
         "docs/ARCHITECTURE.md",
@@ -393,27 +377,28 @@
       ]
     },
     "issue_group_integrity_scalability_review": {
-      "note": "Current integrity/scalability lane after the May 4 publishability pass: progress docs are consolidated into README/product, ARCHITECTURE/system, focused workflow docs, QA_PITFALLS/regression checklist, TODO/current backlog, and summary_bank/file groups. The pass refreshed promoted docs screenshots/videos/timelapse media, visually sampled README images and WebM contact sheets, hardened Playwright map readiness around the actual MapLibre canvas, serialized docs-video recording runs to avoid shared port conflicts, disabled demo trace capture to avoid Windows trace-file copy flake, lengthened object-evidence video hold to clear temporal guards, updated concise Agent-first assertions, and reran backend, frontend lint/build, recorded demos, screenshot export, tutorial export, and Playwright before the 3D popup removal. Remaining TODO/stub hits are tracked backlog, UI placeholders, launcher invalid-GGUF guards, SQL placeholders, SVG fallback wording, or test fixtures rather than unsupported runtime stubs. May 4 reproducibility follow-up passed root cold-start verification after .\\run.ps1 -Clean: launcher re-synced locked deps, installed Playwright Chromium, ran backend 427 and frontend lint/build. After removing the 3D popup spec, current Playwright is 98 passed with 1 intentional HTML-dump skip. Fetch dry-run now preserves existing GGUF artifacts without requiring --force, and .env.example makes SimSat-first startup explicit while keeping DISABLE_EXTERNAL_APIS=true for quota-safe fallback.",
+      "note": "Current May 5 integrity/scalability lane: progress docs remain consolidated into README/product, ARCHITECTURE/system, focused workflow docs, QA_PITFALLS/regression checklist, TODO/current backlog, and summary_bank/file groups. The latest pass pruned stale evidence-tool UI language, documented target packs as backend/proof contracts, added a docs guard against retired UI claims, and removed the retired object-evidence demo script from refresh docs. Recent runtime integrity work also covers scanner resume after frontend reload, stale demo-query isolation from active live missions, SimSat-first startup, GGUF fetch expectations, 3D popup removal, and lean Mission UI boundaries.",
       "files": [
-        "docs/TODO.md",
+        "README.md",
+        "docs/README.md",
+        "docs/ARCHITECTURE.md",
+        "docs/DEMO_GUIDE.md",
+        "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
+        "docs/TODO.md",
+        "docs/media/README.md",
         "summary_bank.json",
         "source/backend/tests/test_docs_artifacts.py",
-        "source/frontend/e2e/runtime.ts",
-        "source/frontend/playwright.demo.config.ts",
+        "source/backend/tests/test_import_contracts.py",
+        "source/backend/tests/test_scanner_resume.py",
+        "source/frontend/e2e/vlm.spec.ts",
         "source/frontend/e2e/qa_verification.spec.ts",
         "source/frontend/e2e/capture_screenshots.spec.ts",
-        "docs/media/readme/readme-ground-agent-playbook.png",
-        "docs/media/readme/readme-ground-agent-chat-action.png",
-        "docs/media/readme/readme-location-camera-context.png",
-        "docs/media/videos/object-evidence-demo.webm",
-        "docs/media/videos/tutorial_video.webm",
-        "docs/media/timelapse/highlight-greenland-ice-timelapse.webm",
-        "docs/README.md"
+        "source/frontend/playwright.demo.config.ts"
       ]
     },
     "issue_group_context_menu_vlm_and_visual_polish": {
-      "note": "May 4 UI/VLM polish lane: Ground Agent leaves more room for chat, tab/map controls use compact tooltips, the 2D/3D control stays in a fixed bottom-right position with a flip-style affordance, map legend/chrome are smaller, Mission Control exposes launch readiness instead of silently disabling launch, VLM Q&A and caption actions render labelled result containers, map-fly actions surface an Arrived HUD state, and object evidence defaults public port review toward group/area candidates such as shipping container cluster, container yard cluster, docked-vessel group, and berth basin context. CV provenance tooltip z-order and grouped target tests keep poor zoomed imagery from becoming over-specific homes/boats style claims.",
+      "note": "May 5 lean UI polish lane: Ground Agent remains the primary operator surface, map/action controls stay compact, Mission Control exposes launch readiness and scan progress without target/monitor subtabs, VLM and target-pack APIs remain backend/dev proof plumbing, and public port proof defaults to group/area candidates such as shipping container cluster, container yard cluster, docked-vessel group, and berth basin context. Guards keep poor zoomed imagery from becoming over-specific homes/boats claims and keep retired evidence tools out of normal Mission UI.",
       "files": [
         "docs/TODO.md",
         "docs/QA_PITFALLS.md",
@@ -421,11 +406,9 @@
         "source/frontend/components/GroundAgent.tsx",
         "source/frontend/components/MapVisualizer.tsx",
         "source/frontend/components/MissionControl.tsx",
-        "source/frontend/index.css",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "source/frontend/e2e/qa_verification.spec.ts",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/videos/object-evidence-demo.webm"
       ]
     },
@@ -461,7 +444,6 @@
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
@@ -615,7 +597,6 @@
         "docs/DEMO_GUIDE.md",
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
@@ -657,7 +638,6 @@
       "note": "Local-only Ground Agent tool calls now plan mutating actions as in-bubble proposal cards before execution: loading/rescanning replays, starting mission packs from explicit or current context including Florida Fire/Drought Readiness Watch, building bounded custom mission proposals from flexible prompts with workflow attempts/final result/use-case and target-pack inference, routing temporal area requests such as Davenport new-construction timelapse into semantic mission plans before map navigation, routing garbage-patch-style monthly 10-year prompts into a cautious North Pacific debris-convergence candidate mission with plastic target pack and no-overclaim evidence limits, extracting last-N-years windows and explicit monthly/quarterly/yearly cadence metadata, using a small repo-local ground_agent_tool_semantics.example.jsonl fixture plus deterministic matcher for product-specific routing/eval examples, toggling link state, editing mission object targets, stopping active missions, resolving known destination text through `/api/location/resolve`, presenting `navigate_map_location` previews with center/bbox/provider/confidence/provenance and Esri 3x3 imagery tiles, flying the map camera only after confirmation for targets such as Bull Creek, FL, Giza Pyramid Complex, Bronx, NY, Davenport, FL, Suez Canal, Greenland Ice Edge, Manchar Lake, and the North Pacific debris review window, asking for stop-and-fly confirmation before destination redirects during active missions, surfacing structured action chips, showing an operator playbook, using hackathon-focused quick commands, navigating core app panels, and refreshing mission/telemetry after confirmed actions.",
       "files": [
         "docs/OBJECT_EVIDENCE_MODE.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/readme/readme-ground-agent-chat-action.png",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
@@ -701,7 +681,6 @@
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
@@ -729,7 +708,7 @@
       ]
     },
     "issue_group_hackathon_scope_agent_first_polish": {
-      "note": "May 2 hackathon-scope polish pass: normal app loads now land on Agent first, Ground Agent is the primary operator panel, SAT/GND Dialogue Bus stays directly below it so the background Satellite Pruner remains visible to Ground Validator, Mission Control advanced controls are grouped under Plan/Replay/Targets/Monitors subtabs, SimSat/Mapbox remains the first runtime story while Sentinel Hub sh.txt stays development-only for cache refreshes, Florida Fire/Drought Readiness Watch was added as cautious candidate triage using the registered wildfire use case plus fireline target pack, Florida Manatee Habitat Review was added as a protected-wildlife-safe hard habitat/access proxy proposal that refuses population, presence, and individual animal detection claims while supporting Banana River/Clearwater/Crystal River-style waterline region hints, unsupported wildfire_lifeline_monitoring references were normalized to registered use-case IDs, screenshot/video export tests were updated for the new layout, docs screenshots and tutorial_video.webm were refreshed and visually sampled, and TODO/summary-bank tracking now captures the remaining Florida source-backed imagery promotion gap.",
+      "note": "May 2 hackathon-scope polish pass: normal app loads now land on Agent first, Ground Agent is the primary operator panel, SAT/GND Dialogue Bus stays directly below it so the background Satellite Pruner remains visible to Ground Validator, SimSat/Mapbox remains the first runtime story while Sentinel Hub sh.txt stays development-only for cache refreshes, Florida Fire/Drought Readiness Watch was added as cautious candidate triage using the registered wildfire use case plus fireline target pack, Florida Manatee Habitat Review was added as a protected-wildlife-safe hard habitat/access proxy proposal that refuses population, presence, and individual animal detection claims while supporting Banana River/Clearwater/Crystal River-style waterline region hints, unsupported wildfire_lifeline_monitoring references were normalized to registered use-case IDs, screenshot/video export tests were updated for the Agent-first layout, docs screenshots and tutorial_video.webm were refreshed and visually sampled, and TODO/summary-bank tracking now captures the remaining Florida source-backed imagery promotion gap.",
       "files": [
         "README.md",
         "docs/ARCHITECTURE.md",
@@ -737,7 +716,6 @@
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
@@ -775,7 +753,6 @@
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
         "run.ps1",
@@ -820,7 +797,6 @@
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
@@ -887,7 +863,6 @@
         "docs/MODEL_HANDOFF.md",
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
         "source/backend/api/main.py",
@@ -946,7 +921,6 @@
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
@@ -1052,7 +1026,6 @@
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
         "source/backend/assets/evals/object_evidence_gold.jsonl",
@@ -1108,7 +1081,6 @@
         "docs/MODEL_HANDOFF.md",
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
@@ -1147,7 +1119,7 @@
       ]
     },
     "feature_group_frontend_shell": {
-      "note": "Primary operator UI shells, Agent-first right rail, Ground Agent primary panel, multiline Ground Agent composer for longer operations prompts, SAT/GND Dialogue Bus secondary panel, Mission Control Plan/Replay/Targets/Monitors subtabs, map interactions including right-click and propagation-safe button-driven spatial options, proposal-card location preview tiles for confirmed map navigation, Agent Dialogue inline bus errors, Ground Agent guarded sends/errors, logs integrity metrics, and settings/runtime surfaces.",
+      "note": "Primary operator UI shells, Agent-first right rail, Ground Agent primary panel, multiline Ground Agent composer for longer operations prompts, SAT/GND Dialogue Bus secondary panel, lean Mission Control plan/replay surfaces, map interactions including right-click and propagation-safe button-driven spatial options, proposal-card location preview tiles for confirmed map navigation, Agent Dialogue inline bus errors, Ground Agent guarded sends/errors, logs integrity metrics, and settings/runtime surfaces.",
       "files": [
         "docs/ARCHITECTURE.md",
         "docs/DEMO_GUIDE.md",
@@ -1166,10 +1138,11 @@
       ]
     },
     "qa_suite_and_demo_flows": {
-      "note": "Current QA/demo flow lane: backend docs artifacts guard promoted images, explicit public WebMs, summary-bank file refs, and temporal/nonblank video quality; frontend Playwright covers API smoke, Agent-first shell, Ground Agent actions, Mission subtabs, bbox selection, visual evidence/VLM, visual stories, screenshot export, dual-agent demo, and the Rondonia tutorial. May 4 tightened run conditions by waiting on MapLibre canvas dimensions instead of basemap-credit text, running video exports sequentially on the default ports, disabling demo traces for recording-only jobs on Windows, lengthening the object-evidence video hold, and updating assertions for concise UI copy. Current full Playwright after 3D removal: 98 passed with 1 intentional HTML-dump skip. QA also includes nested docs markdown link validation, fetch dry-run existing-artifact coverage, cold-start launcher verification, and refreshed screenshot capture after map credit polish. Latest root verify passed backend 427.",
+      "note": "Current QA/demo flow lane: backend docs artifact guards cover promoted images, explicit public WebMs, summary-bank file refs, stale retired-UI docs claims, and temporal/nonblank video quality; import-contract tests guard backend entrypoints. Frontend Playwright covers API smoke, Agent-first shell, Ground Agent actions, lean Mission plan/replay controls, bbox selection, retired evidence-tool absence, stale demo-query isolation, visual stories, screenshot export, dual-agent demo, and the Rondonia tutorial. Demo exports use npm run demo:record and npm run demo:tutorial; the old object-evidence recording command is intentionally gone.",
       "files": [
         "source/backend/tests/test_docs_artifacts.py",
         "source/backend/tests/test_import_contracts.py",
+        "source/backend/tests/test_scanner_resume.py",
         "source/frontend/playwright.config.ts",
         "source/frontend/playwright.demo.config.ts",
         "source/frontend/e2e/runtime.ts",
@@ -1180,8 +1153,8 @@
         "source/frontend/e2e/vlm.spec.ts",
         "source/frontend/e2e/tutorial_video.spec.ts",
         "docs/media/videos/showcase-demo.webm",
-        "docs/media/videos/object-evidence-demo.webm",
         "docs/media/videos/tutorial_video.webm",
+        "docs/media/videos/object-evidence-demo.webm",
         "docs/README.md"
       ]
     },
@@ -1250,7 +1223,6 @@
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
@@ -1294,7 +1266,6 @@
       "files": [
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
         "source/backend/assets/evals/object_evidence_gold.jsonl",
@@ -1332,7 +1303,6 @@
         "docs/ARCHITECTURE.md",
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
@@ -1385,7 +1355,7 @@
       ]
     },
     "feature_group_proof_demo_mode": {
-      "note": "Showcase-ready deterministic demo lane with visual overlay, guided UI flow, Proof Mode panel, Playwright video/trace/screenshots, proof JSON export with explicit payload_accounting, SimSat-first README proof positioning, backend-derived DTN queue proof, Liquid evidence-packet wording, README presentation screenshots extracted from current demo WebMs, visually audited Object Evidence story plates with app-level CV captures kept local until promoted, per-demo evidence-frame screenshot/luminance guards, preloaded mission/replay starts that avoid generic cold-start scans, Rondonia replay proof, Pakistan Manchar Lake payload reduction, Critical Minerals provenance, ice/snow abstain safety proof, Suez maritime link outage recovery, real Sentinel-2 L2A demo frames and cached API WebMs, active-replay Proof Mode binding, clearer replay proof-panel playback windows, dynamic replay-specific Proof Mode titles/context/story lines, final-step readiness waits for screenshots instead of fixed sleeps, scroll-safe and subtab-aware demo launch actions, semantic demo assertions for volatile timelapse wording, refreshed public demo/tutorial exports, and tutorial video output centered on Rondonia end-to-end product flow with select tool, Ground Agent action, Satellite Agent pruning, temporal/static evidence, CV boxes, compact proof JSON, and tagged training data.",
+      "note": "Showcase-ready deterministic proof lane with guided UI flow, explicit Proof Mode entry, Playwright video/screenshots, proof JSON export with payload_accounting, SimSat-first README positioning, backend-derived DTN queue proof, Liquid evidence-packet wording, target-pack proof metadata, replay-specific Proof Mode titles/context/story lines, and preloaded mission/replay starts that avoid generic cold-start scans. Public demos cover Critical Minerals, payload reduction, provenance, abstain safety, orbital eclipse, and paced Rondonia tutorial flow; the legacy port audit remains linked as cautious target-pack proof history, not a normal Mission-tab tool.",
       "files": [
         "README.md",
         "docs/ARCHITECTURE.md",
@@ -1393,7 +1363,6 @@
         "docs/OBJECT_EVIDENCE_MODE.md",
         "docs/QA_PITFALLS.md",
         "docs/TODO.md",
-        "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/readme/readme-orbital-eclipse.png",
         "docs/media/readme/readme-payload-reduction.png",
@@ -1480,6 +1449,21 @@
         "source/frontend/e2e/qa_verification.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
+        "summary_bank.json"
+      ]
+    },
+    "issue_group_mission_reload_and_startup_state": {
+      "note": "Mission reload/startup integrity lane: the backend scanner resumes from mission.cells_scanned after websocket reconnects, the frontend reconstructs scanned-cell paint from mission progress plus persisted alerts, stale demo query params cannot override an active live mission, Proof Mode is disabled without a mission/replay and stays mission-scoped when active, and normal app startup must not auto-play the last replay.",
+      "files": [
+        "source/backend/core/scanner.py",
+        "source/backend/tests/test_scanner_resume.py",
+        "source/frontend/App.tsx",
+        "source/frontend/components/MissionControl.tsx",
+        "source/frontend/components/ProofModePanel.tsx",
+        "source/frontend/hooks/useTelemetry.ts",
+        "source/frontend/e2e/vlm.spec.ts",
+        "docs/TODO.md",
+        "docs/QA_PITFALLS.md",
         "summary_bank.json"
       ]
     }

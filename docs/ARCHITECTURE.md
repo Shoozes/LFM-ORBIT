@@ -1,6 +1,6 @@
 # LFM Orbit Architecture
 
-Current as of **May 2, 2026**.
+Current as of **May 5, 2026**.
 
 ## System Shape
 
@@ -149,7 +149,7 @@ The backend runs two long-lived loops during app lifespan:
 - `source/frontend/hooks/useTelemetry.ts`
   Grid, alerts, selected cell, mission completion, websocket lifecycle.
 - `source/frontend/components/MapVisualizer.tsx`
-  MapLibre basemap, scan grid, pins, bbox preview, context menu, glowing visual evidence boxes, object-evidence legend, hover provenance popup, scan progress hints, safe marker-label rendering, basemap degradation notices, and map-pin sync failure visibility.
+  MapLibre basemap, scan grid, pins, bbox preview, context menu, retained proof boxes when alerts/replays carry them, scan progress hints, safe marker-label rendering, basemap degradation notices, and map-pin sync failure visibility.
 - `source/frontend/utils/objectEvidence.ts`
   Shared semantic object-evidence colors plus normalized bbox conversion used by MapLibre overlays.
 - `source/frontend/components/MissionControl.tsx`
@@ -251,4 +251,4 @@ Architecture docs describe the guard suite; run-by-run totals live in `README.md
 - Proof Mode is intentionally app-level demo UI, not a correctness substitute. Correctness remains covered by backend tests, frontend type checks, and normal Playwright specs.
 - Satellite GGUF reasoning is only active when a manifest-resolved model artifact is installed locally.
 - The current scan grid is the repo-local square-cell compatibility layer, which is sufficient for the SimSat hackathon demo. Production geospatial scale-out is intentionally parked outside the active scope.
-- Object Evidence boxes are normalized to `unit_xyxy`; disabled targets are skipped, unsafe civilian-scope labels are rejected before persistence, and degenerate boxes are discarded before counts or proof JSON are emitted.
+- Target-pack proof boxes are normalized to `unit_xyxy`; disabled targets are skipped, unsafe civilian-scope labels are rejected before persistence, and degenerate boxes are discarded before counts or proof JSON are emitted.

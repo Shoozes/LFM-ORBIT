@@ -12,12 +12,6 @@ npm ci
 npm run demo:showcase
 ```
 
-Record the dedicated Object Evidence proof with the glowing CV square and tooltip:
-
-```bash
-npm run demo:object-evidence
-```
-
 Refresh the visual use-case proof grid:
 
 ```bash
@@ -43,7 +37,7 @@ What it proves:
 7. Screenshot, video, and proof JSON artifacts
 8. Tutorial-style subtitles and visible UI flow before the proof panel
 9. Abstain and backend-derived link-outage queue behavior in the full demo set
-10. Optional CV object evidence overlays with glowing boxes and provenance tooltips when an operator runs visual grounding inside a selected bbox
+10. Target-pack proof metadata attached to alerts, replays, datasets, and Proof Mode without a separate Mission-tab evidence workspace
 
 Artifacts:
 
@@ -77,7 +71,7 @@ Docs video exports:
 | Payload Reduction | `docs/media/videos/payload-reduction-demo.webm` |
 | Provenance | `docs/media/videos/provenance-demo.webm` |
 | Greenland Abstain Safety | `docs/media/videos/abstain-safety-demo.webm` |
-| Object Evidence Port Audit | `docs/media/videos/object-evidence-demo.webm` |
+| Legacy Target-Pack Port Audit | `docs/media/videos/object-evidence-demo.webm` |
 | Suez Maritime Eclipse | `docs/media/videos/orbital-eclipse-demo.webm` |
 | Tutorial Walkthrough | `docs/media/videos/tutorial_video.webm` |
 | README Timelapse Highlight | `docs/media/timelapse/highlight-greenland-ice-timelapse.gif`, `docs/media/timelapse/highlight-greenland-ice-timelapse.webm` |
@@ -107,9 +101,9 @@ Current runtime wording: SimSat is the primary realtime lane. Replay fixtures ar
 
 Target-pack wording: target packs are attached to missions, alerts, replay snapshots, dataset exports, and Proof Mode. They are no longer a separate Mission-tab operator tool. The main public showcase pack is `critical_minerals`; `deforestation`, `fireline`, `port`, `glacier`, `waterline`, `lifeline`, `camp`, and cautious `plastic`/coastal-debris packs remain available through presets and backend contracts.
 
-Legacy Object Evidence recordings live under `source/frontend/e2e/artifacts/object-evidence/` for audit history only. They must not be treated as normal Mission-tab UX, and they must not reopen exact/singular object boxes such as the rejected `channel vessel` box.
+Legacy target-pack port recordings live under `source/frontend/e2e/artifacts/object-evidence/` for audit history only. They must not be treated as normal Mission-tab UX, and they must not reopen exact/singular object boxes such as the rejected `channel vessel` box.
 
-The visual use-case story builder writes every generated story plate and manifest under `source/backend/assets/seeded_data/visual_story_frames/`. Only promoted, visually audited public plates are copied to `docs/media/story-plates/`; currently that public set is Critical Minerals Expansion Watch and the port Object Evidence plate. Public plates must carry `visual_audit_status=approved`, and their box labels must read as areas, groups, zones, samples, corridors, or candidates unless a true object-scale model path supports a singular-object claim. The builder reads Sentinel Hub OAuth credentials from environment variables, `.tools/.secrets/sentinel.txt`, or `.tools/.secrets/sh.txt`, then stores reusable frames and provenance in `source/backend/assets/seeded_data/visual_story_frames/`.
+The visual use-case story builder writes every generated story plate and manifest under `source/backend/assets/seeded_data/visual_story_frames/`. Only promoted, visually audited public plates are copied to `docs/media/story-plates/`; currently that public set is Critical Minerals Expansion Watch and the port target-pack plate. Public plates must carry `visual_audit_status=approved`, and their box labels must read as areas, groups, zones, samples, corridors, or candidates unless a true object-scale model path supports a singular-object claim. The builder reads Sentinel Hub OAuth credentials from environment variables, `.tools/.secrets/sentinel.txt`, or `.tools/.secrets/sh.txt`, then stores reusable frames and provenance in `source/backend/assets/seeded_data/visual_story_frames/`.
 
 The story plates are visual proof assets, not hidden model claims. Sentinel Hub is used for broad satellite-context plates and timelapse-friendly development frames. Esri World Imagery context is used only where object-scale roofs/shelters need to be visible; those plates label `imagery_origin=esri_context`. All story boxes label `box_source=visual_story_fixture`, and the roof plate calls out sample boxes rather than an exhaustive roof count, so they are not confused with live model-backed detections. The cached story frames can be recycled into dataset exports with `python scripts/export_orbit_dataset.py --include-seeded-cache ...`, and the Playwright visual-story spec still verifies the real app can draw glowing CV boxes, legends, and provenance tooltips without overwriting README proof plates.
 

@@ -1,6 +1,6 @@
 # QA Pitfalls
 
-Current as of **May 4, 2026**.
+Current as of **May 5, 2026**.
 
 This doc is the regression-prevention checklist for generated media, mission stories, agent behavior, and model claims. Treat it as a question-and-answer gate before promoting screenshots, videos, story plates, or demo copy into public docs.
 
@@ -10,7 +10,7 @@ This doc is the regression-prevention checklist for generated media, mission sto
 
 Use a SimSat/Mapbox mission where the app can show the full loop: mission context, SAT-side pruning, retained evidence packets, Ground Agent review, compact proof JSON, and replayable audit artifacts.
 
-The current strongest public showcase track is Critical Minerals Expansion Watch over the Salar de Atacama / Escondida / Atacama mining corridor. It exercises the app's real shape: scan a mission bbox, prune low-value cells, keep contextual evidence, box retained extraction-site regions, reason over a compact evidence packet, and show why raw imagery does not need to downlink first. The current first-impression tutorial uses Rondonia frontier canopy-loss triage because it more clearly demonstrates select-tool operation, Ground Agent confirmation, temporal/static evidence, CV region boxes, Proof Mode, and tagged training export in one continuous walkthrough.
+The current strongest public showcase track is Critical Minerals Expansion Watch over the Salar de Atacama / Escondida / Atacama mining corridor. It exercises the app's real shape: scan a mission bbox, prune low-value cells, keep contextual evidence, box retained extraction-site regions, reason over a compact evidence packet, and show why raw imagery does not need to downlink first. The current first-impression tutorial uses Rondonia frontier canopy-loss triage because it more clearly demonstrates select-tool operation, Ground Agent confirmation, temporal/static evidence, target-pack proof fields, Proof Mode, and tagged training export in one continuous walkthrough.
 
 ### Why not lead with every possible use case?
 
@@ -44,7 +44,15 @@ The generated plate had a `channel vessel` box over open water, plus an audit no
 
 ### What changed after the port local-audit pass?
 
-Exact object boxes are too brittle when the zoomed satellite context is soft or low resolution. The safer default is group/area evidence: `shipping container cluster`, `container yard cluster`, `docked-vessel group`, and `berth basin context`. The fallback VLM path must not invent exact `homes` or `boats` boxes, and model-backed exact-object classes must clear class-specific confidence gates before becoming map evidence.
+Exact object boxes are too brittle when the zoomed satellite context is soft or low resolution. The safer default is group/area evidence: `shipping container cluster`, `container yard cluster`, `docked-vessel group`, and `berth basin context`. The fallback VLM path must not invent exact `homes` or `boats` boxes, and model-backed exact-object classes must clear class-specific confidence gates before becoming proof evidence.
+
+### What UI evidence tools are intentionally retired?
+
+The old Mission-tab target/monitor subtabs and visual-evidence tools panel are retired for submission. Target packs now live as backend/proof metadata attached to missions, alerts, replay snapshots, dataset rows, and Proof Mode. If future work reintroduces operator tuning, it needs new product review and tests because first-run Mission UI should stay focused on plan, replay, progress, and timelapse.
+
+### What went wrong with reload-driven scan confusion?
+
+Frontend reload could reconnect to an active mission and make the scan look like it restarted, while stale demo query params could make the UI appear to fall back to a deforestation replay. The guards are: backend scanner resumes from `mission.cells_scanned`, frontend repaint reconstructs prior scanned cells from mission progress plus alerts, stale demo URLs cannot override active live missions, and normal app startup must not auto-play the last replay.
 
 ### What went wrong with the first object-evidence runtime capture?
 
@@ -157,6 +165,7 @@ from `source/backend`, then:
 
 ```powershell
 npx playwright test e2e/visual-stories.spec.ts
+npx playwright test e2e/vlm.spec.ts
 npm run demo:record
 npm run demo:tutorial
 npm run lint
