@@ -81,6 +81,8 @@ LFM Orbit's hackathon runtime is DPhi Space SimSat-first. Sentinel Hub is option
 
 High-quality replay timelapses can be refreshed from Sentinel Hub and then reused by demos and dataset export through the existing `assets/seeded_data/sh_<signature>.webm` cache. The folder name is legacy; the data is stored real API imagery, not generated evidence.
 
+Generated `nasa_*` and `sh_*` WebM/meta pairs are ignored by default. Promote only reviewed fixtures with `git add -f`, then record the provenance and docs references in this file, `docs/dev/TODO.md`, and `summary_bank.json`.
+
 The seeder requests Sentinel SCL quality data before each visual frame. Cloud shadow, medium/high cloud probability, cirrus, no-data, and defective pixels are quality-gated before WebM creation. Accepted frames store `frame_quality` metadata; rejected windows are stored in `_meta.json` under `rejected_windows`.
 
 Credentials can come from environment variables, `.tools/.secrets/sentinel.txt`, or `.tools/.secrets/sh.txt`. The Sentinel Hub Process API uses OAuth credentials. Supported local forms include `SH_CLIENT_ID=...` / `SH_CLIENT_SECRET=...`, two-line legacy secret-then-id files, or labeled trial bundles:

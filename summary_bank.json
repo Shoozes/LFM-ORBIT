@@ -280,8 +280,9 @@
       ]
     },
     "issue_group_import_contracts_and_env_resilience": {
-      "note": "Repo integrity guardrails for broken backend imports/exports, seed/GEE/debug entrypoints, DPhi SimSat-first cold-start defaults, safe optional local credential discovery including labeled Sentinel Hub trial bundles, malformed local environment overrides, backend lockfile/root-verify drift, launcher prerequisite drift, offline-safe fallback behavior, current focused import checks for supported modules/scripts/manual entrypoints, docs/media/context-bank file-reference checks, repo-relative summary-bank path enforcement, and a script-directory coverage assertion so newly added backend scripts enter the import guard automatically.",
+      "note": "Repo integrity guardrails for broken backend imports/exports, seed/GEE/debug entrypoints, DPhi SimSat-first cold-start defaults, safe optional local credential discovery including labeled Sentinel Hub trial bundles, malformed local environment overrides, backend lockfile/root-verify drift, launcher prerequisite drift, offline-safe fallback behavior, current focused import checks for supported modules/scripts/manual entrypoints, docs/media/context-bank file-reference checks, repo-relative summary-bank path enforcement, runtime seeded-cache ignore policy for generated NASA/Sentinel WebM outputs, and a script-directory coverage assertion so newly added backend scripts enter the import guard automatically.",
       "files": [
+        ".gitignore",
         ".env.example",
         "README.md",
         "docs/dev/ARCHITECTURE.md",
@@ -296,6 +297,7 @@
         "source/backend/assets/evals/object_evidence_gold.jsonl",
         "source/backend/assets/object_targets/default_target_packs.json",
         "source/backend/assets/replays/port_supply_chain_replay.json",
+        "source/backend/assets/seeded_data/README.md",
         "source/backend/assets/seeded_data/visual_story_frames/port_esri_meta.json",
         "source/backend/assets/seeded_data/visual_story_frames/visual_story_manifest.json",
         "source/backend/core/config.py",

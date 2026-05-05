@@ -12,6 +12,7 @@ See [QA_PITFALLS.md](QA_PITFALLS.md) for the detailed guardrail checklist.
 - The hackathon runtime is DPhi Space SimSat-first. Sentinel Hub, NASA, and GEE-style providers are optional development or replay support.
 - Evidence surfaces must keep `runtime_truth_mode`, `imagery_origin`, and `scoring_basis` visible.
 - Replay-cache entries are stored real API imagery with preserved metadata. They are deterministic review assets, not generated evidence.
+- New runtime cache WebM/meta outputs under `source/backend/assets/seeded_data/` are ignored by default; promote only reviewed fixtures with forced git add plus docs and summary-bank updates.
 - Fast Replay excludes cached WebMs that fail timelapse-integrity checks.
 - Cloud, no-data, malformed spectral bands, and RGB-only inputs must abstain instead of fabricating indices.
 - Ground Agent mutating actions use proposal cards before state changes.
