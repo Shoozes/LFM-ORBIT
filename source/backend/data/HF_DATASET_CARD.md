@@ -61,22 +61,17 @@ The default viewer config is `training_assets.jsonl`, which contains single-imag
 
 ## Current Export
 
-- 200 exported Orbit samples in the current runtime cycle
+- Latest raw replay/cache export commit: `b6ef429d958a21dc7690d3f4b7cc4f3bd2088d25`
+- 33 exported Orbit samples in the current raw export cycle
 - 0 cached API observation rows
-- 11 replay-cache rows
-- 0 visual object-evidence story frames
+- 25 replay-cache rows
+- 7 visual object-evidence story frames
 - 0 persisted monitor-report rows
-- 15 records with timelapse references
-- 163 deduplicated image/frame assets
-- 15 temporal sequences
-- 185 metadata-only mission rows preserving operator task text, target packs, object targets, and bbox intent
-- 0 external provider image calls in the final cleanup rerun
-- 0 external provider temporal-sequence calls in this refresh
-- 163 reused existing image tags
-- 15 reused existing temporal-sequence tags
-- 0 skipped assets after stale SVG cleanup, stale generated-sample cleanup, stale generated-image cleanup, and monitor-frame asset validation
-- 0 tagger failures
-- 0 orphan or missing image files after validating `metadata.jsonl` against `images/`
+- 0 metadata-only mission rows in the latest raw export
+- 26 records with timelapse references
+- Florida firewatch sample `seeded_83e3aea2__83e3aea2` is tagged `wildfire` / `fireline`, includes Sentinel-2 `B12/B08/B04` band tags, derived `ndvi`, `nbr_swir2`, `swir2_nir_ratio`, one WebM timelapse, and three accepted frame PNGs.
+
+The retagged SFT configs remain available for model work when raw replay/cache rows are converted into single-image or temporal training rows.
 
 Latest replay-cache additions:
 

@@ -48,6 +48,103 @@
   "vlm_explanation": "Sentinel-2 L2A timelapse seeded for SR-26 Balu Forest wildfire close look [+0,+0] from 2026-04-01 to 2026-05-05. Metadata inference was skipped for this cache refresh.",
   "source": "Sentinel Hub Sentinel-2 L2A SWIR/NIR/Red burn-scar composite",
   "visual_mode": "burn_scar",
+  "spectral_bands": {
+    "visual_mode": "burn_scar",
+    "requested_bands": [
+      "B12",
+      "B08",
+      "B04"
+    ],
+    "band_stats_by_frame": [
+      {
+        "label": "baseline_2026_04_01",
+        "bands": {
+          "B04_red": {
+            "mean": 0.0613,
+            "p10": 0.0298,
+            "p90": 0.1129
+          },
+          "B08_nir": {
+            "mean": 0.2709,
+            "p10": 0.2221,
+            "p90": 0.3383
+          },
+          "B12_swir2": {
+            "mean": 0.1328,
+            "p10": 0.0707,
+            "p90": 0.2416
+          }
+        },
+        "derived_indices": {
+          "ndvi": 0.6309,
+          "nbr_swir2": 0.3421,
+          "swir2_nir_ratio": 0.4902
+        },
+        "valid_pixel_ratio": 0.8507,
+        "stats_source": "sentinelhub_process_b04_b08_b12_scl"
+      },
+      {
+        "label": "prefire_2026_04_05",
+        "bands": {
+          "B04_red": {
+            "mean": 0.0557,
+            "p10": 0.0267,
+            "p90": 0.1049
+          },
+          "B08_nir": {
+            "mean": 0.2792,
+            "p10": 0.23,
+            "p90": 0.348
+          },
+          "B12_swir2": {
+            "mean": 0.1271,
+            "p10": 0.0683,
+            "p90": 0.2334
+          }
+        },
+        "derived_indices": {
+          "ndvi": 0.6674,
+          "nbr_swir2": 0.3744,
+          "swir2_nir_ratio": 0.4552
+        },
+        "valid_pixel_ratio": 0.9996,
+        "stats_source": "sentinelhub_process_b04_b08_b12_scl"
+      },
+      {
+        "label": "active_2026_04_16",
+        "bands": {
+          "B04_red": {
+            "mean": 0.061,
+            "p10": 0.0319,
+            "p90": 0.1104
+          },
+          "B08_nir": {
+            "mean": 0.2869,
+            "p10": 0.2356,
+            "p90": 0.3578
+          },
+          "B12_swir2": {
+            "mean": 0.1351,
+            "p10": 0.0713,
+            "p90": 0.2503
+          }
+        },
+        "derived_indices": {
+          "ndvi": 0.6493,
+          "nbr_swir2": 0.3597,
+          "swir2_nir_ratio": 0.4709
+        },
+        "valid_pixel_ratio": 0.9307,
+        "stats_source": "sentinelhub_process_b04_b08_b12_scl"
+      }
+    ],
+    "derived_indices": [
+      "ndvi",
+      "nbr_swir2",
+      "swir2_nir_ratio"
+    ],
+    "note": "Band statistics are computed from accepted Sentinel-2 L2A pixels after SCL/dataMask quality filtering."
+  },
   "cloud_policy": {
     "min_valid_pixel_ratio": 0.65,
     "invalid_scl_classes": [
@@ -103,6 +200,7 @@
   "seeded_at": "2026-05-05",
   "training_ready": true,
   "use_case_id": "wildfire",
-  "target_category": "fireline",
+  "target_category": "wildfire",
+  "target_pack_id": "fireline",
   "target_task": "wildfire_close_look_candidate_review"
 }

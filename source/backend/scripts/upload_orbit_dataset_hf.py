@@ -35,6 +35,7 @@ def build_upload_command(
     commit_message: str | None = None,
     create_pr: bool = False,
     large_folder: bool = False,
+    delete_patterns: list[str] | None = None,
 ) -> list[str]:
     """Build an `hf` upload command without embedding the token."""
     clean_repo = repo_id.strip()
@@ -51,6 +52,11 @@ def build_upload_command(
         command.extend(["--commit-message", commit_message])
     if create_pr and not large_folder:
         command.append("--create-pr")
+    if not large_folder:
+        for pattern in delete_patterns or []:
+            clean_pattern = pattern.strip()
+            if clean_pattern:
+                command.extend(["--delete", clean_pattern])
     return command
 
 
@@ -85,6 +91,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--create-repo", action="store_true", help="Create the dataset repo if it does not exist.")
     parser.add_argument("--create-pr", action="store_true", help="Upload as a Hub pull request.")
     parser.add_argument("--large-folder", action="store_true", help="Use resumable `hf upload-large-folder`.")
+    parser.add_argument(
+        "--delete",
+        action="append",
+        default=[],
+        help="Glob pattern to delete from the Hub repo in the same commit. Repeat for multiple patterns.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Print the upload plan without running hf.")
     return parser.parse_args()
 
@@ -106,6 +118,7 @@ def main() -> int:
         commit_message=args.commit_message,
         create_pr=args.create_pr,
         large_folder=args.large_folder,
+        delete_patterns=args.delete,
     )
     repo_command = build_repo_create_command(repo_id=args.repo_id, private=args.private)
 

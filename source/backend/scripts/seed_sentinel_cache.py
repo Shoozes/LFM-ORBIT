@@ -90,11 +90,28 @@ function evaluatePixel(sample) {
 }
 """
 
+SH_BAND_STATS_EVALSCRIPT = """//VERSION=3
+function setup() {
+    return {
+        input: ["B04", "B08", "B12", "SCL", "dataMask"],
+        output: { bands: 5, sampleType: "FLOAT32" }
+    };
+}
+function evaluatePixel(sample) {
+    return [sample.B04, sample.B08, sample.B12, sample.SCL, sample.dataMask];
+}
+"""
+
 SH_EVALSCRIPT = SH_EVALSCRIPTS["true_color"]
 
 _VISUAL_MODE_LABELS = {
     "true_color": "Sentinel Hub Sentinel-2 L2A true color 10m",
     "burn_scar": "Sentinel Hub Sentinel-2 L2A SWIR/NIR/Red burn-scar composite",
+}
+
+_VISUAL_MODE_BANDS = {
+    "true_color": ["B04", "B03", "B02"],
+    "burn_scar": ["B12", "B08", "B04"],
 }
 
 
@@ -108,6 +125,58 @@ def _frame_quality_from_scl(arr: np.ndarray) -> dict:
     else:
         scl = arr.astype(np.uint8)
     return dict(evaluate_scene_quality(scl))
+
+
+def _safe_index(numerator: float, denominator: float) -> float | None:
+    if abs(denominator) < 1e-9:
+        return None
+    return round(numerator / denominator, 4)
+
+
+def _normalize_reflectance(values: np.ndarray) -> np.ndarray:
+    finite = values[np.isfinite(values)]
+    if finite.size and float(np.nanmedian(finite)) > 2.0:
+        return values / 10000.0
+    return values
+
+
+def _band_stats_from_response(arr: np.ndarray) -> dict | None:
+    if arr.ndim != 3 or arr.shape[-1] < 5:
+        return None
+    red = _normalize_reflectance(arr[:, :, 0].astype(np.float32))
+    nir = _normalize_reflectance(arr[:, :, 1].astype(np.float32))
+    swir2 = _normalize_reflectance(arr[:, :, 2].astype(np.float32))
+    scl = arr[:, :, 3].astype(np.uint8)
+    data_mask = arr[:, :, 4] > 0
+    valid_mask = data_mask & ~np.isin(scl.astype(int), INVALID_SCL_CLASSES)
+    if int(valid_mask.sum()) == 0:
+        return None
+
+    def stats(values: np.ndarray) -> dict:
+        selected = values[valid_mask]
+        return {
+            "mean": round(float(np.nanmean(selected)), 4),
+            "p10": round(float(np.nanpercentile(selected, 10)), 4),
+            "p90": round(float(np.nanpercentile(selected, 90)), 4),
+        }
+
+    red_mean = stats(red)["mean"]
+    nir_mean = stats(nir)["mean"]
+    swir2_mean = stats(swir2)["mean"]
+    return {
+        "bands": {
+            "B04_red": stats(red),
+            "B08_nir": stats(nir),
+            "B12_swir2": stats(swir2),
+        },
+        "derived_indices": {
+            "ndvi": _safe_index(nir_mean - red_mean, nir_mean + red_mean),
+            "nbr_swir2": _safe_index(nir_mean - swir2_mean, nir_mean + swir2_mean),
+            "swir2_nir_ratio": _safe_index(swir2_mean, nir_mean),
+        },
+        "valid_pixel_ratio": round(float(valid_mask.mean()), 4),
+        "stats_source": "sentinelhub_process_b04_b08_b12_scl",
+    }
 
 def get_chunk_signature(bbox: list[float]) -> str:
     rounded = [round(b, 3) for b in bbox]
@@ -209,6 +278,30 @@ def fetch_sh_window(
             ",".join(quality["reasons"]),
         )
         return None, "", quality
+
+    band_stats_request = SentinelHubRequest(
+        evalscript=SH_BAND_STATS_EVALSCRIPT,
+        input_data=[
+            SentinelHubRequest.input_data(
+                data_collection=DataCollection.SENTINEL2_L2A,
+                time_interval=time_interval,
+                mosaicking_order="leastCC",
+            )
+        ],
+        responses=[SentinelHubRequest.output_response("default", MimeType.TIFF)],
+        bbox=bbox,
+        size=(256, 192),
+        config=config,
+    )
+
+    try:
+        band_stats_data = band_stats_request.get_data()
+        band_stats = _band_stats_from_response(band_stats_data[0]) if band_stats_data else None
+        if band_stats:
+            quality["band_stats"] = band_stats
+    except Exception as exc:
+        logger.warning("  [SH] Band stats failed %s %s->%s: %s", label, start_date, end_date, exc)
+        quality["band_stats_error"] = str(exc)
     
     request = SentinelHubRequest(
         evalscript=SH_EVALSCRIPTS.get(visual_mode, SH_EVALSCRIPT),
@@ -298,6 +391,7 @@ def seed_single_cell(
     skip_vlm_metadata: bool = False,
     use_case_id: str | None = None,
     target_category: str | None = None,
+    target_pack_id: str | None = None,
     target_task: str | None = None,
     date_windows: list[tuple[str, str, str]] | None = None,
     visual_mode: str = "true_color",
@@ -318,8 +412,10 @@ def seed_single_cell(
     frames = []
     isos = []
     frame_quality = []
+    band_stats_by_frame = []
     rejected_windows = []
     provider_source = _VISUAL_MODE_LABELS.get(visual_mode, _VISUAL_MODE_LABELS["true_color"])
+    requested_bands = _VISUAL_MODE_BANDS.get(visual_mode, _VISUAL_MODE_BANDS["true_color"])
     
     frame_windows = date_windows or [
         (f"{year}-{month:02d}-15", f"{year}-{month:02d}-01", f"{year + 1}-01-01" if month == 12 else f"{year}-{month + 1:02d}-01")
@@ -340,6 +436,11 @@ def seed_single_cell(
                 "nodata_pixel_ratio": quality.get("nodata_pixel_ratio") if quality else None,
                 "reasons": quality.get("reasons", []) if quality else [],
             })
+            if quality and quality.get("band_stats"):
+                band_stats_by_frame.append({
+                    "label": label,
+                    **quality["band_stats"],
+                })
         else:
             rejected_windows.append({
                 "label": label,
@@ -408,6 +509,13 @@ def seed_single_cell(
         "vlm_explanation": vlm_text,
         "source": provider_source,
         "visual_mode": visual_mode,
+        "spectral_bands": {
+            "visual_mode": visual_mode,
+            "requested_bands": requested_bands,
+            "band_stats_by_frame": band_stats_by_frame,
+            "derived_indices": ["ndvi", "nbr_swir2", "swir2_nir_ratio"],
+            "note": "Band statistics are computed from accepted Sentinel-2 L2A pixels after SCL/dataMask quality filtering.",
+        },
         "cloud_policy": {
             "min_valid_pixel_ratio": DETECTION.min_quality_threshold,
             "invalid_scl_classes": INVALID_SCL_CLASSES,
@@ -419,6 +527,7 @@ def seed_single_cell(
         "training_ready": True,
         "use_case_id": use_case_id,
         "target_category": target_category,
+        "target_pack_id": target_pack_id,
         "target_task": target_task,
     }
     with open(meta_path, "w") as f:
@@ -438,6 +547,7 @@ def seed_single_cell(
             "seeded_at": meta["seeded_at"],
             "use_case_id": use_case_id,
             "target_category": target_category,
+            "target_pack_id": target_pack_id,
             "target_task": target_task,
         },
     )
@@ -458,6 +568,7 @@ def seed_grid(
     skip_vlm_metadata: bool = False,
     use_case_id: str | None = None,
     target_category: str | None = None,
+    target_pack_id: str | None = None,
     target_task: str | None = None,
     date_windows: list[tuple[str, str, str]] | None = None,
     visual_mode: str = "true_color",
@@ -494,6 +605,7 @@ def seed_grid(
                 skip_vlm_metadata,
                 use_case_id,
                 target_category,
+                target_pack_id,
                 target_task,
                 date_windows,
                 visual_mode,
@@ -530,6 +642,7 @@ def main():
     parser.add_argument("--region-note", default=None, help="Short provenance or mission note for a custom seed target.")
     parser.add_argument("--use-case-id", default=None, help="Optional temporal use-case id to persist into metadata.")
     parser.add_argument("--target-category", default=None, help="Optional target category to persist into metadata.")
+    parser.add_argument("--target-pack-id", default=None, help="Optional target pack id to persist into metadata.")
     parser.add_argument("--target-task", default=None, help="Optional target task to persist into metadata.")
     parser.add_argument(
         "--date-window",
@@ -598,6 +711,7 @@ def main():
             args.skip_vlm_metadata,
             args.use_case_id,
             args.target_category,
+            args.target_pack_id,
             args.target_task,
             date_windows or None,
             args.visual_mode,

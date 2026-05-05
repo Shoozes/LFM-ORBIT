@@ -137,6 +137,10 @@ uv run --no-sync python scripts\seed_sentinel_cache.py `
   --grid 1 `
   --cell-dim 0.08 `
   --visual-mode burn_scar `
+  --use-case-id wildfire `
+  --target-category wildfire `
+  --target-pack-id fireline `
+  --target-task wildfire_close_look_candidate_review `
   --date-window pre-fire=2026-04-01:2026-04-10 `
   --date-window ignition-window=2026-04-20:2026-04-23 `
   --date-window active-fire=2026-04-24:2026-04-26 `
@@ -144,7 +148,7 @@ uv run --no-sync python scripts\seed_sentinel_cache.py `
   --skip-vlm-metadata
 ```
 
-Treat this as candidate evidence until the contact sheet is visually reviewed; cloud, smoke, or missing-scene artifacts should not replace a clearer demo. If too many windows are rejected, widen the date window or pick another clear acquisition instead of forcing a cloudy timelapse.
+Treat this as candidate evidence until the contact sheet is visually reviewed; cloud, smoke, or missing-scene artifacts should not replace a clearer demo. Wildfire exports should carry `wildfire` as the category, `fireline` as the target pack, frame PNGs, and the SWIR/NIR/Red band stats from accepted frames. If too many windows are rejected, widen the date window or pick another clear acquisition instead of forcing a cloudy timelapse.
 
 ## Risk Watch Manifests
 
@@ -288,12 +292,13 @@ uv run --no-sync python scripts\upload_orbit_dataset_hf.py `
   --private
 ```
 
-The helper reads `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or `.tools/.secrets/hf.txt`, then calls the `hf` CLI with the token in process environment only. Use `--dry-run` to inspect the upload command without network calls.
+The helper reads `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or `.tools/.secrets/hf.txt`, then calls the `hf` CLI with the token in process environment only. Use `--dry-run` to inspect the upload command without network calls. Use repeated `--delete` patterns when a cleaned export should replace generated Hub files such as `samples/**`, `samples.jsonl`, and `manifest.json`.
 
-Current local packaging result after optional replay seeding:
+Current raw replay/cache export result after the Florida firewatch seed refresh:
 
-- Dataset export: `200` current-cycle samples, `0` cached API observation rows, `11` replay-cache rows, `0` visual story frames, `0` monitor-report rows, `185` mission metadata rows, and `15` rows with timelapse references.
-- Retag output: `163` deduplicated training assets, `15` temporal sequences, `185` mission metadata rows, `0` external provider calls in the final cleanup rerun, `163` reused image tags, `15` reused sequence tags, `0` skipped assets, `0` tagger failures, and `0` orphan or missing image files. New exports rasterize SVG fallbacks to PNG before retagging, support offline context thumbnails, clear generated `samples/` before export, suppress unresolved monitor frame refs, and clear generated `images/` / `frames/` output after reusable prior tags are loaded.
+- Dataset export: `33` samples, `25` replay-cache rows, `7` visual story frames, `0` mission metadata rows, and `26` rows with timelapse references.
+- Firewatch seed: `seeded_83e3aea2__83e3aea2`, tagged `wildfire`, target pack `fireline`, with Sentinel-2 `B12/B08/B04` band tags, derived `ndvi`, `nbr_swir2`, `swir2_nir_ratio`, one WebM timelapse, and three accepted frame PNGs.
+- Retag output from the prior training refresh remains reusable for model work; run retag only when the raw export needs to be transformed into single-image or temporal SFT rows.
 
 ## Dataset Refresh Cadence
 
@@ -302,7 +307,7 @@ Current local packaging result after optional replay seeding:
 - Keep `mission_metadata` for metadata-only missions such as the Greenland ice/snow extent replay instead of forcing invalid timelapse assets into image configs.
 - Record each Hub refresh in this README, `docs/dev/DATASET_CYCLE_TUTORIAL.md`, and `summary_bank.json` with counts, commit hash, tagger source, and skipped/failed asset counts.
 - For hackathon demos, prefer seeded replay data and SimSat runtime evidence before spending direct-provider quota on refreshes.
-- Hugging Face dataset: `Shoozes/LFM-Orbit-SatData`, latest data/card commit `2d5c5c400b61e869a1154881743ac6f1c1f77e3b`, with `mission_metadata=185` for operator task text, target packs, object targets, bbox intent, and metadata-only replay missions.
+- Hugging Face dataset: `Shoozes/LFM-Orbit-SatData`, latest raw export commit `b6ef429d958a21dc7690d3f4b7cc4f3bd2088d25`, with `records=33`, `seeded_cache_records=25`, `mission_metadata_records=0`, and the tagged Florida firewatch Sentinel-2 sample included.
 - Dataset Viewer schema note: upload `source/backend/data/HF_DATASET_CARD.md` as the Hub `README.md` so single-image SFT rows, temporal SFT rows, metadata, mission metadata, and review records load as separate configs instead of one mixed inferred JSON split.
 
 ## Optional Tkinter UI

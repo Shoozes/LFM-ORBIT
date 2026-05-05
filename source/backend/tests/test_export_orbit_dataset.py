@@ -473,6 +473,10 @@ def test_write_dataset_export_can_include_seeded_cache_records(tmp_path, monkeyp
     init_bus(reset=True)
 
     (seeded_dir / "sh_demo1234.webm").write_bytes(b"webm-bytes")
+    demo_frame_dir = seeded_dir / "sh_demo1234_frames"
+    demo_frame_dir.mkdir()
+    (demo_frame_dir / "01_before.png").write_bytes(b"png-before")
+    (demo_frame_dir / "02_after.png").write_bytes(b"png-after")
     (seeded_dir / "sh_demo1234_meta.json").write_text(
         json.dumps(
             {
@@ -486,6 +490,10 @@ def test_write_dataset_export_can_include_seeded_cache_records(tmp_path, monkeyp
                 "end_date": "2025-01",
                 "frames_count": 25,
                 "frame_dates": ["2023-01-15", "2025-01-15"],
+                "frame_images": [
+                    str(demo_frame_dir / "01_before.png"),
+                    str(demo_frame_dir / "02_after.png"),
+                ],
                 "date_windows": [
                     {"label": "before", "start_date": "2023-01-01", "end_date": "2023-02-01"},
                     {"label": "after", "start_date": "2025-01-01", "end_date": "2025-02-01"},
@@ -509,9 +517,32 @@ def test_write_dataset_export_can_include_seeded_cache_records(tmp_path, monkeyp
                 "vlm_explanation": "Seeded Sentinel-2 timelapse.",
                 "source": "Sentinel Hub Sentinel-2 L2A",
                 "training_ready": True,
-                "use_case_id": "deforestation",
-                "target_category": "deforestation",
-                "target_task": "deforestation_detection",
+                "use_case_id": "wildfire",
+                "target_category": "wildfire",
+                "target_pack_id": "fireline",
+                "target_task": "wildfire_close_look_candidate_review",
+                "spectral_bands": {
+                    "visual_mode": "burn_scar",
+                    "requested_bands": ["B12", "B08", "B04"],
+                    "band_stats_by_frame": [
+                        {
+                            "label": "before",
+                            "bands": {
+                                "B04_red": {"mean": 0.05},
+                                "B08_nir": {"mean": 0.3},
+                                "B12_swir2": {"mean": 0.15},
+                            },
+                            "derived_indices": {
+                                "ndvi": 0.7143,
+                                "nbr_swir2": 0.3333,
+                                "swir2_nir_ratio": 0.5,
+                            },
+                            "valid_pixel_ratio": 0.97,
+                            "stats_source": "test",
+                        },
+                    ],
+                    "derived_indices": ["ndvi", "nbr_swir2", "swir2_nir_ratio"],
+                },
             }
         ),
         encoding="utf-8",
@@ -566,14 +597,22 @@ def test_write_dataset_export_can_include_seeded_cache_records(tmp_path, monkeyp
     ice_record = next(item for item in records if item["chunk_signature"] == "ice1234")
     assert record["record_type"] == "seeded_cache"
     assert record["confirmation_source"] == "seeded_data"
-    assert record["target_category"] == "deforestation"
-    assert record["target_task"] == "deforestation_detection"
+    assert record["target_category"] == "wildfire"
+    assert record["target_pack_id"] == "fireline"
+    assert "target_pack:fireline" in record["reason_codes"]
+    assert record["target_task"] == "wildfire_temporal_detection"
     assert record["visual_mode"] == "burn_scar"
     assert record["date_windows"][0]["label"] == "before"
     assert record["frame_quality"][0]["valid_pixel_ratio"] == 0.97
     assert record["rejected_windows"][0]["quality"]["cloud_pixel_ratio"] == 0.8
+    assert record["seeded_meta_path"] == "sh_demo1234_meta.json"
+    assert record["band_tags"] == ["B12", "B08", "B04"]
+    assert record["derived_indices"] == ["ndvi", "nbr_swir2", "swir2_nir_ratio"]
+    assert record["spectral_bands"]["band_stats_by_frame"][0]["derived_indices"]["ndvi"] == 0.7143
     assert record["assets"]["timelapse"] == "timelapse.webm"
+    assert record["assets"]["frames"] == ["frames/01_01_before.png", "frames/02_02_after.png"]
     assert (output_dir / "samples" / record["sample_id"] / "timelapse.webm").read_bytes() == b"webm-bytes"
+    assert (output_dir / "samples" / record["sample_id"] / "frames" / "01_01_before.png").read_bytes() == b"png-before"
     assert ice_record["target_category"] == "cryosphere"
     assert ice_record["target_task"] == "ice_snow_extent_monitoring"
     assert ice_record["runtime_truth_mode"] == "replay"

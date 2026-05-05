@@ -44,6 +44,13 @@ def _safe_name(value: str) -> str:
     return cleaned.strip("._") or "sample"
 
 
+def _portable_path(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(_REPO_ROOT).as_posix()
+    except ValueError:
+        return path.name
+
+
 def _sample_id(primary_id: str, cell_id: str) -> str:
     base = _safe_name(primary_id or cell_id or "sample")
     safe_cell = _safe_name(cell_id or "cell")
@@ -121,6 +128,31 @@ def _file_to_data_url(path: Path) -> str | None:
         return None
     data_b64 = base64.b64encode(path.read_bytes()).decode("ascii")
     return f"data:{mime_type};base64,{data_b64}"
+
+
+def _copy_seeded_frame_images(record: dict[str, Any], sample_dir: Path) -> list[str]:
+    frame_paths = record.get("frame_images")
+    if not isinstance(frame_paths, list):
+        return []
+    frames_dir = sample_dir / "frames"
+    copied: list[str] = []
+    for index, raw_path in enumerate(frame_paths, start=1):
+        rel_path = str(raw_path or "").strip()
+        if not rel_path:
+            continue
+        source = Path(rel_path)
+        if not source.is_absolute():
+            source = _REPO_ROOT / source
+        if not source.exists() or not source.is_file():
+            continue
+        suffix = source.suffix.lower()
+        if suffix not in {".png", ".jpg", ".jpeg"}:
+            continue
+        frames_dir.mkdir(parents=True, exist_ok=True)
+        frame_name = f"{index:02d}_{_safe_name(source.stem)}{suffix}"
+        shutil.copy2(source, frames_dir / frame_name)
+        copied.append(f"frames/{frame_name}")
+    return copied
 
 
 def _split_for_key(key: str, eval_ratio: float) -> str:
@@ -645,14 +677,21 @@ def _build_seeded_cache_record(meta_path: Path, *, eval_ratio: float) -> dict[st
     date_windows = list(meta.get("date_windows", [])) if isinstance(meta.get("date_windows"), list) else []
     frame_quality = list(meta.get("frame_quality", [])) if isinstance(meta.get("frame_quality"), list) else []
     rejected_windows = list(meta.get("rejected_windows", [])) if isinstance(meta.get("rejected_windows"), list) else []
+    spectral_bands = meta.get("spectral_bands") if isinstance(meta.get("spectral_bands"), dict) else {}
     location_name = str(meta.get("location_name") or "")
     use_case_id = str(meta.get("use_case_id") or "").strip()
     target_category = str(meta.get("target_category") or "").strip()
+    target_pack_id = str(meta.get("target_pack_id") or "").strip()
     target_task = str(meta.get("target_task") or "").strip()
     runtime_truth_mode = str(meta.get("runtime_truth_mode") or "replay")
     imagery_origin = str(meta.get("imagery_origin") or "cached_api")
     scoring_basis = str(meta.get("scoring_basis") or "visual_only")
     inferred_deforestation = "rond" in location_name.lower()
+    reason_codes = ["seeded_data", "training_ready"] if training_ready else ["seeded_data"]
+    if use_case_id:
+        reason_codes.append(f"use_case:{use_case_id}")
+    if target_pack_id:
+        reason_codes.append(f"target_pack:{target_pack_id}")
     return {
         "sample_id": sample_id,
         "split": _split_for_key(sample_id, eval_ratio),
@@ -670,7 +709,7 @@ def _build_seeded_cache_record(meta_path: Path, *, eval_ratio: float) -> dict[st
         "change_score": 0.0,
         "confidence": 0.0,
         "priority": "review",
-        "reason_codes": ["seeded_data", "training_ready"] if training_ready else ["seeded_data"],
+        "reason_codes": reason_codes,
         "observation_source": str(meta.get("source") or "seeded_cache"),
         "runtime_truth_mode": runtime_truth_mode,
         "imagery_origin": imagery_origin,
@@ -683,12 +722,17 @@ def _build_seeded_cache_record(meta_path: Path, *, eval_ratio: float) -> dict[st
         "date_windows": date_windows,
         "frame_quality": frame_quality,
         "rejected_windows": rejected_windows,
+        "frame_images": list(meta.get("frame_images", [])) if isinstance(meta.get("frame_images"), list) else [],
+        "spectral_bands": spectral_bands,
+        "band_tags": list(spectral_bands.get("requested_bands", [])) if isinstance(spectral_bands.get("requested_bands"), list) else [],
+        "derived_indices": list(spectral_bands.get("derived_indices", [])) if isinstance(spectral_bands.get("derived_indices"), list) else [],
         "frames_count": int(meta.get("frames_count") or 0),
-        "seeded_meta_path": str(meta_path),
+        "seeded_meta_path": _portable_path(meta_path),
         "visual_mode": meta.get("visual_mode"),
         "location_name": location_name,
         "region_note": meta.get("region_note"),
         "use_case_id": use_case_id or None,
+        "target_pack_id": target_pack_id or None,
         "confirmation_source": "seeded_data",
         "timelapse_analysis": str(meta.get("vlm_explanation") or "").strip() or None,
         "rejection_reason": None,
@@ -1006,6 +1050,8 @@ def write_dataset_export(
                 "timelapse",
                 _resolve_cached_timelapse_data(record.get("chunk_signature")),
             )
+            if record["record_type"] == "seeded_cache":
+                record["assets"]["frames"] = _copy_seeded_frame_images(record, sample_dir)
 
         if record["assets"].get("timelapse"):
             with_timelapse += 1

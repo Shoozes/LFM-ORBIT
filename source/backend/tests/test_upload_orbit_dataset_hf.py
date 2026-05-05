@@ -35,6 +35,7 @@ def test_build_upload_command_omits_token(tmp_path):
         revision="main",
         commit_message="Update dataset",
         create_pr=True,
+        delete_patterns=["samples/**", "manifest.json"],
     )
 
     assert command[:3] == ["hf", "upload", "user/orbit-data"]
@@ -43,6 +44,7 @@ def test_build_upload_command_omits_token(tmp_path):
     assert "--commit-message" in command
     assert "Update dataset" in command
     assert "--create-pr" in command
+    assert command[-4:] == ["--delete", "samples/**", "--delete", "manifest.json"]
     assert all("hf_" not in item for item in command)
 
 

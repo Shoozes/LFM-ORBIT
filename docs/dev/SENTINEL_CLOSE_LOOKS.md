@@ -100,7 +100,8 @@ uv run --no-sync python scripts/seed_sentinel_cache.py `
   --location-name "Lochloosa West Fire close look" `
   --region-note "May 4 2026 source-reported Alachua County wildfire near CR 325 and CR 346; candidate smoke/burn-scar context only." `
   --use-case-id wildfire `
-  --target-category fireline `
+  --target-category wildfire `
+  --target-pack-id fireline `
   --target-task wildfire_close_look_candidate_review `
   --date-window prefire_2026_04_20=2026-04-20:2026-05-03 `
   --date-window event_2026_05_04=2026-05-04:2026-05-05 `
@@ -122,7 +123,8 @@ uv run --no-sync python scripts/seed_sentinel_cache.py `
   --location-name "SR-26 Balu Forest wildfire close look" `
   --region-note "April 15 2026 source-reported Alachua County wildfire near SR-26/CR-234; candidate smoke/burn-scar context only." `
   --use-case-id wildfire `
-  --target-category fireline `
+  --target-category wildfire `
+  --target-pack-id fireline `
   --target-task wildfire_close_look_candidate_review `
   --date-window baseline_2026_04_01=2026-04-01:2026-04-04 `
   --date-window prefire_2026_04_05=2026-04-05:2026-04-14 `
@@ -133,7 +135,7 @@ uv run --no-sync python scripts/seed_sentinel_cache.py `
   --force
 ```
 
-May 5, 2026 status: credentials resolved from `.tools/.secrets/sh.txt`; the baseline, prefire, and active-fire windows returned accepted Sentinel-2 L2A SWIR/NIR/Red frames, while the April 19-May 5 postfire window was rejected for insufficient valid pixels. The cache was promoted as `source/backend/assets/seeded_data/sh_83e3aea2.webm` with frame PNGs under `source/backend/assets/seeded_data/sh_83e3aea2_frames/` and curated replay `florida_sr26_wildfire_replay`. Keep the wording candidate-only until a later accepted postfire pass is cached.
+May 5, 2026 status: credentials resolved from `.tools/.secrets/sh.txt`; the baseline, prefire, and active-fire windows returned accepted Sentinel-2 L2A SWIR/NIR/Red frames, while the April 19-May 5 postfire window was rejected for insufficient valid pixels. The cache was promoted as `source/backend/assets/seeded_data/sh_83e3aea2.webm` with frame PNGs under `source/backend/assets/seeded_data/sh_83e3aea2_frames/`, `wildfire` category tags, `fireline` target-pack tags, and curated replay `florida_sr26_wildfire_replay`. Keep the wording candidate-only until a later accepted postfire pass is cached.
 
 ## README Highlight
 

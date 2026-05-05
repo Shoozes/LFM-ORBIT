@@ -61,6 +61,25 @@ def test_frame_quality_from_scl_uses_data_mask_as_nodata():
     assert quality["nodata_pixel_ratio"] == 1.0
 
 
+def test_band_stats_from_response_computes_wildfire_indices():
+    arr = np.zeros((4, 4, 5), dtype=np.float32)
+    arr[:, :, 0] = 0.05
+    arr[:, :, 1] = 0.30
+    arr[:, :, 2] = 0.15
+    arr[:, :, 3] = 4
+    arr[:, :, 4] = 1
+
+    stats = seed_sentinel_cache._band_stats_from_response(arr)
+
+    assert stats is not None
+    assert stats["bands"]["B04_red"]["mean"] == 0.05
+    assert stats["bands"]["B08_nir"]["mean"] == 0.3
+    assert stats["bands"]["B12_swir2"]["mean"] == 0.15
+    assert stats["derived_indices"]["ndvi"] == 0.7143
+    assert stats["derived_indices"]["nbr_swir2"] == 0.3333
+    assert stats["derived_indices"]["swir2_nir_ratio"] == 0.5
+
+
 def test_seed_single_cell_persists_frame_images_for_custom_windows(tmp_path, monkeypatch):
     frames = [
         np.full((8, 8, 3), 40, dtype=np.uint8),
@@ -74,6 +93,12 @@ def test_seed_single_cell_persists_frame_images_for_custom_windows(tmp_path, mon
             "cloud_pixel_ratio": 0.0,
             "nodata_pixel_ratio": 0.0,
             "reasons": [],
+            "band_stats": {
+                "bands": {"B04_red": {"mean": 0.05}, "B08_nir": {"mean": 0.3}, "B12_swir2": {"mean": 0.15}},
+                "derived_indices": {"ndvi": 0.7143, "nbr_swir2": 0.3333, "swir2_nir_ratio": 0.5},
+                "valid_pixel_ratio": 0.99,
+                "stats_source": "test",
+            },
         }
 
     monkeypatch.setattr(seed_sentinel_cache, "fetch_sh_window", fake_fetch)
@@ -94,7 +119,8 @@ def test_seed_single_cell_persists_frame_images_for_custom_windows(tmp_path, mon
         force=True,
         skip_vlm_metadata=True,
         use_case_id="wildfire",
-        target_category="fireline",
+        target_category="wildfire",
+        target_pack_id="fireline",
         target_task="wildfire_close_look_candidate_review",
         date_windows=[
             ("pre", "2026-04-05", "2026-04-14"),
@@ -107,6 +133,11 @@ def test_seed_single_cell_persists_frame_images_for_custom_windows(tmp_path, mon
     meta = json.loads((tmp_path / f"sh_{sig}_meta.json").read_text())
     assert meta["start_date"] == "2026-04-05"
     assert meta["end_date"] == "2026-04-18"
+    assert meta["target_category"] == "wildfire"
+    assert meta["target_pack_id"] == "fireline"
     assert len(meta["frame_images"]) == 2
+    assert meta["spectral_bands"]["requested_bands"] == ["B12", "B08", "B04"]
+    assert len(meta["spectral_bands"]["band_stats_by_frame"]) == 2
+    assert meta["spectral_bands"]["band_stats_by_frame"][0]["derived_indices"]["ndvi"] == 0.7143
     assert (tmp_path / f"sh_{sig}_frames" / "01_pre.png").exists()
     assert (tmp_path / f"sh_{sig}_frames" / "02_active.png").exists()

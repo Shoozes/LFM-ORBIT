@@ -255,22 +255,19 @@ Recorded proof demos now export both the full proof screen and the isolated `evi
 
 Orbit also stores timestamped watch manifests under `source/backend/assets/watchlists/`. These are source-backed risk watches, not labels. The SPC Day 2 Southern High Plains watch is now promoted only to `incident_report_verified_candidate` after NM Fire Info reported the Sparks Fire in Quay County inside the watch bbox; satellite burn-scar confirmation still requires a separate post-event imagery pass.
 
-Current local export after including replay cache:
+Current raw replay/cache export after including the Florida firewatch seed:
 
-- `200` current-cycle Orbit samples
+- `33` Orbit samples
 - `0` cached API observation rows
-- `11` replay-cache rows
-- `0` visual story frame rows
+- `25` replay-cache rows
+- `7` visual story frame rows
 - `0` monitor-report rows
-- `185` mission metadata rows
-- `15` rows with timelapse references
-- `163` deduplicated retagged image/frame assets
-- `15` temporal sequence rows
-- `0` external provider calls in the latest refresh
-- `163` image tags and `15` sequence tags reused from the previous retag folder to avoid rescanning already-tagged assets
-- `0` skipped assets, `0` tagger failures, and `0` orphan or missing uploaded image files
+- `0` mission metadata rows
+- `26` rows with timelapse references
+- `wildfire` / `fireline` tags plus Sentinel-2 `B12/B08/B04` band stats on `seeded_83e3aea2__83e3aea2`
+- `0` local Windows paths in the published raw export JSONL/manifest
 
-Hugging Face upload is wired and completed locally for the current retagged training export. The dataset is published at `Shoozes/LFM-Orbit-SatData`, with latest data/card commit `2d5c5c400b61e869a1154881743ac6f1c1f77e3b` and `mission_metadata=185` for operator task text, target packs, object targets, bbox intent, and metadata-only replay missions.
+Hugging Face upload is wired and completed locally. The dataset is published at `Shoozes/LFM-Orbit-SatData`, with latest raw export commit `b6ef429d958a21dc7690d3f4b7cc4f3bd2088d25`: `records=33`, `seeded_cache_records=25`, `mission_metadata_records=0`, and the Florida firewatch sample tagged as `wildfire` / `fireline` with Sentinel-2 `B12/B08/B04` frame stats. The earlier retagged training export remains reusable for model work when raw replay/cache rows need SFT conversion.
 
 The trained model handoff bundle is published at `Shoozes/lfm2.5-450m-vl-orbit-satellite`. Latest checked revision: `560b0c6e4eb68696527630b8e652cc34850a82b9`. Local fetch with `--force` refreshed `runtime-data/models/lfm2.5-vlm-450m/`; `scripts/smoke_satellite_model.py --require-present --max-tokens 8` passed with `loaded=true` in the launcher-managed Windows backend environment. The manifest reports task `orbit-satellite-triage`, base model `LiquidAI/LFM2.5-VL-450M`, GGUF runtime, `training_modality=image_text`, `image_training_verified=true`, `1611` train rows, `1611` multimodal rows, `1878` image blocks, and `179` eval rows. Runtime remains `text_evidence_packet` because no `mmproj` or direct image-conditioned adapter is wired.
 
