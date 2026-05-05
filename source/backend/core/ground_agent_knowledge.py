@@ -56,6 +56,7 @@ MISSION_PACKS: dict[str, dict[str, Any]] = {
         ],
         "use_case_id": "mining_expansion",
         "target_pack_id": "critical_minerals",
+        "proof_replay_id": "atacama_mining_replay",
         "task_text": "Run Critical Minerals Expansion Watch over the Salar de Atacama / Escondida / Atacama mining corridor. Compare historical and current satellite imagery for evaporation pond regions, tailings regions, open-pit expansion, industrial roads, facility clusters, exposed soil, and surface color change without claiming illegal mining, pollution confirmation, or production output.",
         "bbox": [-69.115, -24.29, -69.035, -24.21],
         "start_date": "2024-01-15",
@@ -1695,6 +1696,14 @@ def _match_mission_pack_from_context() -> tuple[str, dict[str, Any]] | None:
     return _match_mission_pack(context_text)
 
 
+def _mission_pack_proof_replay_id(text: str, pack: dict[str, Any]) -> str | None:
+    replay_id = pack.get("proof_replay_id")
+    if not isinstance(replay_id, str) or not replay_id:
+        return None
+    live_terms = ("live", "current runtime", "fresh scan", "new scan", "simsat", "real data", "sentinel")
+    return None if any(term in text for term in live_terms) else replay_id
+
+
 def _is_protected_wildlife_request(text: str) -> bool:
     return any(term in text for term in ("manatee", "manatees"))
 
@@ -2537,6 +2546,15 @@ def execute_ground_agent_chat(user_msg: str) -> dict[str, Any]:
                 "suggestions": _suggestions(),
             }
         pack_id, pack = match
+        proof_replay_id = _mission_pack_proof_replay_id(text, pack)
+        if proof_replay_id:
+            return {
+                "reply": f"I matched the deterministic proof replay for `{pack['label']}`: `{proof_replay_id}`. Review before loading it into the app.",
+                "actions": [],
+                "proposals": [_with_request(_replay_proposal("load_replay", proof_replay_id), user_msg)],
+                "state": _base_state(),
+                "suggestions": _suggestions(),
+            }
         return {
             "reply": f"I matched mission pack `{pack_id}`. Review the mission before launch.",
             "actions": [],
@@ -2556,7 +2574,7 @@ def execute_ground_agent_chat(user_msg: str) -> dict[str, Any]:
 def _suggestions() -> list[str]:
     return [
         "Run Florida firewatch mission",
-        "Run critical minerals mission",
+        "Load critical minerals proof replay",
         "Take me to the Bronx NY",
         "Stop mission and fly to Bull Creek FL",
         "List replays",

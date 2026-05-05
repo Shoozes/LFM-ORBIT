@@ -577,11 +577,28 @@ export default function App() {
       const launchedMission = Boolean(
         findOkAction(response, "start_custom_mission") || findOkAction(response, "start_mission_pack"),
       );
+      const loadedReplay = findOkAction(response, "load_replay");
       if (launchedMission) {
         previewedMissionIdRef.current = refreshedMission.id;
       }
       setDrawnBbox([...refreshedMission.bbox]);
-      if (launchedMission) {
+      if (loadedReplay) {
+        const primaryCellId = typeof loadedReplay.primary_cell_id === "string"
+          ? loadedReplay.primary_cell_id
+          : null;
+        setVlmBoxes([]);
+        setShowMissionTimelapse(false);
+        setProofMission(refreshedMission);
+        setProofModeActive(false);
+        setDismissedCompleteMissionId(null);
+        if (primaryCellId) {
+          setSelectedCellId(primaryCellId);
+          setActiveTab("inspect");
+        } else {
+          setSelectedCellId(null);
+          setActiveTab("logs");
+        }
+      } else if (launchedMission) {
         setVlmBoxes([]);
         setShowMissionTimelapse(false);
         setSelectedCellId(null);

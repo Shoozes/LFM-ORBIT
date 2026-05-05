@@ -125,9 +125,9 @@ Current runtime: SimSat/Mapbox hackathon satellite-data API family, default SimS
 | Check | Current State |
 |---|---|
 | Root verify | `.\run.ps1 -Verify` passing |
-| Backend tests | `460 passed` |
+| Backend tests | `463 passed` |
 | Frontend | typecheck + build passing |
-| Playwright E2E | `97 passed`, `6 skipped` |
+| Playwright E2E | `98 passed`, `6 skipped` |
 | Docs/import guards | `22 passed` |
 | Clean-start smoke | Idle on Atacama context, no auto replay, no default scan |
 | Florida firewatch smoke | Recent 30-day window, `378/378` cells, `0` confirmed flags |

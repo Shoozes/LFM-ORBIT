@@ -1157,7 +1157,7 @@
       ]
     },
     "qa_suite_and_demo_flows": {
-      "note": "Current QA/demo flow lane: backend docs artifact guards cover promoted images, explicit public WebMs, summary-bank file refs, stale retired-UI docs claims, and temporal/nonblank video quality; import-contract tests guard backend entrypoints. Frontend Playwright covers API smoke, clean startup/no auto mission, Agent-first shell, Ground Agent actions, lean Mission plan/replay controls, map-side Area Tools selection/clear/draw state, retired evidence-tool absence, stale demo-query isolation, visual stories, screenshot export, dual-agent demo, and the Rondonia tutorial. The tutorial now starts clean, launches a Rondonia deforestation mission through Ground Agent chat, points at the Area Tools card for bbox/cell-count/draw/clear context, shows the grid scan and space/ground agent handoff, then loads replay-backed proof with timelapse, CV boxes, compact proof JSON, and training tags. Demo exports use npm run demo:record and npm run demo:tutorial; the old object-evidence recording command is intentionally gone. May 5 release validation passed frontend lint/build, docs artifact/import pytest, demo record, tutorial record, and full Playwright 97 passed / 6 intentional skips.",
+      "note": "Current QA/demo flow lane: backend docs artifact guards cover promoted images, explicit public WebMs, summary-bank file refs, stale retired-UI docs claims, and temporal/nonblank video quality; import-contract tests guard backend entrypoints. Frontend Playwright covers API smoke, clean startup/no auto mission, Agent-first shell, Ground Agent actions, lean Mission plan/replay controls, map-side Area Tools selection/clear/draw state, retired evidence-tool absence, stale demo-query isolation, visual stories, screenshot export, dual-agent demo, and the Rondonia tutorial. The tutorial now starts clean, launches a Rondonia deforestation mission through Ground Agent chat, points at the Area Tools card for bbox/cell-count/draw/clear context, shows the grid scan and space/ground agent handoff, then loads replay-backed proof with timelapse, CV boxes, compact proof JSON, and training tags. Demo exports use npm run demo:record and npm run demo:tutorial; the old object-evidence recording command is intentionally gone. May 5 release validation passed frontend lint/build, docs artifact/import pytest, demo record, tutorial record, and full Playwright 98 passed / 6 intentional skips.",
       "files": [
         "source/backend/tests/test_docs_artifacts.py",
         "source/backend/tests/test_import_contracts.py",
@@ -1555,7 +1555,7 @@
       ]
     },
     "issue_group_launcher_clean_start_verify": {
-      "note": "Windows clean-start and verify hardening: run.ps1 now stops stale repo-owned backend/frontend listeners, refuses unrelated port owners, captures backend startup logs under runtime-data/logs, fails early with backend error tails when health never comes up, and checks external command exit codes for npm, npx, uv, Playwright, model fetch, and dev server startup. The E2E suite was updated for the lean UI contract: clean startup stays idle, scan-progress tests explicitly start a smoke mission, map-side Area Tools replaced hidden draw controls, and retired visual-overlay UI specs are intentionally skipped. Cold reset plus option-1 equivalent startup succeeded, Playwright/node_modules dependency checks resolved cleanly, and full run.ps1 -Verify passed with backend 460 passed, GGUF smoke, frontend lint/build, and Playwright 97 passed / 6 intentional skips.",
+      "note": "Windows clean-start and verify hardening: run.ps1 now stops stale repo-owned backend/frontend listeners, refuses unrelated port owners, captures backend startup logs under runtime-data/logs, fails early with backend error tails when health never comes up, and checks external command exit codes for npm, npx, uv, Playwright, model fetch, and dev server startup. The E2E suite was updated for the lean UI contract: clean startup stays idle, scan-progress tests explicitly start a smoke mission, map-side Area Tools replaced hidden draw controls, and retired visual-overlay UI specs are intentionally skipped. Cold reset plus option-1 equivalent startup succeeded, Playwright/node_modules dependency checks resolved cleanly, and full run.ps1 -Verify passed with backend 463 passed, GGUF smoke, frontend lint/build, and Playwright 98 passed / 6 intentional skips.",
       "files": [
         "run.ps1",
         "source/frontend/e2e/app.spec.ts",
@@ -1587,6 +1587,25 @@
         "source/backend/tests/test_replay.py",
         "source/frontend/e2e/capture_screenshots.spec.ts",
         "docs/dev/TODO.md",
+        "summary_bank.json"
+      ]
+    },
+    "issue_group_chat_to_proof_replay_handoff": {
+      "note": "Chat-to-proof replay handoff hardening: showcase mission packs can declare proof_replay_id so normal operator chat loads deterministic proof replays while explicit live/current/fresh requests still start realtime scans. Ground Agent load_replay completion now refreshes mission state, clears stale proof/timelapse media, selects the replay primary cell, and opens Inspect, preventing a Florida Firewatch -> Critical Minerals sequence from showing empty or stale proof. Browser regressions cover the cross-mission handoff and the Agent replay confirmation flow.",
+      "files": [
+        "README.md",
+        "docs/dev/TODO.md",
+        "docs/media/readme/readme-ground-agent-playbook.png",
+        "docs/media/readme/readme-location-camera-context.png",
+        "docs/media/videos/tutorial_video.webm",
+        "source/backend/core/ground_agent_knowledge.py",
+        "source/backend/tests/test_api.py",
+        "source/frontend/App.tsx",
+        "source/frontend/components/GroundAgent.tsx",
+        "source/frontend/e2e/capture_screenshots.spec.ts",
+        "source/frontend/e2e/qa_verification.spec.ts",
+        "source/frontend/e2e/tutorial_video.spec.ts",
+        "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json"
       ]
     }

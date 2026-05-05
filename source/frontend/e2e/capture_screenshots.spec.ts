@@ -223,8 +223,8 @@ test("screenshot: Ground Agent proposes critical minerals replay from chat", asy
   });
 
   await page.getByTestId("ground-agent-run-proposal").click();
-  await expect(page.getByText("Loaded replay `atacama_mining_replay`")).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("load replay - atacama_mining_replay")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("REPLAY ACTIVE: atacama_mining_replay")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("tab-inspect")).toHaveClass(/border-zinc-900/);
 });
 
 test("screenshot: Ground Agent semantic location camera context", async ({ page, request }) => {

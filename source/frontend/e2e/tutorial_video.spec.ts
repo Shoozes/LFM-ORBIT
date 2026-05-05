@@ -349,7 +349,8 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
   await moveMouseToHighlight(page, "[data-testid='ground-agent-run-proposal']");
   await replayProposal.getByRole("button", { name: "Run Replay" }).click();
   await removeHighlight(page);
-  await expect(page.getByText(new RegExp(`Loaded replay.*${RONDONIA_REPLAY_ID}`))).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(`REPLAY ACTIVE: ${RONDONIA_REPLAY_ID}`)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("tab-inspect")).toHaveClass(/border-zinc-900/);
   await showVoiceoverSubtitle(
     page,
     "The replay restores a completed scan: cells swept, low-value areas pruned, and retained evidence ready for review.",

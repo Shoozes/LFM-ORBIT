@@ -1591,6 +1591,52 @@ def test_ground_agent_chat_proposes_critical_minerals_replay_before_loading():
     assert proposal["details"]["imagery_origin"] == "cached_api"
 
 
+def test_ground_agent_quick_critical_minerals_prompt_uses_proof_replay():
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "Load critical minerals proof replay"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "load_replay"
+    assert proposal["confirm_label"] == "Run Replay"
+    assert proposal["details"]["replay_id"] == "atacama_mining_replay"
+    assert proposal["details"]["use_case_id"] == "mining_expansion"
+
+
+def test_ground_agent_run_critical_minerals_defaults_to_proof_replay():
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "Run critical minerals mission"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "load_replay"
+    assert proposal["confirm_label"] == "Run Replay"
+    assert proposal["details"]["replay_id"] == "atacama_mining_replay"
+    assert proposal["details"]["runtime_truth_mode"] == "replay"
+
+
+def test_ground_agent_live_critical_minerals_can_still_start_mission_pack():
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "Run live critical minerals mission"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "start_mission_pack"
+    assert proposal["details"]["pack_id"] == "mining_atacama"
+
+
 def test_ground_agent_chat_proposes_rondonia_replay_with_proxy_band_basis():
     response = client.post(
         "/api/agent/chat",
@@ -1771,6 +1817,7 @@ def test_ground_agent_chat_returns_operator_playbook():
     assert "proof mode" in reply
     assert "proposal-based" in reply
     assert "Run Florida firewatch mission" in payload["suggestions"]
+    assert "Load critical minerals proof replay" in payload["suggestions"]
     assert "List replays" in payload["suggestions"]
 
 

@@ -185,6 +185,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await expect(page.getByTestId("ground-agent-suggestions-label")).toContainText("Suggested Prompts");
     await expect(page.getByTestId("ground-agent-suggestions-label")).toContainText("Ask only. Confirm before app changes.");
     await expect(page.getByRole("button", { name: "Run Florida firewatch mission" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Load critical minerals proof replay" })).toBeVisible();
     await expect(page.getByTestId("header-agent-bus")).toContainText("SAT/GND Dialogue Bus");
   });
 
@@ -244,9 +245,8 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await expect(proposal.getByText("cached_api")).toBeVisible();
 
     await proposal.getByRole("button", { name: "Run Replay" }).click();
-    await expect(proposal.getByRole("button", { name: "Confirmed" })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("Loaded replay `georgia_wildfire_replay`")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("load replay - georgia_wildfire_replay")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("REPLAY ACTIVE: georgia_wildfire_replay")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("tab-inspect")).toHaveClass(/border-zinc-900/);
 
     await page.getByTestId("tab-mission").click();
     await expect(page.getByText("Replay Mission · georgia_wildfire_replay")).toBeVisible({ timeout: 15_000 });

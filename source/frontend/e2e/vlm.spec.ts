@@ -124,6 +124,44 @@ test.describe("Mission target pack UX", () => {
     await expect(page.getByTestId("proof-json")).not.toContainText("critical minerals");
   });
 
+  test("chat minerals proof replay replaces a prior Florida firewatch mission", async ({ page, request }) => {
+    test.setTimeout(90_000);
+    await resetRuntimeState(request);
+    await startMission(request, {
+      task_text: "Run Florida Fire/Drought Readiness Watch over a North Florida corridor. Treat this as candidate evidence until source-backed imagery confirms smoke, active fire, or burn scar.",
+      bbox: [-83.2, 29.0, -81.3, 30.7],
+      start_date: "2026-04-05",
+      end_date: "2026-05-05",
+      use_case_id: "wildfire",
+      target_pack_id: "fireline",
+    });
+
+    await gotoApp(page);
+    await waitForLinkOpen(page);
+    await waitForBasemapReady(page);
+
+    const chatInput = page.getByPlaceholder("Request replay, mission pack, link action...");
+    await chatInput.fill("Run critical minerals mission");
+    await page.getByRole("button", { name: "Send" }).click();
+
+    const proposal = page.getByTestId("ground-agent-proposal-card").last();
+    await expect(proposal).toContainText("Load replay: Critical Minerals Expansion Watch", { timeout: 15_000 });
+    await expect(proposal).toContainText("atacama_mining_replay");
+    await proposal.getByRole("button", { name: "Run Replay" }).click();
+
+    await expect(page.getByText("REPLAY ACTIVE: atacama_mining_replay")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("tab-inspect")).toHaveClass(/border-zinc-900/);
+
+    await page.getByTestId("tab-agents").click();
+    await page.getByTestId("ground-agent-nav-proof").click();
+    await expect(page.getByTestId("proof-mode-panel")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("demo-title")).toContainText("Atacama Mining Replay proof");
+    await expect(page.getByTestId("proof-json")).toContainText('"replay_id": "atacama_mining_replay"');
+    await expect(page.getByTestId("proof-json")).toContainText("critical_minerals");
+    await expect(page.getByTestId("proof-json")).not.toContainText("fireline");
+    await expect(page.getByTestId("proof-json")).not.toContainText("Florida Fire/Drought");
+  });
+
   test("completed live mission exposes result CTAs into logs and proof", async ({ page, request }) => {
     await resetRuntimeState(request);
     await routeMissionTimelapse(page);
