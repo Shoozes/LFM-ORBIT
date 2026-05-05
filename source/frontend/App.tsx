@@ -237,6 +237,11 @@ function normalizeNumberArray(value: unknown, length: number): number[] | null {
   return numbers.every((entry) => Number.isFinite(entry)) ? numbers : null;
 }
 
+function formatBboxShort(bbox: number[] | null): string {
+  if (!bbox) return "No selected area";
+  return bbox.map((value) => value.toFixed(2)).join(", ");
+}
+
 function normalizeCameraNumber(value: unknown): number | undefined {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : undefined;
@@ -695,6 +700,26 @@ export default function App() {
       ? "bg-emerald-500 animate-pulse"
       : "bg-amber-400"
     : "bg-red-500";
+  const areaToolStatus = drawBboxActive
+    ? "Drawing"
+    : drawnBbox
+      ? scanAnimationActive
+        ? "Scanning"
+        : "Selected"
+      : "No Area";
+  const areaToolTone = drawBboxActive
+    ? "border-amber-200 bg-amber-50/94 text-amber-900"
+    : drawnBbox
+      ? scanAnimationActive
+        ? "border-emerald-200 bg-emerald-50/94 text-emerald-950"
+        : "border-cyan-200 bg-cyan-50/94 text-cyan-950"
+      : "border-zinc-200 bg-white/94 text-zinc-800";
+  const handleClearBbox = useCallback(() => {
+    setDrawnBbox(null);
+    setDrawBboxActive(false);
+    setVlmBoxes([]);
+    setShowMissionTimelapse(false);
+  }, []);
 
   return (
     <div className="relative flex h-screen w-screen overflow-hidden bg-zinc-50 text-zinc-900 font-sans text-sm">
@@ -803,6 +828,60 @@ export default function App() {
               <p className="mt-1 text-[11px] leading-relaxed text-amber-900">{missionStopNotice}</p>
             </div>
           )}
+
+          <div
+            data-testid="map-area-tools"
+            className={`w-[min(360px,calc(100vw-2rem))] rounded border px-3 py-2 shadow-sm backdrop-blur ${areaToolTone}`}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-70">Area Tools</p>
+                <div className="mt-1 flex min-w-0 items-center gap-2">
+                  <span
+                    className={`h-2 w-2 shrink-0 rounded-full ${
+                      drawBboxActive ? "animate-pulse bg-amber-500" : drawnBbox ? "bg-cyan-500" : "bg-zinc-400"
+                    }`}
+                  />
+                  <span data-testid="map-area-status" className="text-[11px] font-semibold uppercase tracking-[0.16em]">
+                    {areaToolStatus}
+                  </span>
+                  {selectedGridCellCount > 0 && drawnBbox && (
+                    <span className="shrink-0 rounded border border-current/15 bg-white/45 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] opacity-80">
+                      {selectedGridCellCount} cells
+                    </span>
+                  )}
+                </div>
+                <p data-testid="map-area-bbox" className="mt-1 truncate font-mono text-[10px] opacity-75">
+                  {formatBboxShort(drawnBbox)}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  data-testid="map-draw-area-button"
+                  title={drawBboxActive ? "Cancel area drawing" : "Draw a mission area on the map"}
+                  onClick={() => setDrawBboxActive((active) => !active)}
+                  className={`rounded border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] transition ${
+                    drawBboxActive
+                      ? "border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-200"
+                      : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500 hover:bg-zinc-50"
+                  }`}
+                >
+                  {drawBboxActive ? "Cancel" : "Draw"}
+                </button>
+                <button
+                  type="button"
+                  data-testid="map-clear-area-button"
+                  title="Clear selected mission area"
+                  disabled={!drawnBbox && !drawBboxActive}
+                  onClick={handleClearBbox}
+                  className="rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-700 transition hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-zinc-300 disabled:hover:bg-white disabled:hover:text-zinc-700"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {drawBboxActive && (
@@ -844,7 +923,7 @@ export default function App() {
                       onClose={() => {}}
                       onDrawBbox={() => setDrawBboxActive(true)}
                       drawnBbox={drawnBbox}
-                      onClearBbox={() => { setDrawnBbox(null); setVlmBoxes([]); setShowMissionTimelapse(false); }}
+                      onClearBbox={handleClearBbox}
                       onOpenTimelapse={() => { setShowMissionTimelapse((prev) => !prev); }}
                       mission={mission}
                       onRefresh={fetchMission}

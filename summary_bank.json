@@ -380,7 +380,7 @@
       ]
     },
     "issue_group_integrity_scalability_review": {
-      "note": "Current May 5 integrity/scalability lane: progress docs stay consolidated into README/product, docs/user/operator review, docs/dev/system-maintenance, QA_PITFALLS/regression checklist, TODO/current backlog, and summary_bank/file groups. The latest pass made the user/dev split explicit, moved dataset/future/Sentinel/agent-growth docs into dev, kept demo/proof contracts in user docs, added a docs guard for that split, and pruned tracked ad hoc backend scratch probes. Recent runtime integrity work also covers scanner resume after frontend reload, stale demo-query isolation from active live missions, telemetry idle-without-mission behavior, SimSat-first startup, GGUF fetch expectations, 3D popup removal, firewatch proxy-only filtering, shared SAT/GND GGUF status, and lean Mission UI boundaries.",
+      "note": "Current May 5 integrity/scalability lane: progress docs stay consolidated into README/product, docs/user/operator review, docs/dev/system-maintenance, QA_PITFALLS/regression checklist, TODO/current backlog, and summary_bank/file groups. The latest pass made the user/dev split explicit, moved dataset/future/Sentinel/agent-growth docs into dev, kept demo/proof contracts in user docs, added a docs guard for that split, and pruned tracked ad hoc backend scratch probes. Recent runtime integrity work also covers scanner resume after frontend reload, stale demo-query isolation from active live missions, telemetry idle-without-mission behavior, SimSat-first startup, GGUF fetch expectations, 3D popup removal, firewatch proxy-only filtering, shared SAT/GND GGUF status, and lean Mission UI boundaries, and visible map-side Area Tools for flyover/drawn bbox status and clearing.",
       "files": [
         "README.md",
         "docs/README.md",
@@ -401,7 +401,9 @@
         "docs/dev/AGENT_GROWTH_LOOP.md",
         "docs/dev/SENTINEL_CLOSE_LOOKS.md",
         "docs/dev/DATASET_CYCLE_TUTORIAL.md",
-        "docs/dev/FUTURE_SENTINEL_LANES.md"
+        "docs/dev/FUTURE_SENTINEL_LANES.md",
+        "source/frontend/App.tsx",
+        "source/frontend/e2e/bbox.spec.ts"
       ]
     },
     "issue_group_context_menu_vlm_and_visual_polish": {
@@ -1129,7 +1131,7 @@
       ]
     },
     "feature_group_frontend_shell": {
-      "note": "Primary operator UI shells, Agent-first right rail, Ground Agent primary panel, multiline Ground Agent composer for longer operations prompts, SAT/GND Dialogue Bus secondary panel, lean Mission Control plan/replay surfaces, map interactions including right-click and propagation-safe button-driven spatial options, proposal-card location preview tiles for confirmed map navigation, Agent Dialogue inline bus errors, Ground Agent guarded sends/errors, logs integrity metrics, and settings/runtime surfaces.",
+      "note": "Primary operator UI shells, Agent-first right rail, Ground Agent primary panel, SAT/GND Dialogue Bus secondary panel, lean Mission Control plan/replay surfaces, map-side Area Tools for selected/drawing/scanning bbox state with Draw/Clear access, map interactions including right-click and propagation-safe button-driven spatial options, proposal-card location preview tiles for confirmed map navigation, Agent Dialogue inline bus errors, Ground Agent guarded sends/errors, logs integrity metrics, and settings/runtime surfaces.",
       "files": [
         "docs/dev/ARCHITECTURE.md",
         "docs/user/DEMO_GUIDE.md",
@@ -1530,6 +1532,17 @@
         "source/backend/data/README.md",
         "source/backend/tests/test_docs_artifacts.py",
         "source/backend/tests/test_import_contracts.py",
+        "summary_bank.json"
+      ]
+    },
+    "issue_group_area_selection_discoverability": {
+      "note": "Map area selection discoverability cleanup: flyover/location actions and default startup bbox state now surface through a compact map-side Area Tools card with selected/drawing/scanning status, selected grid-cell count, bbox summary, Draw, and Clear. This keeps selection management out of hidden Mission-tab-only controls while preserving the lean Mission panel and existing spatial context menu.",
+      "files": [
+        "source/frontend/App.tsx",
+        "source/frontend/components/MissionControl.tsx",
+        "source/frontend/components/MapVisualizer.tsx",
+        "source/frontend/e2e/bbox.spec.ts",
+        "docs/dev/TODO.md",
         "summary_bank.json"
       ]
     }

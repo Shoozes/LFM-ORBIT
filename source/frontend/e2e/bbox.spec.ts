@@ -2,6 +2,29 @@ import { test, expect } from "@playwright/test";
 import { gotoApp, openMapContextMenu, resetRuntimeState, waitForBasemapReady } from "./runtime";
 
 test.describe("Bounding Box Draw Validation", () => {
+  test("map area tools expose selection status and clearing without opening Mission", async ({ page, request }) => {
+    await resetRuntimeState(request);
+    await gotoApp(page);
+    await waitForBasemapReady(page);
+
+    await expect(page.getByTestId("map-area-tools")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("map-area-status")).toContainText("Selected");
+    await expect(page.getByTestId("map-clear-area-button")).toBeEnabled();
+
+    await page.getByTestId("map-clear-area-button").click();
+    await expect(page.getByTestId("map-area-status")).toContainText("No Area");
+    await expect(page.getByTestId("map-area-bbox")).toContainText("No selected area");
+    await expect(page.getByTestId("map-clear-area-button")).toBeDisabled();
+
+    await page.getByTestId("map-draw-area-button").click();
+    await expect(page.getByTestId("map-area-status")).toContainText("Drawing");
+    await expect(page.getByText("DRAWING MODE ACTIVE")).toBeVisible();
+
+    await page.getByTestId("map-draw-area-button").click();
+    await expect(page.getByTestId("map-area-status")).toContainText("No Area");
+    await expect(page.getByText("DRAWING MODE ACTIVE")).toHaveCount(0);
+  });
+
   test("assigning a bbox from the map populates mission focus controls", async ({ page }) => {
     await gotoApp(page);
 
@@ -30,6 +53,7 @@ test.describe("Bounding Box Draw Validation", () => {
     await page.getByText("◫ Set Mission BBox Here").click();
 
     await expect(page.getByTestId("view-timelapse-preview")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("map-area-status")).toContainText("Selected");
   });
 
   test("mission form shows date validation errors before deployment", async ({ page, request }) => {
@@ -48,6 +72,7 @@ test.describe("Bounding Box Draw Validation", () => {
   test("mission launch readiness explains missing task and optional area", async ({ page, request }) => {
     await resetRuntimeState(request);
     await gotoApp(page);
+    await page.getByTestId("map-clear-area-button").click();
     await page.locator("[data-testid='tab-mission']").click();
 
     await expect(page.getByTestId("mission-launch-readiness")).toContainText("Add an instruction to launch.");

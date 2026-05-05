@@ -18,6 +18,7 @@ See [QA_PITFALLS.md](QA_PITFALLS.md) for the detailed guardrail checklist.
 - Mission target packs remain backend/proof metadata and appear through alerts, replays, dataset rows, and Proof Mode; the normal Mission tab stays focused on plan, replay, progress, and timelapse.
 - Mission date windows are use-case aware: long-term change missions can keep annual/history windows, while operational Fire Watch presets default to the last 30 days through current date.
 - Clean startup is idle by contract: the app opens on the Atacama mining context without auto-playing a replay, starting a mission, or letting the telemetry websocket scan the legacy default region.
+- Area selection is a first-class map control: the map-side Area Tools card shows selected/drawing/scanning state, selected-cell count, bbox, Draw, and Clear without requiring the Mission tab.
 - Florida Fire/Drought Readiness Watch is candidate-only unless smoke, active-fire, burn-scar, hotspot, or fireline-specific source evidence is present; generic proxy vegetation changes are filtered before downlink.
 - The retired target/monitor subtabs and visual-evidence tools panel must stay out of the submission UI unless deliberately reintroduced after review.
 - Frontend reloads must not restart an active mission from the first scan cell or let stale demo query params override a live mission.
@@ -90,6 +91,7 @@ Maps and missions:
 - Firewatch scans must not promote proxy-only canopy/vegetation deltas into map pins, ground confirmations, or fire claims.
 - Stopped missions, replay contexts, and camera-only navigation show paused/idle scan state.
 - Live missions show explicit starting, scanning, and complete status while cells arrive.
+- Camera-only flyovers that populate a bbox must keep area state visible and clearable from the map, not hidden inside the Mission tab.
 - Fire Watch and similar operational readiness missions use a recent 30-day default unless the operator explicitly requests historical trend analysis.
 - Basemap render/tile/WebGL failures must stay visible and must not alter scoring or provenance.
 
@@ -143,6 +145,8 @@ Model/runtime:
 - Full Playwright passed `98` with `1` intentional HTML-dump skip after 3D and Mission evidence UI pruning.
 - Docs/import/scanner focused guard passed `21`; docs artifact guard alone passed `16` after the May 5 consolidation pass.
 - Focused Playwright Mission target-pack guard passed `3` on alternate ports because local `8000` was already occupied.
+- Focused Playwright bbox guard passed `5` after the map-side Area Tools cleanup.
+- Visual screenshot check passed for the map-side Area Tools card over the Atacama startup context.
 - Media contact-sheet review passed for promoted README images and docs videos; next refresh should trim black Proof Mode loading transition frames.
 - Latest pushed CI and CodeQL runs on `main` passed after the tutorial pacing update.
 - Current tutorial WebM duration is about `171.00s`; it now starts clean, launches the Rondonia mission through Ground Agent chat, shows the grid scan, then loads replay-backed proof.
