@@ -684,6 +684,7 @@ export default function App() {
             }}
             vlmBoxes={vlmBoxes}
             scanAnimationActive={scanAnimationActive}
+            scanStateKey={mission?.id ?? null}
             cameraRequest={mapCameraRequest}
             onCameraRequestHandled={(requestId) => {
               setMapCameraRequest((current) => current?.id === requestId ? null : current);

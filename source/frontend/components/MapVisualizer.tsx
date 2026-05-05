@@ -39,6 +39,8 @@ type MapVisualizerProps = {
   vlmBoxes?: VlmBox[];
   /** True only while a live mission scan is actively moving across cells */
   scanAnimationActive?: boolean;
+  /** Changes when a new mission/replay context should clear prior scan paint */
+  scanStateKey?: string | number | null;
   /** Programmatic camera target from Ground Agent or mission context */
   cameraRequest?: MapCameraRequest | null;
   onCameraRequestHandled?: (requestId: string) => void;
@@ -312,12 +314,14 @@ export default function MapVisualizer({
   onMenuGenerateTimelapse,
   vlmBoxes = [],
   scanAnimationActive = true,
+  scanStateKey = null,
   cameraRequest = null,
   onCameraRequestHandled,
 }: MapVisualizerProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MaplibreMap | null>(null);
   const firstMenuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const selectedCellIdRef = useRef<string | null>(selectedCellId);
   const previousSelectedCellId = useRef<string | null>(null);
   const didFitBounds = useRef(false);
   // Use a plain object as a map from pin id → Marker to avoid clash with MapLibre Map type
@@ -327,7 +331,6 @@ export default function MapVisualizer({
   const vlmHoverHandlersAttachedRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [shiftHeld, setShiftHeld] = useState(false);
   const [pinTooltip, setPinTooltip] = useState<string | null>(null);
   const [cameraHud, setCameraHud] = useState<MapCameraRequest | null>(null);
   const [cameraMoveState, setCameraMoveState] = useState<"idle" | "moving" | "arrived">("idle");
@@ -422,15 +425,14 @@ export default function MapVisualizer({
   const dropPinRef = useRef(dropPin);
   const geoJsonGridRef = useRef(geoJsonGrid);
   const drawBboxActiveRef = useRef(drawBboxActive);
-  const shiftHeldRef = useRef(shiftHeld);
 
   useEffect(() => {
     onCellClickRef.current = onCellClick;
     dropPinRef.current = dropPin;
     geoJsonGridRef.current = geoJsonGrid;
     drawBboxActiveRef.current = drawBboxActive;
-    shiftHeldRef.current = shiftHeld;
-  }, [onCellClick, dropPin, geoJsonGrid, drawBboxActive, shiftHeld]);
+    selectedCellIdRef.current = selectedCellId;
+  }, [onCellClick, dropPin, geoJsonGrid, drawBboxActive, selectedCellId]);
 
   const gridBounds = useMemo(() => {
     if (!geoJsonGrid) return null;
@@ -471,15 +473,6 @@ export default function MapVisualizer({
     const cellId = getTargetCellIdAtPoint(map, point);
     openSpatialMenu(point.x, point.y, center.lng, center.lat, cellId);
   };
-
-  // Track shift key
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => { if (e.key === "Shift") setShiftHeld(true); };
-    const up = (e: KeyboardEvent) => { if (e.key === "Shift") setShiftHeld(false); };
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
-    return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
-  }, []);
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -635,17 +628,6 @@ export default function MapVisualizer({
         }
       });
 
-      // Shift-click anywhere to drop operator pin (only when not drawing bbox)
-      map.on("click", (event) => {
-        if (!event.originalEvent.shiftKey || drawBboxActiveRef.current) return;
-        const { lng, lat } = event.lngLat;
-        void dropPinRef.current(lat, lng).then((saved) => {
-          if (saved) {
-            showPinTooltip(`★ Operator pin dropped at ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-          }
-        });
-      });
-
       // Mouse drag for bbox
       map.on("mousedown", (event) => {
         if (!drawBboxActiveRef.current) return;
@@ -768,11 +750,39 @@ export default function MapVisualizer({
 
     const source = getGeoJsonSource(map, "scan-grid");
     source?.setData(geoJsonGrid);
+    try {
+      map.removeFeatureState({ source: "scan-grid" });
+      previousSelectedCellId.current = null;
+      const activeSelectedCellId = selectedCellIdRef.current;
+      if (activeSelectedCellId) {
+        setFeatureStateIfReady(map, "scan-grid", activeSelectedCellId, { isSelected: true });
+        previousSelectedCellId.current = activeSelectedCellId;
+      }
+    } catch {
+      // Best effort only; stale feature-state cleanup must not break map rendering.
+    }
     if (!didFitBounds.current && gridBounds) {
       map.fitBounds(gridBounds, { padding: 40, duration: 0 });
       didFitBounds.current = true;
     }
   }, [geoJsonGrid, gridBounds]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded() || !map.getSource("scan-grid")) return;
+    try {
+      map.removeFeatureState({ source: "scan-grid" });
+      previousSelectedCellId.current = null;
+      const activeSelectedCellId = selectedCellIdRef.current;
+      if (activeSelectedCellId) {
+        setFeatureStateIfReady(map, "scan-grid", activeSelectedCellId, { isSelected: true });
+        previousSelectedCellId.current = activeSelectedCellId;
+      }
+    } catch {
+      // Best effort only; new mission paint reset should not interrupt scanning.
+    }
+    clearSatelliteFootprint(map);
+  }, [clearSatelliteFootprint, scanStateKey]);
 
   // Selected cell highlight
   useEffect(() => {
@@ -1090,7 +1100,7 @@ export default function MapVisualizer({
       };
 
       const hideObjectTooltip = () => {
-        map.getCanvas().style.cursor = (shiftHeldRef.current || drawBboxActiveRef.current) ? "crosshair" : "";
+        map.getCanvas().style.cursor = drawBboxActiveRef.current ? "crosshair" : "";
         vlmPopupRef.current?.remove();
         vlmPopupRef.current = null;
       };
@@ -1104,13 +1114,13 @@ export default function MapVisualizer({
     }
   }, [vlmGeoJson, mapReady]);
 
-  // Cursor style when shift held or bbox active
+  // Cursor style when bbox drawing is active
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const canvas = map.getCanvas();
-    canvas.style.cursor = (shiftHeld || drawBboxActive) ? "crosshair" : "";
-  }, [shiftHeld, drawBboxActive]);
+    canvas.style.cursor = drawBboxActive ? "crosshair" : "";
+  }, [drawBboxActive]);
 
   return (
     <div data-testid="map-visualizer" className="relative w-full h-full bg-[#05070b]">
@@ -1333,16 +1343,6 @@ export default function MapVisualizer({
           >
              ◆ Drop Operator Pin
           </button>
-        </div>
-      )}
-
-      {/* Shift-click hint / Draw bbox mode */}
-      {shiftHeld && (
-        <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl border backdrop-blur-md px-5 py-3 text-sm font-mono
-         border-zinc-300/30 bg-zinc-900/50 text-white shadow-xl">
-          {drawBboxActive
-            ? (bboxStartRef.current ? "⊡ Click second corner to complete area" : "⊡ Click first corner to start area selection")
-            : "★ Click to drop an operator pin"}
         </div>
       )}
 
