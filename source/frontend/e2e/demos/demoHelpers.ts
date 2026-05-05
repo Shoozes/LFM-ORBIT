@@ -48,8 +48,6 @@ type DemoScenario = {
   preloadReplayId?: string;
   presetId?: string;
   presetLabel?: string;
-  monitorButtonTestId?: string;
-  monitorProofText?: string;
   launchMission?: boolean;
   initialBboxText?: string;
   taskText?: string;
@@ -110,8 +108,6 @@ const DEMO_SCENARIOS: Record<DemoCase, DemoScenario> = {
     proofSubtitle: "Compact maritime alert packets queue locally, then flush when the link is restored.",
     presetId: "maritime_suez",
     presetLabel: "Suez channel",
-    monitorButtonTestId: "maritime-monitor-button",
-    monitorProofText: "Maritime Monitor",
     launchMission: true,
     initialBboxText: "32.50",
     taskText: "Review maritime vessel queueing near the Suez channel.",
@@ -260,27 +256,6 @@ export async function openDemo(page: Page, request: APIRequestContext, demoCase:
     await expect(page.getByTestId("selected-mission-preset")).toContainText(scenario.presetLabel ?? "", {
       timeout: 10_000,
     });
-
-    if (scenario.monitorButtonTestId) {
-      await showSubtitle(page, "Run the monitor preview before the proof screen so the video shows the mission logic.", 1_600);
-      const monitorsTab = page.getByTestId("mission-panel-tab-monitors");
-      if (await monitorsTab.count()) {
-        await monitorsTab.click();
-      }
-      const monitorSelector = `[data-testid='${scenario.monitorButtonTestId}']`;
-      await expect(page.locator(monitorSelector)).toBeVisible({ timeout: 15_000 });
-      await moveMouseToHighlight(page, monitorSelector);
-      await page.locator(monitorSelector).click();
-      await removeHighlight(page);
-      const proofCard = page.getByTestId("monitor-proof-card");
-      await expect(proofCard).toBeVisible({ timeout: 15_000 });
-      await expect(proofCard).toContainText(scenario.monitorProofText ?? "");
-      await showSubtitle(page, "The monitor returns deterministic evidence fields before any downlink story begins.", 1_800);
-      const planTab = page.getByTestId("mission-panel-tab-plan");
-      if (await planTab.count()) {
-        await planTab.click();
-      }
-    }
 
     if (scenario.launchMission) {
       await showSubtitle(page, "Confirm the deterministic mission is active before Proof Mode binds the proof.", 1_500);

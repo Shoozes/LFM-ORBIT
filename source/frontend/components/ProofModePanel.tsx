@@ -873,8 +873,8 @@ export default function ProofModePanel({
           use_case_id: usesReplayEvidence ? mission?.use_case_id ?? null : profile.replayId,
           confidence_stack: confidenceStack,
           grounding: groundingResults,
-          vqa: vqaAnswer,
-          caption,
+          visual_summary: vqaAnswer,
+          evidence_note: caption,
           ...(missionObjectTargets.length > 0 ? { object_targets: missionObjectTargets } : {}),
           ...(compactDetectionSummary ? { detections: compactDetectionSummary } : {}),
           ...(compactObjectDeltas.length > 0 ? { object_deltas: compactObjectDeltas } : {}),
@@ -1233,12 +1233,12 @@ export default function ProofModePanel({
               <p className="mt-1 text-xs font-semibold text-white">{proof.result}</p>
             </div>
             <div className="rounded border border-zinc-800 bg-zinc-950 p-3">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">VQA</p>
+              <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">Visual summary</p>
               <p className="mt-1 text-xs font-semibold text-white">{proof.abstained ? "Unavailable" : vqaAnswer}</p>
             </div>
             <div className="rounded border border-zinc-800 bg-zinc-950 p-3">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">Caption</p>
-              <p className="mt-1 text-xs font-semibold text-white">{proof.abstained ? "No caption transmitted" : caption}</p>
+              <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">Evidence note</p>
+              <p className="mt-1 text-xs font-semibold text-white">{proof.abstained ? "No note transmitted" : caption}</p>
             </div>
           </div>
         </section>

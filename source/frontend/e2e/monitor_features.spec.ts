@@ -77,57 +77,6 @@ test.describe("Monitor Feature Visual Proof", () => {
     expect((await evalResponse.json()).downlink_now_recall).toBe(1);
   });
 
-  test("visual proof: lifeline before/after monitor preview", async ({ page, request }) => {
-    test.setTimeout(45_000);
-    await resetRuntimeState(request);
-    await gotoApp(page);
-    await waitForLinkOpen(page);
-    await waitForBasemapReady(page);
-    await page.locator("[data-testid='tab-mission']").click();
-    await page.getByTestId("mission-panel-tab-monitors").click();
-
-    await expect(page.locator("[data-testid='monitor-template-panel']")).toBeVisible();
-    await page.locator("[data-testid='lifeline-monitor-button']").click();
-    const proofCard = page.locator("[data-testid='monitor-proof-card']");
-
-    await expect(proofCard).toBeVisible({ timeout: 15_000 });
-    await expect(proofCard).toContainText("Lifeline Monitor");
-    await expect(proofCard).toContainText("downlink now");
-    await expect(proofCard).toContainText("distinct frames");
-
-    await page.screenshot({
-      path: `${SHOT_DIR}/06-lifeline-monitor-preview.png`,
-      fullPage: false,
-    });
-  });
-
-  test("visual proof: maritime monitor preview", async ({ page, request }) => {
-    test.setTimeout(45_000);
-    await resetRuntimeState(request);
-    await gotoApp(page);
-    await waitForLinkOpen(page);
-    await waitForBasemapReady(page);
-    await page.locator("[data-testid='tab-mission']").click();
-    await page.getByTestId("mission-panel-tab-monitors").click();
-
-    await expect(page.locator("[data-testid='monitor-template-panel']")).toBeVisible();
-    await page.locator("[data-testid='maritime-monitor-button']").click();
-    const proofCard = page.locator("[data-testid='monitor-proof-card']");
-
-    await expect(proofCard).toBeVisible({ timeout: 15_000 });
-    await expect(proofCard).toContainText("Maritime Monitor");
-    await expect(proofCard).toContainText("directions");
-    await expect(proofCard).toContainText("STAC optional");
-    await page.getByTestId("mission-panel-tab-plan").click();
-    await expect(page.locator("[data-testid='bbox-badge']")).toContainText("Active Area", { timeout: 10_000 });
-    await waitForNextPaint(page);
-
-    await page.screenshot({
-      path: `${SHOT_DIR}/07-maritime-monitor-preview.png`,
-      fullPage: false,
-    });
-  });
-
   test("visual proof: Florida I-4 transportation mix mission preset", async ({ page, request }) => {
     test.setTimeout(45_000);
     await resetRuntimeState(request);

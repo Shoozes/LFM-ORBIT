@@ -9,7 +9,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { getApiBaseUrl } from "../utils/telemetry";
-import { Mission, ObjectTarget, TargetPack } from "../types/mission";
+import { Mission } from "../types/mission";
 import { getDefaultMissionDateRange } from "../utils/dateRange";
 
 type ReplayCatalogItem = {
@@ -23,15 +23,6 @@ type ReplayCatalogItem = {
   alert_count: number;
   cells_scanned: number;
   primary_cell_id: string;
-};
-
-type MonitorPreview = {
-  kind: "lifeline" | "maritime";
-  title: string;
-  mode: string;
-  primary: string;
-  secondary: string[];
-  status: string;
 };
 
 type MissionPresetTone =
@@ -59,25 +50,7 @@ type MissionPreset = {
   sourceNote?: string;
 };
 
-type MissionPanelTab = "plan" | "replay" | "targets" | "monitors";
-
-type MaritimeMonitorResponse = {
-  mode?: string;
-  use_case?: { id?: string; display_name?: string };
-  target?: { timestamp?: string };
-  monitor?: { signals?: string[] };
-  stac?: { disabled?: boolean; items?: unknown[] };
-  investigation?: { directions?: unknown[] };
-};
-
-type LifelineMonitorResponse = {
-  mode?: string;
-  use_case?: { id?: string; display_name?: string };
-  asset?: { display_name?: string; asset_id?: string };
-  candidate?: { event_type?: string; civilian_impact?: string };
-  decision?: { action?: string; priority?: string; downlink_now?: boolean };
-  frames?: { pair_state?: { distinct_contextual_frames?: boolean; asset_pair_available?: boolean } };
-};
+type MissionPanelTab = "plan" | "replay";
 
 type ApiErrorPayload = {
   detail?: string | { msg?: string; message?: string } | Array<{ msg?: string; message?: string } | string>;
@@ -254,16 +227,6 @@ const PRESET_TONE_CLASSES: Record<MissionPresetTone, string> = {
 
 const cleanApiError = (message: string) => message.replace(/^Value error,\s*/i, "");
 
-function makePackId(name: string): string {
-  const slug = name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 80);
-  return slug || "custom_pack";
-}
-
 async function readApiError(response: Response, fallback: string) {
   try {
     const payload = (await response.json()) as ApiErrorPayload;
@@ -345,15 +308,9 @@ export default function MissionControl({
   const [replays, setReplays] = useState<ReplayCatalogItem[]>([]);
   const [replayBusyId, setReplayBusyId] = useState<string | null>(null);
   const [replayNotice, setReplayNotice] = useState("");
-  const [monitorBusy, setMonitorBusy] = useState<MonitorPreview["kind"] | null>(null);
-  const [monitorPreview, setMonitorPreview] = useState<MonitorPreview | null>(null);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [selectedUseCaseId, setSelectedUseCaseId] = useState<string | null>(null);
-  const [targetPacks, setTargetPacks] = useState<TargetPack[]>([]);
   const [selectedTargetPackId, setSelectedTargetPackId] = useState<string | null>(null);
-  const [newTargetLabel, setNewTargetLabel] = useState("");
-  const [customPackName, setCustomPackName] = useState("");
-  const [targetBusy, setTargetBusy] = useState(false);
   const [activePanelTab, setActivePanelTab] = useState<MissionPanelTab>("plan");
 
   const [submitting, setSubmitting] = useState(false);
@@ -375,19 +332,6 @@ export default function MissionControl({
           setReplays([]);
         }
       })();
-      void (async () => {
-        try {
-          const response = await fetch(`${apiBase}/api/object-targets/packs`);
-          if (!response.ok) {
-            setTargetPacks([]);
-            return;
-          }
-          const payload = (await response.json()) as { packs?: TargetPack[] };
-          setTargetPacks(payload.packs ?? []);
-        } catch {
-          setTargetPacks([]);
-        }
-      })();
     }
   }, [apiBase, isOpen, onRefresh]);
 
@@ -404,7 +348,6 @@ export default function MissionControl({
     setSelectedPresetId(preset.id);
     setSelectedUseCaseId(preset.useCaseId);
     setSelectedTargetPackId(preset.targetPackId ?? null);
-    setMonitorPreview(null);
     setErrorMsg("");
     setTask(preset.taskText);
     setStartDate(preset.startDate);
@@ -424,7 +367,6 @@ export default function MissionControl({
     setSelectedPresetId(preset.id);
     setSelectedUseCaseId(preset.useCaseId);
     setSelectedTargetPackId(preset.targetPackId ?? null);
-    setMonitorPreview(null);
     setErrorMsg("");
     setTask(preset.taskText);
     setStartDate(preset.startDate);
@@ -472,186 +414,6 @@ export default function MissionControl({
     await fetch(`${apiBase}/api/mission/stop`, { method: "POST" });
     await onRefresh();
   };
-
-  const readTargetError = (response: Response) => readApiError(response, "Object target update failed.");
-
-  const handleTargetPackChange = async (packId: string) => {
-    setSelectedTargetPackId(packId || null);
-    if (!mission?.id || !packId) return;
-    setTargetBusy(true);
-    setErrorMsg("");
-    try {
-      const response = await fetch(`${apiBase}/api/mission/targets/set-pack`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mission_id: mission.id, target_pack_id: packId }),
-      });
-      if (!response.ok) {
-        throw new Error(await readTargetError(response));
-      }
-      await onRefresh();
-    } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : "Target pack update failed.");
-    } finally {
-      setTargetBusy(false);
-    }
-  };
-
-  const handleAddTarget = async () => {
-    const label = newTargetLabel.trim();
-    if (!mission?.id || !label) return;
-    setTargetBusy(true);
-    setErrorMsg("");
-    try {
-      const response = await fetch(`${apiBase}/api/mission/targets/add`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mission_id: mission.id,
-          targets: [{ label, prompt: `Find ${label}`, class_key: "custom", enabled: true }],
-        }),
-      });
-      if (!response.ok) {
-        throw new Error(await readTargetError(response));
-      }
-      setNewTargetLabel("");
-      await onRefresh();
-    } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : "Object target update failed.");
-    } finally {
-      setTargetBusy(false);
-    }
-  };
-
-  const handleRemoveTarget = async (target: ObjectTarget) => {
-    if (!mission?.id) return;
-    setTargetBusy(true);
-    setErrorMsg("");
-    try {
-      const response = await fetch(`${apiBase}/api/mission/targets/remove`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mission_id: mission.id, labels: [target.label] }),
-      });
-      if (!response.ok) {
-        throw new Error(await readTargetError(response));
-      }
-      await onRefresh();
-    } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : "Object target update failed.");
-    } finally {
-      setTargetBusy(false);
-    }
-  };
-
-  const handleToggleTarget = async (target: ObjectTarget) => {
-    if (!mission?.id) return;
-    setTargetBusy(true);
-    setErrorMsg("");
-    try {
-      const response = await fetch(`${apiBase}/api/mission/targets/add`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mission_id: mission.id,
-          targets: [{ ...target, enabled: !target.enabled }],
-        }),
-      });
-      if (!response.ok) {
-        throw new Error(await readTargetError(response));
-      }
-      await onRefresh();
-    } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : "Object target update failed.");
-    } finally {
-      setTargetBusy(false);
-    }
-  };
-
-  const handleResetTargetsToPack = async () => {
-    const packId = selectedTargetPackId ?? mission?.target_pack_id ?? null;
-    if (!mission?.id || !packId) return;
-    setTargetBusy(true);
-    setErrorMsg("");
-    try {
-      const response = await fetch(`${apiBase}/api/mission/targets/set-pack`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mission_id: mission.id, target_pack_id: packId }),
-      });
-      if (!response.ok) {
-        throw new Error(await readTargetError(response));
-      }
-      await onRefresh();
-    } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : "Target pack reset failed.");
-    } finally {
-      setTargetBusy(false);
-    }
-  };
-
-  const handleSaveTargetPack = async () => {
-    const name = customPackName.trim();
-    const targets = mission?.object_targets ?? [];
-    if (!name || targets.length === 0) return;
-    setTargetBusy(true);
-    setErrorMsg("");
-    try {
-      const response = await fetch(`${apiBase}/api/object-targets/packs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: makePackId(name),
-          name,
-          description: "Runtime custom pack saved from Mission Control.",
-          targets,
-        }),
-      });
-      if (!response.ok) {
-        throw new Error(await readTargetError(response));
-      }
-      const payload = (await response.json()) as { pack?: TargetPack };
-      if (payload.pack) {
-        setTargetPacks((current) => {
-          const others = current.filter((pack) => pack.id !== payload.pack!.id);
-          return [...others, payload.pack!].sort((a, b) => a.name.localeCompare(b.name));
-        });
-        setSelectedTargetPackId(payload.pack.id);
-      }
-      setCustomPackName("");
-    } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : "Target pack save failed.");
-    } finally {
-      setTargetBusy(false);
-    }
-  };
-
-  const handleClearTargets = async () => {
-    if (!mission?.id) {
-      setSelectedTargetPackId(null);
-      return;
-    }
-    setTargetBusy(true);
-    setErrorMsg("");
-    try {
-      const response = await fetch(`${apiBase}/api/mission/targets/clear`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mission_id: mission.id }),
-      });
-      if (!response.ok) {
-        throw new Error(await readTargetError(response));
-      }
-      setSelectedTargetPackId(null);
-      await onRefresh();
-    } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : "Object target clear failed.");
-    } finally {
-      setTargetBusy(false);
-    }
-  };
-
-  const formatMonitorLabel = (value: string) => value.replace(/_/g, " ");
 
   const handleReplayLoad = async (replayId: string) => {
     setReplayBusyId(replayId);
@@ -704,118 +466,9 @@ export default function MissionControl({
     }
   };
 
-  const handleMaritimePreview = async () => {
-    setMonitorBusy("maritime");
-    setErrorMsg("");
-    setSelectedPresetId("maritime_suez");
-    setSelectedUseCaseId("maritime_activity");
-    setSelectedTargetPackId("port");
-    setTask(MARITIME_PREVIEW_TARGET.taskText);
-    setStartDate("2025-03-01");
-    setEndDate(MARITIME_PREVIEW_TARGET.timestamp);
-    onPreviewBbox?.(MARITIME_PREVIEW_TARGET.bbox);
-    try {
-      const response = await fetch(`${apiBase}/api/maritime/monitor`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lat: MARITIME_PREVIEW_TARGET.lat,
-          lon: MARITIME_PREVIEW_TARGET.lon,
-          timestamp: MARITIME_PREVIEW_TARGET.timestamp,
-          task_text: MARITIME_PREVIEW_TARGET.taskText,
-          anomaly_description: "dense vessel queue near a narrow channel",
-          include_stac: false,
-        }),
-      });
-      if (!response.ok) {
-        throw new Error(await readApiError(response, "Maritime monitor preview failed."));
-      }
-      const payload = (await response.json()) as MaritimeMonitorResponse;
-      setMonitorPreview({
-        kind: "maritime",
-        title: "Maritime Monitor",
-        mode: payload.mode || "orbit_maritime_monitoring_v1",
-        primary: payload.use_case?.display_name || payload.use_case?.id || "maritime_activity",
-        secondary: [
-          `${payload.investigation?.directions?.length ?? 0} directions`,
-          `${payload.monitor?.signals?.length ?? 0} signals`,
-          `STAC ${payload.stac?.disabled ? "optional" : `${payload.stac?.items?.length ?? 0} scenes`}`,
-        ],
-        status: payload.target?.timestamp || "ready",
-      });
-    } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : "Maritime monitor preview failed.");
-    } finally {
-      setMonitorBusy(null);
-    }
-  };
-
-  const handleLifelinePreview = async () => {
-    setMonitorBusy("lifeline");
-    setErrorMsg("");
-    setSelectedPresetId(null);
-    setSelectedUseCaseId("civilian_lifeline_disruption");
-    setSelectedTargetPackId("lifeline");
-    try {
-      const response = await fetch(`${apiBase}/api/lifelines/monitor`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          asset_id: "orbit_bridge_corridor",
-          baseline_frame: {
-            label: "before",
-            date: "2025-01-01",
-            source: "seeded_fixture",
-            asset_ref: "before.png",
-          },
-          current_frame: {
-            label: "after",
-            date: "2025-01-15",
-            source: "seeded_fixture",
-            asset_ref: "after.png",
-          },
-          candidate: {
-            event_type: "probable_access_obstruction",
-            severity: "high",
-            confidence: 0.88,
-            bbox: [0.2, 0.25, 0.65, 0.75],
-            civilian_impact: "public_mobility_disruption",
-            why: "The current frame shows a bridge approach obstruction.",
-            action: "downlink_now",
-          },
-          task_text: "Before/after lifeline bridge disruption review.",
-        }),
-      });
-      if (!response.ok) {
-        throw new Error(await readApiError(response, "Lifeline monitor preview failed."));
-      }
-      const payload = (await response.json()) as LifelineMonitorResponse;
-      setMonitorPreview({
-        kind: "lifeline",
-        title: "Lifeline Monitor",
-        mode: payload.mode || "orbit_lifeline_monitoring_v1",
-        primary: `${formatMonitorLabel(payload.decision?.action || "review")} · ${formatMonitorLabel(payload.decision?.priority || "watch")}`,
-        secondary: [
-          payload.asset?.display_name || payload.asset?.asset_id || "lifeline asset",
-          formatMonitorLabel(payload.candidate?.civilian_impact || "civilian_lifeline"),
-          payload.frames?.pair_state?.distinct_contextual_frames ? "distinct frames" : "needs context",
-        ],
-        status: payload.use_case?.id || "civilian_lifeline_disruption",
-      });
-    } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : "Lifeline monitor preview failed.");
-    } finally {
-      setMonitorBusy(null);
-    }
-  };
-
-
   if (!isOpen) return null;
 
   const hasBlockingLiveMission = mission?.status === "active" && mission.mission_mode !== "replay";
-  const selectedTargetPack = targetPacks.find((pack) => pack.id === selectedTargetPackId) ?? null;
-  const objectTargets = mission?.object_targets ?? selectedTargetPack?.targets ?? [];
-  const objectTargetCount = objectTargets.filter((target) => target.enabled).length;
   const selectedPreset = MISSION_LOCATION_PRESETS.find((preset) => preset.id === selectedPresetId) ?? null;
   const launchBlockedReason = hasBlockingLiveMission
     ? "Mission already running."
@@ -906,7 +559,7 @@ export default function MissionControl({
                 Mission Pass Complete
               </p>
               <p className="mt-1 leading-relaxed">
-                Satellite Pruner finished the selected review area. Review object-target results, Logs, Inspect, or Proof Mode before turning candidate evidence into a claim.
+                Satellite Pruner finished the selected review area. Review mission evidence, Logs, Inspect, or Proof Mode before turning candidate evidence into a claim.
               </p>
               <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-wider text-emerald-800">
                 <span>{mission.cells_scanned} cells recorded</span>
@@ -962,12 +615,10 @@ export default function MissionControl({
             </div>
           </div>
 
-          <div data-testid="mission-panel-tabs" className="grid grid-cols-4 gap-1 rounded-lg border border-zinc-200 bg-zinc-50 p-1">
+          <div data-testid="mission-panel-tabs" className="grid grid-cols-2 gap-1 rounded-lg border border-zinc-200 bg-zinc-50 p-1">
             {([
               ["plan", "Plan"],
               ["replay", "Replay"],
-              ["targets", `Targets ${objectTargetCount}`],
-              ["monitors", "Monitors"],
             ] as const).map(([id, label]) => (
               <button
                 key={id}
@@ -1102,213 +753,6 @@ export default function MissionControl({
           </div>
           )}
 
-          {activePanelTab === "targets" && (
-          <div data-testid="object-targets-panel" className="space-y-3 rounded-lg border border-zinc-200 bg-white px-4 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <label className="block text-[10px] uppercase tracking-wider font-semibold text-zinc-500">
-                Object Targets
-              </label>
-              <span className="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold">
-                {objectTargetCount} active
-              </span>
-            </div>
-            <div className="space-y-1.5">
-              <label className="block text-[10px] uppercase tracking-wider font-semibold text-zinc-400">
-                Target Pack
-              </label>
-              <select
-                data-testid="target-pack-select"
-                value={selectedTargetPackId ?? ""}
-                onChange={(event) => void handleTargetPackChange(event.target.value)}
-                disabled={targetBusy || targetPacks.length === 0}
-                className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-800 outline-none transition focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 disabled:opacity-50"
-              >
-                <option value="">Custom objects</option>
-                {targetPacks.map((pack) => (
-                  <option key={pack.id} value={pack.id}>
-                    {pack.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {objectTargets.length > 0 ? (
-                objectTargets.map((target) => (
-                  <span
-                    key={target.label}
-                    data-testid="object-target-chip"
-                    className={`inline-flex max-w-full items-center gap-1.5 rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider ${
-                      target.enabled
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                        : "border-zinc-200 bg-zinc-50 text-zinc-400"
-                    }`}
-                    title={`${target.prompt} · ${target.class_key}`}
-                  >
-                    <button
-                      type="button"
-                      data-testid="object-target-toggle"
-                      aria-label={`${target.enabled ? "Disable" : "Enable"} ${target.label}`}
-                      aria-pressed={target.enabled}
-                      onClick={() => void handleToggleTarget(target)}
-                      disabled={!mission?.id || targetBusy}
-                      className="min-w-0 truncate text-left disabled:cursor-not-allowed"
-                    >
-                      {target.label}
-                    </button>
-                    {mission?.id && (
-                      <button
-                        type="button"
-                        aria-label={`Remove ${target.label}`}
-                        onClick={() => void handleRemoveTarget(target)}
-                        disabled={targetBusy}
-                        className="rounded px-1 text-[11px] leading-none text-zinc-500 hover:bg-white hover:text-red-600 disabled:opacity-40"
-                      >
-                        x
-                      </button>
-                    )}
-                  </span>
-                ))
-              ) : (
-                <span className="rounded border border-zinc-200 bg-zinc-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                  No objects
-                </span>
-              )}
-            </div>
-            <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2">
-              <input
-                data-testid="object-target-pack-name"
-                value={customPackName}
-                onChange={(event) => setCustomPackName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    void handleSaveTargetPack();
-                  }
-                }}
-                disabled={!mission?.id || objectTargets.length === 0 || targetBusy}
-                placeholder="Save as pack"
-                className="min-w-0 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 placeholder-zinc-400 outline-none transition focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 disabled:opacity-50"
-              />
-              <button
-                type="button"
-                data-testid="object-target-save-pack"
-                onClick={() => void handleSaveTargetPack()}
-                disabled={!mission?.id || !customPackName.trim() || objectTargets.length === 0 || targetBusy}
-                className="shrink-0 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                data-testid="object-target-reset-pack"
-                onClick={() => void handleResetTargetsToPack()}
-                disabled={!mission?.id || !selectedTargetPackId || targetBusy}
-                className="shrink-0 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Reset
-              </button>
-            </div>
-            <div className="flex gap-2">
-              <input
-                data-testid="object-target-input"
-                value={newTargetLabel}
-                onChange={(event) => setNewTargetLabel(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    void handleAddTarget();
-                  }
-                }}
-                disabled={!mission?.id || targetBusy}
-                placeholder="Add object"
-                className="min-w-0 flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 placeholder-zinc-400 outline-none transition focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 disabled:opacity-50"
-              />
-              <button
-                type="button"
-                data-testid="object-target-add"
-                onClick={() => void handleAddTarget()}
-                disabled={!mission?.id || !newTargetLabel.trim() || targetBusy}
-                className="shrink-0 rounded-lg border border-zinc-300 bg-zinc-900 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Add
-              </button>
-              <button
-                type="button"
-                data-testid="object-target-clear"
-                onClick={() => void handleClearTargets()}
-                disabled={targetBusy || (!mission?.id && !selectedTargetPackId)}
-                className="shrink-0 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-          )}
-
-          {activePanelTab === "monitors" && (
-          <div data-testid="monitor-template-panel" className="space-y-3 rounded-lg border border-zinc-200 bg-white px-4 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <label className="block text-[10px] uppercase tracking-wider font-semibold text-zinc-500">
-                Monitor Templates
-              </label>
-              <span className="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold">
-                API Ready
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                data-testid="maritime-monitor-button"
-                onClick={() => void handleMaritimePreview()}
-                disabled={monitorBusy !== null}
-                className="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
-              >
-                {monitorBusy === "maritime" ? "Loading..." : "Maritime"}
-              </button>
-              <button
-                type="button"
-                data-testid="lifeline-monitor-button"
-                onClick={() => void handleLifelinePreview()}
-                disabled={monitorBusy !== null}
-                className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
-              >
-                {monitorBusy === "lifeline" ? "Loading..." : "Lifeline"}
-              </button>
-            </div>
-            {monitorPreview && (
-              <div
-                data-testid="monitor-proof-card"
-                className={`rounded border px-3 py-3 ${
-                  monitorPreview.kind === "maritime"
-                    ? "border-blue-200 bg-blue-50/70"
-                    : "border-amber-200 bg-amber-50/70"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-zinc-900">{monitorPreview.title}</p>
-                    <p className="mt-0.5 truncate text-[11px] font-mono text-zinc-500">{monitorPreview.mode}</p>
-                  </div>
-                  <span className="shrink-0 rounded bg-white px-2 py-1 text-[10px] uppercase tracking-wider font-semibold text-zinc-600 border border-white/80">
-                    {monitorPreview.status}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm font-medium text-zinc-800">{monitorPreview.primary}</p>
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  {monitorPreview.secondary.map((item) => (
-                    <span
-                      key={item}
-                      className="min-w-0 rounded border border-white/80 bg-white px-2 py-1 text-center text-[10px] font-semibold leading-tight text-zinc-600 break-words"
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          )}
-
           {activePanelTab === "plan" && (
           <>
           {/* Task prompt */}
@@ -1405,7 +849,7 @@ export default function MissionControl({
                         onClick={onOpenEvidenceTools}
                         className="w-full mt-1 rounded border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-[10px] uppercase tracking-wider text-cyan-800 hover:bg-cyan-100 transition font-semibold"
                       >
-                        Evidence Tools
+                        Mission Evidence
                       </button>
                     )}
                   </div>

@@ -44,7 +44,7 @@ The backend runs two long-lived loops during app lifespan:
 22. `core/replay.py` can reset runtime state and load a completed mission directly into the same mission, queue, gallery, metrics, and dialogue stores used by realtime operations. It also exposes cached API WebMs as Fast Replay entries and can rescan replay metadata through the current runtime/model stack while preserving replay target packs when present.
 23. `ValidationPanel.tsx`, `TimelapseViewer.tsx`, and `VlmPanel.tsx` expand a selected alert into imagery, analysis, exports, mission-target visual grounding, and timelapse context. Mission-tab timelapse output renders ahead of optional visual-evidence actions so active temporal video evidence remains visible.
 24. `SettingsPanel.tsx` queries provider, SimSat, analysis, and depth status endpoints independently, with short retries so one transient miss does not force a false offline settings surface.
-25. `GroundAgent.tsx`, `/api/agent/chat`, and `/api/agent/action/confirm` provide a local action chat that proposes and confirms replay loads/rescans, mission packs, object-target edits, target-pack saves, and SAT/GND link changes before mutating app state.
+25. `GroundAgent.tsx`, `/api/agent/chat`, and `/api/agent/action/confirm` provide a local action chat that proposes and confirms replay loads/rescans, mission packs, SAT/GND link changes, and map-navigation actions before mutating app state.
 26. `ProofModePanel.tsx` turns replay state into visible Proof Mode output: satellite frame, bbox/evidence overlay, evidence result, latency, provenance, raw-vs-alert bytes, reduction ratio, abstain state, backend-derived link outage queue, and proof JSON.
 
 ## Module Map
@@ -118,7 +118,7 @@ The backend runs two long-lived loops during app lifespan:
 - `source/backend/core/timelapse.py`
   Temporal frame generation and video assembly; `steps` caps provider frame fetches for long windows.
 - `source/backend/core/vlm.py`
-  Optional grounding/VQA/caption helper with deterministic offline fallbacks; imagery fetch failures fall back instead of sending blank tiles into optional pipelines.
+  Mission-evidence grounding helper with deterministic offline fallbacks; imagery fetch failures fall back instead of sending blank tiles into optional pipelines.
 - `source/backend/scripts/decision_gate.py`
   Local pipeline readiness report for scan counts, stage failures, QC rejection breakdowns, and optical/SAR readiness recommendations.
 - `source/backend/scripts/fetch_satellite_model.py`
@@ -153,7 +153,7 @@ The backend runs two long-lived loops during app lifespan:
 - `source/frontend/utils/objectEvidence.ts`
   Shared semantic object-evidence colors plus normalized bbox conversion used by MapLibre overlays.
 - `source/frontend/components/MissionControl.tsx`
-  Mission entry form, object-target pack selector/chips, manual add/remove/clear target controls, Fast Replay loader/rescan controls, maritime/lifeline monitor previews, temporal windows, bbox controls, stop/launch state.
+  Mission entry form, preset selection, Fast Replay loader/rescan controls, temporal windows, bbox controls, stop/launch state.
 - `source/frontend/components/SettingsPanel.tsx`
   Independent provider/SimSat/model/depth status fetches with retry, trimmed credential validation, optional Depth Anything V3 toggle, and runtime health surface.
 - `source/frontend/e2e/testUrls.ts`
@@ -175,9 +175,9 @@ The backend runs two long-lived loops during app lifespan:
 - `source/frontend/components/AgentDialogue.tsx`
   Live SAT/GND bus stream and operator injection, including inline bus stats and injection failure visibility.
 - `source/frontend/components/GroundAgent.tsx`
-  Ground assistant chat surface with inline backend-error payloads, timeout labeling, guarded send state, proposal cards, and confirmed local action results for replay, mission-pack, object-target, target-pack, and link-control tool calls.
+  Ground assistant chat surface with inline backend-error payloads, timeout labeling, guarded send state, proposal cards, and confirmed local action results for replay, mission-pack, link-control, and map-navigation tool calls.
 - `source/frontend/components/VlmPanel.tsx`
-  Grounding, mission-target batch grounding, VQA, and caption actions for the selected bbox, with explicit action controls, prompt/question validation through the API contract, inline API-error handling, result-chip provenance tooltips, and normalized object box propagation to the map.
+  Mission Evidence panel for the active target pack, with batch grounding, inline API-error handling, result-chip provenance tooltips, and normalized object box propagation to the map.
 - `source/frontend/components/TimelapseViewer.tsx`
   Timelapse generation, playback UI, and retryable error display for provider/API failures.
 - `source/frontend/components/ProofModePanel.tsx`
@@ -244,7 +244,7 @@ Architecture docs describe the guard suite; run-by-run totals live in `README.md
 
 - The satellite path is still metadata/evidence-packet GGUF reasoning over scored signals. Production image-conditioned `mmproj` or native VLM inference is not wired into runtime yet.
 - The current trained Orbit bundle includes image-text training rows, but it should not be described as direct image-conditioned runtime inference unless `/api/analysis/status` reports `image_conditioned_runtime_enabled=true`.
-- The optional visual evidence grounding path works with available dependencies, but VQA/caption currently rely on compatibility fallbacks unless a matching local transformer setup is added.
+- The mission-evidence grounding path works with available dependencies; broader visual helper APIs stay backend-compatible but are not exposed as primary operator controls.
 - Depth Anything V3 is integrated as an optional adapter and Settings toggle. Depth statistics are not part of the live alert scoring or promotion gate, and per-frame timelapse inference remains opt-in due runtime cost.
 - Tool-call parsing supports nested fenced JSON arguments for local LFM output. Inline JSON extraction remains intentionally conservative to avoid over-parsing normal prose.
 - The primary UI is desktop-operator oriented with a fixed right mission rail. The map now has a non-right-click action path, but responsive/mobile layout coverage remains follow-up work.

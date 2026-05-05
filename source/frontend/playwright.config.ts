@@ -61,6 +61,7 @@ export default defineConfig({
         RESET_RUNTIME_STATE_ON_BOOT: "true",
         OBSERVATION_PROVIDER: "simsat_sentinel",
         DISABLE_EXTERNAL_APIS: "true",
+        ORBIT_CORS_ALLOW_ORIGINS: APP_BASE,
       },
     },
     {

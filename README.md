@@ -36,9 +36,9 @@ Full repo verification:
 - DPhi SimSat is the primary runtime lane: `provider=simsat_sentinel`, `runtime_truth_mode=realtime`, `imagery_origin=simsat`, `scoring_basis=proxy_bands`.
 - Agent 1 prunes scan cells before downlink.
 - Agent 2 reviews retained evidence packets: bbox, source, temporal/proxy scores, confidence, and visual evidence references.
-- Object Evidence Mode adds target packs, mission-bound object targets, batch grounding, glowing CV boxes, and compact count/delta proof fields.
+- Mission Evidence runs the active mission target pack, draws glowing CV boxes, and keeps compact count/delta proof fields.
 - Link outages queue compact JSON alerts in the backend agent bus and flush after restore.
-- Ground Agent proposes and confirms local actions before mutation: replay loads/rescans, mission packs, object-target edits, target-pack saves, SAT/GND link changes, and semantic camera moves to known location contexts.
+- Ground Agent proposes and confirms local actions before mutation: replay loads/rescans, mission packs, SAT/GND link changes, and semantic camera moves to known location contexts.
 
 ## Proof Gallery
 
@@ -96,7 +96,7 @@ Sentinel Hub close-look replay: Sentinel-2 L2A frames around the Greenland Iluli
 
 ![Ground Agent operator playbook](docs/media/readme/readme-ground-agent-playbook.png)
 
-Ground Agent is the operator interface: SAT/GND roles, app navigation, replay loading, mission packs, object-target edits, and link simulation are available from one panel. Mutating actions still use review cards before state changes; see the [proposal proof](docs/media/readme/readme-ground-agent-chat-action.png).
+Ground Agent is the operator interface: SAT/GND roles, app navigation, replay loading, mission packs, and link simulation are available from one panel. Mutating actions still use review cards before state changes; see the [proposal proof](docs/media/readme/readme-ground-agent-chat-action.png).
 
 ### 10. Semantic Location Camera
 

@@ -802,7 +802,7 @@ export default function App() {
                 )}
                 {drawnBbox && showBboxTools && (
                   <div>
-                    <Suspense fallback={<LoadingPanel label="Evidence Tools" />}>
+                    <Suspense fallback={<LoadingPanel label="Mission Evidence" />}>
                       <VlmPanel
                         isOpen={true}
                         onClose={() => { setDrawnBbox(null); setVlmBoxes([]); setShowBboxTools(false); }}

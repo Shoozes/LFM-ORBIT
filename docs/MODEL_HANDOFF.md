@@ -294,4 +294,4 @@ This handoff closes artifact resolution and publication flow. The runtime gaps b
 - automatic `mmproj` use in the current `llama_cpp` path when a compatible projector exists
 - native `transformers_vlm` runtime support if the HF checkpoint/LoRA path is the safer image-conditioned adapter
 - an image-conditioned smoke test that proves output changes when image pixels change
-- replacement visual VQA/caption runtimes for the final selected local model family
+- replacement visual-summary runtimes for the final selected local model family

@@ -261,9 +261,8 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
   await waitForLinkOpen(page);
   await waitForBasemapReady(page);
   await expect(page.getByText(`Replay Mission · ${RONDONIA_REPLAY_ID}`)).toBeVisible({ timeout: 15_000 });
-  await page.getByTestId("mission-panel-tab-targets").click();
-  await expect(page.getByTestId("object-targets-panel")).toContainText("clearing candidate", { timeout: 15_000 });
-  await page.getByTestId("mission-panel-tab-plan").click();
+  await page.getByTestId("open-evidence-tools").click();
+  await expect(page.getByTestId("vlm-mission-targets")).toContainText("clearing candidate", { timeout: 15_000 });
   await waitForNextPaint(page, 8);
 
   await showVoiceoverSubtitle(
@@ -290,13 +289,12 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
   await drawMapBbox(page, { x: 0.34, y: 0.35 }, { x: 0.62, y: 0.61 });
   await page.getByTestId("tab-mission").click();
   await expect(page.getByTestId("bbox-badge")).toBeVisible({ timeout: 10_000 });
-  await page.getByTestId("mission-panel-tab-targets").click();
-  await page.getByTestId("object-targets-panel").scrollIntoViewIfNeeded();
+  await page.getByTestId("vlm-mission-targets").scrollIntoViewIfNeeded();
 
-  await moveMouseToHighlight(page, "[data-testid='object-targets-panel']");
+  await moveMouseToHighlight(page, "[data-testid='vlm-mission-targets']");
   await showVoiceoverSubtitle(
     page,
-    "The target pack is clear: clearing regions, roads, exposed soil, forest edge, and canopy loss.",
+    "Mission evidence stays focused on the target pack: clearing regions, roads, exposed soil, forest edge, and canopy loss.",
   );
   await removeHighlight(page);
 

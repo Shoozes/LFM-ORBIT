@@ -134,7 +134,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await expect(page.getByText(/Active Mission #/)).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("AREA MAPPED")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("bbox-badge")).toContainText("[-145.60, 34.40, -145.40, 34.60]");
-    await expect(page.getByText("Visual Evidence Tools")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("mission-evidence-panel")).toContainText("Mission Evidence", { timeout: 15_000 });
     await expect(page.getByTestId("vlm-mission-targets")).toContainText("coastal debris candidate");
 
     const missionStatus = page.locator('[data-testid="mission-progress-status"], [data-testid="mission-complete-summary"]').first();
@@ -168,12 +168,12 @@ test.describe("QA Verification — Single Page Architecture", () => {
   test("verify Ground Agent is the first operator surface", async ({ page }) => {
     await expect(page.getByTestId("tab-agents")).toHaveClass(/border-zinc-900/);
     await expect(page.getByText("Ground Agent").first()).toBeVisible();
-    await expect(page.getByTestId("ground-agent-operator-playbook")).toContainText("Task, replay, tune.");
+    await expect(page.getByTestId("ground-agent-operator-playbook")).toContainText("Task, replay, inspect.");
     await expect(page.getByRole("button", { name: "Run Florida fire drought mission" })).toBeVisible();
     await expect(page.getByTestId("header-agent-bus")).toContainText("SAT/GND Dialogue Bus");
   });
 
-  test("verify Mission Control declutters advanced tools behind tabs", async ({ page }) => {
+  test("verify Mission Control stays focused on plan and replay", async ({ page }) => {
     await page.getByTestId("tab-mission").click();
     await expect(page.getByTestId("mission-panel-tab-plan")).toHaveClass(/bg-white/);
     await expect(page.getByTestId("mission-preset-panel")).toBeVisible();
@@ -182,12 +182,8 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await page.getByTestId("mission-panel-tab-replay").click();
     await expect(page.getByTestId("fast-replay-panel")).toBeVisible();
     await expect(page.getByTestId("mission-preset-panel")).not.toBeVisible();
-
-    await page.getByTestId("mission-panel-tab-targets").click();
-    await expect(page.getByTestId("object-targets-panel")).toBeVisible();
-
-    await page.getByTestId("mission-panel-tab-monitors").click();
-    await expect(page.getByTestId("monitor-template-panel")).toBeVisible();
+    await expect(page.getByTestId("mission-panel-tab-targets")).toHaveCount(0);
+    await expect(page.getByTestId("mission-panel-tab-monitors")).toHaveCount(0);
   });
 
   test("verify Ground Agent can confirm a replay fetch action", async ({ page }) => {
@@ -215,7 +211,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await page.getByTestId("tab-agents").click();
     await expect(page.getByTestId("ground-agent-nav-object_evidence")).toBeEnabled();
     await page.getByTestId("ground-agent-nav-object_evidence").click();
-    await expect(page.getByText("Visual Evidence Tools")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("mission-evidence-panel")).toContainText("Mission Evidence", { timeout: 10_000 });
   });
 
   test("verify Ground Agent reframes protected wildlife population requests", async ({ page }) => {

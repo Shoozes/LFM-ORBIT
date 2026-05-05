@@ -26,7 +26,7 @@ Built in the Liquid AI x DPhi Space AI in Space context, this mode is product fr
   - `POST /api/mission/targets/clear`
 - `POST /api/vlm/grounding/batch` runs all enabled mission targets through the visual grounding path and returns normalized boxes plus a detection summary.
 - Mission Control shows a target-pack selector, object chips, add/remove controls, enable/disable toggles, reset-to-pack, save-custom-pack, and clear actions backed by the mission target API.
-- Ground Agent can propose and confirm object-target edits, target-pack switches, runtime custom-pack saves, and target clears before mutating state.
+- Ground Agent keeps mission evidence tied to confirmed mission actions. Target-pack editing APIs remain available for development, but the submission UI runs preset mission targets instead of exposing tuning controls.
 - VLM tools can run all enabled mission targets for the active bbox, then push normalized boxes to the glowing map overlay.
 - Batch grounding skips disabled targets, normalizes all returned boxes to `unit_xyxy`, and drops degenerate zero-area boxes before detection counts are computed.
 - Visual evidence boxes now render with glowing semantic outlines, object labels, a map legend, and hover details for label, confidence, bbox, prompt, source model, runtime truth mode, imagery origin, and scoring basis.

@@ -15,7 +15,7 @@ See `docs/QA_PITFALLS.md` for the detailed guardrail checklist.
 - Fast Replay excludes cached WebMs that fail timelapse-integrity checks.
 - Cloud, no-data, malformed spectral bands, and RGB-only inputs must abstain instead of fabricating indices.
 - Ground Agent mutating actions use proposal cards before state changes.
-- Object Evidence Mode supports default/custom target packs, mission-bound object targets, batch grounding, provenance, CV boxes, and compact proof summaries.
+- Mission Evidence runs preset mission target packs through batch grounding, provenance, CV boxes, and compact proof summaries. Custom target-pack APIs remain backend-compatible but are not primary submission UI.
 - Public README proof currently centers on Critical Minerals, Port Object Evidence, payload reduction, orbital eclipse queueing, provenance, abstain safety, Greenland timelapse context, Ground Agent flow, and semantic map context.
 - The current trained NM-UNI bundle is fetched from `Shoozes/lfm2.5-450m-vl-orbit-satellite`; Orbit still treats it as evidence-packet reasoning until a direct image-conditioned adapter is wired and smoke-tested.
 

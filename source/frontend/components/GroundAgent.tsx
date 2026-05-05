@@ -50,7 +50,7 @@ const NAV_SHORTCUTS: Array<{
   requiresMission?: boolean;
 }> = [
   { id: "mission", label: "Mission Control", target: "mission" },
-  { id: "object_evidence", label: "Object Evidence", target: "object_evidence", requiresMission: true },
+  { id: "object_evidence", label: "Mission Evidence", target: "object_evidence", requiresMission: true },
   { id: "logs", label: "Logs", target: "logs" },
   { id: "proof", label: "Proof Mode", target: "proof" },
   { id: "settings", label: "Settings", target: "settings" },
@@ -190,7 +190,7 @@ export default function GroundAgent({ onActionComplete, onNavigate, mission }: G
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Operator Playbook</p>
-              <p className="text-xs leading-tight text-zinc-600">Task, replay, tune.</p>
+              <p className="text-xs leading-tight text-zinc-600">Task, replay, inspect.</p>
             </div>
           </div>
           <span className={`shrink-0 rounded border px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${

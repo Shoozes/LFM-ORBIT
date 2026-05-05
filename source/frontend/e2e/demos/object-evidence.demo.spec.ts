@@ -142,11 +142,8 @@ test("records glowing CV object evidence boxes and tooltips", async ({ page, req
   await page.getByTestId("tab-mission").click();
   await expect(page.getByText("Run Port Activity Object Evidence")).toBeVisible({ timeout: 10_000 });
   await expect(page.getByTestId("bbox-badge")).toContainText("[32.55, 29.93, 32.57, 29.95]");
-  await page.getByTestId("mission-panel-tab-targets").click();
-  await expect(page.getByTestId("object-targets-panel")).toContainText("shipping container cluster", { timeout: 10_000 });
-  await page.getByTestId("mission-panel-tab-plan").click();
   await page.getByTestId("open-evidence-tools").click();
-  await expect(page.getByText("Visual Evidence Tools")).toBeVisible();
+  await expect(page.getByTestId("mission-evidence-panel")).toContainText("Mission Evidence");
   await expect(page.getByTestId("map-scan-paused-hint")).toBeVisible();
 
   await showSubtitle(page, "Run the port target set inside the selected satellite mission bbox.", 1_300);
