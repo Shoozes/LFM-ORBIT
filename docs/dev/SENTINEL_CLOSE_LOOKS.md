@@ -110,6 +110,31 @@ uv run --no-sync python scripts/seed_sentinel_cache.py `
 
 May 5, 2026 status: credentials resolved from `.tools/.secrets/sh.txt`, the pre-fire window returned a real Sentinel-2 L2A frame, and the May 4-5 event window was rejected for no-data/insufficient valid pixels. The seeder correctly refused to save a one-frame timelapse. Rerun after the next accepted Sentinel pass or widen the event window only if the resulting metadata still proves the after-fire frame is source-backed and not just a pre-fire least-cloud mosaic.
 
+SR-26/Balu Forest development close look, for the April 15, 2026 wildfire east of Gainesville:
+
+```powershell
+cd source/backend
+uv run --no-sync python scripts/seed_sentinel_cache.py `
+  --lat 29.6466 `
+  --lon -82.1662 `
+  --grid 1 `
+  --cell-dim 0.035 `
+  --location-name "SR-26 Balu Forest wildfire close look" `
+  --region-note "April 15 2026 source-reported Alachua County wildfire near SR-26/CR-234; candidate smoke/burn-scar context only." `
+  --use-case-id wildfire `
+  --target-category fireline `
+  --target-task wildfire_close_look_candidate_review `
+  --date-window baseline_2026_04_01=2026-04-01:2026-04-04 `
+  --date-window prefire_2026_04_05=2026-04-05:2026-04-14 `
+  --date-window active_2026_04_16=2026-04-16:2026-04-18 `
+  --date-window postfire_2026_04_19=2026-04-19:2026-05-05 `
+  --visual-mode burn_scar `
+  --skip-vlm-metadata `
+  --force
+```
+
+May 5, 2026 status: credentials resolved from `.tools/.secrets/sh.txt`; the baseline, prefire, and active-fire windows returned accepted Sentinel-2 L2A SWIR/NIR/Red frames, while the April 19-May 5 postfire window was rejected for insufficient valid pixels. The cache was promoted as `source/backend/assets/seeded_data/sh_83e3aea2.webm` with frame PNGs under `source/backend/assets/seeded_data/sh_83e3aea2_frames/` and curated replay `florida_sr26_wildfire_replay`. Keep the wording candidate-only until a later accepted postfire pass is cached.
+
 ## README Highlight
 
 The README uses an animated GIF because it renders through standard Markdown image syntax:

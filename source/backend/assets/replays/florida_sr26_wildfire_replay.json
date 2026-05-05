@@ -1,0 +1,54 @@
+{
+  "replay_id": "florida_sr26_wildfire_replay",
+  "title": "Florida SR-26 Wildfire Candidate Replay",
+  "description": "Source-backed Sentinel Hub close look for the April 15, 2026 SR-26/Balu Forest wildfire east of Gainesville.",
+  "use_case_id": "wildfire",
+  "target_pack_id": "fireline",
+  "task_text": "Review the SR-26/Balu Forest wildfire near Gainesville, Florida for candidate smoke, burn-scar, vegetation stress, road corridor context, and fireline review. Keep claims candidate-only unless source-backed imagery supports them.",
+  "summary": "A real Sentinel-2 L2A SWIR/NIR/Red burn-scar replay seeded from sh.txt credentials. The baseline, prefire, and active-fire windows passed QC; the postfire window was rejected for cloud/valid-pixel quality and is preserved in metadata.",
+  "bbox": [-82.2012, 29.6116, -82.1312, 29.6816],
+  "start_date": "2026-04-01",
+  "end_date": "2026-05-05",
+  "cells_scanned": 1,
+  "flags_found": 1,
+  "primary_cell_id": "wildfire_florida_sr26_candidate",
+  "alerts": [
+    {
+      "cell_id": "wildfire_florida_sr26_candidate",
+      "lat": 29.6466,
+      "lng": -82.1662,
+      "seeded_video": "sh_83e3aea2",
+      "event_id": "replay_florida_sr26_wildfire",
+      "change_score": 0.62,
+      "confidence": 0.71,
+      "priority": "high",
+      "reason_codes": ["burn_scar", "smoke_or_cloud_review", "fireline", "candidate_review"],
+      "observation_source": "seeded_sentinelhub_replay",
+      "runtime_truth_mode": "replay",
+      "imagery_origin": "cached_api",
+      "scoring_basis": "sentinelhub_burn_scar_composite",
+      "before_window": {
+        "label": "baseline_2026_04_01",
+        "quality": 0.8507,
+        "burn_context": "pre_event_reference",
+        "flags": []
+      },
+      "after_window": {
+        "label": "active_2026_04_16",
+        "quality": 0.9307,
+        "burn_context": "candidate_smoke_burn_scar_review",
+        "flags": ["burn_scar_candidate", "smoke_or_cloud_review"]
+      },
+      "timelapse_analysis": "The Sentinel-2 SWIR/NIR/Red sequence compares the April 1-4 baseline, April 5-14 prefire window, and April 16-18 active-fire window over the SR-26/Balu Forest incident area. The later April 19-May 5 window was rejected for insufficient valid pixels, so the replay remains candidate evidence rather than a postfire confirmation.",
+      "analysis_summary": "The Florida firewatch replay is useful for show-and-review because it contains source-backed Sentinel frames from the incident area and keeps uncertainty visible.",
+      "satellite_note": "Satellite Pruner retained a candidate fireline packet from the real Sentinel Hub cache.",
+      "ground_note": "Ground Validator should present this as candidate wildfire evidence and preserve the rejected postfire-window quality metadata.",
+      "ground_action": "REVIEW — Florida SR-26 fireline candidate is replay-ready, but needs a later accepted postfire pass before stronger burn-scar claims.",
+      "findings": [
+        "Real Sentinel Hub Process API frames were cached from sh.txt credentials",
+        "Accepted frames: baseline_2026_04_01, prefire_2026_04_05, and active_2026_04_16",
+        "Rejected postfire_2026_04_19 window: insufficient_valid_pixels"
+      ]
+    }
+  ]
+}

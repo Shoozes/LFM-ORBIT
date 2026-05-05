@@ -1541,6 +1541,23 @@ def test_ground_agent_chat_proposes_wildfire_replay_before_loading():
     assert proposal["details"]["imagery_origin"] == "cached_api"
 
 
+def test_ground_agent_chat_proposes_florida_wildfire_replay_when_requested():
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "replay the florida wildfire mission near gainesville"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "load_replay"
+    assert proposal["title"] == "Load replay: Florida SR-26 Wildfire Candidate Replay"
+    assert proposal["details"]["replay_id"] == "florida_sr26_wildfire_replay"
+    assert proposal["details"]["use_case_id"] == "wildfire"
+    assert proposal["details"]["target_pack_id"] == "fireline"
+
+
 def test_ground_agent_chat_proposes_critical_minerals_replay_before_loading():
     response = client.post(
         "/api/agent/chat",

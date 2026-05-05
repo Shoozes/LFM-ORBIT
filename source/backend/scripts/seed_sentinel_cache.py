@@ -307,6 +307,7 @@ def seed_single_cell(
     sig = get_chunk_signature(bbox)
     webm_path = cache_dir / f"sh_{sig}.webm"
     meta_path = cache_dir / f"sh_{sig}_meta.json"
+    frame_dir = cache_dir / f"sh_{sig}_frames"
 
     if webm_path.exists() and not force:
         logger.info("  [SKIP] %s already cached (%s)", sig, webm_path.name)
@@ -324,6 +325,8 @@ def seed_single_cell(
         (f"{year}-{month:02d}-15", f"{year}-{month:02d}-01", f"{year + 1}-01-01" if month == 12 else f"{year}-{month + 1:02d}-01")
         for year, month in _month_range(start_ym, end_ym)
     ]
+    effective_start = frame_windows[0][1] if frame_windows else start_ym
+    effective_end = frame_windows[-1][2] if frame_windows else end_ym
 
     for label, window_start, window_end in frame_windows:
         frame, source_lbl, quality = fetch_sh_window(label, window_start, window_end, bbox, config, visual_mode)
@@ -362,10 +365,26 @@ def seed_single_cell(
             os.remove(tmp)
         return None
 
+    if force and frame_dir.exists():
+        import shutil
+        shutil.rmtree(frame_dir)
+    frame_dir.mkdir(parents=True, exist_ok=True)
+    frame_images = []
+    repo_root = Path(__file__).resolve().parents[3]
+    for index, (label, frame) in enumerate(zip(isos, frames), start=1):
+        safe_label = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in label)
+        frame_path = frame_dir / f"{index:02d}_{safe_label}.png"
+        Image.fromarray(frame).save(frame_path)
+        try:
+            frame_images.append(str(frame_path.relative_to(repo_root).as_posix()))
+        except ValueError:
+            frame_images.append(str(frame_path))
+    logger.info("  Frames -> %s  (%d PNG)", frame_dir.name, len(frame_images))
+
     if skip_vlm_metadata:
         vlm_text = (
             f"Sentinel-2 L2A timelapse seeded for {location_name} "
-            f"from {start_ym} to {end_ym}. Metadata inference was skipped for this cache refresh."
+            f"from {effective_start} to {effective_end}. Metadata inference was skipped for this cache refresh."
         )
     else:
         vlm_text = generate_vlm_metadata(lat, lon, location_name, start_ym, end_ym)
@@ -377,10 +396,11 @@ def seed_single_cell(
         "lon": lon,
         "location_name": location_name,
         "region_note": region_note,
-        "start_date": start_ym,
-        "end_date": end_ym,
+        "start_date": effective_start,
+        "end_date": effective_end,
         "frames_count": len(frames),
         "frame_dates": isos,
+        "frame_images": frame_images,
         "date_windows": [
             {"label": label, "start_date": window_start, "end_date": window_end}
             for label, window_start, window_end in frame_windows

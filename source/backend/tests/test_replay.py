@@ -17,6 +17,7 @@ EXPECTED_REPLAY_IDS = {
     "atacama_mining_replay",
     "singapore_maritime_replay",
     "georgia_wildfire_replay",
+    "florida_sr26_wildfire_replay",
     "delhi_urban_replay",
     "greenland_ice_snow_extent_replay",
     "southeast_fireline_object_replay",
@@ -27,6 +28,7 @@ EXPECTED_REPLAY_IDS = {
 
 MULTISPECTRAL_REPLAY_IDS = {"greenland_ice_snow_extent_replay"}
 PROXY_REPLAY_IDS = {"rondonia_frontier_showcase"}
+BURN_SCAR_REPLAY_IDS = {"florida_sr26_wildfire_replay"}
 METADATA_ONLY_REPLAY_IDS = {"greenland_ice_snow_extent_replay"}
 OBJECT_FIXTURE_REPLAY_IDS = {
     "southeast_fireline_object_replay",
@@ -139,6 +141,30 @@ def test_replay_load_seeds_runtime_surfaces(tmp_path, monkeypatch):
     assert all(msg["read"] is True for msg in confirmation_messages)
 
 
+def test_florida_wildfire_replay_loads_real_seeded_timelapse(tmp_path, monkeypatch):
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+    _reset_runtime_state()
+
+    payload = replay_load("florida_sr26_wildfire_replay")
+
+    assert payload["mission"]["use_case_id"] == "wildfire"
+    assert payload["mission"]["target_pack_id"] == "fireline"
+    assert payload["primary_cell_id"] == "wildfire_florida_sr26_candidate"
+    assert payload["alerts_loaded"] == 1
+
+    recent_alerts = get_recent_alerts(limit=5)["alerts"]
+    assert recent_alerts[0]["cell_id"] == "wildfire_florida_sr26_candidate"
+    assert recent_alerts[0]["observation_source"] == "seeded_sentinelhub_replay"
+    assert recent_alerts[0]["scoring_basis"] == "sentinelhub_burn_scar_composite"
+
+    gallery = list_gallery(limit=5)
+    assert len(gallery) == 1
+    assert gallery[0]["has_timelapse"] == 1
+    assert gallery[0]["timelapse_source"] == "replay"
+
+
 def test_object_evidence_replay_loads_targets_and_detection_summary(tmp_path, monkeypatch):
     monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
     monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
@@ -239,6 +265,8 @@ def test_each_bundled_replay_loads_runtime_surfaces(tmp_path, monkeypatch):
         )
         if replay["replay_id"] in PROXY_REPLAY_IDS:
             expected_scoring_basis = "proxy_bands"
+        if replay["replay_id"] in BURN_SCAR_REPLAY_IDS:
+            expected_scoring_basis = "sentinelhub_burn_scar_composite"
         expected_observation_source = (
             "seeded_sentinelhub_multispectral_replay"
             if replay["replay_id"] in MULTISPECTRAL_REPLAY_IDS

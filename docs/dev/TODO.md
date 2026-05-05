@@ -30,7 +30,7 @@ See [QA_PITFALLS.md](QA_PITFALLS.md) for the detailed guardrail checklist.
 - Docs are split by audience: `docs/user/` is for demo/review operators, `docs/dev/` is for architecture, data/model handoff, future lanes, QA, and backlog work.
 - Tracked ad hoc backend scratch probes are pruned; use maintained scripts, tests, or documented manual provider probes instead.
 - Manual Sentinel WMS connectivity/evalscript checks live in `source/backend/scripts/probe_sentinel_wms.py`; root-level `test_*.py` probes are intentionally blocked by import-contract tests.
-- Manual Sentinel Hub cache refreshes are allowed for development/source-backed replay assets only. The May 5 Lochloosa West Fire seed attempt proved this path stays manual: `sh.txt` credentials resolved, the pre-fire Sentinel-2 L2A frame loaded, the May 4-5 event window was rejected for no-data/insufficient valid pixels, and no one-frame timelapse was written.
+- Manual Sentinel Hub cache refreshes are allowed for development/source-backed replay assets only. The May 5 Lochloosa West Fire seed attempt proved this path stays manual: `sh.txt` credentials resolved, the pre-fire Sentinel-2 L2A frame loaded, the May 4-5 event window was rejected for no-data/insufficient valid pixels, and no one-frame timelapse was written. The SR-26/Balu Forest fire seed succeeded as `sh_83e3aea2` with three real Sentinel-2 L2A burn-scar frames, frame PNGs, and curated replay `florida_sr26_wildfire_replay`; the postfire window remains rejected, so wording stays candidate-only.
 
 ## Active Backlog
 
