@@ -179,7 +179,7 @@ async function runStory(page: Page, story: VisualStory) {
   await page.unroute("**/api/vlm/grounding");
 }
 
-test.describe("visual overlay fixture stories", () => {
+test.describe.skip("retired visual overlay fixture stories", () => {
   test.describe.configure({ mode: "serial" });
 
   for (const story of STORIES) {

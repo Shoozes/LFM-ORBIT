@@ -42,14 +42,13 @@ test.describe('LFM Orbit QA Focus Validation', () => {
   test('Mission Tab Interactive Tools Work', async ({ page }) => {
     await page.getByTestId('tab-mission').click();
 
-    // Check that we can toggle on the boundary drawing mode
-    const drawButton = page.locator('button', { hasText: 'Draw Area on Map' });
-    if (await drawButton.isVisible()) {
-        await drawButton.click();
-        const cancelEsc = page.locator('text=CANCEL [ESC]');
-        await expect(cancelEsc).toBeVisible();
-        await cancelEsc.click();
-    }
+    // Area selection is map-side now, so operators can find it without opening Mission controls.
+    const drawButton = page.getByTestId('map-draw-area-button');
+    await expect(drawButton).toBeVisible();
+    await drawButton.click();
+    const cancelEsc = page.locator('text=CANCEL [ESC]');
+    await expect(cancelEsc).toBeVisible();
+    await cancelEsc.click();
   });
 
   test('Alerts Tab Opens and Displays Items or Empty State', async ({ page }) => {
@@ -61,21 +60,20 @@ test.describe('LFM Orbit QA Focus Validation', () => {
   test('Mock-Mission Bounding Box Selection Renders', async ({ page }) => {
     await page.getByTestId('tab-mission').click();
 
-    const drawButton = page.locator('button', { hasText: 'Draw Area on Map' });
-    if (await drawButton.isVisible()) {
-        await drawButton.click();
+    const drawButton = page.getByTestId('map-draw-area-button');
+    await expect(drawButton).toBeVisible();
+    await drawButton.click();
 
-        // Verify the Drawing pulse element appears in the top center
-        const drawingOverlay = page.locator('text=DRAWING MODE ACTIVE');
-        await expect(drawingOverlay).toBeVisible();
+    // Verify the Drawing pulse element appears in the top center
+    const drawingOverlay = page.locator('text=DRAWING MODE ACTIVE');
+    await expect(drawingOverlay).toBeVisible();
 
-        // Simulate drawing by triggering ESC to cleanly close it so test resets state
-        const cancelEsc = page.locator('text=CANCEL [ESC]');
-        await cancelEsc.click();
+    // Simulate drawing by triggering ESC to cleanly close it so test resets state
+    const cancelEsc = page.locator('text=CANCEL [ESC]');
+    await cancelEsc.click();
 
-        // Verify it disappeared
-        await expect(drawingOverlay).toHaveCount(0);
-    }
+    // Verify it disappeared
+    await expect(drawingOverlay).toHaveCount(0);
   });
 
 });

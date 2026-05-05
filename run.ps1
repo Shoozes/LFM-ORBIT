@@ -182,6 +182,115 @@ function Ensure-Node {
     }
 }
 
+function Get-FileTail {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [int]$Count = 40
+    )
+
+    if (-not (Test-Path $Path)) {
+        return ""
+    }
+
+    try {
+        return (Get-Content -LiteralPath $Path -Tail $Count -ErrorAction Stop) -join "`n"
+    } catch {
+        return ""
+    }
+}
+
+function Invoke-RequiredCommand {
+    param(
+        [Parameter(Mandatory = $true)][scriptblock]$Command,
+        [Parameter(Mandatory = $true)][string]$Description
+    )
+
+    & $Command
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Description failed with exit code $LASTEXITCODE."
+    }
+}
+
+function Get-ListeningPortProcesses {
+    param([Parameter(Mandatory = $true)][int]$Port)
+
+    $connections = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+    if (-not $connections) {
+        return @()
+    }
+
+    $processIds = $connections |
+        Where-Object { $_.OwningProcess -and $_.OwningProcess -gt 0 } |
+        Select-Object -ExpandProperty OwningProcess -Unique
+
+    $items = @()
+    foreach ($processId in $processIds) {
+        $processInfo = Get-CimInstance Win32_Process -Filter "ProcessId=$processId" -ErrorAction SilentlyContinue
+        if ($processInfo) {
+            $items += $processInfo
+        }
+    }
+    return $items
+}
+
+function Test-IsOrbitOwnedProcess {
+    param(
+        [Parameter(Mandatory = $true)]$ProcessInfo,
+        [Parameter(Mandatory = $true)][int]$Port
+    )
+
+    $commandLine = [string]$ProcessInfo.CommandLine
+    if (-not $commandLine) {
+        return $false
+    }
+
+    $normalizedCommand = $commandLine.ToLowerInvariant()
+    $repoNeedle = $RepoRoot.ToLowerInvariant()
+    $backendNeedle = $BackendDir.ToLowerInvariant()
+    $frontendNeedle = $FrontendDir.ToLowerInvariant()
+
+    return (
+        $normalizedCommand.Contains($repoNeedle) -or
+        $normalizedCommand.Contains($backendNeedle) -or
+        $normalizedCommand.Contains($frontendNeedle) -or
+        ($Port -eq 8000 -and $normalizedCommand.Contains("api.main:app") -and $normalizedCommand.Contains("--port 8000")) -or
+        ($Port -eq 5173 -and $normalizedCommand.Contains("vite") -and $normalizedCommand.Contains("5173"))
+    )
+}
+
+function Ensure-OrbitPortAvailable {
+    param(
+        [Parameter(Mandatory = $true)][int]$Port,
+        [Parameter(Mandatory = $true)][string]$Role
+    )
+
+    $listeners = @(Get-ListeningPortProcesses -Port $Port)
+    if ($listeners.Count -eq 0) {
+        return
+    }
+
+    foreach ($listener in $listeners) {
+        $listenerPid = [int]$listener.ProcessId
+        if (Test-IsOrbitOwnedProcess -ProcessInfo $listener -Port $Port) {
+            Write-Host "[i] Stopping stale LFM Orbit $Role on port $Port (PID $listenerPid)..." -ForegroundColor Yellow
+            Stop-Process -Id $listenerPid -Force -ErrorAction SilentlyContinue
+            Wait-Process -Id $listenerPid -Timeout 5 -ErrorAction SilentlyContinue
+            continue
+        }
+
+        $name = (Get-Process -Id $listenerPid -ErrorAction SilentlyContinue).ProcessName
+        if (-not $name) { $name = "unknown" }
+        throw "Port $Port is already in use by $name (PID $listenerPid). Close that process, then rerun .\run.ps1 option 1."
+    }
+
+    Start-Sleep -Milliseconds 500
+    $remaining = @(Get-ListeningPortProcesses -Port $Port)
+    if ($remaining.Count -gt 0) {
+        $pids = ($remaining | ForEach-Object { $_.ProcessId }) -join ", "
+        throw "Port $Port is still in use after cleanup (PID $pids). Close the process manually, then rerun .\run.ps1 option 1."
+    }
+}
+
 function Show-Usage {
     Write-Host "LFM Orbit launcher" -ForegroundColor Cyan
     Write-Host ""
@@ -235,7 +344,7 @@ function Install-FrontendDeps {
     Write-Host "[*] Installing frontend dependencies from package-lock.json..." -ForegroundColor Cyan
     Push-Location $FrontendDir
     try {
-        npm ci
+        Invoke-RequiredCommand -Description "Frontend dependency install" -Command { npm ci }
     } finally {
         Pop-Location
     }
@@ -276,7 +385,9 @@ function Ensure-TrainedModel {
         Write-Host "    Source: $modelUrl" -ForegroundColor Gray
         Write-Host "    Target: $ModelFile" -ForegroundColor Gray
 
-        & $python -c "import urllib.request, sys; print('Downloading trained Orbit model...', flush=True); urllib.request.urlretrieve(sys.argv[1], sys.argv[2])" $modelUrl $ModelFile
+        Invoke-RequiredCommand -Description "Trained Orbit GGUF download" -Command {
+            & $python -c "import urllib.request, sys; print('Downloading trained Orbit model...', flush=True); urllib.request.urlretrieve(sys.argv[1], sys.argv[2])" $modelUrl $ModelFile
+        }
     } else {
         $modelRepoId = $env:LFM_MODEL_REPO_ID
         if (-not $modelRepoId) { $modelRepoId = $env:CANOPY_SENTINEL_MODEL_REPO_ID }
@@ -315,7 +426,9 @@ function Ensure-TrainedModel {
         Push-Location $BackendDir
         try {
             $uv = Ensure-Uv
-            & $uv run --no-sync python scripts\fetch_satellite_model.py --repo-id $modelRepoId --revision $modelRevision --force
+            Invoke-RequiredCommand -Description "Trained Orbit GGUF fetch" -Command {
+                & $uv run --no-sync python scripts\fetch_satellite_model.py --repo-id $modelRepoId --revision $modelRevision --force
+            }
         } finally {
             Pop-Location
         }
@@ -367,7 +480,7 @@ function Install-PlaywrightBrowser {
     Write-Host "[*] Ensuring Playwright Chromium is installed..." -ForegroundColor Cyan
     Push-Location $FrontendDir
     try {
-        npx playwright install chromium
+        Invoke-RequiredCommand -Description "Playwright Chromium install" -Command { npx playwright install chromium }
     } finally {
         Pop-Location
     }
@@ -383,7 +496,7 @@ function Run-Verify {
     try {
         Write-Host "[*] Backend tests..." -ForegroundColor Cyan
         $uv = Ensure-Uv
-        & $uv run --no-sync pytest -q
+        Invoke-RequiredCommand -Description "Backend tests" -Command { & $uv run --no-sync pytest -q }
         if (Test-Path $ModelFile) {
             Assert-TrainedModelRuntime
         }
@@ -394,11 +507,11 @@ function Run-Verify {
     Push-Location $FrontendDir
     try {
         Write-Host "[*] Frontend typecheck..." -ForegroundColor Cyan
-        npm run lint
+        Invoke-RequiredCommand -Description "Frontend typecheck" -Command { npm run lint }
         Write-Host "[*] Frontend production build..." -ForegroundColor Cyan
-        npm run build
+        Invoke-RequiredCommand -Description "Frontend production build" -Command { npm run build }
         Write-Host "[*] Playwright E2E..." -ForegroundColor Cyan
-        npm run test:e2e
+        Invoke-RequiredCommand -Description "Playwright E2E" -Command { npm run test:e2e }
     } finally {
         Pop-Location
     }
@@ -409,13 +522,17 @@ function Run-Verify {
 function Start-BackendProcess {
     $uvCommand = Find-UvCommand
     $venvPython = Join-Path $BackendVenvDir "Scripts\python.exe"
+    $LogDir = Join-Path $RuntimeDir "logs"
+    New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+    $BackendOutLog = Join-Path $LogDir "backend-run.out.log"
+    $BackendErrLog = Join-Path $LogDir "backend-run.err.log"
 
     if ($uvCommand) {
-        return Start-Process -FilePath $uvCommand -ArgumentList "run", "--no-sync", "uvicorn", "api.main:app", "--host", "127.0.0.1", "--port", "8000" -WorkingDirectory $BackendDir -WindowStyle Hidden -PassThru
+        return Start-Process -FilePath $uvCommand -ArgumentList "run", "--no-sync", "uvicorn", "api.main:app", "--host", "127.0.0.1", "--port", "8000" -WorkingDirectory $BackendDir -WindowStyle Hidden -RedirectStandardOutput $BackendOutLog -RedirectStandardError $BackendErrLog -PassThru
     }
 
     if (Test-Path $venvPython) {
-        return Start-Process -FilePath $venvPython -ArgumentList "-m", "uvicorn", "api.main:app", "--host", "127.0.0.1", "--port", "8000" -WorkingDirectory $BackendDir -WindowStyle Hidden -PassThru
+        return Start-Process -FilePath $venvPython -ArgumentList "-m", "uvicorn", "api.main:app", "--host", "127.0.0.1", "--port", "8000" -WorkingDirectory $BackendDir -WindowStyle Hidden -RedirectStandardOutput $BackendOutLog -RedirectStandardError $BackendErrLog -PassThru
     }
 
     throw "Backend runtime is not installed. Run .\run.ps1 -Install first."
@@ -432,11 +549,20 @@ function Run-App {
     }
 
     Write-Host "[*] Launching backend..." -ForegroundColor Cyan
+    Ensure-OrbitPortAvailable -Port 8000 -Role "backend"
     $backendProcess = Start-BackendProcess
 
     Write-Host "[*] Waiting for backend health check..." -ForegroundColor Cyan
     $ready = $false
     for ($i = 1; $i -le 30; $i++) {
+        if ($backendProcess -and $backendProcess.HasExited) {
+            $errLog = Join-Path $RuntimeDir "logs\backend-run.err.log"
+            $tail = Get-FileTail -Path $errLog
+            if ($tail) {
+                throw "Backend exited before becoming healthy. Last backend error log:`n$tail"
+            }
+            throw "Backend exited before becoming healthy."
+        }
         try {
             $response = Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/health" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
             if ($response.StatusCode -eq 200) {
@@ -458,11 +584,15 @@ function Run-App {
 
     Write-Host "[+] Backend ready on http://127.0.0.1:8000" -ForegroundColor Green
     Write-Host "[*] Launching frontend on http://127.0.0.1:5173 ..." -ForegroundColor Cyan
+    Ensure-OrbitPortAvailable -Port 5173 -Role "frontend"
 
     try {
         Push-Location $FrontendDir
         try {
             npm run dev -- --host 127.0.0.1
+            if ($LASTEXITCODE -ne 0) {
+                throw "Frontend dev server failed with exit code $LASTEXITCODE."
+            }
         } finally {
             Pop-Location
         }

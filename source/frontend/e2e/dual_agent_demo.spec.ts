@@ -23,13 +23,14 @@ test("Tutorial: Dual-Agent Architecture Demo", async ({ page, request }) => {
   await showSubtitle(page, "A satellite agent triages imagery before sending compact findings to Earth.", 1800);
 
   await page.locator("[data-testid='tab-mission']").click();
-  await page.getByText("Draw Area on Map").click();
+  await page.getByTestId("map-draw-area-button").click();
 
   await showSubtitle(page, "The operator defines a focus area and mission objective.", 1800);
   await expect(page.getByText("DRAWING MODE ACTIVE")).toBeVisible();
   await drawMapBbox(page, { x: 0.15, y: 0.2 }, { x: 0.42, y: 0.52 });
 
-  await page.fill('textarea', "Scan this region for recent clear-cut deforestation.");
+  await page.locator("[data-testid='tab-mission']").click();
+  await page.getByTestId("mission-task-input").fill("Scan this region for recent clear-cut deforestation.");
   await page.getByTestId("mission-panel-tab-replay").click();
   const replayButtonSelector = "[data-testid='load-replay-rondonia_frontier_showcase']";
   const replayButton = page.locator(replayButtonSelector);

@@ -7,6 +7,7 @@ import {
   loadSeededReplay,
   openMapContextMenu,
   resetRuntimeState,
+  startMission,
   waitForBasemapReady,
   waitForLinkOpen,
   waitForNextPaint,
@@ -94,6 +95,24 @@ async function waitForAgentBusNote(request: APIRequestContext, pattern: RegExp) 
   }).toPass({ timeout: 15_000, intervals: [300, 750, 1500] });
 }
 
+async function ensureSmokeScanMission(request: APIRequestContext) {
+  const current = await request.get(`${API_BASE}/api/mission/current`);
+  if (current.ok()) {
+    const body = await current.json() as { mission?: { status?: string } | null };
+    if (body.mission?.status === "active") {
+      return;
+    }
+  }
+
+  await startMission(request, {
+    task_text: "Scan the Atacama critical minerals corridor for mining change candidates.",
+    bbox: [-69.11, -24.29, -69.03, -24.21],
+    start_date: "2025-05-05",
+    end_date: "2026-05-05",
+    use_case_id: "critical_minerals",
+  });
+}
+
 type RecentAlert = {
   event_id?: unknown;
   cell_id?: unknown;
@@ -122,6 +141,8 @@ async function waitForMetricsProgress(request: APIRequestContext) {
     total_alerts_emitted?: unknown;
     total_bandwidth_saved_mb?: unknown;
   } | null = null;
+
+  await ensureSmokeScanMission(request);
 
   await expect(async () => {
     const res = await request.get(`${API_BASE}/api/metrics/summary`);

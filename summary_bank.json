@@ -1545,6 +1545,22 @@
         "docs/dev/TODO.md",
         "summary_bank.json"
       ]
+    },
+    "issue_group_launcher_clean_start_verify": {
+      "note": "Windows clean-start and verify hardening: run.ps1 now stops stale repo-owned backend/frontend listeners, refuses unrelated port owners, captures backend startup logs under runtime-data/logs, fails early with backend error tails when health never comes up, and checks external command exit codes for npm, npx, uv, Playwright, model fetch, and dev server startup. The E2E suite was updated for the lean UI contract: clean startup stays idle, scan-progress tests explicitly start a smoke mission, map-side Area Tools replaced hidden draw controls, and retired visual-overlay UI specs are intentionally skipped. Cold reset plus option-1 equivalent startup succeeded, and full run.ps1 -Verify passed with backend 453 passed, GGUF smoke, frontend lint/build, and Playwright 94 passed / 6 intentional skips.",
+      "files": [
+        "run.ps1",
+        "source/frontend/e2e/app.spec.ts",
+        "source/frontend/e2e/dual_agent_demo.spec.ts",
+        "source/frontend/e2e/qa-audit.spec.ts",
+        "source/frontend/e2e/visual-stories.spec.ts",
+        "docs/dev/TODO.md",
+        "docs/media/readme/readme-ground-agent-playbook.png",
+        "docs/media/readme/readme-ground-agent-chat-action.png",
+        "docs/media/readme/readme-location-camera-context.png",
+        "docs/media/videos/tutorial_video.webm",
+        "summary_bank.json"
+      ]
     }
   },
   "exclusions": {
