@@ -233,6 +233,53 @@ function Get-ListeningPortProcesses {
     return $items
 }
 
+function Get-ChildProcessIds {
+    param([Parameter(Mandatory = $true)][int]$ProcessId)
+
+    $children = Get-CimInstance Win32_Process -Filter "ParentProcessId=$ProcessId" -ErrorAction SilentlyContinue
+    $ids = @()
+    foreach ($child in $children) {
+        $childId = [int]$child.ProcessId
+        $ids += Get-ChildProcessIds -ProcessId $childId
+        $ids += $childId
+    }
+    return $ids
+}
+
+function Stop-OrbitProcessTree {
+    param(
+        [Parameter(Mandatory = $true)][int]$ProcessId,
+        [string]$Label = "process"
+    )
+
+    if ($ProcessId -eq $PID) {
+        throw "Refusing to stop the current launcher process while cleaning up $Label."
+    }
+
+    $ids = @()
+    $ids += Get-ChildProcessIds -ProcessId $ProcessId
+    $ids += $ProcessId
+    $ids = $ids | Select-Object -Unique
+
+    foreach ($id in $ids) {
+        if ($id -eq $PID) {
+            continue
+        }
+        $process = Get-Process -Id $id -ErrorAction SilentlyContinue
+        if (-not $process) {
+            continue
+        }
+        Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
+    }
+
+    foreach ($id in $ids) {
+        if ($id -eq $PID) {
+            continue
+        }
+        Wait-Process -Id $id -Timeout 5 -ErrorAction SilentlyContinue
+    }
+}
+
 function Test-IsOrbitOwnedProcess {
     param(
         [Parameter(Mandatory = $true)]$ProcessInfo,
@@ -273,8 +320,7 @@ function Ensure-OrbitPortAvailable {
         $listenerPid = [int]$listener.ProcessId
         if (Test-IsOrbitOwnedProcess -ProcessInfo $listener -Port $Port) {
             Write-Host "[i] Stopping stale LFM Orbit $Role on port $Port (PID $listenerPid)..." -ForegroundColor Yellow
-            Stop-Process -Id $listenerPid -Force -ErrorAction SilentlyContinue
-            Wait-Process -Id $listenerPid -Timeout 5 -ErrorAction SilentlyContinue
+            Stop-OrbitProcessTree -ProcessId $listenerPid -Label "$Role on port $Port"
             continue
         }
 
@@ -577,19 +623,19 @@ function Run-App {
 
     if (-not $ready) {
         if ($backendProcess -and -not $backendProcess.HasExited) {
-            Stop-Process -Id $backendProcess.Id -Force
+            Stop-OrbitProcessTree -ProcessId $backendProcess.Id -Label "unhealthy backend"
         }
         throw "Backend did not become healthy within 30 seconds."
     }
 
     Write-Host "[+] Backend ready on http://127.0.0.1:8000" -ForegroundColor Green
     Write-Host "[*] Launching frontend on http://127.0.0.1:5173 ..." -ForegroundColor Cyan
-    Ensure-OrbitPortAvailable -Port 5173 -Role "frontend"
 
     try {
+        Ensure-OrbitPortAvailable -Port 5173 -Role "frontend"
         Push-Location $FrontendDir
         try {
-            npm run dev -- --host 127.0.0.1
+            npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
             if ($LASTEXITCODE -ne 0) {
                 throw "Frontend dev server failed with exit code $LASTEXITCODE."
             }
@@ -599,7 +645,7 @@ function Run-App {
     } finally {
         if ($backendProcess -and -not $backendProcess.HasExited) {
             Write-Host "[*] Stopping backend process $($backendProcess.Id)..." -ForegroundColor Gray
-            Stop-Process -Id $backendProcess.Id -Force
+            Stop-OrbitProcessTree -ProcessId $backendProcess.Id -Label "backend"
         }
     }
 }

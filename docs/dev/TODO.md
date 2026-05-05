@@ -20,7 +20,7 @@ See [QA_PITFALLS.md](QA_PITFALLS.md) for the detailed guardrail checklist.
 - Mission date windows are use-case aware: long-term change missions can keep annual/history windows, while operational Fire Watch presets default to the last 30 days through current date.
 - Clean startup is idle by contract: the app opens on the Atacama mining context without auto-playing a replay, starting a mission, or letting the telemetry websocket scan the legacy default region.
 - Area selection is a first-class map control: the map-side Area Tools card shows selected/drawing/scanning state, selected-cell count, bbox, Draw, and Clear without requiring the Mission tab.
-- Windows launcher startup is defensive: option 1 / `-Install` stops stale repo-owned Orbit listeners on `8000` and `5173`, refuses unrelated port owners, captures backend run logs under `runtime-data/logs/`, and fails fast if backend health never comes up.
+- Launchers are defensive: option 1 / `-Install` stops stale repo-owned Orbit process trees on `8000` and `5173`, refuses unrelated port owners, starts Vite with `--strictPort`, captures backend run logs under `runtime-data/logs/` on Windows, and fails fast if backend health never comes up.
 - `.\run.ps1 -Verify` is the release gate and now fails on external command exit codes from `uv`, `npm`, `npx`, Playwright, model fetch, or frontend dev startup.
 - Florida Fire/Drought Readiness Watch is candidate-only unless smoke, active-fire, burn-scar, hotspot, or fireline-specific source evidence is present; generic proxy vegetation changes are filtered before downlink.
 - The retired target/monitor subtabs and visual-evidence tools panel must stay out of the submission UI unless deliberately reintroduced after review.

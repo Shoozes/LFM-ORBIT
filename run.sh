@@ -240,6 +240,116 @@ ensure_node() {
     fi
 }
 
+port_pids() {
+    local port="$1"
+    if command -v lsof >/dev/null 2>&1; then
+        lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | sort -u
+        return 0
+    fi
+    if command -v ss >/dev/null 2>&1; then
+        ss -ltnp "sport = :$port" 2>/dev/null | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' | sort -u
+        return 0
+    fi
+    if command -v netstat >/dev/null 2>&1; then
+        netstat -ltnp 2>/dev/null | awk -v port=":$port" '$4 ~ port"$" {print $7}' | cut -d/ -f1 | grep -E '^[0-9]+$' | sort -u
+        return 0
+    fi
+    return 0
+}
+
+can_bind_port() {
+    local port="$1"
+    ensure_python
+    "$PYTHON_CMD" - "$port" <<'PY'
+import socket
+import sys
+
+port = int(sys.argv[1])
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+try:
+    sock.bind(("127.0.0.1", port))
+except OSError:
+    raise SystemExit(1)
+finally:
+    sock.close()
+PY
+}
+
+is_orbit_owned_pid() {
+    local pid="$1"
+    local port="$2"
+    local args
+    args="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+    [[ -n "$args" ]] || return 1
+
+    local args_lc repo_lc backend_lc frontend_lc
+    args_lc="$(printf '%s' "$args" | tr '[:upper:]' '[:lower:]')"
+    repo_lc="$(printf '%s' "$REPO_ROOT" | tr '[:upper:]' '[:lower:]')"
+    backend_lc="$(printf '%s' "$BACKEND_DIR" | tr '[:upper:]' '[:lower:]')"
+    frontend_lc="$(printf '%s' "$FRONTEND_DIR" | tr '[:upper:]' '[:lower:]')"
+
+    [[ "$args_lc" == *"$repo_lc"* ]] && return 0
+    [[ "$args_lc" == *"$backend_lc"* ]] && return 0
+    [[ "$args_lc" == *"$frontend_lc"* ]] && return 0
+    [[ "$port" == "8000" && "$args_lc" == *"api.main:app"* && "$args_lc" == *"--port 8000"* ]] && return 0
+    [[ "$port" == "5173" && "$args_lc" == *"vite"* && "$args_lc" == *"5173"* ]] && return 0
+    return 1
+}
+
+stop_process_tree() {
+    local pid="$1"
+    [[ -n "$pid" && "$pid" != "$$" ]] || return 0
+    kill -0 "$pid" 2>/dev/null || return 0
+
+    local child
+    while IFS= read -r child; do
+        [[ -n "$child" ]] && stop_process_tree "$child"
+    done < <(pgrep -P "$pid" 2>/dev/null || true)
+
+    kill "$pid" 2>/dev/null || true
+    for _ in $(seq 1 20); do
+        kill -0 "$pid" 2>/dev/null || return 0
+        sleep 0.1
+    done
+    kill -9 "$pid" 2>/dev/null || true
+}
+
+ensure_orbit_port_available() {
+    local port="$1"
+    local role="$2"
+    local pids
+    mapfile -t pids < <(port_pids "$port")
+
+    if [[ "${#pids[@]}" -eq 0 ]]; then
+        if can_bind_port "$port"; then
+            return 0
+        fi
+        echo "[!] Port $port is already in use, but no process owner could be resolved. Close that listener, then rerun ./run.sh --install." >&2
+        exit 1
+    fi
+
+    local pid
+    for pid in "${pids[@]}"; do
+        if is_orbit_owned_pid "$pid" "$port"; then
+            echo "[i] Stopping stale LFM Orbit $role on port $port (PID $pid)..."
+            stop_process_tree "$pid"
+        else
+            local name
+            name="$(ps -p "$pid" -o comm= 2>/dev/null || printf 'unknown')"
+            echo "[!] Port $port is already in use by $name (PID $pid). Close that process, then rerun ./run.sh --install." >&2
+            exit 1
+        fi
+    done
+
+    sleep 0.5
+    mapfile -t pids < <(port_pids "$port")
+    if [[ "${#pids[@]}" -gt 0 ]] || ! can_bind_port "$port"; then
+        echo "[!] Port $port is still in use after cleanup. Close the process manually, then rerun ./run.sh --install." >&2
+        exit 1
+    fi
+}
+
 can_attempt_model_runtime_install() {
     local kernel_name
     kernel_name="$(uname -s 2>/dev/null || printf '')"
@@ -463,6 +573,7 @@ run_app() {
 
     echo "[*] Launching backend..."
     local backend_pid
+    ensure_orbit_port_available 8000 "backend"
     if UV_CMD="$(find_existing_uv)"; then
         (
             cd "$BACKEND_DIR"
@@ -486,7 +597,7 @@ run_app() {
         exit 1
     fi
 
-    trap 'kill "$backend_pid" 2>/dev/null || true' EXIT
+    trap 'stop_process_tree "$backend_pid" 2>/dev/null || true' EXIT
 
     echo "[*] Waiting for backend health check..."
     local ready=false
@@ -501,14 +612,16 @@ run_app() {
 
     if [[ "$ready" != true ]]; then
         echo "[!] Backend did not become healthy within 30 seconds." >&2
+        stop_process_tree "$backend_pid"
         exit 1
     fi
 
     echo "[+] Backend ready on http://127.0.0.1:8000"
     echo "[*] Launching frontend on http://127.0.0.1:5173 ..."
+    ensure_orbit_port_available 5173 "frontend"
     (
         cd "$FRONTEND_DIR"
-        "$NPM_CMD" run dev -- --host 127.0.0.1
+        "$NPM_CMD" run dev -- --host 127.0.0.1 --port 5173 --strictPort
     )
 }
 

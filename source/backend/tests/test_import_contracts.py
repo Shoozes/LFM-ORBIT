@@ -94,3 +94,11 @@ def test_launchers_keep_minimal_runtime_guards_documented():
     assert "node.exe" in bash_launcher
     assert "NPM_CMD" in bash_launcher
     assert "NPX_CMD" in bash_launcher
+    assert "--strictPort" in bash_launcher
+    assert "--strictPort" in ps_launcher
+    assert "ensure_orbit_port_available 8000" in bash_launcher
+    assert "ensure_orbit_port_available 5173" in bash_launcher
+    assert "Ensure-OrbitPortAvailable -Port 8000" in ps_launcher
+    assert "Ensure-OrbitPortAvailable -Port 5173" in ps_launcher
+    assert "stop_process_tree" in bash_launcher
+    assert "Stop-OrbitProcessTree" in ps_launcher
