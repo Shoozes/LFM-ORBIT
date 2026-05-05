@@ -43,6 +43,8 @@ const DEFAULT_COMMANDS = [
   "List replays",
 ];
 
+const AGENT_REQUEST_TIMEOUT_MS = 30_000;
+
 const NAV_SHORTCUTS: Array<{
   id: "mission" | "logs" | "settings" | "proof";
   label: string;
@@ -139,7 +141,7 @@ export default function GroundAgent({ onActionComplete, onNavigate, mission }: G
     setIsLoading(true);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), AGENT_REQUEST_TIMEOUT_MS);
 
     try {
       const response = await fetch(`${getApiBaseUrl()}/api/agent/chat`, {
@@ -155,7 +157,7 @@ export default function GroundAgent({ onActionComplete, onNavigate, mission }: G
       await appendAgentResponse(data);
     } catch (e) {
       const message = e instanceof DOMException && e.name === "AbortError"
-        ? "Ground Agent timed out."
+        ? "Ground Agent timed out after 30 seconds. Confirm the backend is still running on port 8000."
         : e instanceof Error
           ? e.message
           : "Ground Agent unreachable.";
@@ -203,19 +205,25 @@ export default function GroundAgent({ onActionComplete, onNavigate, mission }: G
         <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
           {NAV_SHORTCUTS.map((shortcut) => {
             const disabled = shortcut.requiresMission && !mission;
+            const disabledReason = disabled ? "Start or load a mission first." : "";
             return (
-              <button
+              <span
                 key={shortcut.id}
-                type="button"
-                data-testid={`ground-agent-nav-${shortcut.id}`}
-                onClick={() => void onNavigate?.(shortcut.target)}
-                disabled={disabled || !onNavigate}
-                title={disabled ? "Start or load a mission first." : `Open ${shortcut.label}`}
-                data-ui-tip={disabled ? "Needs mission" : shortcut.label}
-                className="shrink-0 rounded border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-45"
+                data-testid={`ground-agent-nav-${shortcut.id}-tip`}
+                data-ui-tip={disabled ? disabledReason : `Open ${shortcut.label}`}
+                className="shrink-0"
               >
-                {shortcut.label}
-              </button>
+                <button
+                  type="button"
+                  data-testid={`ground-agent-nav-${shortcut.id}`}
+                  onClick={() => void onNavigate?.(shortcut.target)}
+                  disabled={disabled || !onNavigate}
+                  aria-label={disabled ? `${shortcut.label}. ${disabledReason}` : shortcut.label}
+                  className="rounded border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {shortcut.label}
+                </button>
+              </span>
             );
           })}
         </div>
@@ -265,17 +273,31 @@ export default function GroundAgent({ onActionComplete, onNavigate, mission }: G
       </div>
 
       <div className="border-t border-zinc-200 p-3">
+        <div
+          id="ground-agent-suggestions-label"
+          data-testid="ground-agent-suggestions-label"
+          className="mb-1.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500"
+        >
+          <span>Suggested Prompts</span>
+          <span className="normal-case tracking-normal text-zinc-400">Ask only. Confirm before app changes.</span>
+        </div>
         <div className="mb-2 flex gap-1.5 overflow-x-auto pb-0.5">
           {quickCommands.map((command) => (
-            <button
+            <span
               key={command}
-              type="button"
-              onClick={() => void sendMessage(command)}
-              disabled={isLoading}
-              className="shrink-0 rounded border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-600 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+              data-ui-tip="Suggestion: sends this prompt to Ground Agent."
+              className="shrink-0"
             >
-              {command}
-            </button>
+              <button
+                type="button"
+                onClick={() => void sendMessage(command)}
+                disabled={isLoading}
+                aria-describedby="ground-agent-suggestions-label"
+                className="rounded border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-600 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {command}
+              </button>
+            </span>
           ))}
         </div>
         <div className="flex items-end gap-2">

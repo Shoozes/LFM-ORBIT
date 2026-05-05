@@ -192,10 +192,11 @@ export function useTelemetry(): UseTelemetryState {
       };
     }
 
-    connect();
+    const initialConnectTimer = window.setTimeout(connect, 0);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(initialConnectTimer);
       if (reconnectTimer.current) {
         clearTimeout(reconnectTimer.current);
         reconnectTimer.current = null;

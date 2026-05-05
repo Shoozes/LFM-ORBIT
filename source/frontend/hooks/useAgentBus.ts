@@ -32,7 +32,8 @@ export function useAgentBus() {
   const apiBase = getApiBaseUrl();
 
   useEffect(() => {
-    let reconnectTimer: number;
+    let reconnectTimer: number | undefined;
+    let initialConnectTimer: number | undefined;
     let isActive = true;
 
     const connect = () => {
@@ -78,11 +79,16 @@ export function useAgentBus() {
       };
     };
 
-    connect();
+    initialConnectTimer = window.setTimeout(connect, 0);
 
     return () => {
       isActive = false;
-      clearTimeout(reconnectTimer);
+      if (initialConnectTimer !== undefined) {
+        window.clearTimeout(initialConnectTimer);
+      }
+      if (reconnectTimer !== undefined) {
+        window.clearTimeout(reconnectTimer);
+      }
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;

@@ -164,6 +164,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
 
     await expect(page.getByTestId("ground-agent-nav-object_evidence")).toHaveCount(0);
     await expect(page.getByTestId("ground-agent-nav-proof")).toBeDisabled();
+    await expect(page.getByTestId("ground-agent-nav-proof-tip")).toHaveAttribute("data-ui-tip", "Start or load a mission first.");
 
     await page.getByTestId("ground-agent-nav-logs").click();
     await expect(page.getByText("Alerts & Logs")).toBeVisible();
@@ -181,6 +182,8 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await expect(page.getByTestId("tab-agents")).toHaveClass(/border-zinc-900/);
     await expect(page.getByText("Ground Agent").first()).toBeVisible();
     await expect(page.getByTestId("ground-agent-operator-playbook")).toContainText("Task, replay, inspect.");
+    await expect(page.getByTestId("ground-agent-suggestions-label")).toContainText("Suggested Prompts");
+    await expect(page.getByTestId("ground-agent-suggestions-label")).toContainText("Ask only. Confirm before app changes.");
     await expect(page.getByRole("button", { name: "Run Florida firewatch mission" })).toBeVisible();
     await expect(page.getByTestId("header-agent-bus")).toContainText("SAT/GND Dialogue Bus");
   });
