@@ -4,7 +4,7 @@ Updated **May 5, 2026**.
 
 This is the compact backlog and integrity checklist. Keep run-by-run history in `summary_bank.json`; keep product proof in `README.md`; keep implementation contracts in focused docs.
 
-See `QA_PITFALLS.md` for the detailed guardrail checklist.
+See [QA_PITFALLS.md](QA_PITFALLS.md) for the detailed guardrail checklist.
 
 ## Current State
 
@@ -23,6 +23,8 @@ See `QA_PITFALLS.md` for the detailed guardrail checklist.
 - Frontend reloads must not restart an active mission from the first scan cell or let stale demo query params override a live mission.
 - Public README proof currently centers on Critical Minerals, target-pack proof, payload reduction, orbital eclipse queueing, provenance, abstain safety, Greenland timelapse context, Ground Agent flow, and semantic map context.
 - The current trained NM-UNI bundle is fetched from `Shoozes/lfm2.5-450m-vl-orbit-satellite`; Orbit still treats it as evidence-packet reasoning until a direct image-conditioned adapter is wired and smoke-tested.
+- Docs are split by audience: `docs/user/` is for demo/review operators, `docs/dev/` is for architecture, data/model handoff, future lanes, QA, and backlog work.
+- Tracked ad hoc backend scratch probes are pruned; use maintained scripts, tests, or documented manual provider probes instead.
 
 ## Active Backlog
 
@@ -32,11 +34,12 @@ See `QA_PITFALLS.md` for the detailed guardrail checklist.
 - Add responsive/mobile coverage for the fixed right rail and Proof Mode panel.
 - Add a small frontend unit/component layer for high-churn pure logic and hooks.
 - Keep import/export guards current whenever scripts, entrypoints, or dataset row types change.
+- Keep the docs user/dev split enforced when adding new markdown files.
 - Add lightweight API contract coverage for responses that must never expose local machine paths or secret-adjacent directories.
 - On the next demo-media refresh, pre-warm or trim Proof Mode transition frames so recorded videos do not linger on black loading states.
 - Promote additional camera/location targets only with semantic profiles: aliases, bbox, center, camera, location type, terrain context, mission context, safe evidence guidance, and tags.
 - Add optional external geocoding behind `/api/location/resolve` only if arbitrary place lookup becomes required. Keep the vetted local registry as the offline/default provider.
-- Keep `marine_debris` and live HAB scoring as post-handoff Sentinel lanes; the combined plan lives in `docs/FUTURE_SENTINEL_LANES.md`.
+- Keep `marine_debris` and live HAB scoring as post-handoff Sentinel lanes; the combined plan lives in [FUTURE_SENTINEL_LANES.md](FUTURE_SENTINEL_LANES.md).
 
 ## Scope Lock
 
@@ -128,18 +131,17 @@ Model/runtime:
 
 ## Latest Validation Snapshot
 
-- Root cold-start verify passed after `.\run.ps1 -Clean`.
-- Latest backend suite passed `446`.
+- Latest backend suite passed `453` after the user/dev docs split and scratch-probe prune.
+- Focused docs/import guards passed `21` with the user/dev docs split guard.
 - Focused docs/import/startup-firewatch guards passed `62`.
 - Focused Playwright startup/draw-area guard passed `2`.
-- Frontend lint/build passed after the startup/firewatch stabilization pass.
+- Frontend lint/build passed after the user/dev docs split and scratch-probe prune.
 - Clean-start browser smoke confirmed no active mission, no replay auto-play, Atacama context selected, and only the SAT/GND boot messages on the bus.
 - Florida Fire/Drought smoke confirmed `2026-04-05` to `2026-05-05`, `378/378` cells scanned, and `0` confirmed flags because proxy-only vegetation signals were filtered.
 - Focused scanner reload regression guard passed in `tests/test_scanner_resume.py`.
 - Mission target-pack UI guard passed in `source/frontend/e2e/vlm.spec.ts`.
 - Full Playwright passed `98` with `1` intentional HTML-dump skip after 3D and Mission evidence UI pruning.
 - Docs/import/scanner focused guard passed `21`; docs artifact guard alone passed `16` after the May 5 consolidation pass.
-- Frontend lint/build passed after the May 5 consolidation pass.
 - Focused Playwright Mission target-pack guard passed `3` on alternate ports because local `8000` was already occupied.
 - Media contact-sheet review passed for promoted README images and docs videos; next refresh should trim black Proof Mode loading transition frames.
 - Latest pushed CI and CodeQL runs on `main` passed after the tutorial pacing update.

@@ -81,4 +81,4 @@ retained alert/replay proof fields
 Proof Mode JSON + reset-safe archive + dataset rows
 ```
 
-Current follow-up items live in `dev/TODO.md`. This document is the stable contract and scope boundary.
+Current follow-up items live in `../dev/TODO.md`. This document is the stable contract and scope boundary.

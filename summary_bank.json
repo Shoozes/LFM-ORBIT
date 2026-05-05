@@ -66,15 +66,15 @@
   },
   "groups": {
     "docs_state_and_tracking": {
-      "note": "README is the compact, infographic-led product surface with the live GitHub shape preserved: pitch, one hero visual, showcase command, highlights, proof gallery, validation snapshot, model handoff, runtime limits, explicit scope lock, and docs links. The front-door pitch now frames LFM-ORBIT as a satellite-image timelapse scanner with a space-to-ground handoff: map/time-window search, satellite-side pruning, ground-side validation, and compact proof JSON. test_docs_artifacts.py enforces section order plus repo-wide local markdown links, promoted image nonblank checks, public WebM temporal checks, documented media existence, and summary-bank file references. ARCHITECTURE carries stable system shape and guard-suite design instead of run-by-run progress history. TODO is now a compact active backlog and verification checklist, not a changelog. QA_PITFALLS is the detailed regression guide and now also carries the short README-update rule. docs/media/README.md describes organized media folders. AGENT_GROWTH_LOOP documents the app-usage to semantics/tests/docs improvement method. DATASET_CYCLE_TUTORIAL, MODEL_HANDOFF, and FUTURE_SENTINEL_LANES carry repeatable workflow detail without duplicating progress history. docs/README.md is the single docs index; separate user/dev mini-indexes were pruned to keep the docs surface short.",
+      "note": "README is the compact, infographic-led product surface. docs/README.md is the single docs index and now separates operator-facing docs under docs/user/ from maintenance, data, future-lane, QA, and backlog docs under docs/dev/. Public docs keep run-by-run history out of user copy; summary_bank.json carries detailed history and file groups. test_docs_artifacts.py enforces section order, local markdown links, promoted image nonblank checks, public WebM temporal checks, documented media existence, user/dev docs separation, and summary-bank file references. ARCHITECTURE carries stable system shape and guard-suite design; TODO is the compact active backlog; QA_PITFALLS is the detailed regression guide; AGENT_GROWTH_LOOP documents the app-usage to semantics/tests/docs method.",
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DATASET_CYCLE_TUTORIAL.md",
-        "docs/DEMO_GUIDE.md",
+        "docs/dev/DATASET_CYCLE_TUTORIAL.md",
+        "docs/user/DEMO_GUIDE.md",
         "docs/dev/Liquid_AI_x_DPhi_Space_Hackathon_Criteria.md",
         "docs/dev/MODEL_HANDOFF.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
@@ -106,7 +106,10 @@
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json",
         "docs/README.md",
-        "docs/FUTURE_SENTINEL_LANES.md"
+        "docs/dev/FUTURE_SENTINEL_LANES.md",
+        "docs/dev/AGENT_GROWTH_LOOP.md",
+        "docs/dev/SENTINEL_CLOSE_LOOKS.md",
+        "source/backend/tests/test_docs_artifacts.py"
       ]
     },
     "docs_model_runtime_and_handoff": {
@@ -114,9 +117,9 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
+        "docs/user/DEMO_GUIDE.md",
         "docs/dev/MODEL_HANDOFF.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/story-plates/story-object-evidence-port.png",
@@ -147,7 +150,7 @@
       "note": "Docs/media artifact integrity lane: public docs media is organized under docs/media, referenced markdown links are checked relative to each owning file, promoted README images are checked as nonblank, explicit public WebMs are checked as nonblank and temporal, and summary_bank file references must remain repo-relative and existing. May 4 refreshed README screenshots, recorded demo WebMs, tutorial WebM, object-evidence audit media, and Greenland timelapse GIF/WebM; contact-sheet review confirmed app content first frames, grouped port candidates, proof panels, and distinct timelapse slices. Object-evidence video is now held long enough to clear the public temporal duration guard. Docs artifact integrity covers nested docs/**/*.md links in addition to README/root docs/source data docs. The docs surface was later pruned back to one root index plus focused docs, and stale docs-root media wording points at docs/media/videos/.",
       "files": [
         "README.md",
-        "docs/DEMO_GUIDE.md",
+        "docs/user/DEMO_GUIDE.md",
         "docs/dev/TODO.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/media/README.md",
@@ -172,8 +175,8 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
@@ -208,8 +211,8 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/story-plates/story-object-evidence-port.png",
@@ -238,8 +241,8 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/story-plates/story-object-evidence-port.png",
@@ -276,8 +279,8 @@
         ".env.example",
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/story-plates/story-object-evidence-port.png",
@@ -321,7 +324,7 @@
       "note": "Malformed Depth Anything image payloads fail before optional model loading, nested fenced LFM tool-call JSON parses correctly, benign Windows websocket teardown noise is filtered narrowly, Mission refresh failures leave debug diagnostics, provider/QC failures cannot become positive alerts, and fallback paths leave traceable provenance. MapVisualizer also treats shader/WebGL/basemap render failures as recoverable operator-visible map degradation while keeping mission scoring unaffected.",
       "files": [
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
+        "docs/user/DEMO_GUIDE.md",
         "docs/dev/MODEL_HANDOFF.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
@@ -352,8 +355,8 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "source/backend/api/main.py",
@@ -377,13 +380,13 @@
       ]
     },
     "issue_group_integrity_scalability_review": {
-      "note": "Current May 5 integrity/scalability lane: progress docs remain consolidated into README/product, ARCHITECTURE/system, focused workflow docs, QA_PITFALLS/regression checklist, TODO/current backlog, and summary_bank/file groups. The latest pass pruned stale evidence-tool UI language, documented target packs as backend/proof contracts, added a docs guard against retired UI claims, and removed the retired object-evidence demo script from refresh docs. Recent runtime integrity work also covers scanner resume after frontend reload, stale demo-query isolation from active live missions, telemetry idle-without-mission behavior, SimSat-first startup, GGUF fetch expectations, 3D popup removal, firewatch proxy-only filtering, and lean Mission UI boundaries.",
+      "note": "Current May 5 integrity/scalability lane: progress docs stay consolidated into README/product, docs/user/operator review, docs/dev/system-maintenance, QA_PITFALLS/regression checklist, TODO/current backlog, and summary_bank/file groups. The latest pass made the user/dev split explicit, moved dataset/future/Sentinel/agent-growth docs into dev, kept demo/proof contracts in user docs, added a docs guard for that split, and pruned tracked ad hoc backend scratch probes. Recent runtime integrity work also covers scanner resume after frontend reload, stale demo-query isolation from active live missions, telemetry idle-without-mission behavior, SimSat-first startup, GGUF fetch expectations, 3D popup removal, firewatch proxy-only filtering, shared SAT/GND GGUF status, and lean Mission UI boundaries.",
       "files": [
         "README.md",
         "docs/README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/README.md",
@@ -394,7 +397,11 @@
         "source/frontend/e2e/vlm.spec.ts",
         "source/frontend/e2e/qa_verification.spec.ts",
         "source/frontend/e2e/capture_screenshots.spec.ts",
-        "source/frontend/playwright.demo.config.ts"
+        "source/frontend/playwright.demo.config.ts",
+        "docs/dev/AGENT_GROWTH_LOOP.md",
+        "docs/dev/SENTINEL_CLOSE_LOOKS.md",
+        "docs/dev/DATASET_CYCLE_TUTORIAL.md",
+        "docs/dev/FUTURE_SENTINEL_LANES.md"
       ]
     },
     "issue_group_context_menu_vlm_and_visual_polish": {
@@ -440,8 +447,8 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
@@ -523,8 +530,8 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
@@ -597,8 +604,8 @@
       "note": "Mission lifecycle, SAT/GND message flow, backend-derived DTN queue state, operator-visible Agent Dialogue bus errors, SAT/GND role strip, Ground Agent assistant error payloads, local action chat, bounded agentic mission-planning proposals, candidate-evidence wording, operator playbook shortcuts, Agent-first operator shell behavior, semantic stop/navigate camera actions with location type, terrain context, suggested targets and safe evidence guidance, active-mission destination redirect confirmations for targets such as Giza Pyramid Complex, Florida Fire/Drought candidate mission pack, scan-animation pause semantics, and agent runtime behaviors.",
       "files": [
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
@@ -640,7 +647,7 @@
     "feature_group_ground_agent_action_chat": {
       "note": "Local-only Ground Agent tool calls now plan mutating actions as in-bubble proposal cards before execution: loading/rescanning replays, starting mission packs from explicit or current context including Florida Fire/Drought Readiness Watch, building bounded custom mission proposals from flexible prompts with workflow attempts/final result/use-case and target-pack inference, routing temporal area requests such as Davenport new-construction timelapse into semantic mission plans before map navigation, routing garbage-patch-style monthly 10-year prompts into a cautious North Pacific debris-convergence candidate mission with plastic target pack and no-overclaim evidence limits, extracting last-N-years windows and explicit monthly/quarterly/yearly cadence metadata, using a small repo-local ground_agent_tool_semantics.example.jsonl fixture plus deterministic matcher for product-specific routing/eval examples, toggling link state, editing mission object targets, stopping active missions, resolving known destination text through `/api/location/resolve`, presenting `navigate_map_location` previews with center/bbox/provider/confidence/provenance and Esri 3x3 imagery tiles, flying the map camera only after confirmation for targets such as Bull Creek, FL, Giza Pyramid Complex, Bronx, NY, Davenport, FL, Suez Canal, Greenland Ice Edge, Manchar Lake, and the North Pacific debris review window, asking for stop-and-fly confirmation before destination redirects during active missions, surfacing structured action chips, showing an operator playbook, using hackathon-focused quick commands, navigating core app panels, and refreshing mission/telemetry after confirmed actions.",
       "files": [
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/media/readme/readme-ground-agent-chat-action.png",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
@@ -680,8 +687,8 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
@@ -715,8 +722,8 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
@@ -751,9 +758,9 @@
         ".env.example",
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
+        "docs/user/DEMO_GUIDE.md",
         "docs/dev/MODEL_HANDOFF.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/story-plates/story-object-evidence-port.png",
@@ -794,10 +801,10 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DATASET_CYCLE_TUTORIAL.md",
-        "docs/DEMO_GUIDE.md",
+        "docs/dev/DATASET_CYCLE_TUTORIAL.md",
+        "docs/user/DEMO_GUIDE.md",
         "docs/dev/MODEL_HANDOFF.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
@@ -864,7 +871,7 @@
       "files": [
         "README.md",
         "docs/dev/MODEL_HANDOFF.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/TODO.md",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
@@ -894,8 +901,8 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
@@ -919,9 +926,9 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
+        "docs/user/DEMO_GUIDE.md",
         "docs/dev/MODEL_HANDOFF.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
@@ -1024,9 +1031,9 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
+        "docs/user/DEMO_GUIDE.md",
         "docs/dev/MODEL_HANDOFF.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/story-plates/story-object-evidence-port.png",
@@ -1080,9 +1087,9 @@
       "files": [
         ".env.example",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
+        "docs/user/DEMO_GUIDE.md",
         "docs/dev/MODEL_HANDOFF.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
@@ -1125,7 +1132,7 @@
       "note": "Primary operator UI shells, Agent-first right rail, Ground Agent primary panel, multiline Ground Agent composer for longer operations prompts, SAT/GND Dialogue Bus secondary panel, lean Mission Control plan/replay surfaces, map interactions including right-click and propagation-safe button-driven spatial options, proposal-card location preview tiles for confirmed map navigation, Agent Dialogue inline bus errors, Ground Agent guarded sends/errors, logs integrity metrics, and settings/runtime surfaces.",
       "files": [
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
+        "docs/user/DEMO_GUIDE.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "source/frontend/App.tsx",
@@ -1172,9 +1179,9 @@
         ".nvmrc",
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
+        "docs/user/DEMO_GUIDE.md",
         "docs/dev/MODEL_HANDOFF.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
@@ -1221,9 +1228,9 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
+        "docs/user/DEMO_GUIDE.md",
         "docs/dev/MODEL_HANDOFF.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
@@ -1267,7 +1274,7 @@
     "feature_group_wildfire_seed_and_future_watch": {
       "note": "Real wildfire candidate handling and timestamped watch proof. Highway 82 Georgia remains candidate-quality Sentinel-2 SWIR/NIR/Red replay evidence from cached API imagery; the SPC Southern High Plains watch is now incident-report verified as a Sparks Fire candidate through NM Fire Info, while satellite burn-scar confirmation remains a separate post-event imagery step.",
       "files": [
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/TODO.md",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
@@ -1304,7 +1311,7 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
@@ -1362,8 +1369,8 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
@@ -1426,8 +1433,8 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
-        "docs/OBJECT_EVIDENCE_MODE.md",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-orbital-eclipse.png",
@@ -1487,7 +1494,7 @@
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/DEMO_GUIDE.md",
+        "docs/user/DEMO_GUIDE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "source/backend/core/analyzer.py",
@@ -1502,6 +1509,27 @@
         "source/frontend/components/GroundAgent.tsx",
         "source/frontend/components/MissionControl.tsx",
         "source/frontend/e2e/qa_verification.spec.ts",
+        "summary_bank.json"
+      ]
+    },
+    "issue_group_docs_user_dev_split": {
+      "note": "Docs organization hardening: operator/demo review docs now live under docs/user, engineering and maintenance docs live under docs/dev, root docs only keep README plus media. Local markdown guards enforce the split and link validity. Tracked backend scratch probe scripts were removed because maintained manual provider probes and documented seeders cover that development need with clearer contracts.",
+      "files": [
+        "README.md",
+        "docs/README.md",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
+        "docs/dev/AGENT_GROWTH_LOOP.md",
+        "docs/dev/ARCHITECTURE.md",
+        "docs/dev/DATASET_CYCLE_TUTORIAL.md",
+        "docs/dev/FUTURE_SENTINEL_LANES.md",
+        "docs/dev/MODEL_HANDOFF.md",
+        "docs/dev/QA_PITFALLS.md",
+        "docs/dev/SENTINEL_CLOSE_LOOKS.md",
+        "docs/dev/TODO.md",
+        "source/backend/data/README.md",
+        "source/backend/tests/test_docs_artifacts.py",
+        "source/backend/tests/test_import_contracts.py",
         "summary_bank.json"
       ]
     }
@@ -1532,9 +1560,6 @@
       "note": "[collapsed (+)]"
     },
     "source/backend/core": {
-      "note": "[collapsed (+)]"
-    },
-    "source/backend/scratch": {
       "note": "[collapsed (+)]"
     },
     "source/backend/scripts": {

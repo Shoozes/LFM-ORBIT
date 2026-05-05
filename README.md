@@ -6,7 +6,7 @@ It runs from space to ground. A satellite-side pruner sweeps map tiles and image
 
 A 1-2 KB alert with bbox, confidence, provenance, model output, and payload accounting can move during a narrow contact window. Raw imagery can wait, or never be sent.
 
-[Hackathon event](https://luma.com/n9cw58h0) | [Docs](docs/README.md) | [Demo guide](docs/DEMO_GUIDE.md) | [Tutorial video](docs/media/videos/tutorial_video.webm)
+[Hackathon event](https://luma.com/n9cw58h0) | [Docs](docs/README.md) | [Demo guide](docs/user/DEMO_GUIDE.md) | [Tutorial video](docs/media/videos/tutorial_video.webm)
 
 ![What is LFM-ORBIT?](docs/media/infographics/what-is-lfm-orbit-info.png)
 
@@ -161,7 +161,7 @@ Direct image inference: unavailable until mmproj/native VLM runtime is present
 
 The production launcher path installs `llama-cpp-python` and runs the trained-model smoke check. If the GGUF runtime cannot load, option 1 fails before the app starts instead of silently running the hackathon path without the trained model.
 
-Dataset export, retagging, and Hugging Face upload details live in [docs/DATASET_CYCLE_TUTORIAL.md](docs/DATASET_CYCLE_TUTORIAL.md).
+Dataset export, retagging, and Hugging Face upload details live in [docs/dev/DATASET_CYCLE_TUTORIAL.md](docs/dev/DATASET_CYCLE_TUTORIAL.md).
 
 ## Run Locally
 
@@ -190,16 +190,16 @@ API: `http://127.0.0.1:8000`
 | Doc | Purpose |
 |---|---|
 | [docs/README.md](docs/README.md) | Compact docs index |
-| [docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md) | Demo commands, artifacts, and replay assets |
+| [docs/user/DEMO_GUIDE.md](docs/user/DEMO_GUIDE.md) | Demo commands, artifacts, and replay assets |
 | [docs/dev/ARCHITECTURE.md](docs/dev/ARCHITECTURE.md) | Runtime map and design notes |
-| [docs/OBJECT_EVIDENCE_MODE.md](docs/OBJECT_EVIDENCE_MODE.md) | Target-pack proof contracts, safety scope, and current UI boundaries |
-| [docs/DATASET_CYCLE_TUTORIAL.md](docs/DATASET_CYCLE_TUTORIAL.md) | Seed, export, retag, and Hugging Face cycle |
+| [docs/user/OBJECT_EVIDENCE_MODE.md](docs/user/OBJECT_EVIDENCE_MODE.md) | Target-pack proof contracts, safety scope, and current UI boundaries |
+| [docs/dev/DATASET_CYCLE_TUTORIAL.md](docs/dev/DATASET_CYCLE_TUTORIAL.md) | Seed, export, retag, and Hugging Face cycle |
 | [docs/dev/MODEL_HANDOFF.md](docs/dev/MODEL_HANDOFF.md) | Model bundle and dataset handoff contract |
-| [docs/FUTURE_SENTINEL_LANES.md](docs/FUTURE_SENTINEL_LANES.md) | Post-handoff Sentinel lane boundaries |
+| [docs/dev/FUTURE_SENTINEL_LANES.md](docs/dev/FUTURE_SENTINEL_LANES.md) | Post-handoff Sentinel lane boundaries |
 | [docs/dev/TODO.md](docs/dev/TODO.md) | Compact active backlog and verification checklist |
 
 ## Usage To Training Loop
 
 ![App usage to agent growth loop](docs/media/infographics/app-usage-to-agent-growth-info.png)
 
-Operator prompts become product feedback: semantics rows, backend contracts, browser flows, docs, TODO entries, summary-bank groups, and future model training candidates. The repeatable method lives in [docs/AGENT_GROWTH_LOOP.md](docs/AGENT_GROWTH_LOOP.md).
+Operator prompts become product feedback: semantics rows, backend contracts, browser flows, docs, TODO entries, summary-bank groups, and future model training candidates. The repeatable method lives in [docs/dev/AGENT_GROWTH_LOOP.md](docs/dev/AGENT_GROWTH_LOOP.md).

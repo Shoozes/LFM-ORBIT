@@ -17,7 +17,7 @@ The goal is a closed loop: collect evidence in Orbit, package it cleanly, retag 
 
 ![LFM-ORBIT data cycle](../../../docs/media/infographics/image-to-training-data-flow-info.png)
 
-The app-growth loop starts even earlier: real operator prompts become confirmable actions, tests, docs, local semantics rows, and then future model/app improvements. The full method lives in `../../../docs/AGENT_GROWTH_LOOP.md`.
+The app-growth loop starts even earlier: real operator prompts become confirmable actions, tests, docs, local semantics rows, and then future model/app improvements. The full method lives in `../../../docs/dev/AGENT_GROWTH_LOOP.md`.
 
 ![App usage to agent growth loop](../../../docs/media/infographics/app-usage-to-agent-growth-info.png)
 
@@ -73,7 +73,7 @@ If a context thumbnail falls back to an offline SVG chip, the exporter rasterize
 
 The file must stay local to the repo and should not be uploaded to Hugging Face. It is too small and product-specific for public training value. It also must not become a hidden gazetteer: location names still resolve through explicit vetted targets or a future geocoding provider behind `/api/location/resolve`.
 
-Future marine-debris examples should stay out of the active fixture until `start_marine_debris_scan` exists in the backend whitelist, scan path, and UI. Prototype those rows in `ground_agent_tool_semantics.local.jsonl` only; future Sentinel lane boundaries live in `../../../docs/FUTURE_SENTINEL_LANES.md`.
+Future marine-debris examples should stay out of the active fixture until `start_marine_debris_scan` exists in the backend whitelist, scan path, and UI. Prototype those rows in `ground_agent_tool_semantics.local.jsonl` only; future Sentinel lane boundaries live in `../../../docs/dev/FUTURE_SENTINEL_LANES.md`.
 
 ## Optional Sentinel Replay Data
 
@@ -298,7 +298,7 @@ Current local packaging result after optional replay seeding:
 - Use semantic refresh labels such as `orbit-satdata-YYYY-MM-DD` for local export/retag folders.
 - Publish only changed assets and metadata configs; avoid re-uploading already-present hashes unless a schema changes.
 - Keep `mission_metadata` for metadata-only missions such as the Greenland ice/snow extent replay instead of forcing invalid timelapse assets into image configs.
-- Record each Hub refresh in this README, `docs/DATASET_CYCLE_TUTORIAL.md`, and `summary_bank.json` with counts, commit hash, tagger source, and skipped/failed asset counts.
+- Record each Hub refresh in this README, `docs/dev/DATASET_CYCLE_TUTORIAL.md`, and `summary_bank.json` with counts, commit hash, tagger source, and skipped/failed asset counts.
 - For hackathon demos, prefer seeded replay data and SimSat runtime evidence before spending direct-provider quota on refreshes.
 - Hugging Face dataset: `Shoozes/LFM-Orbit-SatData`, latest data/card commit `2d5c5c400b61e869a1154881743ac6f1c1f77e3b`, with `mission_metadata=185` for operator task text, target packs, object targets, bbox intent, and metadata-only replay missions.
 - Dataset Viewer schema note: upload `source/backend/data/HF_DATASET_CARD.md` as the Hub `README.md` so single-image SFT rows, temporal SFT rows, metadata, mission metadata, and review records load as separate configs instead of one mixed inferred JSON split.

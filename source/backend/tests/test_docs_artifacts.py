@@ -216,6 +216,27 @@ def test_docs_media_is_organized_under_media_subfolders():
     assert expected_subfolders.issubset(actual_subfolders)
 
 
+def test_docs_user_and_dev_surfaces_are_separated():
+    """Keep operator docs and maintenance docs in distinct folders."""
+    docs_root = REPO_ROOT / "docs"
+    user_docs = sorted(path.name for path in (docs_root / "user").glob("*.md"))
+    dev_docs = sorted(path.name for path in (docs_root / "dev").glob("*.md"))
+    root_docs = sorted(path.name for path in docs_root.glob("*.md"))
+
+    assert user_docs == ["DEMO_GUIDE.md", "OBJECT_EVIDENCE_MODE.md"]
+    assert root_docs == ["README.md"]
+    assert {
+        "AGENT_GROWTH_LOOP.md",
+        "ARCHITECTURE.md",
+        "DATASET_CYCLE_TUTORIAL.md",
+        "FUTURE_SENTINEL_LANES.md",
+        "MODEL_HANDOFF.md",
+        "QA_PITFALLS.md",
+        "SENTINEL_CLOSE_LOOKS.md",
+        "TODO.md",
+    }.issubset(set(dev_docs))
+
+
 def test_docs_media_files_are_referenced_by_markdown():
     markdown_roots = [
         REPO_ROOT / "README.md",

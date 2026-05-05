@@ -72,7 +72,7 @@ Keep it local. App-level CV captures, Playwright screenshots, and generated plat
 
 Public docs media must be linked from markdown and covered by `source/backend/tests/test_docs_artifacts.py`. Raw Playwright screenshots should not write to `docs/media/` unless the artifact is intentionally promoted.
 
-If a promoted WebM is referenced from README or the demo guide, it must also be included in the explicit public-video temporal/nonblank guard. The May 3, 2026 media refresh found `object-evidence-demo.webm` linked from README but missing from that explicit video list, which made the docs feel stale even though the file existed. The fix is to list the video in both `docs/DEMO_GUIDE.md` and `test_public_demo_videos_are_temporal_and_nonblank`.
+If a promoted WebM is referenced from README or the demo guide, it must also be included in the explicit public-video temporal/nonblank guard. The May 3, 2026 media refresh found `object-evidence-demo.webm` linked from README but missing from that explicit video list, which made the docs feel stale even though the file existed. The fix is to list the video in both `docs/user/DEMO_GUIDE.md` and `test_public_demo_videos_are_temporal_and_nonblank`.
 
 Recorded docs-video suites should own their ports one at a time. Do not run `npm run demo:record` and `npm run demo:tutorial` in parallel unless the configs are moved to separate API/debug/Vite ports; both suites expect the default `8000`, `8080`, and `5173` launch path.
 
@@ -142,7 +142,7 @@ Do not print or paste tokens. Use `scripts/upload_orbit_dataset_hf.py` so the to
 
 ### How do we verify a Hub refresh?
 
-Upload only after local JSONL parsing and image inventory pass. Then read back the exact Hub revision and verify row counts for every config, the card counts, and manifest portability. Update `../DATASET_CYCLE_TUTORIAL.md`, `source/backend/data/README.md`, `MODEL_HANDOFF.md`, `TODO.md`, and `summary_bank.json` with the final Hub commit, not an intermediate upload commit.
+Upload only after local JSONL parsing and image inventory pass. Then read back the exact Hub revision and verify row counts for every config, the card counts, and manifest portability. Update `DATASET_CYCLE_TUTORIAL.md`, `source/backend/data/README.md`, `MODEL_HANDOFF.md`, `TODO.md`, and `summary_bank.json` with the final Hub commit, not an intermediate upload commit.
 
 ## Cold-Start QA
 

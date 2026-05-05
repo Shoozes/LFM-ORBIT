@@ -64,6 +64,15 @@ def test_supported_script_module_list_matches_scripts_directory():
     assert set(SCRIPT_MODULES) == expected
 
 
+def test_backend_scratch_probe_modules_are_pruned():
+    """Keep ad hoc provider probes out of the tracked backend surface."""
+    scratch_dir = BACKEND_ROOT / "scratch"
+    if not scratch_dir.exists():
+        return
+
+    assert sorted(path.name for path in scratch_dir.glob("*.py")) == []
+
+
 def test_launchers_keep_minimal_runtime_guards_documented():
     """Keep cold-start launchers aligned with the documented Python/Node/uv contract."""
     repo_root = BACKEND_ROOT.parents[1]

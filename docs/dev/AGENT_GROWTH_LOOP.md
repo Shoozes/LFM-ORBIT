@@ -4,7 +4,7 @@ Updated **May 3, 2026**.
 
 This document turns real app usage into repeatable app and agent improvement work. It is the operating method for prompts that reveal product gaps, semantics misses, UX friction, timing issues, or evidence-boundary risk.
 
-![App usage to agent growth loop](media/infographics/app-usage-to-agent-growth-info.png)
+![App usage to agent growth loop](../media/infographics/app-usage-to-agent-growth-info.png)
 
 ## Method
 
@@ -14,7 +14,7 @@ This document turns real app usage into repeatable app and agent improvement wor
 4. Add or update a local JSONL semantics row when the phrase is product-specific tool-routing guidance.
 5. Add backend contract tests for the proposal kind, details, risk level, bbox, dates, target pack, and evidence limits.
 6. Add frontend or Playwright coverage for the operator flow when UI state or confirmation behavior matters.
-7. Update `dev/TODO.md`, `summary_bank.json`, and any focused doc that owns the workflow.
+7. Update `TODO.md`, `summary_bank.json`, and any focused doc that owns the workflow.
 8. Re-run focused tests first, then broader validation when the change touches shared runtime or public proof artifacts.
 
 ## Scenario Card Format
