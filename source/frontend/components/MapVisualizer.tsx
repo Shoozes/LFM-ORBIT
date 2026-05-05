@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import maplibregl, {
   GeoJSONSource,
   LngLatBoundsLike,
@@ -359,6 +367,7 @@ export default function MapVisualizer({
   const scanAnimationActiveRef = useRef(scanAnimationActive);
   const handledCameraRequestRef = useRef<string | null>(null);
   const cameraHudTimeoutRef = useRef<number | null>(null);
+  const dragPanWasEnabledRef = useRef<boolean | null>(null);
 
   // Bbox draw state
   const bboxStartRef = useRef<[number, number] | null>(null);
@@ -422,6 +431,83 @@ export default function MapVisualizer({
     setPinTooltip(null);
   }, []);
 
+  const unprojectPointer = useCallback((event: ReactPointerEvent<HTMLElement>): [number, number] | null => {
+    const map = mapRef.current;
+    if (!map) return null;
+    const rect = map.getContainer().getBoundingClientRect();
+    const lngLat = map.unproject([event.clientX - rect.left, event.clientY - rect.top]);
+    return [lngLat.lng, lngLat.lat];
+  }, []);
+
+  const beginBboxPointer = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!drawBboxActiveRef.current || event.button !== 0) return;
+    const start = unprojectPointer(event);
+    if (!start) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    bboxStartRef.current = start;
+    setBboxPreview([start[0], start[1], start[0], start[1]]);
+  }, [unprojectPointer]);
+
+  const updateBboxPointer = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!drawBboxActiveRef.current || !bboxStartRef.current) return;
+    const current = unprojectPointer(event);
+    if (!current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const [startLng, startLat] = bboxStartRef.current;
+    const [lng, lat] = current;
+    setBboxPreview([
+      Math.min(startLng, lng),
+      Math.min(startLat, lat),
+      Math.max(startLng, lng),
+      Math.max(startLat, lat),
+    ]);
+  }, [unprojectPointer]);
+
+  const finishBboxPointer = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!drawBboxActiveRef.current || !bboxStartRef.current) return;
+    const current = unprojectPointer(event);
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // Browser may already release capture after cancellation.
+    }
+    if (!current) {
+      bboxStartRef.current = null;
+      setBboxPreview(null);
+      return;
+    }
+    const [startLng, startLat] = bboxStartRef.current;
+    const [lng, lat] = current;
+    bboxStartRef.current = null;
+    setBboxPreview(null);
+    if (Math.abs(lng - startLng) < 0.001 || Math.abs(lat - startLat) < 0.001) {
+      return;
+    }
+    onBboxDrawn?.([
+      Math.min(startLng, lng),
+      Math.min(startLat, lat),
+      Math.max(startLng, lng),
+      Math.max(startLat, lat),
+    ]);
+  }, [onBboxDrawn, unprojectPointer]);
+
+  const cancelBboxPointer = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    bboxStartRef.current = null;
+    setBboxPreview(null);
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // Browser may already release capture after cancellation.
+    }
+  }, []);
+
   useEffect(() => {
     scanAnimationActiveRef.current = scanAnimationActive;
     if (!scanAnimationActive) {
@@ -443,7 +529,7 @@ export default function MapVisualizer({
   const geoJsonGridRef = useRef(geoJsonGrid);
   const drawBboxActiveRef = useRef(drawBboxActive);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     onCellClickRef.current = onCellClick;
     dropPinRef.current = dropPin;
     geoJsonGridRef.current = geoJsonGrid;
@@ -648,56 +734,6 @@ export default function MapVisualizer({
         if (typeof cellId === "string" || typeof cellId === "number") {
           onCellClickRef.current(String(cellId));
         }
-      });
-
-      // Mouse drag for bbox
-      map.on("mousedown", (event) => {
-        if (!drawBboxActiveRef.current) return;
-        // Don't intercept right clicks
-        if (event.originalEvent.button !== 0) return;
-        
-        event.preventDefault();
-        map.dragPan.disable(); // Stop the map from panning while dragging
-        
-        const { lng, lat } = event.lngLat;
-        bboxStartRef.current = [lng, lat];
-        setBboxPreview([lng, lat, lng, lat]);
-      });
-
-      map.on("mousemove", (event) => {
-        if (!drawBboxActiveRef.current || !bboxStartRef.current) return;
-        const { lng, lat } = event.lngLat;
-        const [startLng, startLat] = bboxStartRef.current;
-        setBboxPreview([
-          Math.min(startLng, lng), Math.min(startLat, lat),
-          Math.max(startLng, lng), Math.max(startLat, lat),
-        ]);
-      });
-
-      map.on("mouseup", (event) => {
-        if (!drawBboxActiveRef.current || !bboxStartRef.current) return;
-        map.dragPan.enable();
-        
-        const { lng, lat } = event.lngLat;
-        const [startLng, startLat] = bboxStartRef.current;
-        
-        // Prevent accidental micro-drags or clicks (width < 0.001 deg)
-        if (Math.abs(lng - startLng) < 0.001 || Math.abs(lat - startLat) < 0.001) {
-             bboxStartRef.current = null;
-             setBboxPreview(null);
-             return;
-        }
-
-        const bbox = [
-          Math.min(startLng, lng),
-          Math.min(startLat, lat),
-          Math.max(startLng, lng),
-          Math.max(startLat, lat),
-        ];
-        
-        bboxStartRef.current = null;
-        setBboxPreview(null);
-        onBboxDrawn?.(bbox);
       });
 
       // Context menu
@@ -1144,17 +1180,40 @@ export default function MapVisualizer({
     }
   }, [vlmGeoJson, mapReady]);
 
-  // Cursor style when bbox drawing is active
-  useEffect(() => {
+  // Cursor and gesture ownership when bbox drawing is active
+  useLayoutEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const canvas = map.getCanvas();
     canvas.style.cursor = drawBboxActive ? "crosshair" : "";
+    if (drawBboxActive) {
+      if (dragPanWasEnabledRef.current === null) {
+        dragPanWasEnabledRef.current = map.dragPan.isEnabled();
+      }
+      map.dragPan.disable();
+      return;
+    }
+    bboxStartRef.current = null;
+    setBboxPreview(null);
+    if (dragPanWasEnabledRef.current ?? true) {
+      map.dragPan.enable();
+    }
+    dragPanWasEnabledRef.current = null;
   }, [drawBboxActive]);
 
   return (
     <div data-testid="map-visualizer" className="relative w-full h-full bg-[#05070b]">
       <div ref={mapContainer} className="w-full h-full" />
+      {drawBboxActive && (
+        <div
+          data-testid="bbox-draw-hitbox"
+          className="absolute inset-0 z-[5] cursor-crosshair touch-none"
+          onPointerDown={beginBboxPointer}
+          onPointerMove={updateBboxPointer}
+          onPointerUp={finishBboxPointer}
+          onPointerCancel={cancelBboxPointer}
+        />
+      )}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(56,189,248,0.12),_transparent_26%),linear-gradient(180deg,_rgba(2,6,23,0.12)_0%,_rgba(2,6,23,0.26)_100%)]" />
 
       {cameraHud && (

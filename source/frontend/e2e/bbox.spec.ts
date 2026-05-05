@@ -25,6 +25,38 @@ test.describe("Bounding Box Draw Validation", () => {
     await expect(page.getByText("DRAWING MODE ACTIVE")).toHaveCount(0);
   });
 
+  test("drag-drawing a bbox updates Area Tools and the mission grid", async ({ page, request }) => {
+    await resetRuntimeState(request);
+    await gotoApp(page);
+    await waitForBasemapReady(page);
+
+    await page.getByTestId("map-clear-area-button").click();
+    await expect(page.getByTestId("map-area-status")).toContainText("No Area");
+
+    const canvas = page.locator(".maplibregl-canvas").first();
+    await expect(canvas).toBeVisible({ timeout: 10_000 });
+    const box = await canvas.boundingBox();
+    expect(box).not.toBeNull();
+
+    await page.getByTestId("map-draw-area-button").click();
+    await expect(page.getByTestId("map-area-status")).toContainText("Drawing");
+    await expect(page.getByText("DRAWING MODE ACTIVE")).toBeVisible();
+
+    await page.mouse.move(box!.x + box!.width * 0.34, box!.y + box!.height * 0.34);
+    await page.mouse.down();
+    await page.mouse.move(box!.x + box!.width * 0.57, box!.y + box!.height * 0.58, { steps: 8 });
+    await page.mouse.up();
+
+    await expect(page.getByTestId("map-area-status")).toContainText("Selected");
+    await expect(page.getByTestId("map-area-bbox")).not.toContainText("No selected area");
+    await expect(page.getByTestId("map-area-tools")).toContainText(/\d+ cells/);
+    await expect(page.getByText("DRAWING MODE ACTIVE")).toHaveCount(0);
+
+    await page.getByTestId("tab-mission").click();
+    await expect(page.getByText("Active Area")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("view-timelapse-preview")).toBeVisible();
+  });
+
   test("assigning a bbox from the map populates mission focus controls", async ({ page }) => {
     await gotoApp(page);
 
