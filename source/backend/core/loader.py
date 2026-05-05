@@ -2,7 +2,8 @@
 Temporal observation loader for LFM Orbit.
 
 This module provides temporal observations (before/after windows) for
-vegetation change detection. It exclusively uses direct Sentinel Hub access.
+vegetation change detection. It uses SimSat first and only reaches direct
+external providers when explicitly enabled for development.
 """
 
 import logging
@@ -62,6 +63,10 @@ def _set_cached_obs(cell_id: str, obs: ObservationPair):
         logger.debug("Failed writing observation cache for %s: %s", cache_key, exc)
 
 SOURCE_SENTINELHUB_DIRECT = "sentinelhub_direct_imagery"
+
+
+def _external_apis_disabled() -> bool:
+    return os.environ.get("DISABLE_EXTERNAL_APIS", "true").lower() in ("true", "1", "yes", "on")
 
 
 def _try_load_sentinelhub_observations(cell_id: str) -> Optional[ObservationPair]:
@@ -232,7 +237,7 @@ def load_temporal_observations(cell_id: str) -> ObservationPair:
                 )
                 if (
                     REGION.observation_mode == PROVIDER_SIMSAT_SENTINEL
-                    and os.environ.get("DISABLE_EXTERNAL_APIS", "false").lower() != "true"
+                    and not _external_apis_disabled()
                 ):
                     result = _try_load_simsat_mapbox_observations(cell_id)
                     if result is not None:
@@ -242,7 +247,7 @@ def load_temporal_observations(cell_id: str) -> ObservationPair:
                             "loader:fallback_to_simsat_mapbox",
                             "Falling back to SimSat Mapbox.",
                         )
-                if os.environ.get("DISABLE_EXTERNAL_APIS", "false").lower() == "true":
+                if _external_apis_disabled():
                     log_throttled(
                         logger,
                         logging.WARNING,

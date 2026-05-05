@@ -139,11 +139,11 @@ Current runtime: SimSat-first imagery lane, deterministic replay fixtures for re
 Pull the trained Orbit GGUF bundle into `runtime-data/models/lfm2.5-vlm-450m/`:
 
 ```powershell
-.\run.ps1 -Install -FetchModel
+.\run.ps1 -Install
 ```
 
 ```bash
-./run.sh --install --fetch-model
+./run.sh --install
 ```
 
 This writes `model_manifest.json`, preserves `orbit_model_handoff.json` as `source_handoff.json`, and stores `training_result_manifest.json`. Orbit exposes the distinction as:
@@ -162,12 +162,10 @@ Dataset export, retagging, and Hugging Face upload details live in [docs/DATASET
 
 ```powershell
 .\run.ps1 -Install
-.\run.ps1 -Run
 ```
 
 ```bash
 ./run.sh --install
-./run.sh --run
 ```
 
 App: `http://127.0.0.1:5173`

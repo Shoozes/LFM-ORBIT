@@ -47,13 +47,11 @@ LFM Orbit launcher
 
 Usage:
   ./run.sh                 Open the interactive menu
-  ./run.sh --install       Install locked deps, then start backend + frontend
-  ./run.sh --install-only  Install locked deps without starting the app
-  ./run.sh --run           Start backend + frontend from existing deps
+  ./run.sh --install       Install locked deps, fetch the trained GGUF, then start backend + frontend
+  ./run.sh --install-only  Advanced/dev: install locked deps without starting the app
+  ./run.sh --run           Advanced/dev: start backend + frontend from existing deps
   ./run.sh --clean         Clear mutable runtime stores for a cold start
   ./run.sh --verify        Install deps and run backend, frontend, and E2E checks
-  ./run.sh --install --fetch-model
-                           Also fetch the trained Orbit GGUF bundle before startup
 EOF
 }
 
@@ -89,6 +87,15 @@ load_dotenv() {
 }
 
 load_dotenv
+
+set_production_runtime_defaults() {
+    export OBSERVATION_PROVIDER="${OBSERVATION_PROVIDER:-simsat_sentinel}"
+    export SIMSAT_ENABLED="${SIMSAT_ENABLED:-true}"
+    export SIMSAT_DATA_SOURCE="${SIMSAT_DATA_SOURCE:-sentinel}"
+    export DISABLE_EXTERNAL_APIS="${DISABLE_EXTERNAL_APIS:-true}"
+}
+
+set_production_runtime_defaults
 
 require_command() {
     local name="$1"
@@ -246,7 +253,7 @@ write_simsat_status() {
     if [[ -d "$SIMSAT_DIR" ]]; then
         echo "[i] SimSat vendored source is present."
     else
-        echo "[i] SimSat vendored source is missing. Orbit will still start with Sentinel/NASA/local fallback paths."
+        echo "[i] SimSat vendored source is missing. Orbit stays on the SimSat/local path; direct providers require explicit OBSERVATION_PROVIDER overrides."
     fi
 }
 
@@ -432,7 +439,7 @@ run_app() {
     write_simsat_status
 
     if [[ ! -f "$MODEL_FILE" ]]; then
-        echo "[!] Trained GGUF model not found. Run ./run.sh --install --fetch-model for the production/hackathon path; continuing with development fallback behavior."
+        echo "[!] Trained GGUF model not found. Run ./run.sh --install for the production/hackathon path; continuing with development fallback behavior."
     fi
 
     echo "[*] Launching backend..."
@@ -527,12 +534,9 @@ run_menu() {
         echo "              LFM ORBIT               "
         echo "======================================"
         echo "1. Install/Repair + Fetch trained Orbit GGUF -> Run"
-        echo "2. Install/Repair -> Run (skip model fetch)"
-        echo "3. Install/Repair only (skip model fetch)"
-        echo "4. Run"
-        echo "5. Verify (backend + frontend + E2E)"
-        echo "6. Clean (cold-start runtime reset)"
-        echo "7. Exit"
+        echo "2. Verify (backend + frontend + E2E)"
+        echo "3. Clean (cold-start runtime reset)"
+        echo "4. Exit"
         echo "======================================"
 
         read -r -p "Select an option: " choice
@@ -544,29 +548,14 @@ run_menu() {
                 exit 0
                 ;;
             2)
-                FETCH_MODEL=false
-                install_deps
-                run_app
-                exit 0
-                ;;
-            3)
-                FETCH_MODEL=false
-                install_deps
-                exit 0
-                ;;
-            4)
-                run_app
-                exit 0
-                ;;
-            5)
                 run_verify
                 exit 0
                 ;;
-            6)
+            3)
                 clean_data
                 sleep 2
                 ;;
-            7)
+            4)
                 exit 0
                 ;;
             *)
@@ -624,6 +613,7 @@ if [[ "$VERIFY" == true ]]; then
 fi
 
 if [[ "$INSTALL" == true ]]; then
+    FETCH_MODEL=true
     install_deps
     run_app
     exit 0

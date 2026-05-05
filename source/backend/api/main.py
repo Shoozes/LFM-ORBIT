@@ -34,6 +34,7 @@ from core.agent_bus import (
 )
 from core.config import (
     PROVIDER_FALLBACK_ORDER,
+    PROVIDER_GEE,
     PROVIDER_NASA_DIRECT,
     PROVIDER_SENTINELHUB_DIRECT,
     PROVIDER_SIMSAT_MAPBOX,
@@ -593,6 +594,16 @@ def provider_status():
     simsat_available = client.is_available()
     sentinelhub_available = sentinel_creds.available
     nasa_available = nasa_creds.available
+    external_apis_enabled = os.environ.get("DISABLE_EXTERNAL_APIS", "true").lower() not in {"true", "1", "yes", "on"}
+    direct_provider_active = REGION.observation_mode in {
+        PROVIDER_GEE,
+        PROVIDER_SENTINELHUB_DIRECT,
+        PROVIDER_NASA_DIRECT,
+    }
+    direct_providers_enabled = external_apis_enabled or direct_provider_active
+    fallback_order = [PROVIDER_SIMSAT_SENTINEL]
+    if direct_providers_enabled:
+        fallback_order = list(PROVIDER_FALLBACK_ORDER)
 
     mode = get_runtime_mode_summary()
     return {
@@ -613,19 +624,23 @@ def provider_status():
                 "description": "Optional SimSat Mapbox imagery endpoint",
             },
             PROVIDER_SENTINELHUB_DIRECT: {
-                "available": sentinelhub_available,
+                "available": direct_providers_enabled and sentinelhub_available,
+                "credential_available": sentinelhub_available,
                 "credential_source": sentinel_creds.source,
                 "description": "Direct Sentinel Hub access",
             },
             PROVIDER_NASA_DIRECT: {
-                "available": nasa_available,
+                "available": direct_providers_enabled and nasa_available,
+                "credential_available": nasa_available,
                 "credential_source": nasa_creds.source,
                 "description": "Direct NASA API fallback",
             },
         },
+        "direct_providers_enabled": direct_providers_enabled,
         "sentinel_secret_detected": sentinelhub_available,
         "sentinel_credential_source": sentinel_creds.source,
-        "fallback_order": list(PROVIDER_FALLBACK_ORDER),
+        "fallback_order": fallback_order,
+        "configured_fallback_order": list(PROVIDER_FALLBACK_ORDER),
     }
 
 

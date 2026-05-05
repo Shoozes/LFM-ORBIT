@@ -667,6 +667,19 @@ def test_provider_status_keeps_simsat_as_primary_hackathon_path():
     assert data["providers"]["sentinelhub_direct"]["description"] == "Direct Sentinel Hub access"
 
 
+def test_provider_status_defaults_direct_providers_disabled(monkeypatch):
+    """Direct provider secrets can be detected without enabling that runtime path."""
+    monkeypatch.delenv("DISABLE_EXTERNAL_APIS", raising=False)
+
+    response = client.get("/api/provider/status")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["direct_providers_enabled"] is False
+    assert data["fallback_order"] == ["simsat_sentinel"]
+    assert data["providers"]["sentinelhub_direct"]["available"] is False
+
+
 def test_simsat_status_endpoint_includes_mapbox_metadata():
     """SimSat status should expose optional Mapbox readiness without leaking the token."""
     response = client.get("/api/simsat/status")
@@ -2006,8 +2019,9 @@ def test_maritime_monitor_endpoint_validates_coordinates():
 # Timelapse endpoint tests
 # ---------------------------------------------------------------------------
 
-def test_timelapse_generate_endpoint_returns_webm():
+def test_timelapse_generate_endpoint_returns_webm(monkeypatch):
     """Timelapse generation endpoint must return base64 WEBM structure."""
+    monkeypatch.setenv("DISABLE_EXTERNAL_APIS", "false")
     with patch("core.timelapse._read_cache", return_value=None), \
          patch("core.timelapse._write_cache"), \
          patch("core.timelapse._fetch_gee_frames") as mock_fetch:

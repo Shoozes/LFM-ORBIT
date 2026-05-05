@@ -1,5 +1,7 @@
 from core.config import (
+    PROVIDER_SENTINELHUB_DIRECT,
     PROVIDER_SIMSAT_MAPBOX,
+    PROVIDER_SIMSAT_SENTINEL,
     get_runtime_mode_summary,
     imagery_origin_for_source,
     is_imagery_backed_scoring_enabled,
@@ -45,6 +47,22 @@ def test_simsat_data_source_mapbox_selects_mapbox_provider(monkeypatch):
     monkeypatch.setenv("SIMSAT_DATA_SOURCE", "mapbox")
 
     assert resolve_active_provider() == PROVIDER_SIMSAT_MAPBOX
+
+
+def test_sentinel_credentials_do_not_auto_promote_provider(monkeypatch):
+    monkeypatch.delenv("OBSERVATION_PROVIDER", raising=False)
+    monkeypatch.delenv("SIMSAT_ENABLED", raising=False)
+    monkeypatch.setenv("SENTINEL_CLIENT_ID", "local-dev-id")
+    monkeypatch.setenv("SENTINEL_CLIENT_SECRET", "local-dev-secret")
+    monkeypatch.setenv("NASA_API_KEY", "local-dev-nasa")
+
+    assert resolve_active_provider() == PROVIDER_SIMSAT_SENTINEL
+
+
+def test_direct_sentinel_provider_requires_explicit_choice(monkeypatch):
+    monkeypatch.setenv("OBSERVATION_PROVIDER", PROVIDER_SENTINELHUB_DIRECT)
+
+    assert resolve_active_provider() == PROVIDER_SENTINELHUB_DIRECT
 
 
 def test_depth_anything_v3_defaults_disabled(monkeypatch):

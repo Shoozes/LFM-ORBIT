@@ -338,9 +338,10 @@ def resolve_active_provider() -> str:
     Resolution rules:
       - If OBSERVATION_PROVIDER env var is set to a valid provider, use it directly.
       - If SimSat is enabled (SIMSAT_ENABLED=true), use the requested SimSat data source.
-      - If Sentinel credentials are available, use sentinelhub_direct.
-      - If NASA credentials are available, use nasa_api_direct.
       - Otherwise, stay on the safe SimSat/local fallback path.
+
+    Direct Sentinel Hub, NASA, and GEE providers are manual operator choices.
+    Local secrets must never auto-promote a fresh run away from SimSat.
     """
     explicit = os.environ.get("OBSERVATION_PROVIDER", "").strip()
     if explicit in VALID_PROVIDERS:
@@ -351,15 +352,6 @@ def resolve_active_provider() -> str:
         if source in ("mapbox", "simsat_mapbox"):
             return PROVIDER_SIMSAT_MAPBOX
         return PROVIDER_SIMSAT_SENTINEL
-
-    # Check OAuth creds — no cross-module imports to keep config.py dependency-free
-    creds = resolve_sentinel_credentials()
-    if creds.available:
-        return PROVIDER_SENTINELHUB_DIRECT
-        
-    nasa_creds = resolve_nasa_credentials()
-    if nasa_creds.available:
-        return PROVIDER_NASA_DIRECT
 
     return PROVIDER_SIMSAT_SENTINEL
 

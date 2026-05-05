@@ -81,14 +81,14 @@ The normal launcher path is:
 
 ```powershell
 cd C:\Users\jc816\OneDrive\Desktop\Gen-App\LFM Orbit
-.\run.ps1 -Install -FetchModel
+.\run.ps1 -Install
 ```
 
 ```bash
-./run.sh --install --fetch-model
+./run.sh --install
 ```
 
-`-FetchModel` / `--fetch-model` downloads the trained handoff and opportunistically installs the optional `model` extra (`llama-cpp-python`). If Linux/WSL compiler support is missing, the launcher falls back to the core locked backend install so the app still boots and the model files remain available for a host that can run the GGUF.
+The production launcher path downloads the trained handoff and opportunistically installs the `model` extra (`llama-cpp-python`). If Linux/WSL compiler support is missing, the launcher falls back to the core locked backend install so the app still boots and the model files remain available for a host that can run the GGUF.
 
 Direct script usage:
 

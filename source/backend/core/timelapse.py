@@ -362,7 +362,7 @@ def generate_timelapse_frames(
                 "error": f"Invalid bbox: {exc}",
                 "provenance": {"kind": "unavailable", "label": "Invalid request"}}
 
-    if os.environ.get("DISABLE_EXTERNAL_APIS", "false").lower() == "true":
+    if os.environ.get("DISABLE_EXTERNAL_APIS", "true").lower() in ("true", "1", "yes", "on"):
         return {"video_b64": "", "frames_count": 0, "format": "none",
                 "error": "External APIs disabled.",
                 "provenance": {"kind": "unavailable", "label": "External APIs disabled"}}

@@ -174,7 +174,7 @@ def search_sentinel2_stac(
     timeout_seconds: float = 12.0,
 ) -> dict[str, Any]:
     """Search Element84 Earth Search for Sentinel-2 scenes without downloading COGs."""
-    if os.environ.get("DISABLE_EXTERNAL_APIS", "false").lower() == "true":
+    if os.environ.get("DISABLE_EXTERNAL_APIS", "true").lower() in ("true", "1", "yes", "on"):
         return {
             "provider": STAC_PROVIDER_ID,
             "collection": STAC_COLLECTION,

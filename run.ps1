@@ -67,6 +67,23 @@ function Import-DotEnv {
 }
 
 Import-DotEnv
+
+function Set-ProductionRuntimeDefaults {
+    if (-not $env:OBSERVATION_PROVIDER) {
+        [Environment]::SetEnvironmentVariable("OBSERVATION_PROVIDER", "simsat_sentinel", "Process")
+    }
+    if (-not $env:SIMSAT_ENABLED) {
+        [Environment]::SetEnvironmentVariable("SIMSAT_ENABLED", "true", "Process")
+    }
+    if (-not $env:SIMSAT_DATA_SOURCE) {
+        [Environment]::SetEnvironmentVariable("SIMSAT_DATA_SOURCE", "sentinel", "Process")
+    }
+    if (-not $env:DISABLE_EXTERNAL_APIS) {
+        [Environment]::SetEnvironmentVariable("DISABLE_EXTERNAL_APIS", "true", "Process")
+    }
+}
+
+Set-ProductionRuntimeDefaults
 $BackendVenvDir = $env:UV_PROJECT_ENVIRONMENT
 
 function Require-Command {
@@ -170,13 +187,11 @@ function Show-Usage {
     Write-Host ""
     Write-Host "Usage:"
     Write-Host "  .\run.ps1                 Open the interactive menu"
-    Write-Host "  .\run.ps1 -Install        Install locked deps, then start backend + frontend"
-    Write-Host "  .\run.ps1 -InstallOnly    Install locked deps without starting the app"
-    Write-Host "  .\run.ps1 -Run            Start backend + frontend from existing deps"
+    Write-Host "  .\run.ps1 -Install        Install locked deps, fetch the trained GGUF, then start backend + frontend"
+    Write-Host "  .\run.ps1 -InstallOnly    Advanced/dev: install locked deps without starting the app"
+    Write-Host "  .\run.ps1 -Run            Advanced/dev: start backend + frontend from existing deps"
     Write-Host "  .\run.ps1 -Clean          Clear mutable runtime stores for a cold start"
     Write-Host "  .\run.ps1 -Verify         Install deps and run backend, frontend, and E2E checks"
-    Write-Host "  .\run.ps1 -Install -FetchModel"
-    Write-Host "                            Also fetch the trained Orbit GGUF bundle before startup"
 }
 
 function Write-SimSatStatus {
@@ -185,7 +200,7 @@ function Write-SimSatStatus {
         return
     }
 
-    Write-Host "[i] SimSat vendored source is missing. Orbit will still start with Sentinel/NASA/local fallback paths." -ForegroundColor Yellow
+    Write-Host "[i] SimSat vendored source is missing. Orbit stays on the SimSat/local path; direct providers require explicit OBSERVATION_PROVIDER overrides." -ForegroundColor Yellow
 }
 
 function Install-BackendDeps {
@@ -393,7 +408,7 @@ function Run-App {
     Write-SimSatStatus
 
     if (-not (Test-Path $ModelFile)) {
-        Write-Host "[!] Trained GGUF model not found. Run .\run.ps1 -Install -FetchModel for the production/hackathon path; continuing with development fallback behavior." -ForegroundColor Yellow
+        Write-Host "[!] Trained GGUF model not found. Run .\run.ps1 -Install for the production/hackathon path; continuing with development fallback behavior." -ForegroundColor Yellow
     }
 
     Write-Host "[*] Launching backend..." -ForegroundColor Cyan
@@ -484,12 +499,9 @@ function Run-InteractiveMenu {
         Write-Host "              LFM ORBIT               " -ForegroundColor Green
         Write-Host "======================================" -ForegroundColor Yellow
         Write-Host "1. Install/Repair + Fetch trained Orbit GGUF -> Run"
-        Write-Host "2. Install/Repair -> Run (skip model fetch)"
-        Write-Host "3. Install/Repair only (skip model fetch)"
-        Write-Host "4. Run"
-        Write-Host "5. Verify (backend + frontend + E2E)"
-        Write-Host "6. Clean (cold-start runtime reset)"
-        Write-Host "7. Exit"
+        Write-Host "2. Verify (backend + frontend + E2E)"
+        Write-Host "3. Clean (cold-start runtime reset)"
+        Write-Host "4. Exit"
         Write-Host "======================================" -ForegroundColor Yellow
 
         $choice = Read-Host "Select an option"
@@ -502,29 +514,14 @@ function Run-InteractiveMenu {
                 exit
             }
             "2" {
-                $script:FetchModel = $false
-                Install-Deps
-                Run-App
-                exit
-            }
-            "3" {
-                $script:FetchModel = $false
-                Install-Deps
-                exit
-            }
-            "4" {
-                Run-App
-                exit
-            }
-            "5" {
                 Run-Verify
                 exit
             }
-            "6" {
+            "3" {
                 Clean-Data
                 Start-Sleep -Seconds 2
             }
-            "7" {
+            "4" {
                 exit
             }
             default {
@@ -555,6 +552,7 @@ if ($Verify) {
 }
 
 if ($Install) {
+    $script:FetchModel = $true
     Install-Deps
     Run-App
     exit

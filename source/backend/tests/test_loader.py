@@ -158,7 +158,7 @@ def test_loader_falls_back_from_simsat_sentinel_to_mapbox(tmp_path, monkeypatch)
     monkeypatch.setattr(loader, "CACHE_PATH", str(cache_path))
     loader._init_cache()
     monkeypatch.setenv("MAPBOX_ACCESS_TOKEN", "token")
-    monkeypatch.delenv("DISABLE_EXTERNAL_APIS", raising=False)
+    monkeypatch.setenv("DISABLE_EXTERNAL_APIS", "false")
     monkeypatch.setattr(
         loader,
         "REGION",
@@ -195,6 +195,53 @@ def test_loader_falls_back_from_simsat_sentinel_to_mapbox(tmp_path, monkeypatch)
     obs = loader.load_temporal_observations("cell_fallback")
 
     assert obs["source"] == "simsat_mapbox_imagery"
+
+
+def test_loader_defaults_external_provider_fallbacks_off(tmp_path, monkeypatch):
+    cache_path = tmp_path / "api_cache.sqlite"
+    monkeypatch.setattr(loader, "CACHE_PATH", str(cache_path))
+    loader._init_cache()
+    monkeypatch.delenv("DISABLE_EXTERNAL_APIS", raising=False)
+    monkeypatch.setattr(
+        loader,
+        "REGION",
+        SimpleNamespace(
+            observation_mode="simsat_sentinel",
+            before_label="2024-06",
+            after_label="2025-06",
+        ),
+    )
+    calls = {"simsat": 0, "sentinel": 0, "nasa": 0}
+    monkeypatch.setattr(loader, "_try_load_simsat_observations", lambda cell_id: calls.__setitem__("simsat", calls["simsat"] + 1))
+    monkeypatch.setattr(loader, "_try_load_sentinelhub_observations", lambda cell_id: calls.__setitem__("sentinel", calls["sentinel"] + 1))
+    monkeypatch.setattr(loader, "_try_load_nasa_observations", lambda cell_id: calls.__setitem__("nasa", calls["nasa"] + 1))
+    monkeypatch.setattr(
+        loader,
+        "_load_semi_real_observations",
+        lambda cell_id: {
+            "source": loader.SOURCE_SEMI_REAL,
+            "cell_id": cell_id,
+            "centroid_lat": 0.0,
+            "centroid_lng": 0.0,
+            "before": {
+                "label": "baseline",
+                "quality": 0.95,
+                "bands": {"nir": 0.6, "red": 0.1, "swir": 0.2},
+                "flags": [],
+            },
+            "after": {
+                "label": "after",
+                "quality": 0.92,
+                "bands": {"nir": 0.3, "red": 0.2, "swir": 0.4},
+                "flags": [],
+            },
+        },
+    )
+
+    obs = loader.load_temporal_observations("cell_external_default_off")
+
+    assert obs["source"] == loader.SOURCE_SEMI_REAL
+    assert calls == {"simsat": 1, "sentinel": 0, "nasa": 0}
 
 
 def test_loader_throttles_repeated_fallback_warnings(tmp_path, monkeypatch, caplog):
