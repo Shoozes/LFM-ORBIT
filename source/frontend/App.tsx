@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { VlmBox } from "./components/VlmPanel";
 import { useTelemetry } from "./hooks/useTelemetry";
 import { getApiBaseUrl, generateGridForBbox } from "./utils/telemetry";
+import { getDefaultMissionDateRange } from "./utils/dateRange";
 import type { Mission } from "./types/mission";
 import type { ChatResponse } from "./components/GroundAgentActionCard";
 import type { MapCameraRequest } from "./types/mapCamera";
@@ -376,6 +377,7 @@ export default function App() {
         && Number(mission.cells_scanned ?? 0) >= selectedGridCellCount
       ),
   );
+  const defaultMissionDateRange = useMemo(() => getDefaultMissionDateRange(), []);
 
   const [activeTab, setActiveTab] = useState<"agents" | "mission" | "logs" | "inspect" | "settings">(
     demoQuery.enabled ? "mission" : "agents",
@@ -386,7 +388,7 @@ export default function App() {
     setProofModeActive(true);
 
     let activeMission = mission;
-    let requiresSeededReplay = demoQuery.demoCase === "showcase" && !mission?.replay_id;
+    let requiresSeededReplay = demoQuery.enabled && demoQuery.demoCase === "showcase" && !mission?.replay_id;
     let primaryCellId: string | null = selectedCellId ?? (requiresSeededReplay ? SHOWCASE_PRIMARY_CELL_ID : null);
 
     try {
@@ -398,7 +400,7 @@ export default function App() {
         }
       }
 
-      requiresSeededReplay = demoQuery.demoCase === "showcase" && !activeMission?.replay_id;
+      requiresSeededReplay = demoQuery.enabled && demoQuery.demoCase === "showcase" && !activeMission?.replay_id;
       if (requiresSeededReplay && !primaryCellId) {
         primaryCellId = SHOWCASE_PRIMARY_CELL_ID;
       }
@@ -449,7 +451,7 @@ export default function App() {
       }
       setDemoStepIndex(2);
     }
-  }, [apiBaseUrl, demoQuery.demoCase, demoStartProfile, fetchMission, mission, refreshTelemetry, selectedCellId, setSelectedCellId]);
+  }, [apiBaseUrl, demoQuery.demoCase, demoQuery.enabled, demoStartProfile, fetchMission, mission, refreshTelemetry, selectedCellId, setSelectedCellId]);
 
   const handleGroundAgentNavigate = useCallback(async (
     target: "mission" | "logs" | "settings" | "object_evidence" | "proof",
@@ -681,7 +683,6 @@ export default function App() {
               }
             }}
             vlmBoxes={vlmBoxes}
-            timelineDate={mission?.end_date ?? mission?.start_date ?? null}
             scanAnimationActive={scanAnimationActive}
             cameraRequest={mapCameraRequest}
             onCameraRequestHandled={(requestId) => {
@@ -774,6 +775,7 @@ export default function App() {
                       isScanComplete={missionPassComplete}
                       onReplayLoaded={handleReplayLoaded}
                       onReplayRescanStarted={handleReplayRescanStarted}
+                      scanCellCount={selectedGridCellCount}
                       onPreviewBbox={(bbox) => {
                         setDrawnBbox(bbox);
                         setVlmBoxes([]);
@@ -791,8 +793,8 @@ export default function App() {
                           isOpen={true}
                           onClose={() => setShowMissionTimelapse(false)}
                           bbox={drawnBbox}
-                          startDate={mission?.start_date || "2024-06-01"}
-                          endDate={mission?.end_date || "2025-06-01"}
+                          startDate={mission?.start_date || defaultMissionDateRange.startDate}
+                          endDate={mission?.end_date || defaultMissionDateRange.endDate}
                         />
                     </Suspense>
                   </div>
@@ -888,8 +890,8 @@ export default function App() {
                         isOpen={true}
                         onClose={() => {}}
                         bbox={drawnBbox}
-                        startDate="2024-06-01"
-                        endDate="2025-06-01"
+                        startDate={defaultMissionDateRange.startDate}
+                        endDate={defaultMissionDateRange.endDate}
                       />
                   </Suspense>
                 </div>

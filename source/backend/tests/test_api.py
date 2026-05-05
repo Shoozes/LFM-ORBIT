@@ -411,7 +411,7 @@ def test_analysis_status_endpoint_returns_model_info():
 
 
 def test_analysis_status_endpoint_surfaces_manifest_metadata():
-    """Analysis status should surface resolved manifest/repo details for the optional model."""
+    """Analysis status should surface resolved manifest/repo details for the trained model."""
     runtime_payload = {
         "runtime_inference_mode": "text_evidence_packet",
         "image_conditioned_runtime_enabled": False,
@@ -776,7 +776,7 @@ def test_ground_agent_chat_proposes_bull_creek_camera_with_stop(tmp_path, monkey
     assert proposal["details"]["location_type"] == "wetland / pine-flatwoods context"
     assert "low_relief_terrain" in proposal["details"]["semantic_tags"]
     assert "road or trail corridor" in proposal["details"]["suggested_targets"]
-    assert "3D view is a spatial context aid only" in proposal["details"]["evidence_guidance"]
+    assert "map view as spatial context only" in proposal["details"]["evidence_guidance"]
     assert get_active_mission()["id"] == mission["id"]
 
     confirm = client.post("/api/agent/action/confirm", json={"proposal": proposal})

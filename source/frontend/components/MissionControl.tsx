@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getApiBaseUrl } from "../utils/telemetry";
 import { Mission, ObjectTarget, TargetPack } from "../types/mission";
+import { getDefaultMissionDateRange } from "../utils/dateRange";
 
 type ReplayCatalogItem = {
   replay_id: string;
@@ -91,6 +92,8 @@ const MARITIME_PREVIEW_TARGET = {
   taskText: "Review Suez channel port activity areas: visible shipping container clusters, docked-vessel groups, and berth basin context without claiming exact vessel or boat counts.",
 };
 
+const DEFAULT_MISSION_DATE_RANGE = getDefaultMissionDateRange();
+
 const MISSION_LOCATION_PRESETS: MissionPreset[] = [
   {
     id: "mining_atacama",
@@ -135,8 +138,8 @@ const MISSION_LOCATION_PRESETS: MissionPreset[] = [
     useCaseId: "wildfire",
     taskText: "Run Florida Fire/Drought Readiness Watch over a North Florida corridor. Triage drought-stressed vegetation, smoke candidates, burn-scar candidates, road or trail access, firebreak context, water/vegetation boundaries, and civilian lifeline exposure. Treat this as candidate evidence until source-backed imagery confirms smoke, active fire, or burn scar.",
     bbox: [-83.2, 29.0, -81.3, 30.7],
-    startDate: "2026-04-15",
-    endDate: "2026-04-25",
+    startDate: DEFAULT_MISSION_DATE_RANGE.startDate,
+    endDate: DEFAULT_MISSION_DATE_RANGE.endDate,
     tone: "fire",
     targetPackId: "fireline",
     sourceNote: "Official April/May 2026 context: Drought.gov Southeast update and NIFC National Fire News; candidate triage only.",
@@ -309,6 +312,7 @@ type MissionControlProps = {
   mission: Mission | null;
   onRefresh: () => void;
   isScanComplete?: boolean;
+  scanCellCount?: number;
   onReplayLoaded?: (primaryCellId: string | null) => void | Promise<void>;
   onReplayRescanStarted?: (mission: Mission) => void | Promise<void>;
   onPreviewBbox?: (bbox: number[]) => void;
@@ -326,6 +330,7 @@ export default function MissionControl({
   mission,
   onRefresh,
   isScanComplete,
+  scanCellCount = 0,
   onReplayLoaded,
   onReplayRescanStarted,
   onPreviewBbox,
@@ -333,9 +338,10 @@ export default function MissionControl({
   initialPresetId = null,
 }: MissionControlProps) {
   const apiBase = getApiBaseUrl();
+  const [defaultDateRange] = useState(() => getDefaultMissionDateRange());
   const [task, setTask] = useState("");
-  const [startDate, setStartDate] = useState("2024-06-01");
-  const [endDate, setEndDate] = useState("2025-06-01");
+  const [startDate, setStartDate] = useState(defaultDateRange.startDate);
+  const [endDate, setEndDate] = useState(defaultDateRange.endDate);
   const [replays, setReplays] = useState<ReplayCatalogItem[]>([]);
   const [replayBusyId, setReplayBusyId] = useState<string | null>(null);
   const [replayNotice, setReplayNotice] = useState("");
@@ -818,6 +824,17 @@ export default function MissionControl({
       : "";
   const launchReadiness = launchBlockedReason
     || (drawnBbox ? "Ready: selected area will be scanned." : "Ready: no area selected; active region will be scanned.");
+  const liveMissionActive = mission?.status === "active" && mission.mission_mode !== "replay";
+  const liveCellsScanned = Number(mission?.cells_scanned ?? 0);
+  const liveScanTotal = scanCellCount > 0 ? scanCellCount : null;
+  const liveScanPercent = liveScanTotal
+    ? Math.max(0, Math.min(100, Math.round((liveCellsScanned / liveScanTotal) * 100)))
+    : null;
+  const liveScanLabel = isScanComplete
+    ? "Scan complete"
+    : liveCellsScanned > 0
+      ? "Scanning selected area"
+      : "Starting scan";
 
   const severityColor = (s: string) => {
     if (s === "active") return "text-emerald-700 bg-emerald-50 border-emerald-200";
@@ -899,16 +916,48 @@ export default function MissionControl({
             </div>
           )}
 
+          {liveMissionActive && !isScanComplete && (
+            <div
+              data-testid="mission-progress-status"
+              className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-emerald-950"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700">
+                    {liveScanLabel}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed">
+                    Satellite Pruner is sweeping the selected grid. First cell updates can lag while the runtime warms up.
+                  </p>
+                </div>
+                <span className="mt-1 h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-emerald-500 shadow-[0_0_14px_rgba(16,185,129,0.55)]" />
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                  style={{ width: `${liveScanPercent ?? (liveCellsScanned > 0 ? 35 : 12)}%` }}
+                />
+              </div>
+              <div className="mt-2 flex flex-wrap gap-3 text-[10px] font-semibold uppercase tracking-wider text-emerald-800">
+                <span>
+                  {liveScanTotal ? `${Math.min(liveCellsScanned, liveScanTotal)} / ${liveScanTotal}` : liveCellsScanned} cells scanned
+                </span>
+                <span>{mission.flags_found} flags found</span>
+                <span>{mission.target_pack_id ? mission.target_pack_id.replace(/_/g, " ") : "mission targets"}</span>
+              </div>
+            </div>
+          )}
+
           <div className="rounded-lg border border-cyan-200 bg-cyan-50/70 px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-700">Hackathon Runtime</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-700">Runtime</p>
                 <p className="mt-1 text-xs leading-relaxed text-cyan-950">
-                  Default path stays DPhi SimSat first, with SimSat Mapbox context next. Sentinel Hub `sh.txt` is for development cache refreshes only.
+                  SimSat-first mission scanning is the default submission path.
                 </p>
               </div>
               <span className="shrink-0 rounded border border-cyan-300 bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-700">
-                SimSat First
+                SimSat
               </span>
             </div>
           </div>

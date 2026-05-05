@@ -108,7 +108,6 @@ Run a humanitarian shelter count. Look for shelters, tents, vehicles, water tank
 
 1. Expand frozen eval fixtures beyond the first two replay-safe cases.
 2. Add regression thresholds to CI once the object-evidence fixture set stabilizes.
-3. Add a versioned 3D context registry only if future missions need curated dated 3D assets beyond the current no-auth MapLibre satellite-terrain context view.
-4. Continue responsive/mobile coverage for fixed operator rails and Proof Mode.
+3. Continue responsive/mobile coverage for fixed operator rails and Proof Mode.
 
 Those items are tracked in `docs/TODO.md`; this document describes the current product mode and its contracts.

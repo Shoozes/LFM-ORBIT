@@ -207,7 +207,7 @@ LOCATION_TARGETS: dict[str, dict[str, Any]] = {
             "canal or drainage line",
             "surface moisture context",
         ],
-        "evidence_guidance": "Prefer region-level labels and temporal/source-backed imagery for claims. The 3D view is a spatial context aid only.",
+        "evidence_guidance": "Prefer region-level labels and temporal/source-backed imagery for claims. Use the map view as spatial context only.",
         "summary": "Wetland and pine-flatwoods context target for camera navigation, bbox selection, and cautious land-cover review.",
     },
     "giza_pyramid_complex": {
@@ -2679,7 +2679,7 @@ def get_ground_agent_reply(user_msg: str) -> str:
 
     if any(k in msg for k in ("settings", "gear", "provider", "config", "credential", "sentinel hub")):
         return (
-            "Settings shows provider status, SimSat readiness, credential state, optional model status, and depth adapter status. "
+            "Settings shows provider status, SimSat readiness, credential state, trained model status, and depth adapter status. "
             "DPhi SimSat is the primary hackathon runtime lane."
         )
 

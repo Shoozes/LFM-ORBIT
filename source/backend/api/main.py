@@ -1392,7 +1392,7 @@ def analysis_status():
             },
             gguf_name: {
                 "available": ms.get("loaded", False),
-                "description": "Optional GGUF artifact for satellite triage reasoning",
+                "description": "Trained Orbit GGUF artifact for satellite triage reasoning",
                 "path": ms.get("path", ""),
                 "repo_id": ms.get("repo_id", ""),
                 "revision": ms.get("revision", ""),

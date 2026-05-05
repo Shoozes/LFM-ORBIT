@@ -29,7 +29,7 @@ That means:
 
 ## Orbit Runtime Contract
 
-Orbit resolves the optional satellite model through [model_manifest.py](../source/backend/core/model_manifest.py).
+Orbit resolves the trained satellite model through [model_manifest.py](../source/backend/core/model_manifest.py).
 
 Default runtime location:
 

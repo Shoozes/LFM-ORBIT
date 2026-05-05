@@ -99,7 +99,7 @@ Sources:
 - NASA Earthdata: [Lithium Mining in the Salar de Atacama, Chile](https://www.earthdata.nasa.gov/news/worldview-image-archive/lithium-mining-salar-de-atacama-chile)
 - NOAA National Ocean Service: [What is the Great Pacific Garbage Patch?](https://oceanservice.noaa.gov/facts/garbagepatch.html)
 
-The tutorial walkthrough is now the Rondonia first-impression product run-through. It starts from a ready mission, uses the select tool to confirm the bbox, shows Ground Agent proposal/confirmation, shows Satellite Agent scan/prune/retain behavior, runs the deforestation target pack through CV region boxes, briefly labels optional 3D context as non-evidence, explains timelapse versus static acquisition dates, opens Proof Mode, and ends with compact proof JSON plus tagged training data. The main showcase video still leads with Critical Minerals Expansion Watch; the tutorial is optimized for showing how to use the app end to end.
+The tutorial walkthrough is now the Rondonia first-impression product run-through. It starts from a ready mission, uses the select tool to confirm the bbox, shows Ground Agent proposal/confirmation, shows Satellite Agent scan/prune/retain behavior, runs the deforestation target pack through CV region boxes, explains timelapse versus static acquisition dates, opens Proof Mode, and ends with compact proof JSON plus tagged training data. The main showcase video still leads with Critical Minerals Expansion Watch; the tutorial is optimized for showing how to use the app end to end.
 
 Replay-backed proof mode can now keep the active replay instead of forcing Rondonia, so mission-specific proof copy stays attached to maritime, mining, flood, wildfire, and urban replay packs. Some development replay fixtures use visible Sentinel-2 L2A frames and explicitly reject invalid still-image color-shift timelapses. Their real monthly WebMs are kept in the legacy `source/backend/assets/seeded_data/` cache for dataset export and training, but they are not a Sentinel Hub dependency for the default demo.
 
@@ -107,13 +107,11 @@ Current runtime wording: SimSat is the primary realtime lane. Replay fixtures ar
 
 Object Evidence Mode wording: target packs and CV boxes are product-facing evidence tools, not one-off demo controls. Defaults and custom packs are available through `/api/object-targets/packs`; active missions carry `target_pack_id` and `object_targets`; Mission Control, Ground Agent, and VLM batch grounding can edit and run those targets. The main public showcase pack is `critical_minerals`; `deforestation`, `fireline`, `port`, `glacier`, `waterline`, `lifeline`, `camp`, and cautious `plastic`/coastal-debris packs remain available. Alert proofs can carry persisted `detection_summary` and `object_deltas`; replay snapshots and dataset exports preserve mission target intent for cost control and future training.
 
-The dedicated Object Evidence recording writes local Playwright artifacts under `source/frontend/e2e/artifacts/object-evidence/`. It starts the audited Port Activity review bbox cropped from the broader story context used by `docs/media/story-plates/story-object-evidence-port.png`, keeps that bbox stable, uses group/area targets for `shipping container cluster`, `container yard cluster`, `docked-vessel group`, and `berth basin context`, returns deterministic visually audited boxes, hovers a glowing map square, and captures the CV tooltip with confidence, bbox, prompt, model, runtime mode, imagery origin, and scoring basis. The recording must not reopen exact/singular object boxes such as the rejected `channel vessel` box or any 3D overlay selection boxes.
+The dedicated Object Evidence recording writes local Playwright artifacts under `source/frontend/e2e/artifacts/object-evidence/`. It starts the audited Port Activity review bbox cropped from the broader story context used by `docs/media/story-plates/story-object-evidence-port.png`, keeps that bbox stable, uses group/area targets for `shipping container cluster`, `container yard cluster`, `docked-vessel group`, and `berth basin context`, returns deterministic visually audited boxes, hovers a glowing map square, and captures the CV tooltip with confidence, bbox, prompt, model, runtime mode, imagery origin, and scoring basis. The recording must not reopen exact/singular object boxes such as the rejected `channel vessel` box.
 
 The visual use-case story builder writes every generated story plate and manifest under `source/backend/assets/seeded_data/visual_story_frames/`. Only promoted, visually audited public plates are copied to `docs/media/story-plates/`; currently that public set is Critical Minerals Expansion Watch and the port Object Evidence plate. Public plates must carry `visual_audit_status=approved`, and their box labels must read as areas, groups, zones, samples, corridors, or candidates unless a true object-scale model path supports a singular-object claim. The builder reads Sentinel Hub OAuth credentials from environment variables, `.tools/.secrets/sentinel.txt`, or `.tools/.secrets/sh.txt`, then stores reusable frames and provenance in `source/backend/assets/seeded_data/visual_story_frames/`.
 
 The story plates are visual proof assets, not hidden model claims. Sentinel Hub is used for broad satellite-context plates and timelapse-friendly development frames. Esri World Imagery context is used only where object-scale roofs/shelters need to be visible; those plates label `imagery_origin=esri_context`. All story boxes label `box_source=visual_story_fixture`, and the roof plate calls out sample boxes rather than an exhaustive roof count, so they are not confused with live model-backed detections. The cached story frames can be recycled into dataset exports with `python scripts/export_orbit_dataset.py --include-seeded-cache ...`, and the Playwright visual-story spec still verifies the real app can draw glowing CV boxes, legends, and provenance tooltips without overwriting README proof plates.
-
-Optional 3D context view: once a bbox is selected on the 2D map, the floating `3D` button opens a no-auth MapLibre satellite-terrain view. It uses Sentinel-2 cloudless EOX raster imagery over public MapLibre DEM terrain, with a deterministic local fallback texture and relief mesh underneath live tiles so demos do not wait on external tile timing or disappear over low-relief regions. It reuses the same selected bbox and CV object boxes, extrudes CV regions over terrain, exposes terrain exaggeration, shows object tooltips, and labels `Context timestamp` separately from `Timeline`. The `AI context experimental` toggle reads a fast local terrain/canvas structure cue and shows Depth Anything V3 readiness when available; it does not auto-run per-frame model inference, identify objects, or change satellite acquisition dates.
 
 Replay WebMs may include cloudy context frames, but the proof panel keeps playback inside a clearer evidence window for final screenshots. Cloudy/no-data frames remain quality-gated in seeded creation and do not become positive detections.
 
@@ -135,15 +133,6 @@ Refresh the README-safe Greenland timelapse highlight:
 cd ../backend
 uv run --no-sync python scripts/build_docs_timelapse_highlight.py
 ```
-
-Verify the optional 3D context view:
-
-```bash
-cd ../frontend
-npx playwright test e2e/map3d.spec.ts
-```
-
-That captures `source/frontend/e2e/screenshots/map-3d-context-view.png` and checks that the 3D terrain view uses the active bbox/CV box, AI context summary, timestamp warnings, and fallback/error paths without presenting itself as a timeline frame.
 
 Optional development only: refresh high-quality Sentinel Hub replay cache after adding OAuth credentials:
 

@@ -7,6 +7,7 @@
  */
 import { useEffect, useState } from "react";
 import { formatSourceLabel, getApiBaseUrl } from "../utils/telemetry";
+import { getDefaultMissionDateRange } from "../utils/dateRange";
 
 type TimelapseProvenance = {
   kind?: string;
@@ -64,13 +65,14 @@ export default function TimelapseViewer({
       setError(null);
       setTimelapse(null);
       try {
+        const defaultRange = getDefaultMissionDateRange();
         const res = await fetch(`${apiBase}/api/timelapse/generate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             bbox,
-            start_date: startDate || "2024-01-01",
-            end_date: endDate || "2024-12-31",
+            start_date: startDate || defaultRange.startDate,
+            end_date: endDate || defaultRange.endDate,
             steps: 24,
           }),
         });

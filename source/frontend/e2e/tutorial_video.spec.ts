@@ -349,22 +349,6 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
     "CV BOXES stay on the map with confidence and provenance, so reviewers can audit them.",
   );
 
-  await expect(page.getByTestId("map-3d-toggle")).toBeVisible({ timeout: 10_000 });
-  await moveMouseToHighlight(page, "[data-testid='map-3d-toggle']");
-  await showVoiceoverSubtitle(
-    page,
-    "3D CONTEXT helps terrain orientation. It does not replace satellite evidence.",
-  );
-  await page.getByTestId("map-3d-toggle").click();
-  await removeHighlight(page);
-  await expect(page.getByTestId("map-3d-panel")).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText("This 3D view is terrain/context, not a satellite acquisition frame.")).toBeVisible({ timeout: 10_000 });
-  await showVoiceoverSubtitle(
-    page,
-    "The 3D view is static context. Dates still come from satellite replay metadata.",
-  );
-  await page.getByTestId("map-3d-close").click();
-
   await page.getByTestId("tab-logs").click();
   await expect(page.getByText(`Replay Bundle · ${RONDONIA_REPLAY_ID}`)).toBeVisible({ timeout: 10_000 });
   await expect(page.getByTestId("alert-button").filter({ hasText: RONDONIA_PRIMARY_CELL })).toBeVisible({ timeout: 10_000 });

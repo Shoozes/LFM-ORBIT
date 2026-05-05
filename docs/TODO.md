@@ -76,8 +76,7 @@ Maps and missions:
 
 - Confirmed Ground Agent missions must interrupt boot/default scans quickly enough that the selected area becomes the visible scan.
 - Stopped missions, replay contexts, and camera-only navigation show paused/idle scan state.
-- 3D context views are terrain/context only unless matching dated 3D datasets exist.
-- Invalid bbox geometry must keep 3D unavailable instead of creating NaN camera or geometry state.
+- Live missions show explicit starting, scanning, and complete status while cells arrive.
 - Basemap render/tile/WebGL failures must stay visible and must not alter scoring or provenance.
 
 Safety wording:

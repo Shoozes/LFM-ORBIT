@@ -70,10 +70,6 @@ Recorded docs-video suites should own their ports one at a time. Do not run `npm
 
 Treat that as a docs integrity regression. The bank should organize issue and feature groups, not attach most backend files to every group. Keep group file lists focused on the files that define, test, or document the issue. If a generated pass gets too broad, trim it back before handoff and rerun `test_docs_artifacts.py`.
 
-### What if a replay bbox makes the 3D toggle appear earlier than expected?
-
-That is expected when the active mission already has a bbox. Tests should assert the current contract: replay missions can open 3D from their stable mission bbox, while no-bbox states should wait for operator area selection. Do not force the app to hide useful 3D context just to satisfy an old no-bbox assertion.
-
 ### What if MapLibre logs a shader or WebGL warning during headless capture?
 
 Treat it as a recoverable basemap-rendering issue unless the map goes blank or the browser guard fails. The app should surface `Basemap rendering degraded. Scoring is unaffected.` and continue keeping mission scoring/provenance separate from visual tile rendering. If the public screenshot is blank, fix readiness or rendering before promotion.

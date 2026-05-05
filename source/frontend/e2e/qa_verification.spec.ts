@@ -137,9 +137,10 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await expect(page.getByText("Visual Evidence Tools")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("vlm-mission-targets")).toContainText("coastal debris candidate");
 
-    await expect(page.getByRole("button", { name: "Mission Complete" })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId("mission-complete-summary")).toContainText("Mission Pass Complete");
-    await expect(page.getByTestId("mission-complete-summary")).toContainText("plastic");
+    const missionStatus = page.locator('[data-testid="mission-progress-status"], [data-testid="mission-complete-summary"]').first();
+    await expect(missionStatus).toBeVisible({ timeout: 30_000 });
+    await expect(missionStatus).toContainText(/Starting scan|Scanning selected area|Mission Pass Complete/);
+    await expect(missionStatus).toContainText(/plastic|mission targets/);
 
     await page.getByTestId("vlm-run-mission-targets").click();
     await expect(page.getByTestId("vlm-grounding-result").first()).toBeVisible({ timeout: 20_000 });

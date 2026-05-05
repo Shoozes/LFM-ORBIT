@@ -13,7 +13,6 @@ export async function showSubtitle(page: Page, text: string, durationMs = 3000) 
       "PROOF JSON": "#67e8f9",
       "TAGGED TRAINING DATA": "#86efac",
       "TRAINING DATA": "#86efac",
-      "3D CONTEXT": "#f0abfc",
     };
     const escapeHtml = (value: string) => value
       .replace(/&/g, "&amp;")

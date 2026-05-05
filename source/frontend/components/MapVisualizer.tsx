@@ -13,7 +13,6 @@ import { useMapPins } from "../hooks/useMapPins";
 import type { MapPin } from "../hooks/useMapPins";
 import type { VlmBox } from "./VlmPanel";
 import { colorForVlmBox, unitBoxToGeographicBbox } from "../utils/objectEvidence";
-import Map3DOverlay from "./Map3DOverlay";
 import type { MapCameraRequest } from "../types/mapCamera";
 
 type SpatialMenuState = {
@@ -38,8 +37,6 @@ type MapVisualizerProps = {
   onMenuGenerateTimelapse?: (bbox: number[]) => void;
   /** Active bounding boxes provided by optional visual evidence tools */
   vlmBoxes?: VlmBox[];
-  /** Active mission or replay timeline date shown as context in optional 3D view */
-  timelineDate?: string | null;
   /** True only while a live mission scan is actively moving across cells */
   scanAnimationActive?: boolean;
   /** Programmatic camera target from Ground Agent or mission context */
@@ -314,7 +311,6 @@ export default function MapVisualizer({
   onMenuAgentVideoEval,
   onMenuGenerateTimelapse,
   vlmBoxes = [],
-  timelineDate = null,
   scanAnimationActive = true,
   cameraRequest = null,
   onCameraRequestHandled,
@@ -333,7 +329,6 @@ export default function MapVisualizer({
   const [mapError, setMapError] = useState<string | null>(null);
   const [shiftHeld, setShiftHeld] = useState(false);
   const [pinTooltip, setPinTooltip] = useState<string | null>(null);
-  const [map3DOpen, setMap3DOpen] = useState(false);
   const [cameraHud, setCameraHud] = useState<MapCameraRequest | null>(null);
   const [cameraMoveState, setCameraMoveState] = useState<"idle" | "moving" | "arrived">("idle");
 
@@ -421,10 +416,6 @@ export default function MapVisualizer({
   useEffect(() => {
     if (pinError) clearPinTooltip();
   }, [pinError, clearPinTooltip]);
-
-  useEffect(() => {
-    if (!drawnBbox) setMap3DOpen(false);
-  }, [drawnBbox]);
 
   // Mutable refs to resolve stale closures during single-mount map hooks
   const onCellClickRef = useRef(onCellClick);
@@ -1196,6 +1187,16 @@ export default function MapVisualizer({
         </div>
       )}
 
+      {scanAnimationActive && drawnBbox && (
+        <div
+          data-testid="map-scan-active-hint"
+          className="pointer-events-none absolute left-5 bottom-24 z-20 flex items-center gap-2 rounded border border-emerald-200/45 bg-zinc-950/72 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-100 shadow-lg backdrop-blur-md"
+        >
+          <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+          <span>Scan in progress - watching selected cells</span>
+        </div>
+      )}
+
       {/* Grid legend */}
       <div className="absolute right-5 top-5 max-w-[230px] rounded-lg border border-white/10 bg-zinc-950/52 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-zinc-300 shadow-lg backdrop-blur-md pointer-events-none">
         <p className="mb-1.5 text-[9px] font-bold text-zinc-500">Legend</p>
@@ -1254,35 +1255,6 @@ export default function MapVisualizer({
       >
         Map Actions
       </button>
-
-      {drawnBbox && (
-        <button
-          type="button"
-          data-testid="map-3d-toggle"
-          aria-label={map3DOpen ? "3D context open" : "Open 3D context"}
-          aria-pressed={map3DOpen}
-          title="Open 3D context"
-          data-ui-tip="3D context"
-          data-ui-tip-position="left"
-          className="view-flip-button absolute bottom-20 right-5 z-20 flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-zinc-950/82 text-[15px] font-black tracking-tight text-white shadow-[0_8px_24px_rgba(0,0,0,0.34),0_0_18px_rgba(34,211,238,0.16)] backdrop-blur-md transition hover:border-cyan-200/70 hover:bg-cyan-950/80 focus:outline-none focus:ring-2 focus:ring-cyan-300 data-[active=true]:bg-white data-[active=true]:text-zinc-950"
-          data-active={map3DOpen}
-          onMouseDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            setMap3DOpen(true);
-          }}
-        >
-          <span>3D</span>
-        </button>
-      )}
-
-      <Map3DOverlay
-        open={map3DOpen}
-        activeBbox={drawnBbox}
-        vlmBoxes={vlmBoxes}
-        timelineDate={timelineDate}
-        onClose={() => setMap3DOpen(false)}
-      />
 
       {/* Operator Right Click Context Menu */}
       {contextMenu && (

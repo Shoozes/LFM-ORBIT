@@ -563,7 +563,7 @@ function buildConfidenceContributors(
     weighted("scene quality", 0.18, 0.74, "Quality metadata stays with the replay."),
     weighted("visual grounding", 0.2, hasObjectEvidence ? 0.76 : 0.62, "Grounding is candidate evidence pending review."),
     weighted("source provenance", 0.18, 0.86, "Provider, bbox, task, and replay id are carried into proof JSON."),
-    weighted("depth/context", 0.1, 0.34, "Depth/3D context is optional and only assists review."),
+    weighted("map/context", 0.1, 0.34, "Map context assists review but is not scored evidence."),
   ];
 }
 

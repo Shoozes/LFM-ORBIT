@@ -37,7 +37,6 @@ Full repo verification:
 - Agent 1 prunes scan cells before downlink.
 - Agent 2 reviews retained evidence packets: bbox, source, temporal/proxy scores, confidence, and visual evidence references.
 - Object Evidence Mode adds target packs, mission-bound object targets, batch grounding, glowing CV boxes, and compact count/delta proof fields.
-- Optional 3D context reuses the active 2D bbox and CV boxes without pretending to be a dated timelapse frame.
 - Link outages queue compact JSON alerts in the backend agent bus and flush after restore.
 - Ground Agent proposes and confirms local actions before mutation: replay loads/rescans, mission packs, object-target edits, target-pack saves, SAT/GND link changes, and semantic camera moves to known location contexts.
 
@@ -130,7 +129,7 @@ Current runtime: SimSat-first imagery lane, deterministic replay fixtures for re
 | Root verify | `.\run.ps1 -Verify` and `./run.sh --verify` passing |
 | Backend tests | `427 passed` |
 | Frontend | typecheck + build passing |
-| Playwright E2E | `101 passed`, `1 skipped` |
+| Playwright E2E | `98 passed`, `1 skipped` |
 | Recorded demos | showcase, object evidence, payload, provenance, abstain, eclipse |
 | Dataset export | `200` samples, `11` replay-cache rows, `185` mission metadata rows, `15` timelapse rows |
 | Retagged training set | `163` assets, `15` temporal sequences |

@@ -147,8 +147,7 @@ test("records glowing CV object evidence boxes and tooltips", async ({ page, req
   await page.getByTestId("mission-panel-tab-plan").click();
   await page.getByTestId("open-evidence-tools").click();
   await expect(page.getByText("Visual Evidence Tools")).toBeVisible();
-  await expect(page.getByTestId("map-3d-panel")).toBeHidden();
-  await expect(page.getByTestId("map-3d-toggle")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByTestId("map-scan-paused-hint")).toBeVisible();
 
   await showSubtitle(page, "Run the port target set inside the selected satellite mission bbox.", 1_300);
   await expect(page.getByTestId("vlm-mission-targets")).toContainText("shipping container cluster");

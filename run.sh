@@ -272,10 +272,10 @@ install_backend_deps() {
     if [[ "$include_model_runtime" == true ]]; then
         if can_attempt_model_runtime_install; then
             sync_args+=(--extra model)
-            echo "[i] Attempting optional llama-cpp model runtime install."
+            echo "[i] Attempting llama-cpp model runtime install for GGUF inference."
         else
             include_model_runtime=false
-            echo "[i] Skipping optional llama-cpp model runtime install because no Linux C/C++ compiler was found."
+            echo "[i] Skipping llama-cpp model runtime install because no Linux C/C++ compiler was found."
             echo "    Install build-essential, gcc/g++, or clang, then rerun with LFM_ORBIT_INSTALL_MODEL_RUNTIME=1 if local GGUF inference is required."
         fi
     fi
@@ -284,7 +284,7 @@ install_backend_deps() {
         cd "$BACKEND_DIR"
         if ! "$UV_CMD" "${sync_args[@]}"; then
             if [[ "$include_model_runtime" == true ]]; then
-                echo "[!] Optional llama-cpp model runtime failed to install. Retrying core backend install without model runtime." >&2
+                echo "[!] llama-cpp model runtime failed to install. Retrying core backend install without local GGUF runtime." >&2
                 "$UV_CMD" sync --extra dev --locked
             else
                 exit 1
@@ -302,9 +302,9 @@ install_frontend_deps() {
     )
 }
 
-ensure_optional_model() {
+ensure_trained_model() {
     if [[ "$FETCH_MODEL" != true ]]; then
-        echo "[i] Skipping optional GGUF model download. Orbit still boots with the local fallback analysis path."
+        echo "[i] Skipping trained GGUF fetch. Use --fetch-model for production/hackathon runs; fallback analysis is development-only."
         return
     fi
 
@@ -319,7 +319,7 @@ ensure_optional_model() {
             local file_size
             file_size=$(stat -c%s "$MODEL_FILE" 2>/dev/null || stat -f%z "$MODEL_FILE")
             if [[ "$file_size" -ge "$min_size_bytes" ]]; then
-                echo "[i] Optional GGUF model already present."
+                echo "[i] Trained Orbit GGUF already present."
                 return
             fi
             echo "[i] Existing GGUF file is incomplete ($file_size bytes). Re-downloading..."
@@ -329,10 +329,10 @@ ensure_optional_model() {
         fi
 
         if [[ "$needs_download" == true ]]; then
-            echo "[*] Fetching optional GGUF model from LFM_MODEL_URL..."
+            echo "[*] Fetching trained Orbit GGUF from LFM_MODEL_URL..."
             echo "    Source: $LFM_MODEL_URL"
             echo "    Target: $MODEL_FILE"
-            "$PYTHON_CMD" -c "import urllib.request, sys; print('Downloading optional model...', flush=True); urllib.request.urlretrieve(sys.argv[1], sys.argv[2])" "$LFM_MODEL_URL" "$MODEL_FILE"
+            "$PYTHON_CMD" -c "import urllib.request, sys; print('Downloading trained Orbit model...', flush=True); urllib.request.urlretrieve(sys.argv[1], sys.argv[2])" "$LFM_MODEL_URL" "$MODEL_FILE"
         fi
     else
         local model_repo_id="${LFM_MODEL_REPO_ID:-${CANOPY_SENTINEL_MODEL_REPO_ID:-$DEFAULT_MODEL_REPO_ID}}"
@@ -381,14 +381,14 @@ PY
         echo "[!] Downloaded GGUF file is too small ($file_size bytes)." >&2
         exit 1
     fi
-    echo "[+] Optional trained GGUF model ready."
+    echo "[+] Trained Orbit GGUF model ready."
 }
 
 install_deps() {
     install_backend_deps
     write_simsat_status
     install_frontend_deps
-    ensure_optional_model
+    ensure_trained_model
     echo "[+] Install/repair complete."
 }
 
@@ -432,7 +432,7 @@ run_app() {
     write_simsat_status
 
     if [[ ! -f "$MODEL_FILE" ]]; then
-        echo "[i] Optional GGUF model not found. Satellite-side reasoning will stay on safe fallback behavior."
+        echo "[!] Trained GGUF model not found. Run ./run.sh --install --fetch-model for the production/hackathon path; continuing with development fallback behavior."
     fi
 
     echo "[*] Launching backend..."
@@ -526,9 +526,9 @@ run_menu() {
         echo "======================================"
         echo "              LFM ORBIT               "
         echo "======================================"
-        echo "1. Install/Repair -> Run"
-        echo "2. Install/Repair + Fetch optional GGUF model -> Run"
-        echo "3. Install/Repair only"
+        echo "1. Install/Repair + Fetch trained Orbit GGUF -> Run"
+        echo "2. Install/Repair -> Run (skip model fetch)"
+        echo "3. Install/Repair only (skip model fetch)"
         echo "4. Run"
         echo "5. Verify (backend + frontend + E2E)"
         echo "6. Clean (cold-start runtime reset)"
@@ -538,17 +538,19 @@ run_menu() {
         read -r -p "Select an option: " choice
         case "$choice" in
             1)
-                install_deps
-                run_app
-                exit 0
-                ;;
-            2)
                 FETCH_MODEL=true
                 install_deps
                 run_app
                 exit 0
                 ;;
+            2)
+                FETCH_MODEL=false
+                install_deps
+                run_app
+                exit 0
+                ;;
             3)
+                FETCH_MODEL=false
                 install_deps
                 exit 0
                 ;;

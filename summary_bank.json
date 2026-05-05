@@ -100,13 +100,11 @@
         "source/frontend/App.tsx",
         "source/frontend/components/AgentDialogue.tsx",
         "source/frontend/components/GroundAgent.tsx",
-        "source/frontend/components/Map3DOverlay.tsx",
         "source/frontend/components/MapVisualizer.tsx",
         "source/frontend/components/MissionControl.tsx",
         "source/frontend/components/VlmPanel.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json",
@@ -146,7 +144,6 @@
         "source/frontend/components/VlmPanel.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json"
@@ -206,13 +203,11 @@
         "source/frontend/App.tsx",
         "source/frontend/components/AgentDialogue.tsx",
         "source/frontend/components/GroundAgent.tsx",
-        "source/frontend/components/Map3DOverlay.tsx",
         "source/frontend/components/MapVisualizer.tsx",
         "source/frontend/components/MissionControl.tsx",
         "source/frontend/components/VlmPanel.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json"
@@ -246,7 +241,6 @@
         "source/frontend/components/VlmPanel.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json"
@@ -285,19 +279,16 @@
         "source/frontend/components/VlmPanel.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json"
       ]
     },
     "feature_group_3d_context_view": {
-      "note": "Optional 3D context view: the same bottom-right map control flips between 2D and 3D so operators do not hunt for separate mode buttons; 3D opens from the active bbox/replay bbox, shows no-auth MapLibre satellite terrain plus deterministic local relief mesh, reuses 2D bbox and grouped CV evidence, keeps context timestamp separate from evidence acquisition time, and has recoverable init-error and nonblank WebGL coverage. May 4 visual review confirmed terrain appears in 3D mode and no stray 3D selection boxes are shown in the port object-evidence flow.",
+      "note": "Map simplification: the unreliable 3D popup was removed; MapVisualizer stays focused on the 2D operator map, active/paused scan hints, bbox review, and glowing CV evidence boxes.",
       "files": [
-        "source/frontend/components/Map3DOverlay.tsx",
         "source/frontend/components/MapVisualizer.tsx",
         "source/frontend/index.css",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/qa_verification.spec.ts",
         "docs/TODO.md",
         "docs/QA_PITFALLS.md",
@@ -349,14 +340,13 @@
         "source/frontend/components/VlmPanel.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json"
       ]
     },
     "issue_group_error_handling_and_parser_integrity": {
-      "note": "Malformed Depth Anything image payloads fail before optional model loading, nested fenced LFM tool-call JSON parses correctly, benign Windows websocket teardown noise is filtered narrowly, Mission refresh failures leave debug diagnostics, optional 3D context initialization failures surface a recoverable panel instead of a stuck overlay, provider/QC failures cannot become positive alerts, and fallback paths leave traceable provenance. MapVisualizer also treats shader/WebGL/basemap render failures as recoverable operator-visible map degradation while keeping mission scoring unaffected.",
+      "note": "Malformed Depth Anything image payloads fail before optional model loading, nested fenced LFM tool-call JSON parses correctly, benign Windows websocket teardown noise is filtered narrowly, Mission refresh failures leave debug diagnostics, provider/QC failures cannot become positive alerts, and fallback paths leave traceable provenance. MapVisualizer also treats shader/WebGL/basemap render failures as recoverable operator-visible map degradation while keeping mission scoring unaffected.",
       "files": [
         "docs/ARCHITECTURE.md",
         "docs/DEMO_GUIDE.md",
@@ -380,11 +370,9 @@
         "source/frontend/App.tsx",
         "source/frontend/components/AgentDialogue.tsx",
         "source/frontend/components/GroundAgent.tsx",
-        "source/frontend/components/Map3DOverlay.tsx",
         "source/frontend/components/MapVisualizer.tsx",
         "source/frontend/components/MissionControl.tsx",
-        "source/frontend/e2e/bbox.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts"
+        "source/frontend/e2e/bbox.spec.ts"
       ]
     },
     "issue_group_e2e_state_isolation_and_run_conditions": {
@@ -408,7 +396,6 @@
         "source/frontend/e2e/demos/demoHelpers.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
         "source/frontend/e2e/demos/showcase.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/runtime.ts",
         "source/frontend/e2e/test_page_html.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
@@ -419,7 +406,7 @@
       ]
     },
     "issue_group_integrity_scalability_review": {
-      "note": "Current integrity/scalability lane after the May 4 publishability pass: progress docs are consolidated into README/product, ARCHITECTURE/system, focused workflow docs, QA_PITFALLS/regression checklist, TODO/current backlog, and summary_bank/file groups. The pass refreshed promoted docs screenshots/videos/timelapse media, visually sampled README images and WebM contact sheets, hardened Playwright map readiness around the actual MapLibre canvas, serialized docs-video recording runs to avoid shared port conflicts, disabled demo trace capture to avoid Windows trace-file copy flake, lengthened object-evidence video hold to clear temporal guards, updated concise Agent-first assertions, and reran full backend 426, frontend lint/build, recorded demos 6, screenshot export 8, tutorial export 1, and full Playwright 101 with 1 intentional HTML-dump skip. Remaining TODO/stub hits are tracked backlog, UI placeholders, launcher invalid-GGUF guards, SQL placeholders, SVG fallback wording, or test fixtures rather than unsupported runtime stubs. May 4 reproducibility follow-up passed root cold-start verification after .\\run.ps1 -Clean: launcher re-synced locked deps, installed Playwright Chromium, ran backend 427, frontend lint/build, and Playwright 101 with 1 intentional HTML-dump skip. Fetch dry-run now preserves existing GGUF artifacts without requiring --force, and .env.example makes SimSat-first startup explicit while keeping DISABLE_EXTERNAL_APIS=true for quota-safe fallback.",
+      "note": "Current integrity/scalability lane after the May 4 publishability pass: progress docs are consolidated into README/product, ARCHITECTURE/system, focused workflow docs, QA_PITFALLS/regression checklist, TODO/current backlog, and summary_bank/file groups. The pass refreshed promoted docs screenshots/videos/timelapse media, visually sampled README images and WebM contact sheets, hardened Playwright map readiness around the actual MapLibre canvas, serialized docs-video recording runs to avoid shared port conflicts, disabled demo trace capture to avoid Windows trace-file copy flake, lengthened object-evidence video hold to clear temporal guards, updated concise Agent-first assertions, and reran backend, frontend lint/build, recorded demos, screenshot export, tutorial export, and Playwright before the 3D popup removal. Remaining TODO/stub hits are tracked backlog, UI placeholders, launcher invalid-GGUF guards, SQL placeholders, SVG fallback wording, or test fixtures rather than unsupported runtime stubs. May 4 reproducibility follow-up passed root cold-start verification after .\\run.ps1 -Clean: launcher re-synced locked deps, installed Playwright Chromium, ran backend 427 and frontend lint/build. After removing the 3D popup spec, current Playwright is 98 passed with 1 intentional HTML-dump skip. Fetch dry-run now preserves existing GGUF artifacts without requiring --force, and .env.example makes SimSat-first startup explicit while keeping DISABLE_EXTERNAL_APIS=true for quota-safe fallback.",
       "files": [
         "docs/TODO.md",
         "docs/QA_PITFALLS.md",
@@ -447,14 +434,12 @@
         "source/frontend/App.tsx",
         "source/frontend/components/GroundAgent.tsx",
         "source/frontend/components/MapVisualizer.tsx",
-        "source/frontend/components/Map3DOverlay.tsx",
         "source/frontend/components/MissionControl.tsx",
         "source/frontend/components/VlmPanel.tsx",
         "source/frontend/index.css",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "source/frontend/e2e/qa_verification.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
         "docs/media/readme/cv-object-evidence-local-audit.png",
         "docs/media/videos/object-evidence-demo.webm"
@@ -523,7 +508,6 @@
         "source/frontend/components/VlmPanel.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json"
@@ -559,7 +543,6 @@
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/capture_screenshots.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/qa_verification.spec.ts",
         "source/frontend/e2e/tutorial_video.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
@@ -593,7 +576,6 @@
         "source/frontend/components/MissionControl.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/monitor_features.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
@@ -684,13 +666,11 @@
         "source/frontend/App.tsx",
         "source/frontend/components/AgentDialogue.tsx",
         "source/frontend/components/GroundAgent.tsx",
-        "source/frontend/components/Map3DOverlay.tsx",
         "source/frontend/components/MapVisualizer.tsx",
         "source/frontend/components/MissionControl.tsx",
         "source/frontend/components/VlmPanel.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts"
       ]
@@ -769,7 +749,6 @@
         "source/frontend/components/VlmPanel.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json"
@@ -808,7 +787,6 @@
         "source/frontend/components/VlmPanel.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json"
@@ -856,7 +834,6 @@
         "source/frontend/components/VlmPanel.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json"
@@ -930,7 +907,6 @@
         "source/frontend/components/VlmPanel.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json"
@@ -990,7 +966,6 @@
         "source/frontend/components/MissionControl.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json"
@@ -1051,7 +1026,6 @@
         "source/frontend/e2e/demos/demoHelpers.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
         "source/frontend/e2e/dual_agent_demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/runtime.ts",
         "source/frontend/e2e/tutorialHelpers.ts",
         "source/frontend/e2e/tutorial_video.spec.ts",
@@ -1138,7 +1112,6 @@
         "source/frontend/components/VlmPanel.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json"
@@ -1202,7 +1175,6 @@
         "source/frontend/App.tsx",
         "source/frontend/components/AgentDialogue.tsx",
         "source/frontend/components/GroundAgent.tsx",
-        "source/frontend/components/Map3DOverlay.tsx",
         "source/frontend/components/MapVisualizer.tsx",
         "source/frontend/components/MissionControl.tsx",
         "source/frontend/components/SettingsPanel.tsx",
@@ -1210,11 +1182,9 @@
         "source/frontend/e2e/app.spec.ts",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "source/frontend/package.json",
-        "source/frontend/utils/depthMapStats.ts",
         "source/frontend/vite.config.ts"
       ]
     },
@@ -1229,20 +1199,17 @@
         "source/frontend/components/AgentDialogue.tsx",
         "source/frontend/components/AlertsLogs.tsx",
         "source/frontend/components/GroundAgent.tsx",
-        "source/frontend/components/Map3DOverlay.tsx",
         "source/frontend/components/MapVisualizer.tsx",
         "source/frontend/components/MissionControl.tsx",
         "source/frontend/components/SettingsPanel.tsx",
         "source/frontend/components/TimelapseViewer.tsx",
         "source/frontend/components/ValidationPanel.tsx",
         "source/frontend/components/VlmPanel.tsx",
-        "source/frontend/e2e/bbox.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
-        "source/frontend/utils/depthMapStats.ts"
+        "source/frontend/e2e/bbox.spec.ts"
       ]
     },
     "qa_suite_and_demo_flows": {
-      "note": "Current QA/demo flow lane: backend docs artifacts guard promoted images, explicit public WebMs, summary-bank file refs, and temporal/nonblank video quality; frontend Playwright covers API smoke, Agent-first shell, Ground Agent actions, Mission subtabs, bbox selection, visual evidence/VLM, 3D context, visual stories, screenshot export, dual-agent demo, and the Rondonia tutorial. May 4 tightened run conditions by waiting on MapLibre canvas dimensions instead of basemap-credit text, running video exports sequentially on the default ports, disabling demo traces for recording-only jobs on Windows, lengthening the object-evidence recording hold, and updating assertions for concise UI copy. Latest full run: Playwright 101 passed with 1 intentional HTML-dump skip, recorded demos 6 passed, screenshot export 8 passed, tutorial export 1 passed, backend 426 passed, frontend lint/build passed. QA now includes nested docs markdown link validation, fetch dry-run existing-artifact coverage, cold-start launcher verification, and refreshed screenshot capture after map credit polish. Latest root verify passed backend 427 plus Playwright 101 with 1 intentional skip.",
+      "note": "Current QA/demo flow lane: backend docs artifacts guard promoted images, explicit public WebMs, summary-bank file refs, and temporal/nonblank video quality; frontend Playwright covers API smoke, Agent-first shell, Ground Agent actions, Mission subtabs, bbox selection, visual evidence/VLM, visual stories, screenshot export, dual-agent demo, and the Rondonia tutorial. May 4 tightened run conditions by waiting on MapLibre canvas dimensions instead of basemap-credit text, running video exports sequentially on the default ports, disabling demo traces for recording-only jobs on Windows, lengthening the object-evidence video hold, and updating assertions for concise UI copy. Current full Playwright after 3D removal: 98 passed with 1 intentional HTML-dump skip. QA also includes nested docs markdown link validation, fetch dry-run existing-artifact coverage, cold-start launcher verification, and refreshed screenshot capture after map credit polish. Latest root verify passed backend 427.",
       "files": [
         "source/backend/tests/test_docs_artifacts.py",
         "source/backend/tests/test_import_contracts.py",
@@ -1253,7 +1220,6 @@
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/capture_screenshots.spec.ts",
         "source/frontend/e2e/qa_verification.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "source/frontend/e2e/tutorial_video.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
@@ -1304,7 +1270,6 @@
         "source/frontend/components/MissionControl.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "summary_bank.json"
@@ -1365,7 +1330,6 @@
         "source/frontend/components/VlmPanel.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/monitor_features.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
@@ -1526,7 +1490,6 @@
         "source/frontend/e2e/demos/payload-reduction.demo.spec.ts",
         "source/frontend/e2e/demos/provenance.demo.spec.ts",
         "source/frontend/e2e/demos/showcase.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "source/frontend/package.json",
@@ -1568,7 +1531,6 @@
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/object-evidence.demo.spec.ts",
         "source/frontend/e2e/demos/orbital-eclipse.demo.spec.ts",
-        "source/frontend/e2e/map3d.spec.ts",
         "source/frontend/e2e/qa_verification.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",

@@ -196,7 +196,7 @@ function Install-BackendDeps {
     $installModelRuntime = $FetchModel -or (Test-Path $ModelFile) -or ($env:LFM_ORBIT_INSTALL_MODEL_RUNTIME -match "^(1|true|yes|on)$")
     if ($installModelRuntime) {
         $syncArgs += @("--extra", "model")
-        Write-Host "[i] Attempting optional llama-cpp model runtime install." -ForegroundColor Gray
+        Write-Host "[i] Attempting llama-cpp model runtime install for GGUF inference." -ForegroundColor Gray
     }
 
     Push-Location $BackendDir
@@ -205,7 +205,7 @@ function Install-BackendDeps {
         $syncExit = $LASTEXITCODE
         if ($syncExit -ne 0) {
             if ($installModelRuntime) {
-                Write-Host "[!] Optional llama-cpp model runtime failed to install. Retrying core backend install without model runtime." -ForegroundColor Yellow
+                Write-Host "[!] llama-cpp model runtime failed to install. Retrying core backend install without local GGUF runtime." -ForegroundColor Yellow
                 & $uv sync --extra dev --locked
                 if ($LASTEXITCODE -ne 0) {
                     throw "Backend dependency sync failed with exit code $LASTEXITCODE."
@@ -230,9 +230,9 @@ function Install-FrontendDeps {
     }
 }
 
-function Ensure-OptionalModel {
+function Ensure-TrainedModel {
     if (-not $FetchModel) {
-        Write-Host "[i] Skipping optional GGUF model download. Orbit still boots with the local fallback analysis path." -ForegroundColor Gray
+        Write-Host "[i] Skipping trained GGUF fetch. Use -FetchModel for production/hackathon runs; fallback analysis is development-only." -ForegroundColor Gray
         return
     }
 
@@ -248,7 +248,7 @@ function Ensure-OptionalModel {
         if (Test-Path $ModelFile) {
             $fileSize = (Get-Item $ModelFile).Length
             if ($fileSize -ge $minSizeBytes) {
-                Write-Host "    Optional GGUF model already present ($([Math]::Round($fileSize / 1MB, 1)) MB)." -ForegroundColor Gray
+                Write-Host "    Trained Orbit GGUF already present ($([Math]::Round($fileSize / 1MB, 1)) MB)." -ForegroundColor Gray
             } else {
                 Write-Host "    Existing GGUF file is incomplete ($fileSize bytes). Re-downloading..." -ForegroundColor Yellow
                 $needsDownload = $true
@@ -261,11 +261,11 @@ function Ensure-OptionalModel {
             return
         }
 
-        Write-Host "[*] Fetching optional GGUF model from LFM_MODEL_URL..." -ForegroundColor Cyan
+        Write-Host "[*] Fetching trained Orbit GGUF from LFM_MODEL_URL..." -ForegroundColor Cyan
         Write-Host "    Source: $modelUrl" -ForegroundColor Gray
         Write-Host "    Target: $ModelFile" -ForegroundColor Gray
 
-        & $python -c "import urllib.request, sys; print('Downloading optional model...', flush=True); urllib.request.urlretrieve(sys.argv[1], sys.argv[2])" $modelUrl $ModelFile
+        & $python -c "import urllib.request, sys; print('Downloading trained Orbit model...', flush=True); urllib.request.urlretrieve(sys.argv[1], sys.argv[2])" $modelUrl $ModelFile
     } else {
         $modelRepoId = $env:LFM_MODEL_REPO_ID
         if (-not $modelRepoId) { $modelRepoId = $env:CANOPY_SENTINEL_MODEL_REPO_ID }
@@ -319,14 +319,14 @@ function Ensure-OptionalModel {
         throw "Downloaded GGUF file is too small ($fileSize bytes). Remove it and retry with a valid model repo or LFM_MODEL_URL."
     }
 
-    Write-Host "[+] Optional trained GGUF model ready ($([Math]::Round($fileSize / 1MB, 1)) MB)." -ForegroundColor Green
+    Write-Host "[+] Trained Orbit GGUF model ready ($([Math]::Round($fileSize / 1MB, 1)) MB)." -ForegroundColor Green
 }
 
 function Install-Deps {
     Install-BackendDeps
     Write-SimSatStatus
     Install-FrontendDeps
-    Ensure-OptionalModel
+    Ensure-TrainedModel
     Write-Host "[+] Install/repair complete." -ForegroundColor Green
 }
 
@@ -393,7 +393,7 @@ function Run-App {
     Write-SimSatStatus
 
     if (-not (Test-Path $ModelFile)) {
-        Write-Host "[i] Optional GGUF model not found. Satellite-side reasoning will stay on safe fallback behavior." -ForegroundColor Gray
+        Write-Host "[!] Trained GGUF model not found. Run .\run.ps1 -Install -FetchModel for the production/hackathon path; continuing with development fallback behavior." -ForegroundColor Yellow
     }
 
     Write-Host "[*] Launching backend..." -ForegroundColor Cyan
@@ -483,9 +483,9 @@ function Run-InteractiveMenu {
         Write-Host "======================================" -ForegroundColor Yellow
         Write-Host "              LFM ORBIT               " -ForegroundColor Green
         Write-Host "======================================" -ForegroundColor Yellow
-        Write-Host "1. Install/Repair -> Run"
-        Write-Host "2. Install/Repair + Fetch optional GGUF model -> Run"
-        Write-Host "3. Install/Repair only"
+        Write-Host "1. Install/Repair + Fetch trained Orbit GGUF -> Run"
+        Write-Host "2. Install/Repair -> Run (skip model fetch)"
+        Write-Host "3. Install/Repair only (skip model fetch)"
         Write-Host "4. Run"
         Write-Host "5. Verify (backend + frontend + E2E)"
         Write-Host "6. Clean (cold-start runtime reset)"
@@ -496,17 +496,19 @@ function Run-InteractiveMenu {
 
         switch ($choice) {
             "1" {
-                Install-Deps
-                Run-App
-                exit
-            }
-            "2" {
                 $script:FetchModel = $true
                 Install-Deps
                 Run-App
                 exit
             }
+            "2" {
+                $script:FetchModel = $false
+                Install-Deps
+                Run-App
+                exit
+            }
             "3" {
+                $script:FetchModel = $false
                 Install-Deps
                 exit
             }
