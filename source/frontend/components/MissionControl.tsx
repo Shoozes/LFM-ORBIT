@@ -272,6 +272,10 @@ type MissionControlProps = {
   drawnBbox: number[] | null;
   onClearBbox: () => void;
   onOpenTimelapse?: () => void;
+  onOpenLogs?: () => void;
+  onOpenProofMode?: () => void;
+  onInspectFirstResult?: () => void;
+  resultAlertCount?: number;
   mission: Mission | null;
   onRefresh: () => void;
   isScanComplete?: boolean;
@@ -289,6 +293,10 @@ export default function MissionControl({
   drawnBbox,
   onClearBbox,
   onOpenTimelapse,
+  onOpenLogs,
+  onOpenProofMode,
+  onInspectFirstResult,
+  resultAlertCount = 0,
   mission,
   onRefresh,
   isScanComplete,
@@ -568,12 +576,38 @@ export default function MissionControl({
                 Mission Pass Complete
               </p>
               <p className="mt-1 leading-relaxed">
-                Satellite Pruner finished the selected review area. Review Logs, Inspect, or Proof Mode before turning candidate evidence into a claim.
+                Satellite Pruner finished the selected review area. Review results before turning candidate evidence into a claim.
               </p>
               <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-wider text-emerald-800">
                 <span>{mission.cells_scanned} cells recorded</span>
                 <span>{mission.flags_found} flags found</span>
                 {mission.target_pack_id && <span>{mission.target_pack_id.replace(/_/g, " ")}</span>}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  data-testid="mission-complete-open-logs"
+                  onClick={onOpenLogs}
+                  className="rounded border border-emerald-300 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-800 hover:bg-emerald-100"
+                >
+                  Open Logs
+                </button>
+                <button
+                  type="button"
+                  data-testid="mission-complete-open-proof"
+                  onClick={onOpenProofMode}
+                  className="rounded border border-cyan-300 bg-cyan-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-800 hover:bg-cyan-100"
+                >
+                  Proof Mode
+                </button>
+                <button
+                  type="button"
+                  data-testid="mission-complete-open-first-result"
+                  onClick={onInspectFirstResult}
+                  className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-700 hover:bg-zinc-100"
+                >
+                  {resultAlertCount > 0 ? "Inspect Flag" : "Review Summary"}
+                </button>
               </div>
             </div>
           )}

@@ -3,6 +3,7 @@ import type { VlmBox } from "./types/visualEvidence";
 import { useTelemetry } from "./hooks/useTelemetry";
 import { getApiBaseUrl, generateGridForBbox } from "./utils/telemetry";
 import { getDefaultMissionDateRange } from "./utils/dateRange";
+import { cellIdMatchesBbox, filterAlertsForBbox } from "./utils/missionAlerts";
 import type { Mission } from "./types/mission";
 import type { OrbitalScanEventDetail } from "./types/telemetry";
 import type { ChatResponse } from "./components/GroundAgentActionCard";
@@ -276,6 +277,7 @@ export default function App() {
   const [missionStopNotice, setMissionStopNotice] = useState<string | null>(null);
   const [proofModeActive, setProofModeActive] = useState(false);
   const [proofMission, setProofMission] = useState<Mission | null>(null);
+  const [dismissedCompleteMissionId, setDismissedCompleteMissionId] = useState<number | null>(null);
   const [demoStepIndex, setDemoStepIndex] = useState(0);
   const previousActiveMissionRef = useRef<Mission | null>(null);
   const previewedMissionIdRef = useRef<number | null>(null);
@@ -325,6 +327,16 @@ export default function App() {
       previousActiveMissionRef.current = null;
     }
   }, [mission]);
+
+  useEffect(() => {
+    if (!mission) {
+      if (proofMission) setProofMission(null);
+      return;
+    }
+    if (proofMission && proofMission.id !== mission.id) {
+      setProofMission(null);
+    }
+  }, [mission, mission?.id, proofMission, proofMission?.id]);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -394,13 +406,24 @@ export default function App() {
     return geoJsonGrid;
   }, [drawnBbox, geoJsonGrid]);
   const selectedGridCellCount = displayGrid?.features.length ?? 0;
+  const missionScannedCount = Number(mission?.cells_scanned ?? 0);
+  const heartbeatMatchesMission = Boolean(
+    mission?.status === "active"
+      && mission.mission_mode !== "replay"
+      && heartbeat?.last_cell
+      && cellIdMatchesBbox(heartbeat.last_cell, mission.bbox),
+  );
+  const liveMissionScannedCount = Math.max(
+    missionScannedCount,
+    heartbeatMatchesMission ? Number(heartbeat?.cells_scanned ?? 0) : 0,
+  );
   const missionPassComplete = Boolean(
-    isScanComplete
-      || (
-        mission?.status === "active"
-        && mission.mission_mode !== "replay"
-        && selectedGridCellCount > 0
-        && Number(mission.cells_scanned ?? 0) >= selectedGridCellCount
+    mission?.status === "active"
+      && mission.mission_mode !== "replay"
+      && selectedGridCellCount > 0
+      && (
+        liveMissionScannedCount >= selectedGridCellCount
+        || (isScanComplete && heartbeatMatchesMission)
       ),
   );
   const defaultMissionDateRange = useMemo(() => getDefaultMissionDateRange(), []);
@@ -562,6 +585,9 @@ export default function App() {
         setVlmBoxes([]);
         setShowMissionTimelapse(false);
         setSelectedCellId(null);
+        setProofMission(null);
+        setProofModeActive(false);
+        setDismissedCompleteMissionId(null);
         setActiveTab("mission");
       }
     }
@@ -720,6 +746,27 @@ export default function App() {
     setVlmBoxes([]);
     setShowMissionTimelapse(false);
   }, []);
+  const missionScopedAlerts = useMemo(() => (
+    mission?.mission_mode === "replay" ? alerts : filterAlertsForBbox(alerts, mission?.bbox)
+  ), [alerts, mission]);
+  const firstAlertCellId = missionScopedAlerts[0]?.cell_id ?? null;
+  const completionNoticeVisible = Boolean(
+    mission
+      && mission.mission_mode !== "replay"
+      && missionPassComplete
+      && dismissedCompleteMissionId !== mission.id,
+  );
+  const openMissionLogs = useCallback(() => {
+    setActiveTab("logs");
+  }, []);
+  const openFirstResult = useCallback(() => {
+    if (firstAlertCellId) {
+      setSelectedCellId(firstAlertCellId);
+      setActiveTab("inspect");
+      return;
+    }
+    setActiveTab("logs");
+  }, [firstAlertCellId, setSelectedCellId]);
 
   return (
     <div className="relative flex h-screen w-screen overflow-hidden bg-zinc-50 text-zinc-900 font-sans text-sm">
@@ -806,16 +853,76 @@ export default function App() {
             <div className={`flex items-center gap-2 rounded px-3 py-1.5 shadow-sm backdrop-blur ${
               mission.mission_mode === "replay"
                 ? "border border-cyan-200 bg-cyan-50/90"
+                : missionPassComplete
+                  ? "border border-emerald-200 bg-white/92"
                 : "border border-emerald-200 bg-emerald-50/90"
             }`}>
-               <span className={`h-2 w-2 rounded-full animate-pulse ${
+               <span className={`h-2 w-2 rounded-full ${
+                 missionPassComplete && mission.mission_mode !== "replay" ? "" : "animate-pulse"
+               } ${
                  mission.mission_mode === "replay" ? "bg-cyan-500" : "bg-emerald-500"
                }`}></span>
                <span className={`text-[10px] uppercase font-bold tracking-widest ${
                  mission.mission_mode === "replay" ? "text-cyan-700" : "text-emerald-700"
                }`}>
-                 {mission.mission_mode === "replay" ? `REPLAY ACTIVE: ${mission.replay_id || `#${mission.id}`}` : `MISSION ACTIVE: #${mission.id}`}
+                 {mission.mission_mode === "replay"
+                   ? `REPLAY ACTIVE: ${mission.replay_id || `#${mission.id}`}`
+                   : missionPassComplete
+                     ? `SCAN COMPLETE: #${mission.id}`
+                     : `MISSION ACTIVE: #${mission.id}`}
                </span>
+            </div>
+          )}
+
+          {completionNoticeVisible && mission && (
+            <div
+              data-testid="scan-complete-notice"
+              className="max-w-[380px] rounded border border-emerald-200 bg-emerald-50/96 px-3 py-2 text-emerald-950 shadow-sm backdrop-blur"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700">
+                    Scan Complete
+                  </p>
+                  <p className="mt-1 text-[11px] font-medium leading-relaxed">
+                    Mission #{mission.id} finished {liveMissionScannedCount} cells with {mission.flags_found} flags. Review results before making claims.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Dismiss scan complete notice"
+                  onClick={() => setDismissedCompleteMissionId(mission.id)}
+                  className="shrink-0 rounded border border-emerald-200 bg-white/70 px-2 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-white"
+                >
+                  X
+                </button>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  data-testid="scan-complete-open-logs"
+                  onClick={openMissionLogs}
+                  className="rounded border border-emerald-300 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-800 hover:bg-emerald-100"
+                >
+                  Open Logs
+                </button>
+                <button
+                  type="button"
+                  data-testid="scan-complete-open-proof"
+                  onClick={() => void handleProofModeStart()}
+                  className="rounded border border-cyan-300 bg-cyan-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-800 hover:bg-cyan-100"
+                >
+                  Proof Mode
+                </button>
+                <button
+                  type="button"
+                  data-testid="scan-complete-open-first-result"
+                  onClick={openFirstResult}
+                  className="rounded border border-zinc-300 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-700 hover:bg-zinc-100"
+                >
+                  {firstAlertCellId ? "Inspect Flag" : "Review Summary"}
+                </button>
+              </div>
             </div>
           )}
 
@@ -930,6 +1037,10 @@ export default function App() {
                       isScanComplete={missionPassComplete}
                       onReplayLoaded={handleReplayLoaded}
                       onReplayRescanStarted={handleReplayRescanStarted}
+                      onOpenLogs={openMissionLogs}
+                      onOpenProofMode={() => void handleProofModeStart()}
+                      onInspectFirstResult={openFirstResult}
+                      resultAlertCount={missionScopedAlerts.length}
                       scanCellCount={selectedGridCellCount}
                       onPreviewBbox={(bbox) => {
                         setDrawnBbox(bbox);

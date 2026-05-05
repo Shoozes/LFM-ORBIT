@@ -8,6 +8,7 @@ import {
   displayObjectEvidenceLabel,
   objectEvidenceScopeNote,
 } from "../utils/objectEvidence";
+import { filterAlertsForBbox } from "../utils/missionAlerts";
 
 type DemoCase = "showcase" | "payload" | "provenance" | "abstain" | "eclipse" | "ice" | "forest";
 
@@ -17,6 +18,22 @@ type GalleryItem = {
   timelapse_b64: string | null;
   timelapse_source: string | null;
   timelapse_analysis: string | null;
+};
+
+type MissionTimelapse = {
+  video_b64: string;
+  frames_count: number;
+  source?: string;
+  provider?: string;
+  runtime_truth_mode?: string;
+  imagery_origin?: string;
+  scoring_basis?: string;
+  provenance?: {
+    label?: string;
+    provider?: string;
+    kind?: string;
+    cache_family?: string;
+  };
 };
 
 type VlmBoxResult = {
@@ -244,6 +261,10 @@ const DEMO_REASON_CODES: Record<DemoCase, string[]> = {
   ice: ["ndsi_increase", "multi_frame_persistence", "cloud_rejected"],
   forest: ["ndvi_drop", "nbr_drop", "soil_exposure_spike", "proxy_band_review"],
 };
+
+const MISSION_NO_IMAGE_TITLE = "Nothing interesting found.";
+const MISSION_NO_IMAGE_BODY = "The mission finished without retained flags. Proof Mode still shows the mission bbox, date range, source path, and compact JSON summary.";
+const MISSION_NO_IMAGE_NOTE = "This proof stays tied to the current search and never borrows another replay's imagery.";
 
 type DemoProfile = {
   replayId: string;
@@ -487,38 +508,91 @@ function buildFallbackProof(demoCase: DemoCase): ProofJson {
   };
 }
 
-function buildMissionProof(mission: Mission | null, demoCase: DemoCase): ProofJson {
+function buildMissionPayloadAccounting(hasRetainedAlert: boolean): ProofJson["payload_accounting"] {
+  if (hasRetainedAlert) return buildPayloadAccounting(false);
+  return {
+    raw_payload_basis: "representative satellite frames evaluated inside the mission bbox",
+    alert_payload_basis: "no compact alert JSON was transmitted because no mission cell retained alert evidence",
+    counted_alert_fields: [],
+    excluded_from_alert_payload_bytes: EXCLUDED_PAYLOAD_FIELDS,
+    note: "Proof Mode records mission bbox, task, dates, target pack, source mode, and scan counts even when nothing interesting is found.",
+  };
+}
+
+function buildMissionProof(mission: Mission | null, demoCase: DemoCase, evidenceAlert: AlertItem | null = null): ProofJson {
   const base = buildFallbackProof(demoCase);
   if (!mission) return base;
   const dateRange = [mission.start_date, mission.end_date].filter(Boolean).join(" to ") || "current mission window";
   const targets = mission.object_targets?.map((target) => target.label).filter(Boolean) ?? [];
-  const confidence = Math.max(0.35, Math.min(0.92, Number(mission.use_case_confidence ?? base.confidence ?? 0.62)));
-  const result = mission.status === "complete" || mission.cells_scanned > 0
-    ? "mission evidence packet ready"
-    : "mission evidence packet initializing";
+  const hasRetainedAlert = Boolean(evidenceAlert) || Number(mission.flags_found ?? 0) > 0;
+  const alertBytes = evidenceAlert?.payload_bytes ?? (hasRetainedAlert ? ALERT_JSON_BYTES : 0);
+  const confidence = evidenceAlert?.confidence !== undefined
+    ? Number(evidenceAlert.confidence.toFixed(2))
+    : Math.max(0.35, Math.min(0.92, Number(mission.use_case_confidence ?? base.confidence ?? 0.62)));
+  const result = evidenceAlert?.analysis_summary
+    ?? evidenceAlert?.ground_action
+    ?? (hasRetainedAlert
+      ? "mission retained alert evidence for review"
+      : mission.cells_scanned > 0
+        ? "Nothing interesting found."
+        : "mission evidence packet initializing");
+  const status = hasRetainedAlert
+    ? "alert_ready"
+    : mission.cells_scanned > 0
+      ? "no_flags_retained"
+      : "mission_active";
+  const reasonCodes = evidenceAlert?.reason_codes?.length
+    ? evidenceAlert.reason_codes
+    : missionReasonCodes(mission);
   return {
     ...base,
     demo: "mission",
     replay_id: mission.replay_id ?? `mission_${mission.id}`,
-    provider: mission.replay_id ? "Replay (Cached API Imagery)" : "SimSat mission scan",
+    provider: mission.replay_id
+      ? "Replay (Cached API Imagery)"
+      : evidenceAlert?.observation_source
+        ? formatSourceLabel(evidenceAlert.observation_source)
+        : "SimSat mission scan",
     bbox: mission.bbox ?? base.bbox,
+    alert_payload_bytes: alertBytes,
+    payload_reduction_ratio: alertBytes > 0 ? Number((RAW_FRAME_BYTES / alertBytes).toFixed(2)) : null,
     confidence,
     result,
     mission: mission.task_text,
     source_capture_time: dateRange,
     prompt: mission.task_text,
+    payload_accounting: buildMissionPayloadAccounting(hasRetainedAlert),
     output_json: {
-      status: mission.status === "active" ? "mission_active" : "alert_ready",
+      status,
+      mission_id: mission.id,
       result,
       confidence,
-      action: "review_compact_json",
-      cell_id: `mission_${mission.id}`,
-      reason_codes: [mission.target_pack_id, mission.use_case_id].filter((value): value is string => Boolean(value)),
+      action: hasRetainedAlert ? "review_retained_alert" : "review_mission_summary",
+      cell_id: evidenceAlert?.cell_id ?? `mission_${mission.id}`,
+      reason_codes: reasonCodes,
       use_case_id: mission.use_case_id ?? mission.target_pack_id ?? "mission_review",
+      target_pack_id: mission.target_pack_id ?? null,
+      bbox: mission.bbox ?? null,
+      start_date: mission.start_date,
+      end_date: mission.end_date,
+      cells_scanned: mission.cells_scanned,
+      flags_found: mission.flags_found,
+      runtime_truth_mode: evidenceAlert?.runtime_truth_mode ?? "live",
+      imagery_origin: evidenceAlert?.imagery_origin ?? "simsat",
+      scoring_basis: evidenceAlert?.scoring_basis ?? "mission_metadata",
       object_targets: targets,
       grounding: [],
     },
   };
+}
+
+function missionReasonCodes(mission: Mission | null): string[] {
+  if (!mission) return [];
+  return [
+    mission.target_pack_id,
+    mission.use_case_id,
+    mission.mission_mode === "replay" ? "replay_evidence" : "mission_scan",
+  ].filter((value): value is string => Boolean(value));
 }
 
 function rounded(value: number): number {
@@ -602,6 +676,16 @@ function buildConfidenceContributors(
   ];
 }
 
+function buildNoFindingsContributors(mission: Mission | null): ConfidenceContributor[] {
+  const cellsScanned = Number(mission?.cells_scanned ?? 0);
+  return [
+    weighted("scan completion", 0.34, cellsScanned > 0 ? 0.9 : 0.3, `${cellsScanned} mission cells were swept inside the selected bbox.`),
+    weighted("no retained flags", 0.26, 0.88, "No cell passed the mission target retention threshold."),
+    weighted("source provenance", 0.2, 0.84, "Task, bbox, dates, source mode, and target pack stay attached to the proof."),
+    weighted("review safety", 0.2, 0.82, "Proof Mode reports the no-finding result without borrowing another replay's imagery."),
+  ];
+}
+
 function ProofRow({
   label,
   value,
@@ -679,6 +763,15 @@ function missionReplayContext(
   const dateRange = [mission?.start_date, mission?.end_date].filter(Boolean).join(" to ") || proof.source_capture_time;
   const normalized = `${task} ${replayId} ${mission?.use_case_id ?? ""}`.toLowerCase();
 
+  if (normalized.includes("fire") || normalized.includes("wildfire") || normalized.includes("burn") || normalized.includes("smoke")) {
+    return {
+      what: "Florida Fire/Drought readiness pass reviews candidate fireline context",
+      where: normalized.includes("florida") ? "North Florida corridor" : "operator-selected firewatch bbox",
+      when: dateRange,
+      why: "keep smoke, active-fire, and burn-scar claims candidate-only until source-backed imagery supports them",
+    };
+  }
+
   if (normalized.includes("maritime") || normalized.includes("vessel") || normalized.includes("singapore")) {
     return {
       what: "Ground Agent loads short-term maritime traffic replay evidence",
@@ -698,6 +791,15 @@ function missionReplayContext(
 
 function missionReplayStoryLines(mission: Mission | null): string[] {
   const normalized = `${mission?.task_text ?? ""} ${mission?.replay_id ?? ""} ${mission?.use_case_id ?? ""}`.toLowerCase();
+  if (normalized.includes("fire") || normalized.includes("wildfire") || normalized.includes("burn") || normalized.includes("smoke")) {
+    return [
+      "Operator selected a firewatch focus bbox.",
+      "Satellite Pruner swept cells and filtered proxy-only vegetation changes.",
+      "Ground Validator keeps fire claims candidate-only without source-backed smoke, active-fire, or burn-scar evidence.",
+      "Proof Mode shows mission-bounded metadata and compact JSON before any stronger claim.",
+    ];
+  }
+
   if (normalized.includes("maritime") || normalized.includes("vessel") || normalized.includes("singapore")) {
     return [
       "Operator selected a maritime focus bbox.",
@@ -738,13 +840,19 @@ export default function ProofModePanel({
   const [recentAlerts, setRecentAlerts] = useState<AlertItem[]>(alerts);
   const [metrics, setMetrics] = useState<ApiMetricsSummary | null>(metricsSummary);
   const [galleryItem, setGalleryItem] = useState<GalleryItem | null>(null);
+  const [missionTimelapse, setMissionTimelapse] = useState<MissionTimelapse | null>(null);
+  const [missionTimelapseError, setMissionTimelapseError] = useState<string | null>(null);
   const [groundingResults, setGroundingResults] = useState<VlmBoxResult[]>(() => {
     if (!demoMode) return [];
     const profile = DEMO_PROFILES[demoCase];
     return [{ label: profile.groundingLabel, bbox: profile.groundingBox }];
   });
-  const [vqaAnswer, setVqaAnswer] = useState(DEMO_PROFILES[demoCase].vqa);
-  const [caption, setCaption] = useState(DEMO_PROFILES[demoCase].caption);
+  const [vqaAnswer, setVqaAnswer] = useState(
+    demoMode ? DEMO_PROFILES[demoCase].vqa : "Mission evidence is bounded to the selected bbox and retained alert packets.",
+  );
+  const [caption, setCaption] = useState(
+    demoMode ? DEMO_PROFILES[demoCase].caption : "Current mission proof uses mission metadata until retained imagery is selected.",
+  );
   const [observedLatencyMs, setObservedLatencyMs] = useState<number | null>(null);
   const [proof, setProof] = useState<ProofJson>(() => (
     demoMode ? buildFallbackProof(demoCase) : buildMissionProof(mission, demoCase)
@@ -763,22 +871,30 @@ export default function ProofModePanel({
     setMetrics(metricsSummary);
   }, [metricsSummary]);
 
-  useEffect(() => {
-    if (!demoMode) {
-      setProof(buildMissionProof(mission, demoCase));
-      setGroundingResults([]);
-    }
-  }, [demoCase, demoMode, mission]);
-
+  const missionScoped = !demoMode && Boolean(mission);
+  const liveMissionScoped = missionScoped && !mission?.replay_id;
   const usesReplayEvidence = Boolean(mission?.replay_id) || (demoMode && demoCase === "showcase");
+  const scopedAlerts = useMemo(() => (
+    liveMissionScoped
+      ? filterAlertsForBbox(recentAlerts, mission?.bbox)
+      : recentAlerts
+  ), [liveMissionScoped, mission, recentAlerts]);
 
   const activeAlert = useMemo(() => {
     if (selectedCellId) {
-      const matching = recentAlerts.find((alert) => alert.cell_id === selectedCellId);
+      const matching = scopedAlerts.find((alert) => alert.cell_id === selectedCellId);
       if (matching) return matching;
     }
-    return recentAlerts[0] ?? null;
-  }, [demoCase, recentAlerts, selectedCellId]);
+    return scopedAlerts[0] ?? null;
+  }, [scopedAlerts, selectedCellId]);
+  const missionAlert = missionScoped ? activeAlert : null;
+
+  useEffect(() => {
+    if (!demoMode) {
+      setProof(buildMissionProof(mission, demoCase, missionAlert));
+      setGroundingResults([]);
+    }
+  }, [demoCase, demoMode, mission, missionAlert]);
 
   useEffect(() => {
     let cancelled = false;
@@ -795,9 +911,12 @@ export default function ProofModePanel({
       setRecentAlerts(resolvedAlerts);
       setMetrics(metricsPayload ?? metricsSummary);
 
+      const resolvedScopedAlerts = liveMissionScoped
+        ? filterAlertsForBbox(resolvedAlerts, mission?.bbox)
+        : resolvedAlerts;
       const resolvedAlert = selectedCellId
-        ? resolvedAlerts.find((alert) => alert.cell_id === selectedCellId) ?? resolvedAlerts[0] ?? null
-        : resolvedAlerts[0] ?? null;
+        ? resolvedScopedAlerts.find((alert) => alert.cell_id === selectedCellId) ?? resolvedScopedAlerts[0] ?? null
+        : resolvedScopedAlerts[0] ?? null;
 
       if (usesReplayEvidence && resolvedAlert?.cell_id) {
         const galleryPayload = await fetchJson<GalleryItem>(`${apiBaseUrl}/api/gallery/${resolvedAlert.cell_id}`);
@@ -844,8 +963,47 @@ export default function ProofModePanel({
           setCaption(profile.caption);
         } else {
           setGroundingResults([]);
-          setVqaAnswer("Mission evidence is bounded to the selected bbox and retained alert packets.");
-          setCaption("Current mission proof uses mission metadata until retained imagery is selected.");
+          const hasFindings = Boolean(resolvedAlert) || Number(mission?.flags_found ?? 0) > 0;
+          setVqaAnswer(
+            hasFindings
+              ? "Retained mission evidence is bounded to the selected bbox and alert packets."
+              : "Nothing interesting was retained in this mission pass.",
+          );
+          setCaption(
+            hasFindings
+              ? "Current mission proof uses retained alert metadata and mission context."
+              : "Mission completed with no retained flags; the related timelapse is context only.",
+          );
+          setMissionTimelapse(null);
+          setMissionTimelapseError(null);
+          if (mission?.bbox) {
+            const defaultStart = mission.start_date || "2025-05-05";
+            const defaultEnd = mission.end_date || "2026-05-05";
+            const timelapsePayload = await fetchJson<MissionTimelapse & { error?: string; format?: string }>(
+              `${apiBaseUrl}/api/timelapse/generate`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  bbox: mission.bbox,
+                  start_date: defaultStart,
+                  end_date: defaultEnd,
+                  steps: 12,
+                }),
+              },
+            );
+            if (!cancelled) {
+              if (
+                timelapsePayload?.video_b64
+                && Number(timelapsePayload.frames_count ?? 0) >= 2
+                && timelapsePayload.format !== "none"
+              ) {
+                setMissionTimelapse(timelapsePayload);
+              } else {
+                setMissionTimelapseError(timelapsePayload?.error || "Related timelapse unavailable for this mission window.");
+              }
+            }
+          }
         }
       }
 
@@ -859,11 +1017,11 @@ export default function ProofModePanel({
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, alerts, demoCase, demoMode, metricsSummary, mission?.bbox, onStepChange, selectedCellId, usesReplayEvidence]);
+  }, [apiBaseUrl, alerts, demoCase, demoMode, metricsSummary, mission, onStepChange, selectedCellId, usesReplayEvidence]);
 
   useEffect(() => {
     if (!demoMode && mission) {
-      setProof(buildMissionProof(mission, demoCase));
+      setProof(buildMissionProof(mission, demoCase, missionAlert));
       return;
     }
     const isAbstain = demoCase === "abstain";
@@ -983,7 +1141,7 @@ export default function ProofModePanel({
         trace: "Playwright report trace.zip",
       },
     });
-  }, [activeAlert, caption, demoCase, demoMode, dtnProof, flushedQueueCount, groundingResults, linkOffline, linkStatus, mission, queueCount, usesReplayEvidence, vqaAnswer]);
+  }, [activeAlert, caption, demoCase, demoMode, dtnProof, flushedQueueCount, groundingResults, linkOffline, linkStatus, mission, missionAlert, queueCount, usesReplayEvidence, vqaAnswer]);
 
   const toggleOrbitalEclipse = async () => {
     if (!linkOffline) {
@@ -1014,7 +1172,7 @@ export default function ProofModePanel({
 
   const proofJson = useMemo(() => JSON.stringify(proof, null, 2), [proof]);
   const sourceText = `${proof.provider} / ${proof.source_capture_time}`;
-  const evidenceAlert = usesReplayEvidence ? activeAlert : null;
+  const evidenceAlert = usesReplayEvidence || liveMissionScoped ? activeAlert : null;
   const activeObjectTargets = mission?.object_targets?.filter((target) => target.enabled).map((target) => target.label) ?? [];
   const detectionSummary = evidenceAlert?.detection_summary ?? null;
   const objectDeltas = evidenceAlert?.object_deltas ?? [];
@@ -1023,20 +1181,27 @@ export default function ProofModePanel({
     ? detectionSummary.top_boxes.slice(0, 6)
     : groundingResults.slice(0, 6);
   const profile = DEMO_PROFILES[demoCase];
-  const fallbackVideoSource = proof.abstained ? null : profile.visualVideo ?? null;
+  const fallbackVideoSource = proof.abstained || liveMissionScoped ? null : profile.visualVideo ?? null;
   const imageSource = usesReplayEvidence
     ? galleryItem?.context_thumb ?? profile.visualAsset ?? null
-    : profile.visualAsset ?? null;
+    : liveMissionScoped
+      ? null
+      : profile.visualAsset ?? null;
   const timelapseSource = proof.abstained
     ? null
     : usesReplayEvidence
       ? galleryItem?.timelapse_b64 ?? fallbackVideoSource
-      : fallbackVideoSource;
+      : liveMissionScoped
+        ? missionTimelapse?.video_b64 ?? null
+        : fallbackVideoSource;
   const usingFallbackVideo = Boolean(fallbackVideoSource && timelapseSource === fallbackVideoSource);
   const visualSourceLabel = timelapseSource
     ? usingFallbackVideo
       ? profile.visualVideoSource ?? "Context Timelapse"
-      : formatSourceLabel(galleryItem?.timelapse_source ?? "replay")
+      : liveMissionScoped
+        ? missionTimelapse?.provenance?.label
+          ?? formatSourceLabel(missionTimelapse?.source ?? missionTimelapse?.provider ?? "mission timelapse")
+        : formatSourceLabel(galleryItem?.timelapse_source ?? "replay")
     : imageSource
       ? usesReplayEvidence
         ? formatSourceLabel(galleryItem?.context_thumb_source ?? evidenceAlert?.observation_source)
@@ -1045,13 +1210,19 @@ export default function ProofModePanel({
           : "Local Mission Frame"
       : proof.abstained
         ? "No Imagery Downlink"
+        : liveMissionScoped
+          ? "Mission BBox + Results"
         : demoCase === "eclipse"
           ? "Mission BBox + Queue"
           : "Mission BBox";
-  const reasonCodes = evidenceAlert?.reason_codes ?? DEMO_REASON_CODES[demoCase];
-  const cellsScanned = metrics?.total_cells_scanned ?? mission?.cells_scanned ?? 9;
+  const reasonCodes = evidenceAlert?.reason_codes ?? (liveMissionScoped ? missionReasonCodes(mission) : DEMO_REASON_CODES[demoCase]);
+  const cellsScanned = liveMissionScoped
+    ? Number(mission?.cells_scanned ?? 0)
+    : metrics?.total_cells_scanned ?? mission?.cells_scanned ?? 9;
   const alertsEmitted =
-    demoCase === "eclipse"
+    liveMissionScoped
+      ? Number(mission?.flags_found ?? 0)
+      : demoCase === "eclipse"
       ? Math.max(
           queueCount,
           flushedQueueCount,
@@ -1063,15 +1234,28 @@ export default function ProofModePanel({
       : metrics?.total_alerts_emitted ?? mission?.flags_found ?? 4;
   const alertMetricLabel = demoCase === "eclipse" ? "Packets" : "Alerts";
   const replayOverride = isReplayOverride(demoCase, mission);
-  const missionScoped = !demoMode && Boolean(mission);
   const context = replayOverride || missionScoped ? missionReplayContext(mission, proof) : DEMO_CONTEXT[demoCase];
   const storyLines = replayOverride || missionScoped ? missionReplayStoryLines(mission) : DEMO_STORY_LINES[demoCase];
   const proofTitle = replayOverride || missionScoped
     ? missionProofTitle(mission, proof)
     : DEMO_TITLES[demoCase];
+  const liveMissionHasFindings = liveMissionScoped && (Boolean(evidenceAlert) || Number(mission?.flags_found ?? 0) > 0);
   const confidenceStack = Array.isArray(proof.output_json.confidence_stack)
     ? (proof.output_json.confidence_stack as ConfidenceContributor[])
-    : buildConfidenceContributors(demoCase, evidenceAlert, Boolean(detectionSummary));
+    : liveMissionScoped && !liveMissionHasFindings
+      ? buildNoFindingsContributors(mission)
+      : buildConfidenceContributors(demoCase, evidenceAlert, Boolean(detectionSummary));
+  const proofStatusLabel = proof.abstained
+    ? "ABSTAINED"
+    : liveMissionScoped
+      ? (liveMissionHasFindings ? "MISSION PROOF" : "NO FLAGS")
+      : "ALERT READY";
+  const proofDeliveryStatus = proof.abstained
+    ? "status: abstained"
+    : liveMissionScoped && !liveMissionHasFindings
+      ? "status: no flags retained"
+      : "status: transmitted";
+  const showFrameOverlays = Boolean((timelapseSource || imageSource) && (!liveMissionScoped || liveMissionHasFindings));
 
   return (
     <div data-testid="proof-mode-panel" className="absolute inset-0 z-40 flex flex-col bg-zinc-950 text-zinc-100">
@@ -1090,7 +1274,7 @@ export default function ProofModePanel({
         </div>
         <div className="flex items-center gap-3">
           <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-200">
-            {proof.abstained ? "ABSTAINED" : "ALERT READY"}
+            {proofStatusLabel}
           </span>
           <button
             type="button"
@@ -1180,7 +1364,9 @@ export default function ProofModePanel({
           <div className="mb-3 flex items-center justify-between">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Satellite Frame</p>
-              <h2 className="text-sm font-semibold text-white">BBox evidence overlay</h2>
+              <h2 className="text-sm font-semibold text-white">
+                {liveMissionScoped && !liveMissionHasFindings ? "Mission result timelapse" : "BBox evidence overlay"}
+              </h2>
             </div>
             <span className="rounded border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
               {visualSourceLabel}
@@ -1208,7 +1394,7 @@ export default function ProofModePanel({
                   } else {
                     video.playbackRate = 1;
                   }
-                  void video.play();
+                  void video.play().catch(() => undefined);
                 }}
                 onTimeUpdate={(event) => {
                   const video = event.currentTarget;
@@ -1234,26 +1420,52 @@ export default function ProofModePanel({
                 className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_center,rgba(8,145,178,0.14),transparent_45%),linear-gradient(135deg,#09090b,#18181b)] px-8 text-center"
               >
                 <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-200">
-                  {proof.abstained ? "Quality Gate" : "Delay-Tolerant Link"}
+                  {proof.abstained ? "Quality Gate" : liveMissionScoped ? "Mission Summary" : "Delay-Tolerant Link"}
                 </p>
                 <p className="max-w-md text-lg font-semibold text-white">
                   {proof.abstained
                     ? "No imagery was trusted enough to transmit."
+                    : liveMissionScoped
+                      ? liveMissionHasFindings ? "Mission proof is ready." : MISSION_NO_IMAGE_TITLE
                     : "No raw frame was pushed while the link was offline."}
                 </p>
                 <p className="max-w-md text-xs leading-relaxed text-zinc-400">
                   {proof.abstained
                     ? "The proof records an abstain decision, low confidence, and a blocked alert packet."
+                    : liveMissionScoped
+                      ? liveMissionHasFindings
+                        ? "A retained alert packet exists, but no related timelapse frame is available for this cell yet."
+                        : `${MISSION_NO_IMAGE_BODY}${missionTimelapseError ? ` ${missionTimelapseError}` : ""}`
                     : "The mission keeps only compact JSON alerts in the local queue until the downlink is restored."}
+                </p>
+                {liveMissionScoped && (
+                  <p className="max-w-md text-[11px] font-medium leading-relaxed text-cyan-200">
+                    {MISSION_NO_IMAGE_NOTE}
+                  </p>
+                )}
+              </div>
+            )}
+            {liveMissionScoped && !liveMissionHasFindings && (
+              <div
+                data-testid="proof-mission-result-overlay"
+                className="absolute left-4 top-4 max-w-[360px] rounded border border-emerald-300/40 bg-zinc-950/88 px-3 py-2 text-zinc-100 shadow-lg backdrop-blur"
+              >
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-200">Nothing interesting found</p>
+                <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-300">
+                  {mission?.cells_scanned ?? 0} cells scanned, 0 flags retained. Related timelapse is context only.
                 </p>
               </div>
             )}
-            <div className="absolute inset-[18%] border-2 border-cyan-300 shadow-[0_0_0_9999px_rgba(2,6,23,0.24)]" />
-            <div className="absolute left-[24%] top-[28%] h-[38%] w-[45%] border-2 border-red-400 bg-red-500/10" />
-            <div className="absolute left-[24%] top-[calc(28%-28px)] rounded bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
-              evidence bbox
-            </div>
-            {!proof.abstained && proofOverlayBoxes.map((box, index) => (
+            {showFrameOverlays && (
+              <>
+                <div className="absolute inset-[18%] border-2 border-cyan-300 shadow-[0_0_0_9999px_rgba(2,6,23,0.24)]" />
+                <div className="absolute left-[24%] top-[28%] h-[38%] w-[45%] border-2 border-red-400 bg-red-500/10" />
+                <div className="absolute left-[24%] top-[calc(28%-28px)] rounded bg-red-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
+                  evidence bbox
+                </div>
+              </>
+            )}
+            {showFrameOverlays && !proof.abstained && proofOverlayBoxes.map((box, index) => (
               <div
                 key={`${box.label}-${index}`}
                 data-testid="proof-cv-box"
@@ -1283,11 +1495,15 @@ export default function ProofModePanel({
               className="absolute right-4 top-4 rounded border border-zinc-900/40 bg-zinc-950/85 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-100"
             >
               {timelapseSource
-                ? usingFallbackVideo
+                ? liveMissionScoped
+                  ? "Related mission timelapse: context only"
+                  : usingFallbackVideo
                   ? "Context timelapse: spectral metadata is scoring basis"
                   : "Replay WebM evidence: contextual frames"
                 : proof.abstained
                   ? "Static local frame: no alert transmitted"
+                  : liveMissionScoped
+                    ? "Mission proof: compact JSON and bbox metadata"
                   : demoCase === "eclipse"
                     ? "Static local frame: compact JSON queue only"
                     : "Static satellite frame: raw image stays local"}
@@ -1332,7 +1548,7 @@ export default function ProofModePanel({
             <ProofRow label="Alert payload" value={`Alert JSON: ${formatBytes(proof.alert_payload_bytes)}`} testId="proof-alert-bytes" />
             <ProofRow label="Payload basis" value={proof.payload_accounting.alert_payload_basis} testId="proof-payload-accounting" />
             <ProofRow label="Reduction ratio" value={formatRatio(proof.payload_reduction_ratio)} testId="proof-reduction-ratio" />
-            <ProofRow label="Abstain status" value={proof.abstained ? "status: abstained" : "status: transmitted"} />
+            <ProofRow label="Abstain status" value={proofDeliveryStatus} />
           </div>
 
           <div
