@@ -69,7 +69,7 @@ const DEMO_SCENARIOS: Record<DemoCase, DemoScenario> = {
     proofSubtitle: "The important number is visible: the flood frame stays local, kilobytes go downlink.",
     presetId: "flood_manchar",
     presetLabel: "Manchar Lake flood",
-    launchMission: true,
+    launchMission: false,
     initialBboxText: "67.63",
     taskText: "Find new surface water and overflow around Pakistan's Manchar Lake during the 2022 flood sequence.",
     bbox: [67.63, 26.31, 67.87, 26.55],
@@ -82,7 +82,7 @@ const DEMO_SCENARIOS: Record<DemoCase, DemoScenario> = {
     proofSubtitle: "The proof JSON is visible so the region-level mining result is auditable without production or pollution claims.",
     presetId: "mining_atacama",
     presetLabel: "Atacama mining corridor",
-    launchMission: true,
+    launchMission: false,
     initialBboxText: "-69.11",
     taskText: "Run Critical Minerals Expansion Watch over the Salar de Atacama / Escondida / Atacama mining corridor. Compare historical and current satellite imagery for evaporation pond regions, tailings regions, open-pit expansion, industrial roads, facility clusters, exposed soil, and surface color change without claiming illegal mining, pollution confirmation, or production output.",
     bbox: [-69.115, -24.29, -69.035, -24.21],
@@ -95,7 +95,7 @@ const DEMO_SCENARIOS: Record<DemoCase, DemoScenario> = {
     proofSubtitle: "No timelapse or alert is transmitted when the quality gate fails.",
     presetId: "ice_greenland",
     presetLabel: "Greenland coast",
-    launchMission: true,
+    launchMission: false,
     initialBboxText: "-51.13",
     taskText: "Compare same-season Greenland ice cap and glacier edge frames for true growth or retreat.",
     bbox: [-51.13, 69.1, -50.97, 69.26],
@@ -108,8 +108,8 @@ const DEMO_SCENARIOS: Record<DemoCase, DemoScenario> = {
     proofSubtitle: "Compact maritime alert packets queue locally, then flush when the link is restored.",
     presetId: "maritime_suez",
     presetLabel: "Suez channel",
-    launchMission: true,
-    initialBboxText: "32.50",
+    launchMission: false,
+    initialBboxText: "32.5",
     taskText: "Review maritime vessel queueing near the Suez channel.",
     bbox: [32.5, 29.88, 32.58, 29.96],
     startDate: "2025-03-01",
@@ -207,7 +207,8 @@ export async function openDemo(page: Page, request: APIRequestContext, demoCase:
   if (scenario.preloadReplayId) {
     await loadSeededReplay(request, scenario.preloadReplayId);
   }
-  if (scenario.taskText && scenario.bbox && scenario.startDate && scenario.endDate && scenario.useCaseId) {
+  const shouldStartMission = scenario.launchMission === true;
+  if (shouldStartMission && scenario.taskText && scenario.bbox && scenario.startDate && scenario.endDate && scenario.useCaseId) {
     await startMission(request, {
       task_text: scenario.taskText,
       bbox: scenario.bbox,
@@ -221,15 +222,28 @@ export async function openDemo(page: Page, request: APIRequestContext, demoCase:
   await waitForBasemapReady(page);
   await showSubtitle(page, scenario.intro, 1_900);
 
-  await expect(page.getByTestId("demo-caption")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId("proof-mode-button")).toBeVisible();
+  const usesDemoCaption = !shouldStartMission || Boolean(scenario.preloadReplayId);
+  if (usesDemoCaption) {
+    await expect(page.getByTestId("demo-caption")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("proof-mode-button")).toBeVisible();
+  } else {
+    await expect(page.getByTestId("demo-caption")).toHaveCount(0);
+  }
   await page.getByTestId("tab-mission").click();
 
   if (scenario.presetId) {
-    await expect(page.getByTestId("selected-mission-preset")).toContainText(scenario.presetLabel ?? "", {
+    if (usesDemoCaption) {
+      await expect(page.getByTestId("selected-mission-preset")).toContainText(scenario.presetLabel ?? "", {
+        timeout: 15_000,
+      });
+    } else if (scenario.taskText) {
+      await expect(page.getByText(scenario.taskText).first()).toBeVisible({ timeout: 15_000 });
+    }
+    await expect(page.getByTestId("map-area-tools")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("map-area-status")).toContainText("Selected", {
       timeout: 15_000,
     });
-    await expect(page.getByTestId("bbox-badge")).toContainText(scenario.initialBboxText ?? "", {
+    await expect(page.getByTestId("map-area-bbox")).toContainText(scenario.initialBboxText ?? "", {
       timeout: 15_000,
     });
   }
@@ -247,7 +261,7 @@ export async function openDemo(page: Page, request: APIRequestContext, demoCase:
     await removeHighlight(page);
     await expect(page.getByTestId("tab-inspect")).toBeVisible({ timeout: 10_000 });
     await showSubtitle(page, `Selected cell ${scenario.replayCellId}. The proof will use that cell's cached API WebM evidence.`, 1_700);
-  } else if (scenario.presetId) {
+  } else if (scenario.presetId && usesDemoCaption) {
     await showSubtitle(page, "Confirm the mission preset so this video covers the correct geography and task.", 1_600);
     const presetSelector = `[data-testid='mission-preset-${scenario.presetId}']`;
     await moveMouseToHighlight(page, presetSelector);
@@ -274,12 +288,26 @@ export async function openDemo(page: Page, request: APIRequestContext, demoCase:
         page.getByText(/MISSION ACTIVE|Active Mission|Mission In Progress|Mission Pass Complete|Mission Complete/).first(),
       ).toBeVisible({ timeout: 15_000 });
     }
+  } else if (scenario.presetId) {
+    await showSubtitle(page, "The mission is already active with the selected area shown on the map.", 1_500);
+    await expect(
+      page.getByText(/MISSION ACTIVE|Active Mission|Mission In Progress|Mission Pass Complete|Mission Complete/).first(),
+    ).toBeVisible({ timeout: 15_000 });
   }
 
   await showSubtitle(page, "Open Proof Mode for the recorded proof panel.", 1_400);
-  await moveMouseToHighlight(page, "[data-testid='proof-mode-button']");
-  await page.getByTestId("proof-mode-button").click();
-  await removeHighlight(page);
+  if (usesDemoCaption) {
+    await moveMouseToHighlight(page, "[data-testid='proof-mode-button']");
+    await page.getByTestId("proof-mode-button").click();
+    await removeHighlight(page);
+  } else {
+    await page.getByTestId("tab-agents").click();
+    const proofShortcut = page.getByTestId("ground-agent-nav-proof");
+    await expect(proofShortcut).toBeEnabled({ timeout: 15_000 });
+    await moveMouseToHighlight(page, "[data-testid='ground-agent-nav-proof']");
+    await proofShortcut.click();
+    await removeHighlight(page);
+  }
   await expect(page.getByTestId("proof-mode-panel")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("proof-json")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("proof-model")).toContainText("LFM2.5-VL-450M", { timeout: 30_000 });
@@ -309,7 +337,9 @@ export async function saveProofArtifacts(page: Page, demoName: string, testInfo:
   if (docsScreenshotPath) {
     await mkdir(path.dirname(docsScreenshotPath), { recursive: true });
   }
-  await expect(page.getByText(/Step 6:/).first()).toBeVisible({ timeout: 15_000 });
+  if (await page.getByTestId("demo-caption").count()) {
+    await expect(page.getByText(/Step 6:/).first()).toBeVisible({ timeout: 15_000 });
+  }
   await expect(page.getByTestId("proof-json")).toContainText("\"payload_accounting\"", { timeout: 5_000 });
   await page.waitForTimeout(300);
   await page.screenshot({ path: screenshotPath, fullPage: false });

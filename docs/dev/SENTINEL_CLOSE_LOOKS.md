@@ -88,6 +88,28 @@ uv run --no-sync python scripts/seed_sentinel_cache.py `
   --skip-vlm-metadata
 ```
 
+Lochloosa West Fire development close look, for the May 4, 2026 Hawthorne/Lochloosa event:
+
+```powershell
+cd source/backend
+uv run --no-sync python scripts/seed_sentinel_cache.py `
+  --lat 29.5136 `
+  --lon -82.1725 `
+  --grid 1 `
+  --cell-dim 0.05 `
+  --location-name "Lochloosa West Fire close look" `
+  --region-note "May 4 2026 source-reported Alachua County wildfire near CR 325 and CR 346; candidate smoke/burn-scar context only." `
+  --use-case-id wildfire `
+  --target-category fireline `
+  --target-task wildfire_close_look_candidate_review `
+  --date-window prefire_2026_04_20=2026-04-20:2026-05-03 `
+  --date-window event_2026_05_04=2026-05-04:2026-05-05 `
+  --visual-mode burn_scar `
+  --skip-vlm-metadata
+```
+
+May 5, 2026 status: credentials resolved from `.tools/.secrets/sh.txt`, the pre-fire window returned a real Sentinel-2 L2A frame, and the May 4-5 event window was rejected for no-data/insufficient valid pixels. The seeder correctly refused to save a one-frame timelapse. Rerun after the next accepted Sentinel pass or widen the event window only if the resulting metadata still proves the after-fire frame is source-backed and not just a pre-fire least-cloud mosaic.
+
 ## README Highlight
 
 The README uses an animated GIF because it renders through standard Markdown image syntax:

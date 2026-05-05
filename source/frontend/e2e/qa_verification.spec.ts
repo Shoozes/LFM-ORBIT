@@ -149,7 +149,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await expect(page.getByTestId("tab-mission")).toHaveClass(/border-zinc-900/, { timeout: 15_000 });
     await expect(page.getByText(/Active Mission #/)).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("AREA MAPPED")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId("bbox-badge")).toContainText("[-145.60, 34.40, -145.40, 34.60]");
+    await expect(page.getByTestId("map-area-bbox")).toContainText("-145.60, 34.40, -145.40, 34.60");
     await expect(page.getByTestId("mission-evidence-panel")).toHaveCount(0);
     await expect(page.getByTestId("open-evidence-tools")).toHaveCount(0);
 
@@ -191,6 +191,10 @@ test.describe("QA Verification — Single Page Architecture", () => {
   test("verify clean startup stays idle until an operator mission", async ({ page, request }) => {
     await expect(page.getByText("No Mission")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("Scan animation paused - selected area ready")).toBeVisible();
+    await expect(page.getByTestId("map-area-tools")).toBeVisible();
+    await expect(page.getByTestId("map-area-status")).toContainText("Selected");
+    await expect(page.getByTestId("map-draw-area-button")).toBeVisible();
+    await expect(page.getByTestId("map-clear-area-button")).toBeEnabled();
 
     const missionResponse = await request.get(`${API_BASE}/api/mission/current`);
     expect(missionResponse.ok()).toBeTruthy();
@@ -451,12 +455,14 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await expect(linkBadge).toBeVisible();
   });
 
-  test("verify Draw Area on Map functionality and cancellation", async ({ page }) => {
-    await page.getByTestId("tab-mission").click();
-    await page.getByTestId("bbox-badge").getByRole("button", { name: "Clear" }).click();
+  test("verify map-side Area Tools drawing and cancellation", async ({ page }) => {
+    await expect(page.getByTestId("map-area-tools")).toBeVisible();
+    await page.getByTestId("map-clear-area-button").click();
+    await expect(page.getByTestId("map-area-status")).toContainText("No Area");
 
-    const drawBtn = page.getByTestId("draw-area-button");
+    const drawBtn = page.getByTestId("map-draw-area-button");
     await drawBtn.click();
+    await expect(page.getByTestId("map-area-status")).toContainText("Drawing");
 
     // Banner should appear
     const banner = page.getByText("DRAWING MODE ACTIVE");
@@ -465,5 +471,6 @@ test.describe("QA Verification — Single Page Architecture", () => {
     // Press escape to cancel
     await page.keyboard.press("Escape");
     await expect(banner).toBeHidden();
+    await expect(page.getByTestId("map-area-status")).toContainText("No Area");
   });
 });

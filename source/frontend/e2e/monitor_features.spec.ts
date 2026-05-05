@@ -88,7 +88,7 @@ test.describe("Monitor Feature Visual Proof", () => {
     await page.locator("[data-testid='mission-preset-traffic_i4_disney']").click();
     await expect(page.locator("[data-testid='selected-mission-preset']")).toContainText("I-4 interchange");
     await expect(page.locator("textarea")).toHaveValue(/transportation mix scan/);
-    await expect(page.locator("[data-testid='bbox-badge']")).toContainText("-81.53", { timeout: 10_000 });
+    await expect(page.locator("[data-testid='map-area-bbox']")).toContainText("-81.53", { timeout: 10_000 });
     await page.locator("[data-testid='selected-mission-preset']").scrollIntoViewIfNeeded();
     await waitForNextPaint(page);
 
@@ -109,7 +109,7 @@ test.describe("Monitor Feature Visual Proof", () => {
     await page.locator("[data-testid='mission-preset-wildfire_highway82']").click();
     await expect(page.locator("[data-testid='selected-mission-preset']")).toContainText("Highway 82 fire");
     await expect(page.locator("textarea")).toHaveValue(/Highway 82 wildfire/);
-    await expect(page.locator("[data-testid='bbox-badge']")).toContainText("-81.92", { timeout: 10_000 });
+    await expect(page.locator("[data-testid='map-area-bbox']")).toContainText("-81.92", { timeout: 10_000 });
     await page.locator("[data-testid='selected-mission-preset']").scrollIntoViewIfNeeded();
     await waitForNextPaint(page);
 
@@ -131,7 +131,7 @@ test.describe("Monitor Feature Visual Proof", () => {
     await expect(page.locator("[data-testid='selected-mission-preset']")).toContainText("North Florida corridor");
     await expect(page.locator("[data-testid='selected-mission-preset']")).toContainText("candidate triage only");
     await expect(page.locator("textarea")).toHaveValue(/Florida Fire\/Drought Readiness Watch/);
-    await expect(page.locator("[data-testid='bbox-badge']")).toContainText("-83.20", { timeout: 10_000 });
+    await expect(page.locator("[data-testid='map-area-bbox']")).toContainText("-83.20", { timeout: 10_000 });
     await page.locator("[data-testid='selected-mission-preset']").scrollIntoViewIfNeeded();
     await waitForNextPaint(page);
 
@@ -152,7 +152,7 @@ test.describe("Monitor Feature Visual Proof", () => {
     await page.locator("[data-testid='mission-preset-wildfire_future_spc_high_plains']").click();
     await expect(page.locator("[data-testid='selected-mission-preset']")).toContainText("SPC -> Sparks Fire");
     await expect(page.locator("textarea")).toHaveValue(/SPC Day 2 critical fire-weather/);
-    await expect(page.locator("[data-testid='bbox-badge']")).toContainText("-104.90", { timeout: 10_000 });
+    await expect(page.locator("[data-testid='map-area-bbox']")).toContainText("-104.90", { timeout: 10_000 });
     await page.locator("[data-testid='selected-mission-preset']").scrollIntoViewIfNeeded();
     await waitForNextPaint(page);
 
@@ -173,7 +173,7 @@ test.describe("Monitor Feature Visual Proof", () => {
     await page.locator("[data-testid='mission-preset-ice_greenland']").click();
     await expect(page.locator("[data-testid='selected-mission-preset']")).toContainText("Greenland coast");
     await expect(page.locator("textarea")).toHaveValue(/Greenland edge snow and ice extent/);
-    await expect(page.locator("[data-testid='bbox-badge']")).toContainText("-51.13", { timeout: 10_000 });
+    await expect(page.locator("[data-testid='map-area-bbox']")).toContainText("-51.13", { timeout: 10_000 });
     await page.locator("[data-testid='selected-mission-preset']").scrollIntoViewIfNeeded();
     await waitForNextPaint(page);
 

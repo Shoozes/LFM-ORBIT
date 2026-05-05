@@ -25,8 +25,9 @@ test.describe("Mission target pack UX", () => {
     await waitForLinkOpen(page);
     await waitForBasemapReady(page);
 
+    await expect(page.getByTestId("map-area-tools")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("map-area-bbox")).toContainText("-81.92", { timeout: 10_000 });
     await page.getByTestId("tab-mission").click();
-    await expect(page.getByTestId("bbox-badge")).toContainText("-81.92", { timeout: 10_000 });
     await expect(page.getByTestId("mission-panel-tab-plan")).toBeVisible();
     await expect(page.getByTestId("mission-panel-tab-replay")).toBeVisible();
     await expect(page.getByTestId("mission-panel-tab-targets")).toHaveCount(0);
@@ -63,9 +64,9 @@ test.describe("Mission target pack UX", () => {
     await waitForLinkOpen(page);
     await waitForBasemapReady(page);
 
+    await expect(page.getByTestId("map-area-bbox")).toContainText("-81.92, 31.14, -81.76, 31.30");
     await page.getByTestId("tab-mission").click();
     await expect(page.getByText("Run Southeast Fireline Watch.")).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByTestId("bbox-badge")).toContainText("[-81.92, 31.14, -81.76, 31.30]");
     await expect(page.getByTestId("demo-caption")).toHaveCount(0);
     await expect(page.getByTestId("selected-mission-preset")).toHaveCount(0);
   });

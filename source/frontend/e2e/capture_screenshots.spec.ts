@@ -24,6 +24,13 @@ async function settleScreenshotFrame(page: Page) {
   await waitForNextPaint(page, 3);
 }
 
+async function expectMapAreaTools(page: Page) {
+  await expect(page.getByTestId("map-area-tools")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId("map-area-status")).toContainText(/Selected|Drawing|Scanning|No Area/i);
+  await expect(page.getByTestId("map-draw-area-button")).toBeVisible();
+  await expect(page.getByTestId("map-clear-area-button")).toBeVisible();
+}
+
 async function waitForAlerts(page: Page, min = 1) {
   await page.locator("[data-testid='tab-logs']").click();
   await expect(page.locator("[data-testid='alert-button']").first()).toBeVisible({ timeout: 45_000 });
@@ -39,6 +46,7 @@ test("screenshot: satellite agent heartbeat + scan HUD", async ({ page, request 
   await gotoApp(page);
   await waitForLinkOpen(page);
   await waitForBasemapReady(page);
+  await expectMapAreaTools(page);
 
   // Open agent dialogue tab so heartbeat messages are visible
   await page.locator("[data-testid='tab-agents']").click();
@@ -62,6 +70,7 @@ test("screenshot: dual agent dialogue in flight", async ({ page, request }) => {
   await gotoApp(page);
   await waitForLinkOpen(page);
   await waitForBasemapReady(page);
+  await expectMapAreaTools(page);
 
   // Switch to agent dialogue tab
   await page.locator("[data-testid='tab-agents']").click();
@@ -83,6 +92,7 @@ test("screenshot: alert analysis — offline LFM verdict", async ({ page, reques
   await gotoApp(page);
   await waitForLinkOpen(page);
   await waitForBasemapReady(page);
+  await expectMapAreaTools(page);
   await waitForAlerts(page, 1);
 
   const firstAlert = page.locator("[data-testid='alert-button']").first();
@@ -115,6 +125,7 @@ test("screenshot: settings panel — provider + local model status", async ({ pa
   await gotoApp(page);
   await waitForLinkOpen(page);
   await waitForBasemapReady(page);
+  await expectMapAreaTools(page);
   await page.locator("[data-testid='tab-settings']").click();
 
   await expect(page.getByText("Provider Status")).toBeVisible({ timeout: 10_000 });
@@ -137,6 +148,7 @@ test("screenshot: full mission control — replay ready", async ({ page, request
   await gotoApp(page);
   await waitForLinkOpen(page);
   await waitForBasemapReady(page);
+  await expectMapAreaTools(page);
   await page.locator("[data-testid='tab-mission']").click();
   await expect(page.getByText("Replay Mission · rondonia_frontier_showcase")).toBeVisible({ timeout: 15_000 });
   await page.screenshot({
@@ -154,6 +166,7 @@ test("screenshot: Ground Agent operator playbook", async ({ page, request }) => 
   await gotoApp(page);
   await waitForLinkOpen(page);
   await waitForBasemapReady(page);
+  await expectMapAreaTools(page);
   await page.locator("[data-testid='tab-agents']").click();
   await waitForAgentDialogue(page);
   await expect(page.getByTestId("agent-role-strip")).toContainText("Satellite Pruner");
@@ -172,6 +185,7 @@ test("screenshot: Ground Agent proposes wildfire replay from chat", async ({ pag
   await gotoApp(page);
   await waitForLinkOpen(page);
   await waitForBasemapReady(page);
+  await expectMapAreaTools(page);
   await page.locator("[data-testid='tab-agents']").click();
   await waitForAgentDialogue(page);
 
@@ -213,6 +227,7 @@ test("screenshot: Ground Agent semantic location camera context", async ({ page,
   await gotoApp(page);
   await waitForLinkOpen(page);
   await waitForBasemapReady(page);
+  await expectMapAreaTools(page);
   await page.locator("[data-testid='tab-agents']").click();
   await waitForAgentDialogue(page);
 

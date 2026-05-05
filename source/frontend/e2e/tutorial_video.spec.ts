@@ -273,6 +273,14 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
     7_400,
   );
 
+  await moveMouseToHighlight(page, "[data-testid='map-area-tools']");
+  await showVoiceoverSubtitle(
+    page,
+    "Area Tools now stay on the map. This is where you see the selected bbox, cell count, Draw, and Clear.",
+    5_200,
+  );
+  await removeHighlight(page);
+
   await page.getByTestId("tab-agents").click();
   const chatInput = page.getByPlaceholder("Request replay, mission pack, link action...");
   await moveMouseToHighlight(page, "textarea[placeholder='Request replay, mission pack, link action...']");
@@ -305,11 +313,13 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
   await page.getByTestId("tab-mission").click();
   await expect(page.locator('[data-testid="mission-progress-status"], [data-testid="mission-complete-summary"]').first()).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/cells scanned|cells recorded/i).first()).toBeVisible({ timeout: 30_000 });
+  await moveMouseToHighlight(page, "[data-testid='map-area-tools']");
   await showVoiceoverSubtitle(
     page,
-    "Each square is a map tile. The scan is reading cells in order and comparing FRAMES inside the mission time window.",
+    "Each square is a map tile. Area Tools shows the active selection while the scan reads cells and compares FRAMES inside the time window.",
     5_800,
   );
+  await removeHighlight(page);
   await showVoiceoverSubtitle(
     page,
     "Most cells are noise. Possible ANOMALY packets get retained so the ground side can focus on evidence instead of hundreds of raw images.",
