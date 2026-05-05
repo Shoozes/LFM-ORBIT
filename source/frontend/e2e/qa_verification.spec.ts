@@ -134,24 +134,20 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await expect(page.getByText(/Active Mission #/)).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("AREA MAPPED")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("bbox-badge")).toContainText("[-145.60, 34.40, -145.40, 34.60]");
-    await expect(page.getByTestId("mission-evidence-panel")).toContainText("Mission Evidence", { timeout: 15_000 });
-    await expect(page.getByTestId("vlm-mission-targets")).toContainText("coastal debris candidate");
+    await expect(page.getByTestId("mission-evidence-panel")).toHaveCount(0);
+    await expect(page.getByTestId("open-evidence-tools")).toHaveCount(0);
 
     const missionStatus = page.locator('[data-testid="mission-progress-status"], [data-testid="mission-complete-summary"]').first();
     await expect(missionStatus).toBeVisible({ timeout: 30_000 });
     await expect(missionStatus).toContainText(/Starting scan|Scanning selected area|Mission Pass Complete/);
     await expect(missionStatus).toContainText(/plastic|mission targets/);
-
-    await page.getByTestId("vlm-run-mission-targets").click();
-    await expect(page.getByTestId("vlm-grounding-result").first()).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByTestId("vlm-grounding-result").first()).toContainText(/debris|slick|foam/i);
   });
 
   test("verify Ground Agent operator shortcuts navigate the app", async ({ page }) => {
     await page.getByTestId("tab-agents").click();
 
-    await expect(page.getByTestId("ground-agent-nav-object_evidence")).toBeDisabled();
-    await expect(page.getByTestId("ground-agent-nav-proof")).toBeVisible();
+    await expect(page.getByTestId("ground-agent-nav-object_evidence")).toHaveCount(0);
+    await expect(page.getByTestId("ground-agent-nav-proof")).toBeDisabled();
 
     await page.getByTestId("ground-agent-nav-logs").click();
     await expect(page.getByText("Alerts & Logs")).toBeVisible();
@@ -209,9 +205,10 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await expect(page.getByText("REPLAY ACTIVE: georgia_wildfire_replay")).toBeVisible({ timeout: 15_000 });
 
     await page.getByTestId("tab-agents").click();
-    await expect(page.getByTestId("ground-agent-nav-object_evidence")).toBeEnabled();
-    await page.getByTestId("ground-agent-nav-object_evidence").click();
-    await expect(page.getByTestId("mission-evidence-panel")).toContainText("Mission Evidence", { timeout: 10_000 });
+    await expect(page.getByTestId("ground-agent-nav-object_evidence")).toHaveCount(0);
+    await expect(page.getByTestId("ground-agent-nav-proof")).toBeEnabled();
+    await page.getByTestId("ground-agent-nav-proof").click();
+    await expect(page.getByTestId("proof-mode-panel")).toBeVisible({ timeout: 30_000 });
   });
 
   test("verify Ground Agent reframes protected wildlife population requests", async ({ page }) => {

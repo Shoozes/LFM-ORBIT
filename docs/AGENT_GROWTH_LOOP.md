@@ -50,8 +50,8 @@ Expected flow:
 2. The proposal resolves to the North Pacific debris convergence review window and applies the `plastic` target pack.
 3. The proposal shows monthly cadence, a 10-year date window, bbox, target pack, and explicit candidate-only evidence limits.
 4. The proposal can preserve a wider context bbox, but the mission uses a compact review bbox so the selected area scans quickly and does not pretend to cover a whole open-ocean gyre.
-5. Confirming launches the mission, moves the UI to Mission, selects the bbox, opens Mission Evidence, and starts the live scan loop.
-6. The pass reaches a visible Mission Pass Complete summary, then the operator can run all mission targets and see candidate result chips.
+5. Confirming launches the mission, moves the UI to Mission, selects the bbox, and starts the live scan loop.
+6. The pass reaches a visible Mission Pass Complete summary, then the operator can review alerts, timelapse, and Proof Mode.
 7. Outputs remain coastal/open-ocean slick, foam-line, windrow, or floating-debris candidates. They must not claim that the Great Pacific Garbage Patch is directly visible as a coherent mass.
 
 ## Browser Flow Runbook
@@ -62,9 +62,9 @@ Future coding agents should execute this as a user story, not only as an API ass
 2. Send the scenario prompt through Ground Agent.
 3. Verify the chat card shows `start_custom_mission`, `plastic`, `monthly`, a 10-year window, the North Pacific region label, and no-overclaim evidence guidance.
 4. Confirm the proposal.
-5. Verify Mission becomes active, the map selects the compact review bbox, Mission Evidence opens, and the target chips list debris/slick/foam candidates.
+5. Verify Mission becomes active, the map selects the compact review bbox, and progress is visible.
 6. Wait for Mission Pass Complete.
-7. Click `Run Targets` and verify candidate grounding result chips render.
+7. Open Logs, Inspect, or Proof Mode and verify candidate evidence remains bounded.
 8. Capture any gap as semantics, location resolution, evidence boundary, mission state, UI clarity, async timing, artifact export, or docs.
 
 ## Dataset Rule

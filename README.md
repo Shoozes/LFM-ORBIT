@@ -36,7 +36,7 @@ Full repo verification:
 - DPhi SimSat is the primary runtime lane: `provider=simsat_sentinel`, `runtime_truth_mode=realtime`, `imagery_origin=simsat`, `scoring_basis=proxy_bands`.
 - Agent 1 prunes scan cells before downlink.
 - Agent 2 reviews retained evidence packets: bbox, source, temporal/proxy scores, confidence, and visual evidence references.
-- Mission Evidence runs the active mission target pack, draws glowing CV boxes, and keeps compact count/delta proof fields.
+- Mission target packs stay attached to alerts and Proof Mode instead of adding a separate operator panel.
 - Link outages queue compact JSON alerts in the backend agent bus and flush after restore.
 - Ground Agent proposes and confirms local actions before mutation: replay loads/rescans, mission packs, SAT/GND link changes, and semantic camera moves to known location contexts.
 

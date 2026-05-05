@@ -31,7 +31,7 @@ async function readAgentError(response: Response, fallback: string): Promise<str
 
 type GroundAgentProps = {
   onActionComplete?: (response: ChatResponse) => void | Promise<void>;
-  onNavigate?: (target: "mission" | "logs" | "settings" | "object_evidence" | "proof") => void | Promise<void>;
+  onNavigate?: (target: "mission" | "logs" | "settings" | "proof") => void | Promise<void>;
   mission?: Mission | null;
 };
 
@@ -44,15 +44,14 @@ const DEFAULT_COMMANDS = [
 ];
 
 const NAV_SHORTCUTS: Array<{
-  id: "mission" | "logs" | "settings" | "object_evidence" | "proof";
+  id: "mission" | "logs" | "settings" | "proof";
   label: string;
-  target: "mission" | "logs" | "settings" | "object_evidence" | "proof";
+  target: "mission" | "logs" | "settings" | "proof";
   requiresMission?: boolean;
 }> = [
   { id: "mission", label: "Mission Control", target: "mission" },
-  { id: "object_evidence", label: "Mission Evidence", target: "object_evidence", requiresMission: true },
   { id: "logs", label: "Logs", target: "logs" },
-  { id: "proof", label: "Proof Mode", target: "proof" },
+  { id: "proof", label: "Proof Mode", target: "proof", requiresMission: true },
   { id: "settings", label: "Settings", target: "settings" },
 ];
 

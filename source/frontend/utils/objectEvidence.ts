@@ -1,4 +1,4 @@
-import type { VlmBox } from "../components/VlmPanel";
+import type { VlmBox } from "../types/visualEvidence";
 
 export const OBJECT_EVIDENCE_COLORS: Record<string, string> = {
   aid: "#38bdf8",

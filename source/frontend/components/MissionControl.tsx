@@ -279,7 +279,6 @@ type MissionControlProps = {
   onReplayLoaded?: (primaryCellId: string | null) => void | Promise<void>;
   onReplayRescanStarted?: (mission: Mission) => void | Promise<void>;
   onPreviewBbox?: (bbox: number[]) => void;
-  onOpenEvidenceTools?: () => void;
   initialPresetId?: string | null;
 };
 
@@ -297,7 +296,6 @@ export default function MissionControl({
   onReplayLoaded,
   onReplayRescanStarted,
   onPreviewBbox,
-  onOpenEvidenceTools,
   initialPresetId = null,
 }: MissionControlProps) {
   const apiBase = getApiBaseUrl();
@@ -559,7 +557,7 @@ export default function MissionControl({
                 Mission Pass Complete
               </p>
               <p className="mt-1 leading-relaxed">
-                Satellite Pruner finished the selected review area. Review mission evidence, Logs, Inspect, or Proof Mode before turning candidate evidence into a claim.
+                Satellite Pruner finished the selected review area. Review Logs, Inspect, or Proof Mode before turning candidate evidence into a claim.
               </p>
               <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-wider text-emerald-800">
                 <span>{mission.cells_scanned} cells recorded</span>
@@ -833,7 +831,7 @@ export default function MissionControl({
                   </button>
                 </div>
                 {onOpenTimelapse && (
-                  <div className="grid grid-cols-2 gap-2">
+                  <div>
                     <button
                       type="button"
                       data-testid="view-timelapse-preview"
@@ -842,16 +840,6 @@ export default function MissionControl({
                     >
                       Timelapse
                     </button>
-                    {onOpenEvidenceTools && (
-                      <button
-                        type="button"
-                        data-testid="open-evidence-tools"
-                        onClick={onOpenEvidenceTools}
-                        className="w-full mt-1 rounded border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-[10px] uppercase tracking-wider text-cyan-800 hover:bg-cyan-100 transition font-semibold"
-                      >
-                        Mission Evidence
-                      </button>
-                    )}
                   </div>
                 )}
               </div>

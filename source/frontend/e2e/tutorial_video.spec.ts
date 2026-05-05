@@ -261,8 +261,6 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
   await waitForLinkOpen(page);
   await waitForBasemapReady(page);
   await expect(page.getByText(`Replay Mission · ${RONDONIA_REPLAY_ID}`)).toBeVisible({ timeout: 15_000 });
-  await page.getByTestId("open-evidence-tools").click();
-  await expect(page.getByTestId("vlm-mission-targets")).toContainText("clearing candidate", { timeout: 15_000 });
   await waitForNextPaint(page, 8);
 
   await showVoiceoverSubtitle(
@@ -289,12 +287,11 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
   await drawMapBbox(page, { x: 0.34, y: 0.35 }, { x: 0.62, y: 0.61 });
   await page.getByTestId("tab-mission").click();
   await expect(page.getByTestId("bbox-badge")).toBeVisible({ timeout: 10_000 });
-  await page.getByTestId("vlm-mission-targets").scrollIntoViewIfNeeded();
 
-  await moveMouseToHighlight(page, "[data-testid='vlm-mission-targets']");
+  await moveMouseToHighlight(page, "[data-testid='bbox-badge']");
   await showVoiceoverSubtitle(
     page,
-    "Mission evidence stays focused on the target pack: clearing regions, roads, exposed soil, forest edge, and canopy loss.",
+    "The mission keeps one clear focus area. Target packs stay in the evidence packet, not as extra controls.",
   );
   await removeHighlight(page);
 
@@ -332,19 +329,16 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
   await page.getByTestId("tab-mission").click();
   await openMapContextMenu(page, { xRatio: 0.48, yRatio: 0.48 });
   await page.getByText("Set Mission BBox Here").click();
-  await expect(page.getByTestId("vlm-run-mission-targets")).toBeVisible({ timeout: 10_000 });
-  await moveMouseToHighlight(page, "[data-testid='vlm-run-mission-targets']");
+  await expect(page.getByTestId("bbox-badge")).toBeVisible({ timeout: 10_000 });
+  await moveMouseToHighlight(page, "[data-testid='bbox-badge']");
   await showVoiceoverSubtitle(
     page,
-    "CV BOXES run inside the selected area. They are region-level review evidence, not final claims.",
+    "Changing the bbox updates the selected review area without opening extra tool panels.",
   );
-  await page.getByTestId("vlm-run-mission-targets").click();
   await removeHighlight(page);
-  await expect(page.getByTestId("vlm-grounding-result").first()).toContainText("clearing candidate", { timeout: 10_000 });
-  await expect(page.getByTestId("vlm-object-box-legend")).toBeVisible({ timeout: 10_000 });
   await showVoiceoverSubtitle(
     page,
-    "CV BOXES stay on the map with confidence and provenance, so reviewers can audit them.",
+    "The map remains the operational view. Scanned cells and retained alerts carry the evidence trail.",
   );
 
   await page.getByTestId("tab-logs").click();

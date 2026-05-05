@@ -15,13 +15,13 @@ See `docs/QA_PITFALLS.md` for the detailed guardrail checklist.
 - Fast Replay excludes cached WebMs that fail timelapse-integrity checks.
 - Cloud, no-data, malformed spectral bands, and RGB-only inputs must abstain instead of fabricating indices.
 - Ground Agent mutating actions use proposal cards before state changes.
-- Mission Evidence runs preset mission target packs through batch grounding, provenance, CV boxes, and compact proof summaries. Custom target-pack APIs remain backend-compatible but are not primary submission UI.
+- Mission target packs remain backend-compatible and appear through alerts, replays, and Proof Mode; the normal Mission tab stays focused on plan, progress, and timelapse.
 - Public README proof currently centers on Critical Minerals, Port Object Evidence, payload reduction, orbital eclipse queueing, provenance, abstain safety, Greenland timelapse context, Ground Agent flow, and semantic map context.
 - The current trained NM-UNI bundle is fetched from `Shoozes/lfm2.5-450m-vl-orbit-satellite`; Orbit still treats it as evidence-packet reasoning until a direct image-conditioned adapter is wired and smoke-tested.
 
 ## Active Backlog
 
-- Add target-pack/object-target fields to older non-object replay manifests only when a replay is promoted into Object Evidence or Proof Mode.
+- Add target-pack/object-target fields to older non-object replay manifests only when a replay is promoted into Proof Mode.
 - Seed and review post-event Florida imagery before promoting Florida Fire/Drought Readiness Watch beyond candidate triage.
 - Seed longer source-backed Atacama, Columbia Glacier, Great Salt Lake, and Lake Mead story assets before promoting those as README-level long-form proof.
 - Expand object-evidence eval fixtures beyond the first replay-safe fireline/port cases and add stable CI thresholds.

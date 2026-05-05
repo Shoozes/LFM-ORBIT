@@ -97,6 +97,7 @@ type DtnProof = {
 type ProofModePanelProps = {
   apiBaseUrl: string;
   demoCase: DemoCase;
+  demoMode?: boolean;
   mission: Mission | null;
   alerts: AlertItem[];
   metricsSummary: ApiMetricsSummary | null;
@@ -486,6 +487,40 @@ function buildFallbackProof(demoCase: DemoCase): ProofJson {
   };
 }
 
+function buildMissionProof(mission: Mission | null, demoCase: DemoCase): ProofJson {
+  const base = buildFallbackProof(demoCase);
+  if (!mission) return base;
+  const dateRange = [mission.start_date, mission.end_date].filter(Boolean).join(" to ") || "current mission window";
+  const targets = mission.object_targets?.map((target) => target.label).filter(Boolean) ?? [];
+  const confidence = Math.max(0.35, Math.min(0.92, Number(mission.use_case_confidence ?? base.confidence ?? 0.62)));
+  const result = mission.status === "complete" || mission.cells_scanned > 0
+    ? "mission evidence packet ready"
+    : "mission evidence packet initializing";
+  return {
+    ...base,
+    demo: "mission",
+    replay_id: mission.replay_id ?? `mission_${mission.id}`,
+    provider: mission.replay_id ? "Replay (Cached API Imagery)" : "SimSat mission scan",
+    bbox: mission.bbox ?? base.bbox,
+    confidence,
+    result,
+    mission: mission.task_text,
+    source_capture_time: dateRange,
+    prompt: mission.task_text,
+    output_json: {
+      status: mission.status === "active" ? "mission_active" : "alert_ready",
+      result,
+      confidence,
+      action: "review_compact_json",
+      cell_id: `mission_${mission.id}`,
+      reason_codes: [mission.target_pack_id, mission.use_case_id].filter((value): value is string => Boolean(value)),
+      use_case_id: mission.use_case_id ?? mission.target_pack_id ?? "mission_review",
+      object_targets: targets,
+      grounding: [],
+    },
+  };
+}
+
 function rounded(value: number): number {
   return Number(value.toFixed(3));
 }
@@ -657,7 +692,7 @@ function missionReplayContext(
     what: task,
     where: "operator-selected mission bbox",
     when: dateRange,
-    why: "keep the replay claim bound to its evidence, source, model output, and compact proof JSON",
+    why: "keep the claim bound to its evidence, source, model output, and compact proof JSON",
   };
 }
 
@@ -674,15 +709,25 @@ function missionReplayStoryLines(mission: Mission | null): string[] {
 
   return [
     "Operator selected a mission focus bbox.",
-    "Ground Agent loaded replay evidence after confirmation.",
+    "Ground Agent kept the mission evidence bounded.",
     "The proof keeps task, source, model, and bbox attached.",
     "Compact JSON is reviewable without raw-frame downlink.",
   ];
 }
 
+function missionProofTitle(mission: Mission | null, proof: ProofJson): string {
+  if (mission?.replay_id) {
+    return `${replayDisplayName(mission.replay_id)} proof`;
+  }
+  const rawTitle = mission?.task_text?.trim() || proof.mission || "Current mission";
+  const title = rawTitle.replace(/^Run\s+/i, "").replace(/\.$/, "");
+  return `${title.length > 84 ? `${title.slice(0, 81)}...` : title} proof`;
+}
+
 export default function ProofModePanel({
   apiBaseUrl,
   demoCase,
+  demoMode = true,
   mission,
   alerts,
   metricsSummary,
@@ -694,13 +739,16 @@ export default function ProofModePanel({
   const [metrics, setMetrics] = useState<ApiMetricsSummary | null>(metricsSummary);
   const [galleryItem, setGalleryItem] = useState<GalleryItem | null>(null);
   const [groundingResults, setGroundingResults] = useState<VlmBoxResult[]>(() => {
+    if (!demoMode) return [];
     const profile = DEMO_PROFILES[demoCase];
     return [{ label: profile.groundingLabel, bbox: profile.groundingBox }];
   });
   const [vqaAnswer, setVqaAnswer] = useState(DEMO_PROFILES[demoCase].vqa);
   const [caption, setCaption] = useState(DEMO_PROFILES[demoCase].caption);
   const [observedLatencyMs, setObservedLatencyMs] = useState<number | null>(null);
-  const [proof, setProof] = useState<ProofJson>(() => buildFallbackProof(demoCase));
+  const [proof, setProof] = useState<ProofJson>(() => (
+    demoMode ? buildFallbackProof(demoCase) : buildMissionProof(mission, demoCase)
+  ));
   const [linkOffline, setLinkOffline] = useState(false);
   const [queueCount, setQueueCount] = useState(0);
   const [flushedQueueCount, setFlushedQueueCount] = useState(0);
@@ -715,7 +763,14 @@ export default function ProofModePanel({
     setMetrics(metricsSummary);
   }, [metricsSummary]);
 
-  const usesReplayEvidence = Boolean(mission?.replay_id) || demoCase === "showcase";
+  useEffect(() => {
+    if (!demoMode) {
+      setProof(buildMissionProof(mission, demoCase));
+      setGroundingResults([]);
+    }
+  }, [demoCase, demoMode, mission]);
+
+  const usesReplayEvidence = Boolean(mission?.replay_id) || (demoMode && demoCase === "showcase");
 
   const activeAlert = useMemo(() => {
     if (selectedCellId) {
@@ -782,10 +837,16 @@ export default function ProofModePanel({
       } else {
         await sleep(500);
         onStepChange?.(4);
-        const profile = DEMO_PROFILES[demoCase];
-        setGroundingResults([{ label: profile.groundingLabel, bbox: profile.groundingBox }]);
-        setVqaAnswer(profile.vqa);
-        setCaption(profile.caption);
+        if (demoMode) {
+          const profile = DEMO_PROFILES[demoCase];
+          setGroundingResults([{ label: profile.groundingLabel, bbox: profile.groundingBox }]);
+          setVqaAnswer(profile.vqa);
+          setCaption(profile.caption);
+        } else {
+          setGroundingResults([]);
+          setVqaAnswer("Mission evidence is bounded to the selected bbox and retained alert packets.");
+          setCaption("Current mission proof uses mission metadata until retained imagery is selected.");
+        }
       }
 
       await sleep(700);
@@ -798,9 +859,13 @@ export default function ProofModePanel({
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, alerts, demoCase, metricsSummary, mission?.bbox, onStepChange, selectedCellId, usesReplayEvidence]);
+  }, [apiBaseUrl, alerts, demoCase, demoMode, metricsSummary, mission?.bbox, onStepChange, selectedCellId, usesReplayEvidence]);
 
   useEffect(() => {
+    if (!demoMode && mission) {
+      setProof(buildMissionProof(mission, demoCase));
+      return;
+    }
     const isAbstain = demoCase === "abstain";
     const profile = DEMO_PROFILES[demoCase];
     const bbox = usesReplayEvidence ? mission?.bbox ?? profile.bbox : profile.bbox;
@@ -918,7 +983,7 @@ export default function ProofModePanel({
         trace: "Playwright report trace.zip",
       },
     });
-  }, [activeAlert, caption, demoCase, dtnProof, flushedQueueCount, groundingResults, linkOffline, linkStatus, mission, queueCount, usesReplayEvidence, vqaAnswer]);
+  }, [activeAlert, caption, demoCase, demoMode, dtnProof, flushedQueueCount, groundingResults, linkOffline, linkStatus, mission, queueCount, usesReplayEvidence, vqaAnswer]);
 
   const toggleOrbitalEclipse = async () => {
     if (!linkOffline) {
@@ -998,10 +1063,11 @@ export default function ProofModePanel({
       : metrics?.total_alerts_emitted ?? mission?.flags_found ?? 4;
   const alertMetricLabel = demoCase === "eclipse" ? "Packets" : "Alerts";
   const replayOverride = isReplayOverride(demoCase, mission);
-  const context = replayOverride ? missionReplayContext(mission, proof) : DEMO_CONTEXT[demoCase];
-  const storyLines = replayOverride ? missionReplayStoryLines(mission) : DEMO_STORY_LINES[demoCase];
-  const proofTitle = replayOverride
-    ? `${replayDisplayName(mission?.replay_id ?? proof.replay_id)} proof`
+  const missionScoped = !demoMode && Boolean(mission);
+  const context = replayOverride || missionScoped ? missionReplayContext(mission, proof) : DEMO_CONTEXT[demoCase];
+  const storyLines = replayOverride || missionScoped ? missionReplayStoryLines(mission) : DEMO_STORY_LINES[demoCase];
+  const proofTitle = replayOverride || missionScoped
+    ? missionProofTitle(mission, proof)
     : DEMO_TITLES[demoCase];
   const confidenceStack = Array.isArray(proof.output_json.confidence_stack)
     ? (proof.output_json.confidence_stack as ConfidenceContributor[])

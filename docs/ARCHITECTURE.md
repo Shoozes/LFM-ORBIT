@@ -42,7 +42,7 @@ The backend runs two long-lived loops during app lifespan:
 20. `core/queue.py` persists confirmed alerts for `Logs`, `Inspect`, and recent-alert APIs.
 21. `core/gallery.py` expands confirmed alerts into imagery/timelapse evidence and now reuses local replay cache imagery for thumbnail fallback before dropping to offline chips; dataset export rasterizes SVG fallbacks to PNG.
 22. `core/replay.py` can reset runtime state and load a completed mission directly into the same mission, queue, gallery, metrics, and dialogue stores used by realtime operations. It also exposes cached API WebMs as Fast Replay entries and can rescan replay metadata through the current runtime/model stack while preserving replay target packs when present.
-23. `ValidationPanel.tsx`, `TimelapseViewer.tsx`, and `VlmPanel.tsx` expand a selected alert into imagery, analysis, exports, mission-target visual grounding, and timelapse context. Mission-tab timelapse output renders ahead of optional visual-evidence actions so active temporal video evidence remains visible.
+23. `ValidationPanel.tsx` and `TimelapseViewer.tsx` expand a selected alert into imagery, analysis, exports, and timelapse context. Mission-tab timelapse output stays separate from mission setup so active temporal video evidence remains visible.
 24. `SettingsPanel.tsx` queries provider, SimSat, analysis, and depth status endpoints independently, with short retries so one transient miss does not force a false offline settings surface.
 25. `GroundAgent.tsx`, `/api/agent/chat`, and `/api/agent/action/confirm` provide a local action chat that proposes and confirms replay loads/rescans, mission packs, SAT/GND link changes, and map-navigation actions before mutating app state.
 26. `ProofModePanel.tsx` turns replay state into visible Proof Mode output: satellite frame, bbox/evidence overlay, evidence result, latency, provenance, raw-vs-alert bytes, reduction ratio, abstain state, backend-derived link outage queue, and proof JSON.
@@ -176,12 +176,10 @@ The backend runs two long-lived loops during app lifespan:
   Live SAT/GND bus stream and operator injection, including inline bus stats and injection failure visibility.
 - `source/frontend/components/GroundAgent.tsx`
   Ground assistant chat surface with inline backend-error payloads, timeout labeling, guarded send state, proposal cards, and confirmed local action results for replay, mission-pack, link-control, and map-navigation tool calls.
-- `source/frontend/components/VlmPanel.tsx`
-  Mission Evidence panel for the active target pack, with batch grounding, inline API-error handling, result-chip provenance tooltips, and normalized object box propagation to the map.
 - `source/frontend/components/TimelapseViewer.tsx`
   Timelapse generation, playback UI, and retryable error display for provider/API failures.
 - `source/frontend/components/ProofModePanel.tsx`
-  Demo-only Proof Mode surface for deterministic showcase recordings. It exposes stable test IDs for proof fields and uses replay state instead of introducing separate persistence.
+  Proof Mode surface for deterministic showcase recordings and current mission/replay evidence review. It exposes stable test IDs for proof fields and uses replay state instead of introducing separate persistence.
 
 ## Persistence and Contracts
 

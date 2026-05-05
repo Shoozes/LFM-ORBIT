@@ -1,9 +1,10 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { VlmBox } from "./components/VlmPanel";
+import type { VlmBox } from "./types/visualEvidence";
 import { useTelemetry } from "./hooks/useTelemetry";
 import { getApiBaseUrl, generateGridForBbox } from "./utils/telemetry";
 import { getDefaultMissionDateRange } from "./utils/dateRange";
 import type { Mission } from "./types/mission";
+import type { OrbitalScanEventDetail } from "./types/telemetry";
 import type { ChatResponse } from "./components/GroundAgentActionCard";
 import type { MapCameraRequest } from "./types/mapCamera";
 
@@ -14,7 +15,6 @@ const loadAgentDialogue = () => import("./components/AgentDialogue");
 const loadGroundAgent = () => import("./components/GroundAgent");
 const loadMissionControl = () => import("./components/MissionControl");
 const loadTimelapseViewer = () => import("./components/TimelapseViewer");
-const loadVlmPanel = () => import("./components/VlmPanel");
 const loadAlertsLogs = () => import("./components/AlertsLogs");
 const loadProofModePanel = () => import("./components/ProofModePanel");
 
@@ -25,11 +25,11 @@ const AgentDialogue = lazy(loadAgentDialogue);
 const GroundAgent = lazy(loadGroundAgent);
 const MissionControl = lazy(loadMissionControl);
 const TimelapseViewer = lazy(loadTimelapseViewer);
-const VlmPanel = lazy(loadVlmPanel);
 const AlertsLogs = lazy(loadAlertsLogs);
 const ProofModePanel = lazy(loadProofModePanel);
 
 type DemoCase = "showcase" | "payload" | "provenance" | "abstain" | "eclipse" | "ice" | "forest";
+type ScanCellState = Record<string, { isAnomaly: boolean; isDiscarded: boolean }>;
 
 const SHOWCASE_REPLAY_ID = "atacama_mining_replay";
 const SHOWCASE_PRIMARY_CELL_ID = "mining_atacama_open_pit";
@@ -242,8 +242,8 @@ export default function App() {
     demoStartProfile ? [...demoStartProfile.bbox] : null
   ));
   const [vlmBoxes, setVlmBoxes] = useState<VlmBox[]>([]);
+  const [scanCellState, setScanCellState] = useState<ScanCellState>({});
   const [showMissionTimelapse, setShowMissionTimelapse] = useState(false);
-  const [showBboxTools, setShowBboxTools] = useState(false);
   const [mission, setMission] = useState<Mission | null>(null);
   const [mapCameraRequest, setMapCameraRequest] = useState<MapCameraRequest | null>(null);
   const [missionStopNotice, setMissionStopNotice] = useState<string | null>(null);
@@ -283,7 +283,6 @@ export default function App() {
         setDrawnBbox([...mission.bbox]);
         setVlmBoxes([]);
         setShowMissionTimelapse(false);
-        setShowBboxTools(false);
         previewedMissionIdRef.current = mission.id;
       }
       return;
@@ -327,7 +326,6 @@ export default function App() {
     setDrawnBbox(loadedMission?.bbox ? [...loadedMission.bbox] : null);
     setVlmBoxes([]);
     setShowMissionTimelapse(false);
-    setShowBboxTools(false);
     if (primaryCellId) {
       setSelectedCellId(primaryCellId);
       setActiveTab("inspect");
@@ -345,7 +343,6 @@ export default function App() {
     setDrawnBbox(rescanMission.bbox ? [...rescanMission.bbox] : null);
     setVlmBoxes([]);
     setShowMissionTimelapse(false);
-    setShowBboxTools(false);
     setActiveTab("mission");
   }, [fetchMission, refreshTelemetry, setSelectedCellId]);
 
@@ -358,7 +355,6 @@ export default function App() {
     const lats = coords.map(c => c[1]);
     const bbox = [Math.min(...lngs), Math.min(...lats), Math.max(...lngs), Math.max(...lats)];
     setDrawnBbox(bbox);
-    setShowBboxTools(false);
   };
 
   const displayGrid = useMemo(() => {
@@ -385,7 +381,6 @@ export default function App() {
 
   const handleProofModeStart = useCallback(async () => {
     setDemoStepIndex(0);
-    setProofModeActive(true);
 
     let activeMission = mission;
     let requiresSeededReplay = demoQuery.enabled && demoQuery.demoCase === "showcase" && !mission?.replay_id;
@@ -403,6 +398,12 @@ export default function App() {
       requiresSeededReplay = demoQuery.enabled && demoQuery.demoCase === "showcase" && !activeMission?.replay_id;
       if (requiresSeededReplay && !primaryCellId) {
         primaryCellId = SHOWCASE_PRIMARY_CELL_ID;
+      }
+
+      if (!activeMission && !demoQuery.enabled) {
+        setProofModeActive(false);
+        setActiveTab("mission");
+        return;
       }
 
       if (requiresSeededReplay && activeMission?.replay_id !== SHOWCASE_REPLAY_ID) {
@@ -424,6 +425,7 @@ export default function App() {
       if (activeMission) {
         setProofMission(activeMission);
       }
+      setProofModeActive(true);
       setDemoStepIndex(1);
 
       await Promise.all([
@@ -431,11 +433,16 @@ export default function App() {
         fetchMission(),
       ]);
 
-      const bbox = (!requiresSeededReplay && demoStartProfile ? demoStartProfile.bbox : activeMission?.bbox) ?? SHOWCASE_FALLBACK_BBOX;
+      const bbox = (!requiresSeededReplay && demoStartProfile ? demoStartProfile.bbox : activeMission?.bbox)
+        ?? (demoQuery.enabled ? SHOWCASE_FALLBACK_BBOX : null);
+      if (!bbox) {
+        setProofModeActive(false);
+        setActiveTab("mission");
+        return;
+      }
       setDrawnBbox([...bbox]);
       setShowMissionTimelapse(false);
-      setShowBboxTools(false);
-      setVlmBoxes([{ label: demoBoxLabel(demoQuery.demoCase), bbox: [0.24, 0.18, 0.74, 0.76] }]);
+      setVlmBoxes(demoQuery.enabled ? [{ label: demoBoxLabel(demoQuery.demoCase), bbox: [0.24, 0.18, 0.74, 0.76] }] : []);
       if (primaryCellId) {
         setSelectedCellId(primaryCellId);
       }
@@ -443,6 +450,12 @@ export default function App() {
       setDemoStepIndex(2);
     } catch (error) {
       console.error("Proof Mode failed to load replay", error);
+      if (!demoQuery.enabled) {
+        setProofModeActive(false);
+        setActiveTab("mission");
+        return;
+      }
+      setProofModeActive(true);
       setProofMission(activeMission);
       setDrawnBbox(SHOWCASE_FALLBACK_BBOX);
       setVlmBoxes([{ label: "mining expansion region", bbox: [0.24, 0.18, 0.74, 0.76] }]);
@@ -454,25 +467,14 @@ export default function App() {
   }, [apiBaseUrl, demoQuery.demoCase, demoQuery.enabled, demoStartProfile, fetchMission, mission, refreshTelemetry, selectedCellId, setSelectedCellId]);
 
   const handleGroundAgentNavigate = useCallback(async (
-    target: "mission" | "logs" | "settings" | "object_evidence" | "proof",
+    target: "mission" | "logs" | "settings" | "proof",
   ) => {
     if (target === "proof") {
       await handleProofModeStart();
       return;
     }
-    if (target === "object_evidence") {
-      const bbox = mission?.bbox ?? drawnBbox;
-      if (bbox) {
-        setDrawnBbox([...bbox]);
-        setVlmBoxes([]);
-        setShowMissionTimelapse(false);
-        setShowBboxTools(true);
-      }
-      setActiveTab("mission");
-      return;
-    }
     setActiveTab(target);
-  }, [drawnBbox, handleProofModeStart, mission]);
+  }, [handleProofModeStart]);
 
   const handleGroundAgentActionComplete = useCallback(async (response?: ChatResponse) => {
     const [, refreshedMission] = await Promise.all([
@@ -494,7 +496,6 @@ export default function App() {
         setDrawnBbox([...bbox]);
         setVlmBoxes([]);
         setShowMissionTimelapse(false);
-        setShowBboxTools(true);
         setSelectedCellId(null);
         setActiveTab("mission");
       }
@@ -528,7 +529,6 @@ export default function App() {
       if (launchedMission) {
         setVlmBoxes([]);
         setShowMissionTimelapse(false);
-        setShowBboxTools(true);
         setSelectedCellId(null);
         setActiveTab("mission");
       }
@@ -565,17 +565,38 @@ export default function App() {
   }, [fetchMission, missionPassComplete, refreshTelemetry]);
 
   useEffect(() => {
+    setScanCellState({});
+  }, [mission?.id]);
+
+  useEffect(() => {
+    const handleScan = (event: Event) => {
+      const detail = (event as CustomEvent<OrbitalScanEventDetail>).detail;
+      if (!detail?.cell_id) return;
+      setScanCellState((current) => {
+        const next = {
+          isAnomaly: Boolean(detail.is_anomaly),
+          isDiscarded: !detail.is_anomaly,
+        };
+        const previous = current[detail.cell_id];
+        if (previous?.isAnomaly === next.isAnomaly && previous.isDiscarded === next.isDiscarded) {
+          return current;
+        }
+        return { ...current, [detail.cell_id]: next };
+      });
+    };
+    window.addEventListener("orbital-scan", handleScan);
+    return () => window.removeEventListener("orbital-scan", handleScan);
+  }, []);
+
+  useEffect(() => {
     void loadMapVisualizer();
   }, []);
 
   useEffect(() => {
-    if (drawnBbox && showBboxTools) {
-      void loadVlmPanel();
-    }
     if (drawnBbox && showMissionTimelapse) {
       void loadTimelapseViewer();
     }
-  }, [drawnBbox, showBboxTools, showMissionTimelapse]);
+  }, [drawnBbox, showMissionTimelapse]);
 
   useEffect(() => {
     if (!selectedCellId) {
@@ -632,23 +653,19 @@ export default function App() {
             drawnBbox={drawnBbox}
             onBboxDrawn={(bbox) => {
               setDrawnBbox(bbox);
-              setShowBboxTools(true);
               setDrawBboxActive(false);
             }}
             onMenuAssignBBox={(bbox) => {
               setDrawnBbox(bbox);
-              setShowBboxTools(true);
               setActiveTab("mission");
             }}
             onMenuGenerateTimelapse={(bbox) => {
               setDrawnBbox(bbox);
-              setShowBboxTools(true);
               setShowMissionTimelapse(true);
               setActiveTab("mission");
             }}
             onMenuAgentVideoEval={async (bbox) => {
               setDrawnBbox(bbox);
-              setShowBboxTools(true);
               setActiveTab("agents");
               try {
                 await postAgentBusMessage(apiBaseUrl, {
@@ -683,6 +700,7 @@ export default function App() {
               }
             }}
             vlmBoxes={vlmBoxes}
+            scanCellState={scanCellState}
             scanAnimationActive={scanAnimationActive}
             scanStateKey={mission?.id ?? null}
             cameraRequest={mapCameraRequest}
@@ -761,16 +779,15 @@ export default function App() {
           {activeTab === "mission" && (
             <div className="flex flex-col h-full">
               <div className="flex-1">
-                <div className={drawnBbox && (showBboxTools || showMissionTimelapse) ? "h-[360px] border-b border-zinc-200" : "h-full"}>
+                <div className={drawnBbox && showMissionTimelapse ? "h-[360px] border-b border-zinc-200" : "h-full"}>
                   <Suspense fallback={<LoadingPanel label="Mission" />}>
                     <MissionControl
                       isOpen={true}
                       onClose={() => {}}
                       onDrawBbox={() => setDrawBboxActive(true)}
                       drawnBbox={drawnBbox}
-                      onClearBbox={() => { setDrawnBbox(null); setVlmBoxes([]); setShowMissionTimelapse(false); setShowBboxTools(false); }}
-                      onOpenTimelapse={() => { setShowBboxTools(true); setShowMissionTimelapse((prev) => !prev); }}
-                      onOpenEvidenceTools={() => { setShowBboxTools(true); setShowMissionTimelapse(false); }}
+                      onClearBbox={() => { setDrawnBbox(null); setVlmBoxes([]); setShowMissionTimelapse(false); }}
+                      onOpenTimelapse={() => { setShowMissionTimelapse((prev) => !prev); }}
                       mission={mission}
                       onRefresh={fetchMission}
                       isScanComplete={missionPassComplete}
@@ -781,7 +798,6 @@ export default function App() {
                         setDrawnBbox(bbox);
                         setVlmBoxes([]);
                         setShowMissionTimelapse(false);
-                        setShowBboxTools(false);
                       }}
                       initialPresetId={demoStartProfile?.presetId ?? null}
                     />
@@ -797,20 +813,6 @@ export default function App() {
                           startDate={mission?.start_date || defaultMissionDateRange.startDate}
                           endDate={mission?.end_date || defaultMissionDateRange.endDate}
                         />
-                    </Suspense>
-                  </div>
-                )}
-                {drawnBbox && showBboxTools && (
-                  <div>
-                    <Suspense fallback={<LoadingPanel label="Mission Evidence" />}>
-                      <VlmPanel
-                        isOpen={true}
-                        onClose={() => { setDrawnBbox(null); setVlmBoxes([]); setShowBboxTools(false); }}
-                        activeBbox={drawnBbox}
-                        onBoxesUpdate={setVlmBoxes}
-                        activeMissionTargets={mission?.object_targets ?? []}
-                        targetPackId={mission?.target_pack_id ?? null}
-                      />
                     </Suspense>
                   </div>
                 )}
@@ -950,6 +952,7 @@ export default function App() {
           <ProofModePanel
             apiBaseUrl={apiBaseUrl}
             demoCase={demoQuery.demoCase}
+            demoMode={demoQuery.enabled}
             mission={proofMission ?? mission}
             alerts={alerts}
             metricsSummary={metricsSummary}

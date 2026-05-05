@@ -11,7 +11,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { OrbitalScanEventDetail } from "../types/telemetry";
 import { useMapPins } from "../hooks/useMapPins";
 import type { MapPin } from "../hooks/useMapPins";
-import type { VlmBox } from "./VlmPanel";
+import type { VlmBox } from "../types/visualEvidence";
 import { colorForVlmBox, unitBoxToGeographicBbox } from "../utils/objectEvidence";
 import type { MapCameraRequest } from "../types/mapCamera";
 
@@ -22,6 +22,8 @@ type SpatialMenuState = {
   lat: number;
   cellId: string | null;
 };
+
+type ScanCellState = Record<string, { isAnomaly?: boolean; isDiscarded?: boolean }>;
 
 type MapVisualizerProps = {
   geoJsonGrid: GeoJSON.FeatureCollection | null;
@@ -37,6 +39,8 @@ type MapVisualizerProps = {
   onMenuGenerateTimelapse?: (bbox: number[]) => void;
   /** Active bounding boxes provided by optional visual evidence tools */
   vlmBoxes?: VlmBox[];
+  /** Durable scan paint replayed after map source or tab refreshes */
+  scanCellState?: ScanCellState;
   /** True only while a live mission scan is actively moving across cells */
   scanAnimationActive?: boolean;
   /** Changes when a new mission/replay context should clear prior scan paint */
@@ -136,6 +140,17 @@ function setFeatureStateIfReady(
     return true;
   } catch {
     return false;
+  }
+}
+
+function applyScanCellState(map: MaplibreMap | null, scanCellState: ScanCellState): void {
+  if (!map || !map.isStyleLoaded() || !map.getSource("scan-grid")) return;
+  for (const [cellId, state] of Object.entries(scanCellState)) {
+    setFeatureStateIfReady(map, "scan-grid", cellId, {
+      isScanned: true,
+      isAnomaly: Boolean(state.isAnomaly),
+      isDiscarded: Boolean(state.isDiscarded),
+    });
   }
 }
 
@@ -313,6 +328,7 @@ export default function MapVisualizer({
   onMenuAgentVideoEval,
   onMenuGenerateTimelapse,
   vlmBoxes = [],
+  scanCellState = {},
   scanAnimationActive = true,
   scanStateKey = null,
   cameraRequest = null,
@@ -322,6 +338,7 @@ export default function MapVisualizer({
   const mapRef = useRef<MaplibreMap | null>(null);
   const firstMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const selectedCellIdRef = useRef<string | null>(selectedCellId);
+  const scanCellStateRef = useRef<ScanCellState>(scanCellState);
   const previousSelectedCellId = useRef<string | null>(null);
   const didFitBounds = useRef(false);
   // Use a plain object as a map from pin id → Marker to avoid clash with MapLibre Map type
@@ -433,6 +450,11 @@ export default function MapVisualizer({
     drawBboxActiveRef.current = drawBboxActive;
     selectedCellIdRef.current = selectedCellId;
   }, [onCellClick, dropPin, geoJsonGrid, drawBboxActive, selectedCellId]);
+
+  useEffect(() => {
+    scanCellStateRef.current = scanCellState;
+    applyScanCellState(mapRef.current, scanCellState);
+  }, [scanCellState]);
 
   const gridBounds = useMemo(() => {
     if (!geoJsonGrid) return null;
@@ -698,6 +720,13 @@ export default function MapVisualizer({
         setContextMenu((prev) => prev ? null : prev);
       });
 
+      applyScanCellState(map, scanCellStateRef.current);
+      const activeSelectedCellId = selectedCellIdRef.current;
+      if (activeSelectedCellId) {
+        setFeatureStateIfReady(map, "scan-grid", activeSelectedCellId, { isSelected: true });
+        previousSelectedCellId.current = activeSelectedCellId;
+      }
+
       setMapReady(true);
     });
 
@@ -752,6 +781,7 @@ export default function MapVisualizer({
     source?.setData(geoJsonGrid);
     try {
       map.removeFeatureState({ source: "scan-grid" });
+      applyScanCellState(map, scanCellStateRef.current);
       previousSelectedCellId.current = null;
       const activeSelectedCellId = selectedCellIdRef.current;
       if (activeSelectedCellId) {
