@@ -1,6 +1,8 @@
 # LFM-ORBIT
 
-Satellites capture more imagery than they can downlink. LFM-ORBIT runs onboard triage: a satellite pruner scans each pass, rejects low-value frames, wakes local Liquid evidence reasoning only for anomalies, and transmits compact proof JSON instead of raw imagery.
+LFM-ORBIT is a satellite-image timelapse scanner: pick an area on a map, choose a time window, and ask the system to find the anomaly that matters.
+
+It runs from space to ground. A satellite-side pruner sweeps map tiles and image frames, rejects low-value data before downlink, and keeps only candidate evidence. A ground-side validator reconstructs the story with timelapse context, model reasoning, provenance, CV boxes, and compact proof JSON.
 
 A 1-2 KB alert with bbox, confidence, provenance, model output, and payload accounting can move during a narrow contact window. Raw imagery can wait, or never be sent.
 

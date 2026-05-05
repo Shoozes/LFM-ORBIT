@@ -1,5 +1,7 @@
 # LFM Orbit Docs
 
+LFM-ORBIT is the satellite-image timelapse scanner: mission chat and map selection on the ground, scan pruning in space, and compact proof packets back on the ground for review.
+
 Start with the product README, then use only the focused doc you need.
 
 ## Demo And Review
