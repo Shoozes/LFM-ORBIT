@@ -120,6 +120,40 @@ def _strip_optional_text(value: str | None, field_name: str) -> str | None:
     return text or None
 
 
+_STATUS_PATH_KEYS = {
+    "path",
+    "model_dir",
+    "model_path",
+    "manifest_path",
+    "mmproj_path",
+    "source_handoff_path",
+    "training_result_manifest_path",
+    "hf_checkpoint_path",
+    "lora_adapter_path",
+    "readme_path",
+}
+
+
+def _public_status_value(key: str, value: Any) -> Any:
+    if key not in _STATUS_PATH_KEYS or not isinstance(value, str):
+        return value
+    text = value.strip()
+    if not text:
+        return ""
+    return text.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
+
+
+def _public_status_payload(payload: Any) -> Any:
+    if isinstance(payload, dict):
+        return {
+            str(key): _public_status_payload(_public_status_value(str(key), value))
+            for key, value in payload.items()
+        }
+    if isinstance(payload, list):
+        return [_public_status_payload(item) for item in payload]
+    return payload
+
+
 def _normalize_bbox_for_request(value: list[float] | None) -> list[float] | None:
     if value is None:
         return None
@@ -1329,7 +1363,7 @@ def inference_status():
     """LFM GGUF model load status for the satellite inference engine."""
     payload = llm_model_status()
     payload["runtime_capabilities"] = runtime_capabilities()
-    return payload
+    return _public_status_payload(payload)
 
 
 class ImageInferenceBody(BaseModel):
@@ -1400,7 +1434,7 @@ def analysis_status():
         "image_conditioned_runtime_reason",
         "direct image runtime adapter is not wired",
     )
-    return {
+    return _public_status_payload({
         "default_model": gnd["model"],
         "ground_validator_model": gnd,
         "optional_model": gguf_name,
@@ -1461,7 +1495,7 @@ def analysis_status():
             "Satellite triage and Ground validation share the resolved GGUF artifact when loaded. "
             "Ground validation keeps deterministic severity gates and falls back to offline_lfm_v1 if needed."
         ),
-    }
+    })
 
 
 # ---------------------------------------------------------------------------

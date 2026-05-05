@@ -1,6 +1,6 @@
 # Dataset Cycle Tutorial
 
-This is the optional data loop for LFM Orbit: package replayable training data, retag it with Qwen, and publish a viewer-safe Hugging Face dataset. It supports real-data development, but the hackathon runtime remains DPhi Space SimSat-first.
+This is the optional data loop for LFM Orbit: package replayable training data, retag it with Qwen, and publish a viewer-safe Hugging Face dataset. It supports real-data development, but the hackathon satellite-data API family remains SimSat/Mapbox through DPhi Space SimSat.
 
 ## Story
 
@@ -156,4 +156,4 @@ The Hub card keeps schemas separate:
 - Reuse existing image hashes and upload only changed configs/assets unless a schema changes.
 - Keep metadata-only missions in `mission_metadata`; do not force invalid WebMs into image configs.
 - Record counts, tagger source, skipped assets, failures, and Hub commit hash in this tutorial, `source/backend/data/README.md`, and `summary_bank.json`.
-- Keep direct Sentinel/NASA/GEE refreshes optional. The hackathon path remains DPhi SimSat-first plus seeded replay data.
+- Keep direct Sentinel/NASA/GEE refreshes optional. The hackathon path remains SimSat/Mapbox through DPhi Space SimSat plus seeded replay data.

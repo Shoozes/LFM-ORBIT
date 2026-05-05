@@ -1,12 +1,12 @@
 # Sentinel Close Looks
 
-Sentinel Hub is the optional close-look lane for LFM-ORBIT. It is useful when an operator wants a clearer cached replay around a selected bbox/date window after the SimSat-first product flow has identified a region worth inspecting.
+Sentinel Hub is the optional close-look lane for LFM-ORBIT. It is useful when an operator wants a clearer cached replay around a selected bbox/date window after the SimSat/Mapbox product flow has identified a region worth inspecting.
 
 ## What It Can And Cannot Do
 
 - Sentinel-2 L2A gives useful 10m-class context for water, ice/snow, burn-scar, vegetation, port, and infrastructure-scale monitoring.
 - It is not sub-meter inspection. Do not use it to imply individual-person, vehicle-plate, or building-detail confirmation. For roof-scale visual proof plates, use separate context imagery and label that imagery origin explicitly.
-- Fresh Sentinel Hub calls are optional development/replay support. The default showcase remains DPhi SimSat-first and credential-free.
+- Fresh Sentinel Hub calls are optional development/replay support. The default showcase remains SimSat/Mapbox through DPhi Space SimSat and credential-free.
 - Seeded Sentinel Hub outputs must stay labeled as cached/replay evidence once stored under `source/backend/assets/seeded_data/`.
 - Timelapse evidence must show multiple contextual satellite frames. A single still image with color shifts is invalid temporal proof.
 

@@ -2,7 +2,7 @@
 
 This is the recorded showcase path for the Liquid AI x DPhi Space Hackathon submission.
 
-The hackathon integration target is DPhi Space SimSat. The recorded showcase does not require Sentinel Hub credentials; bundled replay fixtures and SimSat-first runtime defaults keep the demo deterministic and quota-free.
+The hackathon satellite-data API target is SimSat/Mapbox through DPhi Space SimSat. The default lane is SimSat Sentinel, with SimSat Mapbox available as the optional imagery/context lane when a Mapbox token is configured. The recorded showcase does not require Sentinel Hub credentials; bundled replay fixtures and SimSat/Mapbox runtime defaults keep the demo deterministic and quota-free.
 
 Normal app startup is intentionally idle. It opens on the Atacama mining context so the strongest story is ready to inspect, but it does not auto-play the last replay, launch a mission, or begin scanning until the operator confirms a mission proposal.
 
@@ -99,7 +99,7 @@ The tutorial walkthrough is now the plain-English product run-through. It starts
 
 Replay-backed proof mode can now keep the active replay instead of forcing Rondonia, so mission-specific proof copy stays attached to maritime, mining, flood, wildfire, and urban replay packs. Some development replay fixtures use visible Sentinel-2 L2A frames and explicitly reject invalid still-image color-shift timelapses. Their real monthly WebMs are kept in the legacy `source/backend/assets/seeded_data/` cache for dataset export and training, but they are not a Sentinel Hub dependency for the default demo.
 
-Current runtime wording: SimSat is the primary realtime lane. Replay fixtures are used for deterministic demos. Liquid runtime currently reasons over scored evidence packets unless a manifest-resolved multimodal model bundle is installed.
+Current runtime wording: SimSat/Mapbox is the main hackathon satellite-data API family. SimSat Sentinel is the default realtime lane, SimSat Mapbox is optional imagery/context through the same SimSat path, and replay fixtures are used for deterministic demos. Liquid runtime currently reasons over scored evidence packets unless a manifest-resolved multimodal model bundle is installed.
 
 Target-pack wording: target packs are attached to missions, alerts, replay snapshots, dataset exports, and Proof Mode. They are no longer a separate Mission-tab operator tool. The main public showcase pack is `critical_minerals`; `deforestation`, `fireline`, `port`, `glacier`, `waterline`, `lifeline`, `camp`, and cautious `plastic`/coastal-debris packs remain available through presets and backend contracts.
 

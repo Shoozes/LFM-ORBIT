@@ -206,7 +206,7 @@ The export now includes:
 - cached API observation-store rows when the CLI is run without `--no-api-observations`
 - direct replay-cache rows when the CLI is run with `--include-seeded-cache`
 - persisted maritime/lifeline monitor-report JSON rows when passed through `--monitor-reports-dir`
-- DPhi SimSat Sentinel as the primary hackathon provider lane, plus optional SimSat Mapbox, direct Sentinel Hub, NASA, GEE, replay-cache, and offline provenance fields where available
+- SimSat/Mapbox through DPhi Space SimSat as the hackathon satellite-data API family: default SimSat Sentinel scanning, optional SimSat Mapbox imagery/context, direct Sentinel Hub, NASA, GEE, replay-cache, and offline provenance fields where available
 - temporal use-case metadata and examples for deforestation, wildfire, civilian lifeline disruption, maritime monitoring, ice/snow extent, legacy ice-cap visual review, floods, agriculture, urban expansion, mining, and generic temporal review
 - chat-style `training.jsonl`, `train_training.jsonl`, and `eval_training.jsonl` files for supervised data-refinement workflows
 - second-pass asset retagging through `scripts/retag_training_assets.py`, including deduplicated still images, sampled timelapse frames, ordered temporal sequence rows, Hugging Face ImageFolder-compatible `images/ + metadata.jsonl`, and provider adapters for heuristic/manual queue, Ollama vision models, or OpenAI-compatible vision models

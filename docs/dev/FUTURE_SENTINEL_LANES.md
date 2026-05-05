@@ -4,7 +4,7 @@ Updated **May 4, 2026**.
 
 These are post-handoff implementation notes. They are not current runtime capabilities.
 
-The current showcase remains DPhi SimSat-first. Sentinel Hub is optional local support for replay refreshes, close-look story plates, and dataset development. Any future direct Sentinel lane must stay unavailable-safe, rate-aware, and candidate-only until source evidence plus operator review supports stronger claims.
+The current showcase remains SimSat/Mapbox through DPhi Space SimSat. Sentinel Hub is optional local support for replay refreshes, close-look story plates, and dataset development. Any future direct Sentinel lane must stay unavailable-safe, rate-aware, and candidate-only until source evidence plus operator review supports stronger claims.
 
 ## Shared Rules
 

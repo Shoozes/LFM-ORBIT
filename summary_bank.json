@@ -280,7 +280,7 @@
       ]
     },
     "issue_group_import_contracts_and_env_resilience": {
-      "note": "Repo integrity guardrails for broken backend imports/exports, seed/GEE/debug entrypoints, DPhi SimSat-first cold-start defaults, safe optional local credential discovery including labeled Sentinel Hub trial bundles, malformed local environment overrides, backend lockfile/root-verify drift, launcher prerequisite drift, offline-safe fallback behavior, current focused import checks for supported modules/scripts/manual entrypoints, docs/media/context-bank file-reference checks, repo-relative summary-bank path enforcement, runtime seeded-cache ignore policy for generated NASA/Sentinel WebM outputs, and a script-directory coverage assertion so newly added backend scripts enter the import guard automatically.",
+      "note": "Repo integrity guardrails for broken backend imports/exports, seed/GEE/debug entrypoints, SimSat/Mapbox cold-start defaults through DPhi Space SimSat, safe optional local credential discovery including labeled Sentinel Hub trial bundles, malformed local environment overrides, backend lockfile/root-verify drift, launcher prerequisite drift, offline-safe fallback behavior, current focused import checks for supported modules/scripts/manual entrypoints, docs/media/context-bank file-reference checks, repo-relative summary-bank path enforcement, runtime seeded-cache ignore policy for generated NASA/Sentinel WebM outputs, and a script-directory coverage assertion so newly added backend scripts enter the import guard automatically.",
       "files": [
         ".gitignore",
         ".env.example",
@@ -387,7 +387,7 @@
       ]
     },
     "issue_group_integrity_scalability_review": {
-      "note": "Current May 5 integrity/scalability lane: progress docs stay consolidated into README/product, docs/user/operator review, docs/dev/system-maintenance, QA_PITFALLS/regression checklist, TODO/current backlog, and summary_bank/file groups. The latest pass made the user/dev split explicit, moved dataset/future/Sentinel/agent-growth docs into dev, kept demo/proof contracts in user docs, added a docs guard for that split, and pruned tracked ad hoc backend scratch probes. Recent runtime integrity work also covers scanner resume after frontend reload, stale demo-query isolation from active live missions, telemetry idle-without-mission behavior, SimSat-first startup, GGUF fetch expectations, 3D popup removal, firewatch proxy-only filtering, shared SAT/GND GGUF status, and lean Mission UI boundaries, and visible map-side Area Tools for flyover/drawn bbox status and clearing.",
+      "note": "Current May 5 integrity/scalability lane: progress docs stay consolidated into README/product, docs/user/operator review, docs/dev/system-maintenance, QA_PITFALLS/regression checklist, TODO/current backlog, and summary_bank/file groups. The latest pass made the user/dev split explicit, moved dataset/future/Sentinel/agent-growth docs into dev, kept demo/proof contracts in user docs, added a docs guard for that split, and pruned tracked ad hoc backend scratch probes. Recent runtime integrity work also covers scanner resume after frontend reload, stale demo-query isolation from active live missions, telemetry idle-without-mission behavior, SimSat/Mapbox hackathon API positioning with SimSat Sentinel as default and SimSat Mapbox as optional imagery/context, GGUF fetch expectations, public model/status API path sanitization, 3D popup removal, firewatch proxy-only filtering, shared SAT/GND GGUF status, lean Mission UI boundaries, and visible map-side Area Tools for flyover/drawn bbox status and clearing.",
       "files": [
         "README.md",
         "docs/README.md",
@@ -400,6 +400,7 @@
         "summary_bank.json",
         "source/backend/tests/test_docs_artifacts.py",
         "source/backend/tests/test_import_contracts.py",
+        "source/backend/tests/test_api.py",
         "source/backend/tests/test_scanner_resume.py",
         "source/frontend/e2e/vlm.spec.ts",
         "source/frontend/e2e/qa_verification.spec.ts",
@@ -1009,7 +1010,7 @@
       ]
     },
     "feature_group_provider_pipeline_and_seed_scripts": {
-      "note": "Provider resolution, offline-safe cold-start defaults, DPhi SimSat Sentinel as the hackathon primary lane, optional SimSat Mapbox routing with any non-empty local token treated as configured but empty image payloads rejected before scoring, optional Sentinel Hub secret-file compatibility including current labeled sh.txt shape for development-only cache refreshes, fallback order, cached real API replay assets, optional event-window Sentinel seeding for development, Sentinel close-look documentation, SCL-gated frame rejection where metadata exists, burn-scar visual composites, observation-record integrity, and debug diagnostics for safe fallback paths. May 5 Lochloosa West Fire dev seed used sh.txt manually, accepted the pre-fire frame, rejected the May 4-5 event window for no-data/insufficient valid pixels, and wrote no one-frame timelapse, preserving the timelapse-integrity contract and SimSat default runtime. Manual WMS connectivity/evalscript checks are consolidated under scripts/probe_sentinel_wms.py so root-level test_*.py probes do not look like pytest coverage.",
+      "note": "Provider resolution, offline-safe cold-start defaults, SimSat/Mapbox through DPhi Space SimSat as the hackathon satellite-data API family, DPhi SimSat Sentinel as the default realtime lane, optional SimSat Mapbox imagery/context routing with any non-empty local token treated as configured but empty image payloads rejected before scoring, optional Sentinel Hub secret-file compatibility including current labeled sh.txt shape for development-only cache refreshes, fallback order, cached real API replay assets, optional event-window Sentinel seeding for development, Sentinel close-look documentation, SCL-gated frame rejection where metadata exists, burn-scar visual composites, observation-record integrity, and debug diagnostics for safe fallback paths. May 5 Lochloosa West Fire dev seed used sh.txt manually, accepted the pre-fire frame, rejected the May 4-5 event window for no-data/insufficient valid pixels, and wrote no one-frame timelapse, preserving the timelapse-integrity contract and SimSat default runtime. Manual WMS connectivity/evalscript checks are consolidated under scripts/probe_sentinel_wms.py so root-level test_*.py probes do not look like pytest coverage.",
       "files": [
         ".env.example",
         "source/backend/core/config.py",
@@ -1374,7 +1375,7 @@
       ]
     },
     "feature_group_proof_demo_mode": {
-      "note": "Showcase-ready deterministic proof lane with guided UI flow, explicit Proof Mode entry, Playwright video/screenshots, proof JSON export with payload_accounting, SimSat-first README positioning, backend-derived DTN queue proof, Liquid evidence-packet wording, target-pack proof metadata, replay-specific Proof Mode titles/context/story lines, and preloaded mission/replay starts that avoid generic cold-start scans. Public demos cover Critical Minerals, payload reduction, provenance, abstain safety, orbital eclipse, and paced Rondonia tutorial flow; the legacy port audit remains linked as cautious target-pack proof history, not a normal Mission-tab tool.",
+      "note": "Showcase-ready deterministic proof lane with guided UI flow, explicit Proof Mode entry, Playwright video/screenshots, proof JSON export with payload_accounting, SimSat/Mapbox README positioning, backend-derived DTN queue proof, Liquid evidence-packet wording, target-pack proof metadata, replay-specific Proof Mode titles/context/story lines, and preloaded mission/replay starts that avoid generic cold-start scans. Public demos cover Critical Minerals, payload reduction, provenance, abstain safety, orbital eclipse, and paced Rondonia tutorial flow; the legacy port audit remains linked as cautious target-pack proof history, not a normal Mission-tab tool.",
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
@@ -1438,7 +1439,7 @@
       ]
     },
     "feature_group_simsat_dtn_showcase_proof": {
-      "note": "Current showcase proof surface for DPhi SimSat-first positioning, truthful proxy-band labels, local Liquid evidence-packet review, compact payload accounting, backend-derived unread-message DTN queue proof, and orbital-eclipse screenshot/video artifacts.",
+      "note": "Current showcase proof surface for SimSat/Mapbox through DPhi Space SimSat positioning, truthful proxy-band labels, local Liquid evidence-packet review, compact payload accounting, backend-derived unread-message DTN queue proof, and orbital-eclipse screenshot/video artifacts.",
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",

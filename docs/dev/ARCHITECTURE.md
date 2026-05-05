@@ -196,8 +196,9 @@ The backend runs two long-lived loops during app lifespan:
 
 ### Observation Providers
 
-- Hackathon primary: `simsat_sentinel` from DPhi Space SimSat.
-- Optional SimSat imagery provider: `simsat_mapbox` via `MAPBOX_ACCESS_TOKEN`. Orbit treats any non-empty value as configured for local SimSat routing, but real upstream Mapbox imagery still requires a valid token; empty SimSat image payloads are rejected before scoring.
+- Hackathon satellite-data API family: SimSat/Mapbox through DPhi Space SimSat.
+- Default realtime lane: `simsat_sentinel` from DPhi Space SimSat.
+- Optional SimSat imagery/context lane: `simsat_mapbox` via `MAPBOX_ACCESS_TOKEN`. Orbit treats any non-empty value as configured for local SimSat routing, but real upstream Mapbox imagery still requires a valid token; empty SimSat image payloads are rejected before scoring.
 - Optional development/replay support: `sentinelhub_direct`, `nasa_api_direct`, and GEE-style paths.
 - Final safety net: local deterministic fallback data.
 - Cold-start `.env.example` sets `OBSERVATION_PROVIDER=simsat_sentinel` and `DISABLE_EXTERNAL_APIS=true` so fresh installs and hackathon demos do not depend on Sentinel Hub, NASA, GEE, or provider quota unless the operator explicitly opts in.

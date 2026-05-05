@@ -3,6 +3,7 @@
 These tests verify that all REST endpoints return expected data
 and comply with the locked contract schemas.
 """
+import json
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -18,6 +19,10 @@ from api.main import (
 from core.depth_anything import clear_depth_anything_runtime_override
 
 client = TestClient(app)
+
+
+def _payload_text(payload: dict) -> str:
+    return json.dumps(payload, sort_keys=True)
 
 
 def test_agent_pair_boot_can_be_disabled_for_recorded_demos(monkeypatch):
@@ -448,6 +453,7 @@ def test_analysis_status_endpoint_surfaces_manifest_metadata():
         "image_conditioned_runtime_reason": "mmproj not present",
         "runtime_backend": "none",
         "mmproj_present": False,
+        "model_path": "C:/tmp/model.gguf",
     }
     with patch(
         "api.main.llm_model_status",
@@ -490,12 +496,13 @@ def test_analysis_status_endpoint_surfaces_manifest_metadata():
     assert model["repo_id"] == "jc816/lfm-orbit-satellite"
     assert model["revision"] == "main"
     assert model["source"] == "huggingface"
-    assert model["manifest_path"] == "C:/tmp/model_manifest.json"
-    assert model["mmproj_path"] == "C:/tmp/mmproj.gguf"
-    assert model["source_handoff_path"] == "C:/tmp/source_handoff.json"
+    assert model["path"] == "model.gguf"
+    assert model["manifest_path"] == "model_manifest.json"
+    assert model["mmproj_path"] == "mmproj.gguf"
+    assert model["source_handoff_path"] == "source_handoff.json"
     assert model["source_handoff_present"] is True
     assert model["training_result_manifest"] == "training_result_manifest.json"
-    assert model["training_result_manifest_path"] == "C:/tmp/training_result_manifest.json"
+    assert model["training_result_manifest_path"] == "training_result_manifest.json"
     assert model["training_result_manifest_present"] is True
     assert model["training_method"] == "vlm_sft"
     assert model["training_modality"] == "image_text"
@@ -513,8 +520,10 @@ def test_analysis_status_endpoint_surfaces_manifest_metadata():
     assert data["training_image_blocks"] == 44
     assert data["training_eval_rows"] == 0
     assert data["runtime_capabilities"]["runtime_backend"] == "none"
-    assert model["readme_path"] == "C:/tmp/README.md"
+    assert data["runtime_capabilities"]["model_path"] == "model.gguf"
+    assert model["readme_path"] == "README.md"
     assert model["readme_present"] is True
+    assert "C:/tmp" not in _payload_text(data)
 
 
 def test_inference_status_surfaces_runtime_capabilities():
@@ -527,6 +536,7 @@ def test_inference_status_surfaces_runtime_capabilities():
             "runtime_inference_mode": "text_evidence_packet",
             "image_conditioned_runtime_enabled": False,
             "image_conditioned_runtime_reason": "feature disabled",
+            "model_path": "C:/tmp/model.gguf",
         },
     ):
         response = client.get("/api/inference/status")
@@ -534,8 +544,11 @@ def test_inference_status_surfaces_runtime_capabilities():
     assert response.status_code == 200
     data = response.json()
     assert data["name"] == "model.gguf"
+    assert data["path"] == "model.gguf"
     assert data["runtime_capabilities"]["runtime_inference_mode"] == "text_evidence_packet"
     assert data["runtime_capabilities"]["image_conditioned_runtime_enabled"] is False
+    assert data["runtime_capabilities"]["model_path"] == "model.gguf"
+    assert "C:/tmp" not in _payload_text(data)
 
 
 def test_image_inference_endpoint_returns_status_safe_unavailable_payload():

@@ -33,7 +33,7 @@ Full repo verification:
 ## Highlights
 
 - The main story is Critical Minerals Expansion Watch over the Salar de Atacama / Escondida / Atacama mining corridor: long-term industrial land change with clear region boxes, commercial relevance, environmental relevance, and safe evidence boundaries.
-- DPhi SimSat is the primary runtime lane: `provider=simsat_sentinel`, `runtime_truth_mode=realtime`, `imagery_origin=simsat`, `scoring_basis=proxy_bands`.
+- SimSat/Mapbox is the main hackathon satellite-data API family. The default lane is DPhi Space SimSat Sentinel (`provider=simsat_sentinel`, `runtime_truth_mode=realtime`, `imagery_origin=simsat`, `scoring_basis=proxy_bands`); SimSat Mapbox remains the optional imagery/context lane when a Mapbox token is configured.
 - Agent 1 prunes scan cells before downlink.
 - Agent 2 reviews retained evidence packets: bbox, source, temporal/proxy scores, confidence, and visual evidence references.
 - Mission target packs stay attached to alerts and Proof Mode instead of adding a separate operator panel.
@@ -118,7 +118,7 @@ flowchart LR
   H --> I[Audit UI + dataset export]
 ```
 
-Current runtime: SimSat-first imagery lane, deterministic replay fixtures for repeatable demos, and shared Satellite/Ground Liquid evidence-packet reasoning when the manifest-resolved local GGUF runtime is available. NM-UNI training proof is surfaced from `training_result_manifest.json`; production image-conditioned inference is not claimed unless `mmproj` or native VLM runtime support is present and wired.
+Current runtime: SimSat/Mapbox hackathon satellite-data API family, default SimSat Sentinel scanning lane, optional SimSat Mapbox imagery/context lane, deterministic replay fixtures for repeatable demos, and shared Satellite/Ground Liquid evidence-packet reasoning when the manifest-resolved local GGUF runtime is available. NM-UNI training proof is surfaced from `training_result_manifest.json`; production image-conditioned inference is not claimed unless `mmproj` or native VLM runtime support is present and wired.
 
 ## Validation Snapshot
 

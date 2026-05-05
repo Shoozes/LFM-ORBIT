@@ -9,7 +9,7 @@ See [QA_PITFALLS.md](QA_PITFALLS.md) for the detailed guardrail checklist.
 ## Current State
 
 - LFM Orbit is a demo-ready, local-first mission-control prototype, not an unattended production deployment.
-- The hackathon runtime is DPhi Space SimSat-first. Sentinel Hub, NASA, and GEE-style providers are optional development or replay support.
+- The hackathon satellite-data API family is SimSat/Mapbox through DPhi Space SimSat. Default realtime scanning uses `simsat_sentinel`; `simsat_mapbox` is the optional SimSat imagery/context lane when a Mapbox token is configured. Sentinel Hub, NASA, and GEE-style providers are optional development or replay support only.
 - Evidence surfaces must keep `runtime_truth_mode`, `imagery_origin`, and `scoring_basis` visible.
 - Replay-cache entries are stored real API imagery with preserved metadata. They are deterministic review assets, not generated evidence.
 - New runtime cache WebM/meta outputs under `source/backend/assets/seeded_data/` are ignored by default; promote only reviewed fixtures with forced git add plus docs and summary-bank updates.
@@ -22,6 +22,7 @@ See [QA_PITFALLS.md](QA_PITFALLS.md) for the detailed guardrail checklist.
 - Area selection is a first-class map control: the map-side Area Tools card shows selected/drawing/scanning state, selected-cell count, bbox, Draw, and Clear without requiring the Mission tab.
 - Launchers are defensive: option 1 / `-Install` stops stale repo-owned Orbit process trees on `8000` and `5173`, refuses unrelated port owners, starts Vite with `--strictPort`, captures backend run logs under `runtime-data/logs/` on Windows, and fails fast if backend health never comes up.
 - `.\run.ps1 -Verify` is the release gate and now fails on external command exit codes from `uv`, `npm`, `npx`, Playwright, model fetch, or frontend dev startup.
+- Public model/status APIs expose artifact filenames, repo metadata, capability flags, and presence booleans without leaking local absolute paths or secret-adjacent directories.
 - Florida Fire/Drought Readiness Watch is candidate-only unless smoke, active-fire, burn-scar, hotspot, or fireline-specific source evidence is present; generic proxy vegetation changes are filtered before downlink.
 - The retired target/monitor subtabs and visual-evidence tools panel must stay out of the submission UI unless deliberately reintroduced after review.
 - Frontend reloads must not restart an active mission from the first scan cell or let stale demo query params override a live mission.
@@ -41,7 +42,6 @@ See [QA_PITFALLS.md](QA_PITFALLS.md) for the detailed guardrail checklist.
 - Add a small frontend unit/component layer for high-churn pure logic and hooks.
 - Keep import/export guards current whenever scripts, entrypoints, or dataset row types change.
 - Keep the docs user/dev split enforced when adding new markdown files.
-- Add lightweight API contract coverage for responses that must never expose local machine paths or secret-adjacent directories.
 - On the next demo-media refresh, pre-warm or trim Proof Mode transition frames so recorded videos do not linger on black loading states.
 - Promote additional camera/location targets only with semantic profiles: aliases, bbox, center, camera, location type, terrain context, mission context, safe evidence guidance, and tags.
 - Add optional external geocoding behind `/api/location/resolve` only if arbitrary place lookup becomes required. Keep the vetted local registry as the offline/default provider.
@@ -145,3 +145,4 @@ Model/runtime:
 - May 5 media refresh: `npx playwright test e2e/capture_screenshots.spec.ts` passed `8`, `npm run demo:record` passed `5`, `npm run demo:tutorial` passed `1`, and `uv run --no-sync pytest tests/test_docs_artifacts.py -q` passed `17`. Promoted docs media was visually sampled with a local Playwright contact sheet.
 - May 5 startup/selection check: clean option-1 launcher startup reached backend health and frontend ready with no cold-start mission; Playwright dependencies resolved cleanly from `node_modules`; map-side bbox drawing now has a dedicated draw hitbox and `npx playwright test e2e/bbox.spec.ts` passed `6`, including a real drag-to-grid assertion.
 - May 5 replay metadata cleanup: curated replay JSON now carries explicit `use_case_id`; replay catalog/proposals expose `target_pack_id` when present; root-level manual Sentinel `test_*.py` probes were consolidated into `scripts/probe_sentinel_wms.py`; import-contract tests passed `5`.
+- May 5 API hardening: `/api/analysis/status` and `/api/inference/status` now sanitize path-like model/runtime fields to filenames before returning public JSON; targeted API/docs/import regression guard passed `24`.

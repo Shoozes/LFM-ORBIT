@@ -649,11 +649,11 @@ export default function MissionControl({
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-700">Runtime</p>
                 <p className="mt-1 text-xs leading-relaxed text-cyan-950">
-                  SimSat-first mission scanning is the default submission path.
+                  SimSat/Mapbox is the default submission satellite-data path.
                 </p>
               </div>
               <span className="shrink-0 rounded border border-cyan-300 bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-700">
-                SimSat
+                SimSat/Mapbox
               </span>
             </div>
           </div>

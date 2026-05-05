@@ -1130,7 +1130,7 @@ def _build_agentic_mission_plan(user_msg: str, text: str) -> dict[str, Any] | No
         display_name = "Coastal Debris / Slick Candidate Watch"
     task_text = (
         f"Attempt Ground Agent mission plan for: {clean_request}. "
-        f"Review {region_label or 'the active/default scan region'} with SimSat-first runtime and compact evidence packets. "
+        f"Review {region_label or 'the active/default scan region'} with SimSat/Mapbox runtime and compact evidence packets. "
         f"Requested temporal cadence: {temporal_cadence}. "
         f"{safety}"
     )
