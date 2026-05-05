@@ -80,6 +80,17 @@ def _score_unavailable_fallback_score(reason: str) -> dict:
     )
 
 
+def _resume_progress_for_mission(mission: dict | None, total_cells: int) -> tuple[int, int]:
+    if mission is None:
+        return 0, 0
+    try:
+        cells_scanned = max(0, min(int(mission.get("cells_scanned") or 0), total_cells))
+        flags_found = max(0, int(mission.get("flags_found") or 0))
+    except (TypeError, ValueError):
+        return 0, 0
+    return cells_scanned, flags_found
+
+
 async def stream_region_scan(websocket: WebSocket):
     mission = get_active_mission()
     mission_bbox = mission["bbox"] if mission else None
@@ -135,12 +146,26 @@ async def stream_region_scan(websocket: WebSocket):
         record_cycle_start(cycle_index)
 
         alerts_emitted = 0
-        cells_scanned = 0
+        resume_cells_scanned = 0
+        if mission_id is not None and not getattr(REGION, 'demo_mode_loop_scan', False):
+            resume_cells_scanned, alerts_emitted = _resume_progress_for_mission(mission, total_cells)
+        cells_scanned = resume_cells_scanned
         latest_discard_ratio = 0.0
         mission_changed_during_cycle = False
 
+        if resume_cells_scanned >= total_cells and total_cells > 0 and not getattr(REGION, 'demo_mode_loop_scan', False):
+            await websocket.send_text(json.dumps({"type": "scan_complete"}))
+            completed_mission_id = current_mission_id
+            while True:
+                await asyncio.sleep(1.0)
+                latest_mission = get_active_mission()
+                latest_mission_id = latest_mission["id"] if latest_mission else None
+                if latest_mission_id != completed_mission_id:
+                    break
+            continue
+
         try:
-            for feature in features:
+            for feature in features[resume_cells_scanned:]:
                 latest_mission = get_active_mission()
                 latest_mission_id = latest_mission["id"] if latest_mission else None
                 if latest_mission_id != current_mission_id:

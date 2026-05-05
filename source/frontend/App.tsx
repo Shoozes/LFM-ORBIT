@@ -210,6 +210,26 @@ function getCellIdFromProperties(properties: unknown): string | null {
   return typeof value === "string" || typeof value === "number" ? String(value) : null;
 }
 
+function buildScanCellStateFromProgress(
+  grid: GeoJSON.FeatureCollection | null,
+  cellsScanned: number,
+  alertCellIds: Set<string>,
+): ScanCellState {
+  if (!grid || cellsScanned <= 0) return {};
+  const state: ScanCellState = {};
+  const safeCount = Math.max(0, Math.min(cellsScanned, grid.features.length));
+  for (let index = 0; index < safeCount; index += 1) {
+    const cellId = getCellIdFromProperties(grid.features[index]?.properties);
+    if (!cellId) continue;
+    const isAnomaly = alertCellIds.has(cellId);
+    state[cellId] = { isAnomaly, isDiscarded: !isAnomaly };
+  }
+  for (const cellId of alertCellIds) {
+    state[cellId] = { isAnomaly: true, isDiscarded: false };
+  }
+  return state;
+}
+
 function normalizeNumberArray(value: unknown, length: number): number[] | null {
   if (!Array.isArray(value) || value.length !== length) return null;
   const numbers = value.map((entry) => Number(entry));
@@ -245,6 +265,7 @@ export default function App() {
   const [scanCellState, setScanCellState] = useState<ScanCellState>({});
   const [showMissionTimelapse, setShowMissionTimelapse] = useState(false);
   const [mission, setMission] = useState<Mission | null>(null);
+  const [missionLoaded, setMissionLoaded] = useState(false);
   const [mapCameraRequest, setMapCameraRequest] = useState<MapCameraRequest | null>(null);
   const [missionStopNotice, setMissionStopNotice] = useState<string | null>(null);
   const [proofModeActive, setProofModeActive] = useState(false);
@@ -253,6 +274,7 @@ export default function App() {
   const previousActiveMissionRef = useRef<Mission | null>(null);
   const previewedMissionIdRef = useRef<number | null>(null);
   const apiBaseUrl = getApiBaseUrl();
+  const demoUiEnabled = Boolean(demoQuery.enabled && missionLoaded && (!mission || mission.mission_mode === "replay"));
 
   const fetchMission = useCallback(async () => {
     try {
@@ -265,6 +287,8 @@ export default function App() {
       console.debug(`Mission refresh failed with HTTP ${res.status}.`);
     } catch (error) {
       console.debug("Mission refresh failed.", error);
+    } finally {
+      setMissionLoaded(true);
     }
     return null;
   }, [apiBaseUrl]);
@@ -383,7 +407,8 @@ export default function App() {
     setDemoStepIndex(0);
 
     let activeMission = mission;
-    let requiresSeededReplay = demoQuery.enabled && demoQuery.demoCase === "showcase" && !mission?.replay_id;
+    let proofDemoEnabled = demoQuery.enabled && (!activeMission || activeMission.mission_mode === "replay");
+    let requiresSeededReplay = proofDemoEnabled && demoQuery.demoCase === "showcase" && !mission?.replay_id;
     let primaryCellId: string | null = selectedCellId ?? (requiresSeededReplay ? SHOWCASE_PRIMARY_CELL_ID : null);
 
     try {
@@ -395,12 +420,13 @@ export default function App() {
         }
       }
 
-      requiresSeededReplay = demoQuery.enabled && demoQuery.demoCase === "showcase" && !activeMission?.replay_id;
+      proofDemoEnabled = demoQuery.enabled && (!activeMission || activeMission.mission_mode === "replay");
+      requiresSeededReplay = proofDemoEnabled && demoQuery.demoCase === "showcase" && !activeMission?.replay_id;
       if (requiresSeededReplay && !primaryCellId) {
         primaryCellId = SHOWCASE_PRIMARY_CELL_ID;
       }
 
-      if (!activeMission && !demoQuery.enabled) {
+      if (!activeMission && !proofDemoEnabled) {
         setProofModeActive(false);
         setActiveTab("mission");
         return;
@@ -433,8 +459,8 @@ export default function App() {
         fetchMission(),
       ]);
 
-      const bbox = (!requiresSeededReplay && demoStartProfile ? demoStartProfile.bbox : activeMission?.bbox)
-        ?? (demoQuery.enabled ? SHOWCASE_FALLBACK_BBOX : null);
+      const bbox = (!requiresSeededReplay && proofDemoEnabled && demoStartProfile ? demoStartProfile.bbox : activeMission?.bbox)
+        ?? (proofDemoEnabled ? SHOWCASE_FALLBACK_BBOX : null);
       if (!bbox) {
         setProofModeActive(false);
         setActiveTab("mission");
@@ -442,7 +468,7 @@ export default function App() {
       }
       setDrawnBbox([...bbox]);
       setShowMissionTimelapse(false);
-      setVlmBoxes(demoQuery.enabled ? [{ label: demoBoxLabel(demoQuery.demoCase), bbox: [0.24, 0.18, 0.74, 0.76] }] : []);
+      setVlmBoxes(proofDemoEnabled ? [{ label: demoBoxLabel(demoQuery.demoCase), bbox: [0.24, 0.18, 0.74, 0.76] }] : []);
       if (primaryCellId) {
         setSelectedCellId(primaryCellId);
       }
@@ -450,7 +476,7 @@ export default function App() {
       setDemoStepIndex(2);
     } catch (error) {
       console.error("Proof Mode failed to load replay", error);
-      if (!demoQuery.enabled) {
+      if (!proofDemoEnabled) {
         setProofModeActive(false);
         setActiveTab("mission");
         return;
@@ -567,6 +593,37 @@ export default function App() {
   useEffect(() => {
     setScanCellState({});
   }, [mission?.id]);
+
+  useEffect(() => {
+    if (!mission || mission.mission_mode === "replay" || !displayGrid) {
+      return;
+    }
+    const alertCellIds = new Set(alerts.map((alert) => alert.cell_id).filter(Boolean));
+    const restoredState = buildScanCellStateFromProgress(
+      displayGrid,
+      Number(mission.cells_scanned ?? 0),
+      alertCellIds,
+    );
+    setScanCellState((current) => {
+      const next: ScanCellState = { ...restoredState };
+      for (const [cellId, state] of Object.entries(current)) {
+        if (state.isAnomaly || next[cellId]) {
+          next[cellId] = state.isAnomaly ? state : next[cellId];
+        }
+      }
+      const currentKeys = Object.keys(current);
+      const nextKeys = Object.keys(next);
+      if (currentKeys.length !== nextKeys.length) return next;
+      for (const cellId of nextKeys) {
+        const currentState = current[cellId];
+        const nextState = next[cellId];
+        if (!currentState || currentState.isAnomaly !== nextState.isAnomaly || currentState.isDiscarded !== nextState.isDiscarded) {
+          return next;
+        }
+      }
+      return current;
+    });
+  }, [alerts, displayGrid, mission]);
 
   useEffect(() => {
     const handleScan = (event: Event) => {
@@ -799,7 +856,7 @@ export default function App() {
                         setVlmBoxes([]);
                         setShowMissionTimelapse(false);
                       }}
-                      initialPresetId={demoStartProfile?.presetId ?? null}
+                      initialPresetId={missionLoaded && !mission ? demoStartProfile?.presetId ?? null : null}
                     />
                   </Suspense>
                 </div>
@@ -904,7 +961,7 @@ export default function App() {
         </div>
       </div>
 
-      {demoQuery.enabled && (
+      {demoUiEnabled && (
         <div
           data-testid="demo-caption"
           className="pointer-events-none absolute bottom-4 left-4 z-50 w-[340px] rounded border border-zinc-800 bg-zinc-950/92 p-3 text-zinc-100 shadow-xl backdrop-blur"
@@ -952,7 +1009,7 @@ export default function App() {
           <ProofModePanel
             apiBaseUrl={apiBaseUrl}
             demoCase={demoQuery.demoCase}
-            demoMode={demoQuery.enabled}
+            demoMode={demoUiEnabled}
             mission={proofMission ?? mission}
             alerts={alerts}
             metricsSummary={metricsSummary}

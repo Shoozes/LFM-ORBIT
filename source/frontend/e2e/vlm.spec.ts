@@ -54,4 +54,19 @@ test.describe("Mission target pack UX", () => {
     await expect(page.getByTestId("proof-mode-panel")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("Critical Minerals Expansion Watch")).toHaveCount(0);
   });
+
+  test("does not let stale demo query override an active live mission", async ({ page, request }) => {
+    await resetRuntimeState(request);
+    await startEvidenceMission(request);
+
+    await gotoApp(page, "/?demo=1&demoCase=forest");
+    await waitForLinkOpen(page);
+    await waitForBasemapReady(page);
+
+    await page.getByTestId("tab-mission").click();
+    await expect(page.getByText("Run Southeast Fireline Watch.")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("bbox-badge")).toContainText("[-81.92, 31.14, -81.76, 31.30]");
+    await expect(page.getByTestId("demo-caption")).toHaveCount(0);
+    await expect(page.getByTestId("selected-mission-preset")).toHaveCount(0);
+  });
 });

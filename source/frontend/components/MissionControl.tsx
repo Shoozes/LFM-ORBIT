@@ -341,6 +341,14 @@ export default function MissionControl({
     }
   }, [mission?.id, mission?.target_pack_id]);
 
+  useEffect(() => {
+    if (mission?.status !== "active") return;
+    setSelectedPresetId(null);
+    setSelectedUseCaseId(null);
+    setTask("");
+    setErrorMsg("");
+  }, [mission?.id, mission?.status]);
+
   const applyMissionPreset = (preset: MissionPreset) => {
     setActivePanelTab("plan");
     setSelectedPresetId(preset.id);
