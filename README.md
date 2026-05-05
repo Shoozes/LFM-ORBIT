@@ -125,9 +125,12 @@ Current runtime: SimSat-first imagery lane, deterministic replay fixtures for re
 | Check | Current State |
 |---|---|
 | Root verify | `.\run.ps1 -Verify` and `./run.sh --verify` passing |
-| Backend tests | `427 passed` |
+| Backend tests | `446 passed` |
 | Frontend | typecheck + build passing |
 | Playwright E2E | `98 passed`, `1 skipped` |
+| Docs/import guards | `19 passed` |
+| Clean-start smoke | Idle on Atacama context, no auto replay, no default scan |
+| Florida firewatch smoke | Recent 30-day window, `378/378` cells, `0` confirmed flags |
 | Recorded demos | showcase, object evidence, payload, provenance, abstain, eclipse |
 | Dataset export | `200` samples, `11` replay-cache rows, `185` mission metadata rows, `15` timelapse rows |
 | Retagged training set | `163` assets, `15` temporal sequences |

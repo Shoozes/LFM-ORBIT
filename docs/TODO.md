@@ -17,6 +17,8 @@ See `docs/QA_PITFALLS.md` for the detailed guardrail checklist.
 - Ground Agent mutating actions use proposal cards before state changes.
 - Mission target packs remain backend/proof metadata and appear through alerts, replays, dataset rows, and Proof Mode; the normal Mission tab stays focused on plan, replay, progress, and timelapse.
 - Mission date windows are use-case aware: long-term change missions can keep annual/history windows, while operational Fire Watch presets default to the last 30 days through current date.
+- Clean startup is idle by contract: the app opens on the Atacama mining context without auto-playing a replay, starting a mission, or letting the telemetry websocket scan the legacy default region.
+- Florida Fire/Drought Readiness Watch is candidate-only unless smoke, active-fire, burn-scar, hotspot, or fireline-specific source evidence is present; generic proxy vegetation changes are filtered before downlink.
 - The retired target/monitor subtabs and visual-evidence tools panel must stay out of the submission UI unless deliberately reintroduced after review.
 - Frontend reloads must not restart an active mission from the first scan cell or let stale demo query params override a live mission.
 - Public README proof currently centers on Critical Minerals, target-pack proof, payload reduction, orbital eclipse queueing, provenance, abstain safety, Greenland timelapse context, Ground Agent flow, and semantic map context.
@@ -81,6 +83,8 @@ Maps and missions:
 - App reloads during an active scan must resume from saved mission progress and repaint previously scanned cells from mission state plus persisted alerts.
 - Stale demo URLs such as `?demo=1&demoCase=forest` must not override active live missions.
 - The app must not auto-play the last replay on normal startup.
+- The telemetry websocket must stay idle with an empty grid when no active mission exists; no backend scoring should happen just because the browser opened.
+- Firewatch scans must not promote proxy-only canopy/vegetation deltas into map pins, ground confirmations, or fire claims.
 - Stopped missions, replay contexts, and camera-only navigation show paused/idle scan state.
 - Live missions show explicit starting, scanning, and complete status while cells arrive.
 - Fire Watch and similar operational readiness missions use a recent 30-day default unless the operator explicitly requests historical trend analysis.
@@ -125,7 +129,12 @@ Model/runtime:
 ## Latest Validation Snapshot
 
 - Root cold-start verify passed after `.\run.ps1 -Clean`.
-- Backend suite passed `427`.
+- Latest backend suite passed `446`.
+- Focused docs/import/startup-firewatch guards passed `62`.
+- Focused Playwright startup/draw-area guard passed `2`.
+- Frontend lint/build passed after the startup/firewatch stabilization pass.
+- Clean-start browser smoke confirmed no active mission, no replay auto-play, Atacama context selected, and only the SAT/GND boot messages on the bus.
+- Florida Fire/Drought smoke confirmed `2026-04-05` to `2026-05-05`, `378/378` cells scanned, and `0` confirmed flags because proxy-only vegetation signals were filtered.
 - Focused scanner reload regression guard passed in `tests/test_scanner_resume.py`.
 - Mission target-pack UI guard passed in `source/frontend/e2e/vlm.spec.ts`.
 - Full Playwright passed `98` with `1` intentional HTML-dump skip after 3D and Mission evidence UI pruning.

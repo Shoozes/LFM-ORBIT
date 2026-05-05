@@ -54,6 +54,8 @@ The old Mission-tab target/monitor subtabs and visual-evidence tools panel are r
 
 Frontend reload could reconnect to an active mission and make the scan look like it restarted, while stale demo query params could make the UI appear to fall back to a deforestation replay. The guards are: backend scanner resumes from `mission.cells_scanned`, frontend repaint reconstructs prior scanned cells from mission progress plus alerts, stale demo URLs cannot override active live missions, and normal app startup must not auto-play the last replay.
 
+No active mission means no scan. `/ws/telemetry` may open for UI readiness, but it must emit an empty grid/complete state and avoid scoring cells until an operator-confirmed live mission exists. This prevents clean startup from silently scanning the legacy default region.
+
 ### What went wrong with the first object-evidence runtime capture?
 
 The demo passed semantically but zoomed the map enough that the exported screenshot no longer matched the approved story-plate context. The fix was to keep the mission bbox stable, remove the recording zoom step, and let the docs screenshot show the same port-region framing as the visual-story plate. The runtime capture is useful for UI/provenance flow; the story plate remains the cleaner public object-evidence proof.
@@ -151,6 +153,8 @@ Do not wipe source changes with `git reset`. A clean run means no stale app proc
 ### How should we handle ad hoc QA audit findings?
 
 Reproduce them through the app's normal launch path or Playwright before adding permanent TODOs. The May 4, 2026 audit reported telemetry WebSocket failure, missing `.env`, mission launch failure, camera failure, and silent VLM actions. Follow-up showed the WebSocket route passed after clearing a stale `8080` debug bind, `.env` absence is not a blocker when fallback/direct modes are active, and VLM/camera paths worked but needed clearer visible feedback. Fix confirmed UX gaps; document false positives instead of expanding scope.
+
+For Florida Fire/Drought Watch, reject proxy-only vegetation or canopy-loss changes before they create pins or ground confirmations. Firewatch can use fuel-stress context, but retained fire candidates need smoke, active-fire, burn-scar, hotspot, or fireline-specific source evidence.
 
 ### What should pass before handoff?
 

@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { gotoApp, resetRuntimeState, startMission } from "./runtime";
+import { API_BASE } from "./testUrls";
 
 function formatDateInput(date: Date) {
   const year = date.getFullYear();
@@ -182,6 +183,22 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await expect(page.getByTestId("ground-agent-operator-playbook")).toContainText("Task, replay, inspect.");
     await expect(page.getByRole("button", { name: "Run Florida firewatch mission" })).toBeVisible();
     await expect(page.getByTestId("header-agent-bus")).toContainText("SAT/GND Dialogue Bus");
+  });
+
+  test("verify clean startup stays idle until an operator mission", async ({ page, request }) => {
+    await expect(page.getByText("No Mission")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Scan animation paused - selected area ready")).toBeVisible();
+
+    const missionResponse = await request.get(`${API_BASE}/api/mission/current`);
+    expect(missionResponse.ok()).toBeTruthy();
+    expect((await missionResponse.json()).mission).toBeNull();
+
+    await expect(async () => {
+      const statsResponse = await request.get(`${API_BASE}/api/agent/bus/stats`);
+      expect(statsResponse.ok()).toBeTruthy();
+      const stats = await statsResponse.json() as { total_messages: number };
+      expect(stats.total_messages).toBeLessThanOrEqual(3);
+    }).toPass({ timeout: 10_000 });
   });
 
   test("verify Mission Control stays focused on plan and replay", async ({ page }) => {
@@ -433,8 +450,9 @@ test.describe("QA Verification — Single Page Architecture", () => {
 
   test("verify Draw Area on Map functionality and cancellation", async ({ page }) => {
     await page.getByTestId("tab-mission").click();
+    await page.getByTestId("bbox-badge").getByRole("button", { name: "Clear" }).click();
 
-    const drawBtn = page.getByRole("button", { name: "Draw Area on Map" });
+    const drawBtn = page.getByTestId("draw-area-button");
     await drawBtn.click();
 
     // Banner should appear

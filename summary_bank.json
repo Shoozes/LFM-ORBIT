@@ -377,7 +377,7 @@
       ]
     },
     "issue_group_integrity_scalability_review": {
-      "note": "Current May 5 integrity/scalability lane: progress docs remain consolidated into README/product, ARCHITECTURE/system, focused workflow docs, QA_PITFALLS/regression checklist, TODO/current backlog, and summary_bank/file groups. The latest pass pruned stale evidence-tool UI language, documented target packs as backend/proof contracts, added a docs guard against retired UI claims, and removed the retired object-evidence demo script from refresh docs. Recent runtime integrity work also covers scanner resume after frontend reload, stale demo-query isolation from active live missions, SimSat-first startup, GGUF fetch expectations, 3D popup removal, and lean Mission UI boundaries.",
+      "note": "Current May 5 integrity/scalability lane: progress docs remain consolidated into README/product, ARCHITECTURE/system, focused workflow docs, QA_PITFALLS/regression checklist, TODO/current backlog, and summary_bank/file groups. The latest pass pruned stale evidence-tool UI language, documented target packs as backend/proof contracts, added a docs guard against retired UI claims, and removed the retired object-evidence demo script from refresh docs. Recent runtime integrity work also covers scanner resume after frontend reload, stale demo-query isolation from active live missions, telemetry idle-without-mission behavior, SimSat-first startup, GGUF fetch expectations, 3D popup removal, firewatch proxy-only filtering, and lean Mission UI boundaries.",
       "files": [
         "README.md",
         "docs/README.md",
@@ -1141,7 +1141,7 @@
       ]
     },
     "qa_suite_and_demo_flows": {
-      "note": "Current QA/demo flow lane: backend docs artifact guards cover promoted images, explicit public WebMs, summary-bank file refs, stale retired-UI docs claims, and temporal/nonblank video quality; import-contract tests guard backend entrypoints. Frontend Playwright covers API smoke, Agent-first shell, Ground Agent actions, lean Mission plan/replay controls, bbox selection, retired evidence-tool absence, stale demo-query isolation, visual stories, screenshot export, dual-agent demo, and the Rondonia tutorial. Demo exports use npm run demo:record and npm run demo:tutorial; the old object-evidence recording command is intentionally gone.",
+      "note": "Current QA/demo flow lane: backend docs artifact guards cover promoted images, explicit public WebMs, summary-bank file refs, stale retired-UI docs claims, and temporal/nonblank video quality; import-contract tests guard backend entrypoints. Frontend Playwright covers API smoke, clean startup/no auto mission, Agent-first shell, Ground Agent actions, lean Mission plan/replay controls, bbox selection, retired evidence-tool absence, stale demo-query isolation, visual stories, screenshot export, dual-agent demo, and the Rondonia tutorial. Demo exports use npm run demo:record and npm run demo:tutorial; the old object-evidence recording command is intentionally gone.",
       "files": [
         "source/backend/tests/test_docs_artifacts.py",
         "source/backend/tests/test_import_contracts.py",
@@ -1456,9 +1456,10 @@
       ]
     },
     "issue_group_mission_reload_and_startup_state": {
-      "note": "Mission reload/startup integrity lane: the backend scanner resumes from mission.cells_scanned after websocket reconnects, the frontend reconstructs scanned-cell paint from mission progress plus persisted alerts, stale demo query params cannot override an active live mission, Proof Mode is disabled without a mission/replay and stays mission-scoped when active, and normal app startup must not auto-play the last replay.",
+      "note": "Mission reload/startup integrity lane: the backend scanner resumes from mission.cells_scanned after websocket reconnects, the telemetry websocket stays idle with an empty grid when no active mission exists, the frontend reconstructs scanned-cell paint from mission progress plus persisted alerts, stale demo query params cannot override an active live mission, Proof Mode is disabled without a mission/replay and stays mission-scoped when active, and normal app startup must not auto-play the last replay.",
       "files": [
         "source/backend/core/scanner.py",
+        "source/backend/tests/test_scanner.py",
         "source/backend/tests/test_scanner_resume.py",
         "source/frontend/App.tsx",
         "source/frontend/components/MissionControl.tsx",
@@ -1479,6 +1480,29 @@
         "source/frontend/e2e/qa_verification.spec.ts",
         "source/backend/core/ground_agent_knowledge.py",
         "source/backend/tests/test_api.py"
+      ]
+    },
+    "issue_group_firewatch_truth_boundaries": {
+      "note": "Florida Fire/Drought Readiness Watch is a recent-window readiness scan, not an automatic fire-confirmation story. Startup smoke verified a 30-day window and 378/378 scanned cells with zero confirmed flags when only proxy vegetation deltas were present. Backend guards keep proxy-only semi-real/fallback vegetation changes from becoming firewatch downlinks, map pins, ground confirmations, or fire claims unless smoke, active-fire, burn-scar, hotspot, or fireline-specific source evidence is present.",
+      "files": [
+        "README.md",
+        "docs/ARCHITECTURE.md",
+        "docs/DEMO_GUIDE.md",
+        "docs/QA_PITFALLS.md",
+        "docs/TODO.md",
+        "source/backend/core/analyzer.py",
+        "source/backend/core/ground_agent.py",
+        "source/backend/core/ground_agent_knowledge.py",
+        "source/backend/core/satellite_agent.py",
+        "source/backend/core/scanner.py",
+        "source/backend/tests/test_analyzer.py",
+        "source/backend/tests/test_api.py",
+        "source/backend/tests/test_satellite_agent.py",
+        "source/backend/tests/test_scanner.py",
+        "source/frontend/components/GroundAgent.tsx",
+        "source/frontend/components/MissionControl.tsx",
+        "source/frontend/e2e/qa_verification.spec.ts",
+        "summary_bank.json"
       ]
     }
   },

@@ -64,15 +64,17 @@ The backend runs two long-lived loops during app lifespan:
 - `source/backend/core/mission_archive.py`
   Append-only mission metadata archive used before runtime resets. It keeps task text, bbox, target packs, and object targets available for dataset export and future model-training cycles without refetching imagery.
 - `source/backend/core/scanner.py`
-  Scan orchestration and anomaly-confirmation gating.
+  WebSocket scan orchestration and anomaly-confirmation gating. It stays idle with an empty grid when no active mission exists, resumes active missions from persisted progress, and filters proxy-only firewatch vegetation changes before they become alert pins.
 - `source/backend/core/grid.py`
   Current scan-cell compatibility layer, bbox validation, cell-id validation, and scan-grid generation.
 - `source/backend/core/loader.py`
-  Provider resolution, SimSat Sentinel/Mapbox loading, window loading, cache keys, and fallbacks.
+  Provider resolution, SimSat Sentinel/Mapbox loading, window loading, cache keys, and fallbacks. SimSat health checks are cached briefly so unavailable local SimSat does not stall development fallback scans.
 - `source/backend/core/scene_qc.py`
   Valid-pixel and no-data rejection gate.
 - `source/backend/core/scorer.py`
   Spectral-delta scoring and reason-code generation.
+- `source/backend/core/analyzer.py`
+  Mission-aware interpretation over scored packets. Firewatch can screen fuel-stress context, but proxy-only vegetation signals remain candidate/no-downlink until source-backed smoke, active-fire, burn-scar, hotspot, or fireline evidence appears.
 - `source/backend/core/indices.py`
   Derived spectral index helpers.
 - `source/backend/core/overlays/attribution.py`
@@ -250,5 +252,7 @@ Architecture docs describe the guard suite; run-by-run totals live in `README.md
 - The runtime supports curated replay loading, dynamic cached-API Fast Replay entries with rescan, and portable snapshot export/import. Bundled replay packs remain the stable showcase path.
 - Proof Mode is intentionally app-level demo UI, not a correctness substitute. Correctness remains covered by backend tests, frontend type checks, and normal Playwright specs.
 - Satellite GGUF reasoning is only active when a manifest-resolved model artifact is installed locally.
+- Normal startup opens on the known Atacama mining context but does not start a mission, auto-play the last replay, or scan the legacy default region. Live scanning begins only after operator-confirmed mission state exists.
+- Florida Fire/Drought Readiness Watch uses a recent 30-day operational window by default and rejects proxy-only vegetation changes before downlink, so it remains readiness/candidate triage rather than unsupported fire confirmation.
 - The current scan grid is the repo-local square-cell compatibility layer, which is sufficient for the SimSat hackathon demo. Production geospatial scale-out is intentionally parked outside the active scope.
 - Target-pack proof boxes are normalized to `unit_xyxy`; disabled targets are skipped, unsafe civilian-scope labels are rejected before persistence, and degenerate boxes are discarded before counts or proof JSON are emitted.

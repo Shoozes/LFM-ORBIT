@@ -4,6 +4,8 @@ This is the recorded showcase path for the Liquid AI x DPhi Space Hackathon subm
 
 The hackathon integration target is DPhi Space SimSat. The recorded showcase does not require Sentinel Hub credentials; bundled replay fixtures and SimSat-first runtime defaults keep the demo deterministic and quota-free.
 
+Normal app startup is intentionally idle. It opens on the Atacama mining context so the strongest story is ready to inspect, but it does not auto-play the last replay, launch a mission, or begin scanning until the operator confirms a mission proposal.
+
 Run the main recorded showcase:
 
 ```bash
@@ -112,6 +114,8 @@ Replay WebMs may include cloudy context frames, but the proof panel keeps playba
 Each recorded demo also saves `evidence-frame.png` beside `final-screen.png` and rejects blank or washed-out proof frames before copying the promoted WebM into `docs/media/videos/`.
 
 Recorded demos preload their target mission or replay before the browser connects to telemetry. Demo config also disables the boot-time live agent pair, so recordings should not open on the legacy Amazonas sweep.
+
+Live Florida Fire/Drought Readiness Watch is a smoke-testable readiness path, not a public proof claim. It defaults to a recent 30-day window and filters proxy-only vegetation changes before downlink; only source-backed smoke, active-fire, burn-scar, hotspot, or fireline-specific evidence should become retained fire candidates.
 
 Cloud policy: cloudy or no-data windows are not allowed to become positive detections. When SCL metadata is available, the backend quality gate records cloud/no-data ratios, replay-cache creation skips cloudy frames, and the scanner emits no-transmit quality-gate results when cloud cover blocks evidence.
 
