@@ -34,6 +34,7 @@ type ScanCellState = Record<string, { isAnomaly: boolean; isDiscarded: boolean }
 const SHOWCASE_REPLAY_ID = "atacama_mining_replay";
 const SHOWCASE_PRIMARY_CELL_ID = "mining_atacama_open_pit";
 const SHOWCASE_FALLBACK_BBOX = [-69.115, -24.29, -69.035, -24.21];
+const DEFAULT_START_BBOX = SHOWCASE_FALLBACK_BBOX;
 const DEMO_STEPS_BY_CASE: Record<DemoCase, string[]> = {
   showcase: [
     "Step 1: Minerals replay loaded",
@@ -259,7 +260,7 @@ export default function App() {
   const demoStartProfile = demoQuery.enabled ? DEMO_START_PROFILES[demoQuery.demoCase] : undefined;
   const [drawBboxActive, setDrawBboxActive] = useState(false);
   const [drawnBbox, setDrawnBbox] = useState<number[] | null>(() => (
-    demoStartProfile ? [...demoStartProfile.bbox] : null
+    demoStartProfile ? [...demoStartProfile.bbox] : [...DEFAULT_START_BBOX]
   ));
   const [vlmBoxes, setVlmBoxes] = useState<VlmBox[]>([]);
   const [scanCellState, setScanCellState] = useState<ScanCellState>({});

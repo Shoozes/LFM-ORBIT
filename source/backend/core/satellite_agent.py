@@ -13,11 +13,13 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 from pathlib import Path
 from uuid import uuid4
 from core.agent_bus import post_message, pull_messages, upsert_pin
+from core.analyzer import is_proxy_only_firewatch_signal
 from core.config import REGION
-from core.grid import cell_to_latlng, generate_scan_grid
+from core.grid import cell_to_latlng, generate_grid_for_bbox, generate_scan_grid
 from core.mission import get_active_mission, update_mission_progress
 from core.observability import log_throttled
 from core.scorer import score_cell_change
@@ -32,6 +34,19 @@ _GROUND_RECIPIENT = "ground"
 _SCAN_INTERVAL = 0.3
 # How long to pause between full grid cycles (seconds)
 _CYCLE_PAUSE = 4.0
+
+
+def _llm_stream_bus_enabled() -> bool:
+    raw = os.getenv("ORBIT_DEBUG_LLM_STREAM", "false").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _seeded_cache_can_promote(mission: dict | None) -> bool:
+    if not mission:
+        return False
+    target_pack_id = str(mission.get("target_pack_id") or "").strip().lower()
+    use_case_id = str(mission.get("use_case_id") or "").strip().lower()
+    return target_pack_id == "deforestation" or use_case_id == "deforestation"
 
 
 def _build_flag_message(
@@ -71,18 +86,18 @@ async def _run_llm_triage(cell_id: str, score: dict, loop: asyncio.AbstractEvent
     """
     prompt = build_satellite_prompt(cell_id, score)
 
-    # Post a thinking-started notification
-    post_message(
-        sender=_SATELLITE_SENDER,
-        recipient="broadcast",
-        msg_type="llm_thinking",
-        cell_id=cell_id,
-        payload={
-            "action": "reasoning",
-            "status": "started",
-            "note": f"[LFM] Starting triage reasoning on {cell_id}...",
-        },
-    )
+    if _llm_stream_bus_enabled():
+        post_message(
+            sender=_SATELLITE_SENDER,
+            recipient="broadcast",
+            msg_type="llm_thinking",
+            cell_id=cell_id,
+            payload={
+                "action": "reasoning",
+                "status": "started",
+                "note": f"[LFM] Starting triage reasoning on {cell_id}...",
+            },
+        )
 
     accumulated = ""
 
@@ -94,21 +109,21 @@ async def _run_llm_triage(cell_id: str, score: dict, loop: asyncio.AbstractEvent
 
     result = await loop.run_in_executor(None, _collect_stream)
 
-    # Post a stream-complete notification with the full output
-    post_message(
-        sender=_SATELLITE_SENDER,
-        recipient="broadcast",
-        msg_type="llm_complete",
-        cell_id=cell_id,
-        payload={
-            "action": "reasoning_complete",
-            "status": "done",
-            "thinking": result.get("thinking", ""),
-            "response": result.get("response", ""),
-            "tool_calls": result.get("tool_calls", []),
-            "note": f"[LFM] Triage complete for {cell_id}. Decision embedded in flag.",
-        },
-    )
+    if _llm_stream_bus_enabled():
+        post_message(
+            sender=_SATELLITE_SENDER,
+            recipient="broadcast",
+            msg_type="llm_complete",
+            cell_id=cell_id,
+            payload={
+                "action": "reasoning_complete",
+                "status": "done",
+                "thinking": result.get("thinking", ""),
+                "response": result.get("response", ""),
+                "tool_calls": result.get("tool_calls", []),
+                "note": f"[LFM] Triage complete for {cell_id}. Decision embedded in flag.",
+            },
+        )
 
     return result
 
@@ -131,11 +146,13 @@ def _build_heartbeat_recap(
     cells_remaining = max(0, total_cells - cells_scanned)
     discard_ratio = round((cells_scanned - flags_sent) / cells_scanned, 3) if cells_scanned > 0 else 0.0
 
-    task_label = "Full-grid sweep (no active mission)"
+    task_label = "Idle (no active mission)"
     if mission:
         task_label = f"[MISSION #{mission['id']}] {mission['task_text']}"
 
-    if link_connected:
+    if not mission:
+        what_next = "Awaiting an operator-confirmed live mission before scanning."
+    elif link_connected:
         what_next = "Awaiting next cell. Ground uplink active — flags delivered on emit."
     else:
         what_next = f"Ground uplink SEVERED. Flags buffered in queue ({pending_ground_replies} pending). Will flush on reconnect."
@@ -174,6 +191,19 @@ def _build_heartbeat_message(cells_scanned: int, total_cells: int, cycle: int) -
     }
 
 
+def _scan_features_for_mission(mission: dict) -> list[dict]:
+    mission_bbox = mission.get("bbox")
+    if mission_bbox:
+        return generate_grid_for_bbox(mission_bbox)["features"]
+    grid_data = generate_scan_grid(
+        REGION.center_lat,
+        REGION.center_lng,
+        resolution=REGION.grid_resolution,
+        ring_size=REGION.ring_size,
+    )
+    return grid_data["features"]
+
+
 async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
     """
     Main satellite agent loop.
@@ -182,14 +212,6 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
     """
     logger.info("[SAT] Satellite Pruner Agent booted.")
 
-    grid_data = generate_scan_grid(
-        REGION.center_lat,
-        REGION.center_lng,
-        resolution=REGION.grid_resolution,
-        ring_size=REGION.ring_size,
-    )
-    features = grid_data["features"]
-    total_cells = len(features)
     cycle = 0
     acks_received_lifetime = 0  # cumulative ground acks seen across all cycles
 
@@ -201,7 +223,7 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
         payload=_build_heartbeat_recap(
             cycle=0,
             cells_scanned=0,
-            total_cells=total_cells,
+            total_cells=0,
             flags_sent=0,
             acks_received=0,
             pending_ground_replies=0,
@@ -210,8 +232,7 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
             mission=None,
         ) | {
             "note": (
-                f"Orbital Pruner online. Grid loaded: {total_cells} H3 cells "
-                f"over {REGION.display_name}. Beginning triage sweep."
+                "Orbital Pruner online and idle. Start a live mission to begin the triage sweep."
             ),
         },
     )
@@ -242,7 +263,24 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
             await asyncio.sleep(_CYCLE_PAUSE)
             continue
 
+        if not mission:
+            run_satellite_agent._last_replay_mission_id = None  # type: ignore[attr-defined]
+            if getattr(run_satellite_agent, "_last_mission_id", None) is not None:
+                run_satellite_agent._last_mission_id = None  # type: ignore[attr-defined]
+                post_message(
+                    sender=_SATELLITE_SENDER,
+                    recipient="broadcast",
+                    msg_type="status",
+                    payload={
+                        "note": "Satellite loop idle. No live mission is active.",
+                    },
+                )
+            await asyncio.sleep(_CYCLE_PAUSE)
+            continue
+
         run_satellite_agent._last_replay_mission_id = None  # type: ignore[attr-defined]
+        features = _scan_features_for_mission(mission)
+        total_cells = len(features)
         cycle += 1
         cells_scanned = 0
         flags_sent = 0
@@ -274,6 +312,9 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
 
             live_mission = get_active_mission()
             if live_mission and live_mission.get("mission_mode") == "replay":
+                replay_interrupted = True
+                break
+            if not live_mission or live_mission.get("id") != mission_id:
                 replay_interrupted = True
                 break
 
@@ -313,7 +354,7 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                 cell_bbox = [clng - dim, clat - dim, clng + dim, clat + dim]
                 chunk_sig = _chunk_sig(cell_bbox)
                 
-                if _read_cache(chunk_sig):
+                if _seeded_cache_can_promote(mission) and _read_cache(chunk_sig):
                     # We have seeded video data! Override the score to ensure it flags.
                     score["change_score"] = 0.96
                     score["confidence"] = 0.99
@@ -353,6 +394,18 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
             is_anomaly = score["change_score"] >= REGION.anomaly_threshold
 
             if is_anomaly:
+                if is_proxy_only_firewatch_signal(
+                    use_case_id=str(mission.get("use_case_id") or "") if mission else None,
+                    target_pack_id=str(mission.get("target_pack_id") or "") if mission else None,
+                    reason_codes=list(score.get("reason_codes", [])),
+                    observation_source=str(score.get("observation_source", "unknown")),
+                ):
+                    logger.info(
+                        "[SAT] Dropping firewatch proxy-only vegetation signal %s before downlink.",
+                        cell_id,
+                    )
+                    continue
+
                 # Run LFM triage reasoning on this cell
                 llm_result = None
                 try:

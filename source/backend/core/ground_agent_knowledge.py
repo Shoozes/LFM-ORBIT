@@ -2546,7 +2546,7 @@ def execute_ground_agent_chat(user_msg: str) -> dict[str, Any]:
 
 def _suggestions() -> list[str]:
     return [
-        "Run Florida fire drought mission",
+        "Run Florida firewatch mission",
         "Run critical minerals mission",
         "Take me to the Bronx NY",
         "Stop mission and fly to Bull Creek FL",

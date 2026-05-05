@@ -244,6 +244,57 @@ def test_loader_defaults_external_provider_fallbacks_off(tmp_path, monkeypatch):
     assert calls == {"simsat": 1, "sentinel": 0, "nasa": 0}
 
 
+def test_loader_skips_simsat_fetch_when_disabled_and_unavailable(tmp_path, monkeypatch):
+    cache_path = tmp_path / "api_cache.sqlite"
+    monkeypatch.setattr(loader, "CACHE_PATH", str(cache_path))
+    loader._init_cache()
+    monkeypatch.setenv("DISABLE_EXTERNAL_APIS", "true")
+    monkeypatch.setattr(loader, "_simsat_available_cached", lambda: False)
+    monkeypatch.setattr(
+        loader,
+        "REGION",
+        SimpleNamespace(
+            observation_mode="simsat_sentinel",
+            before_label="2024-06",
+            after_label="2025-06",
+        ),
+    )
+    calls = {"provider": 0}
+
+    def fake_provider(cell_id):
+        calls["provider"] += 1
+        return None
+
+    monkeypatch.setattr("core.simsat_provider.fetch_simsat_observations", fake_provider)
+    monkeypatch.setattr(
+        loader,
+        "_load_semi_real_observations",
+        lambda cell_id: {
+            "source": loader.SOURCE_SEMI_REAL,
+            "cell_id": cell_id,
+            "centroid_lat": 0.0,
+            "centroid_lng": 0.0,
+            "before": {
+                "label": "baseline",
+                "quality": 0.95,
+                "bands": {"nir": 0.6, "red": 0.1, "swir": 0.2},
+                "flags": [],
+            },
+            "after": {
+                "label": "after",
+                "quality": 0.92,
+                "bands": {"nir": 0.3, "red": 0.2, "swir": 0.4},
+                "flags": [],
+            },
+        },
+    )
+
+    obs = loader.load_temporal_observations("cell_no_simsat")
+
+    assert obs["source"] == loader.SOURCE_SEMI_REAL
+    assert calls["provider"] == 0
+
+
 def test_loader_throttles_repeated_fallback_warnings(tmp_path, monkeypatch, caplog):
     cache_path = tmp_path / "api_cache.sqlite"
     monkeypatch.setattr(loader, "CACHE_PATH", str(cache_path))

@@ -11,6 +11,7 @@ from typing import Optional
 import json
 import sqlite3
 import os
+import time
 from pathlib import Path
 
 from core.config import PROVIDER_SIMSAT_MAPBOX, PROVIDER_SIMSAT_SENTINEL, REGION
@@ -63,10 +64,28 @@ def _set_cached_obs(cell_id: str, obs: ObservationPair):
         logger.debug("Failed writing observation cache for %s: %s", cache_key, exc)
 
 SOURCE_SENTINELHUB_DIRECT = "sentinelhub_direct_imagery"
+_SIMSAT_AVAILABILITY_TTL_SECONDS = 10.0
+_SIMSAT_AVAILABILITY_CACHE: dict[str, float | bool] = {"checked_at": 0.0, "available": False}
 
 
 def _external_apis_disabled() -> bool:
     return os.environ.get("DISABLE_EXTERNAL_APIS", "true").lower() in ("true", "1", "yes", "on")
+
+
+def _simsat_available_cached() -> bool:
+    now = time.monotonic()
+    cached_at = float(_SIMSAT_AVAILABILITY_CACHE.get("checked_at") or 0.0)
+    if now - cached_at < _SIMSAT_AVAILABILITY_TTL_SECONDS:
+        return bool(_SIMSAT_AVAILABILITY_CACHE.get("available"))
+    try:
+        from core.simsat_client import get_simsat_client
+
+        available = get_simsat_client().is_available()
+    except Exception:
+        available = False
+    _SIMSAT_AVAILABILITY_CACHE["checked_at"] = now
+    _SIMSAT_AVAILABILITY_CACHE["available"] = available
+    return available
 
 
 def _try_load_sentinelhub_observations(cell_id: str) -> Optional[ObservationPair]:
@@ -113,6 +132,8 @@ def _try_load_nasa_observations(cell_id: str) -> Optional[ObservationPair]:
 
 def _try_load_simsat_observations(cell_id: str) -> Optional[ObservationPair]:
     """Attempt to load observations via local SimSat API."""
+    if _external_apis_disabled() and not _simsat_available_cached():
+        return None
     try:
         from core.simsat_provider import fetch_simsat_observations
 

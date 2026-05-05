@@ -36,7 +36,7 @@ type GroundAgentProps = {
 };
 
 const DEFAULT_COMMANDS = [
-  "Run Florida fire drought mission",
+  "Run Florida firewatch mission",
   "Run critical minerals mission",
   "Take me to the Bronx NY",
   "Stop mission and fly to Bull Creek FL",

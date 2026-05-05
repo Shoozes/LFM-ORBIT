@@ -938,6 +938,8 @@ class AlertAnalysisBody(BaseModel):
     after_window: dict = Field(default_factory=dict)
     observation_source: str = Field(default="unknown")
     demo_forced_anomaly: bool = Field(default=False)
+    use_case_id: str | None = None
+    target_pack_id: str | None = Field(default=None, max_length=80)
 
 @app.post("/api/analysis/timelapse")
 def analysis_timelapse(body: BboxRequest):
@@ -962,6 +964,8 @@ def analyze_alert_endpoint(body: AlertAnalysisBody):
         after_window=body.after_window,
         observation_source=body.observation_source,
         demo_forced_anomaly=body.demo_forced_anomaly,
+        use_case_id=body.use_case_id,
+        target_pack_id=body.target_pack_id,
     )
 
 

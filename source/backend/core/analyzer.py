@@ -132,6 +132,125 @@ def _offline_analysis(
     }
 
 
+def _source_is_proxy_only(observation_source: str) -> bool:
+    source = observation_source.lower()
+    return any(token in source for token in ("semi_real", "proxy", "fallback", "synthetic"))
+
+
+def _has_firewatch_evidence(reason_codes: list[str], observation_source: str) -> bool:
+    codes = {str(code).lower() for code in reason_codes}
+    source = observation_source.lower()
+    return (
+        any(("smoke" in code or "burn" in code or "active_fire" in code or "fireline" in code or "hotspot" in code) for code in codes)
+        or any(token in source for token in ("wildfire", "fireline", "burn", "smoke", "hotspot"))
+    )
+
+
+def is_proxy_only_firewatch_signal(
+    *,
+    use_case_id: str | None,
+    target_pack_id: str | None,
+    reason_codes: list[str],
+    observation_source: str,
+) -> bool:
+    """Return true when firewatch has only generic vegetation-change evidence."""
+    normalized_use_case = (use_case_id or "").strip().lower()
+    normalized_target_pack = (target_pack_id or "").strip().lower()
+    if normalized_use_case != "wildfire" and normalized_target_pack != "fireline":
+        return False
+    return _source_is_proxy_only(observation_source) and not _has_firewatch_evidence(reason_codes, observation_source)
+
+
+def _wildfire_analysis(
+    change_score: float,
+    confidence: float,
+    reason_codes: list[str],
+    before_window: dict,
+    after_window: dict,
+    observation_source: str,
+    demo_forced_anomaly: bool,
+) -> AlertAnalysisResponse:
+    """Mission-aware review for firewatch scans.
+
+    Firewatch can use vegetation stress as a screening signal, but it should not
+    confirm smoke, active fire, or burn scars from generic canopy-loss proxies.
+    """
+    has_fire_evidence = _has_firewatch_evidence(reason_codes, observation_source)
+    proxy_only = is_proxy_only_firewatch_signal(
+        use_case_id="wildfire",
+        target_pack_id="fireline",
+        reason_codes=reason_codes,
+        observation_source=observation_source,
+    )
+
+    severity = _severity_label(change_score)
+    if proxy_only:
+        severity = "low"
+    elif not has_fire_evidence and severity in {"critical", "high"}:
+        severity = "moderate"
+
+    ndvi_before = float(before_window.get("ndvi", 0))
+    ndvi_after = float(after_window.get("ndvi", 0))
+    nbr_before = float(before_window.get("nbr", 0))
+    nbr_after = float(after_window.get("nbr", 0))
+    ndvi_drop = ndvi_before - ndvi_after
+    nbr_drop = nbr_before - nbr_after
+
+    findings: list[str] = []
+    if has_fire_evidence:
+        findings.append(
+            "Firewatch evidence contains a smoke, burn-scar, active-fire, or fireline-specific signal for ground review."
+        )
+    if ndvi_drop > 0:
+        findings.append(
+            f"Vegetation index declined by {ndvi_drop:.3f}; treat this as fuel-stress or land-cover context unless dated imagery confirms a fire signal."
+        )
+    if nbr_drop > 0:
+        findings.append(
+            f"NBR shifted by {nbr_drop:.3f}; this can support burn-scar review but is not confirmation by itself."
+        )
+    if not findings:
+        findings.append(
+            "No source-backed smoke, active-fire, or burn-scar evidence was present in the alert packet."
+        )
+
+    confidence_label = (
+        "high" if confidence >= DETECTION.high_confidence_target else "moderate" if confidence >= DETECTION.moderate_confidence_target else "low"
+    )
+    if proxy_only:
+        confidence_note = (
+            f"Detection confidence is {confidence_label} ({confidence:.2f}) for a vegetation-change proxy, "
+            "not for confirmed fire evidence."
+        )
+        source_note = (
+            "Proxy-only firewatch screening: do not escalate as smoke, active fire, or burn scar until source-backed imagery confirms it."
+        )
+    else:
+        confidence_note = f"Detection confidence is {confidence_label} ({confidence:.2f}) for firewatch triage."
+        source_note = (
+            "Firewatch evidence is retained as a dated candidate packet; final status depends on visual/source-backed confirmation."
+            if not demo_forced_anomaly
+            else "Operator-highlighted firewatch packet retained for replay or training review."
+        )
+
+    summary_lines = [
+        f"Firewatch assessment: {severity.upper()}. Change score: {change_score:.3f}.",
+        "",
+        *findings,
+        "",
+        confidence_note,
+        source_note,
+    ]
+    return {
+        "model": "offline_lfm_v1",
+        "severity": severity,
+        "summary": "\n".join(summary_lines),
+        "findings": findings,
+        "confidence_note": confidence_note,
+        "source_note": source_note,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -144,9 +263,11 @@ def analyze_alert(
     after_window: dict,
     observation_source: str,
     demo_forced_anomaly: bool = False,
+    use_case_id: str | None = None,
+    target_pack_id: str | None = None,
 ) -> AlertAnalysisResponse:
     """
-    Analyze a deforestation alert using available offline infrastructure.
+    Analyze a mission alert using available offline infrastructure.
     
     Args:
         change_score:       Composite change score from the scorer.
@@ -160,6 +281,14 @@ def analyze_alert(
     Returns:
         Dict with model name, severity, summary text, and analysis metadata.
     """
+    normalized_use_case = (use_case_id or "").strip().lower()
+    normalized_target_pack = (target_pack_id or "").strip().lower()
+    if normalized_use_case == "wildfire" or normalized_target_pack == "fireline":
+        return _wildfire_analysis(
+            change_score, confidence, reason_codes,
+            before_window, after_window, observation_source, demo_forced_anomaly,
+        )
+
     return _offline_analysis(
         change_score, confidence, reason_codes,
         before_window, after_window, observation_source, demo_forced_anomaly,

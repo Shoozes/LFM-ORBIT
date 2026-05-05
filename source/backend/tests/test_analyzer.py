@@ -13,6 +13,7 @@ from core.analyzer import (
     _offline_analysis,
     _severity_label,
     analyze_alert,
+    is_proxy_only_firewatch_signal,
 )
 
 
@@ -187,6 +188,59 @@ class TestOfflineAnalysis:
             demo_forced_anomaly=False,
         )
         assert "quality" in result["confidence_note"].lower() or "cloud" in result["confidence_note"].lower()
+
+    def test_wildfire_proxy_alert_does_not_confirm_fire(self):
+        alert = _make_alert(
+            change_score=0.72,
+            confidence=0.91,
+            reason_codes=["ndvi_drop", "nbr_drop", "suspected_canopy_loss"],
+            observation_source="semi_real_loader_v1",
+        )
+        result = analyze_alert(
+            **alert,
+            use_case_id="wildfire",
+            target_pack_id="fireline",
+        )
+
+        assert result["severity"] == "low"
+        assert "Proxy-only firewatch" in result["source_note"]
+        assert "not for confirmed fire evidence" in result["confidence_note"]
+
+    def test_wildfire_source_backed_alert_can_remain_candidate(self):
+        alert = _make_alert(
+            change_score=0.72,
+            confidence=0.91,
+            reason_codes=["burn_scar_candidate", "nbr_drop"],
+            observation_source="simsat_fireline",
+        )
+        result = analyze_alert(
+            **alert,
+            use_case_id="wildfire",
+            target_pack_id="fireline",
+        )
+
+        assert result["severity"] == "critical"
+        assert any("Firewatch evidence" in finding for finding in result["findings"])
+
+    def test_firewatch_proxy_guard_is_mission_scoped(self):
+        assert is_proxy_only_firewatch_signal(
+            use_case_id="wildfire",
+            target_pack_id="fireline",
+            reason_codes=["ndvi_drop", "suspected_canopy_loss"],
+            observation_source="semi_real_loader_v1",
+        )
+        assert not is_proxy_only_firewatch_signal(
+            use_case_id="wildfire",
+            target_pack_id="fireline",
+            reason_codes=["burn_scar_candidate"],
+            observation_source="semi_real_loader_v1",
+        )
+        assert not is_proxy_only_firewatch_signal(
+            use_case_id="deforestation",
+            target_pack_id="deforestation",
+            reason_codes=["suspected_canopy_loss"],
+            observation_source="semi_real_loader_v1",
+        )
 
 
 

@@ -344,10 +344,13 @@ export default function MissionControl({
   useEffect(() => {
     if (mission?.status !== "active") return;
     setSelectedPresetId(null);
-    setSelectedUseCaseId(null);
+    setSelectedUseCaseId(mission.use_case_id ?? null);
+    setSelectedTargetPackId(mission.target_pack_id ?? null);
+    setStartDate(mission.start_date ?? defaultDateRange.startDate);
+    setEndDate(mission.end_date ?? defaultDateRange.endDate);
     setTask("");
     setErrorMsg("");
-  }, [mission?.id, mission?.status]);
+  }, [defaultDateRange.endDate, defaultDateRange.startDate, mission?.end_date, mission?.id, mission?.start_date, mission?.status, mission?.target_pack_id, mission?.use_case_id]);
 
   const applyMissionPreset = (preset: MissionPreset) => {
     setActivePanelTab("plan");

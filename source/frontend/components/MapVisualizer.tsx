@@ -508,8 +508,8 @@ export default function MapVisualizer({
     const map = new maplibregl.Map({
       container: mapContainer.current,
       style: LOCAL_MAP_STYLE as never,
-      center: [-60.025, -3.119],
-      zoom: 6,
+      center: [-69.075, -24.25],
+      zoom: 9,
       pitch: 40,
       attributionControl: false,
     });

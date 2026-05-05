@@ -180,7 +180,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await expect(page.getByTestId("tab-agents")).toHaveClass(/border-zinc-900/);
     await expect(page.getByText("Ground Agent").first()).toBeVisible();
     await expect(page.getByTestId("ground-agent-operator-playbook")).toContainText("Task, replay, inspect.");
-    await expect(page.getByRole("button", { name: "Run Florida fire drought mission" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Run Florida firewatch mission" })).toBeVisible();
     await expect(page.getByTestId("header-agent-bus")).toContainText("SAT/GND Dialogue Bus");
   });
 

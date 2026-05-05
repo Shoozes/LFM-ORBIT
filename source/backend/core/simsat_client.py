@@ -17,17 +17,22 @@ import httpx
 
 
 DEFAULT_SIMSAT_TIMEOUT_SECONDS = 30.0
+DEFAULT_SIMSAT_HEALTH_TIMEOUT_SECONDS = 0.75
+
+
+def _parse_positive_float(value: str | None, default: float) -> float:
+    """Parse a positive timeout value while keeping bad env overrides non-fatal."""
+    try:
+        timeout = float(value or default)
+    except (TypeError, ValueError):
+        return default
+    if timeout <= 0:
+        return default
+    return timeout
 
 
 def _parse_timeout(value: str | None) -> float:
-    """Parse a positive timeout value while keeping bad env overrides non-fatal."""
-    try:
-        timeout = float(value or DEFAULT_SIMSAT_TIMEOUT_SECONDS)
-    except (TypeError, ValueError):
-        return DEFAULT_SIMSAT_TIMEOUT_SECONDS
-    if timeout <= 0:
-        return DEFAULT_SIMSAT_TIMEOUT_SECONDS
-    return timeout
+    return _parse_positive_float(value, DEFAULT_SIMSAT_TIMEOUT_SECONDS)
 
 
 class DataSource(Enum):
@@ -48,6 +53,7 @@ class SimSatConfig:
     base_url: str = "http://localhost:8080"
     mapbox_token: Optional[str] = None
     timeout_seconds: float = 30.0
+    health_timeout_seconds: float = DEFAULT_SIMSAT_HEALTH_TIMEOUT_SECONDS
     
     @classmethod
     def from_env(cls) -> "SimSatConfig":
@@ -56,6 +62,10 @@ class SimSatConfig:
             base_url=os.environ.get("SIMSAT_BASE_URL", "http://localhost:8080"),
             mapbox_token=os.environ.get("MAPBOX_ACCESS_TOKEN") or os.environ.get("MAPBOX_API_TOKEN"),
             timeout_seconds=_parse_timeout(os.environ.get("SIMSAT_TIMEOUT")),
+            health_timeout_seconds=_parse_positive_float(
+                os.environ.get("SIMSAT_HEALTH_TIMEOUT"),
+                DEFAULT_SIMSAT_HEALTH_TIMEOUT_SECONDS,
+            ),
         )
 
 
@@ -366,7 +376,7 @@ class SimSatClient:
             True if the API is reachable, False otherwise.
         """
         try:
-            response = self.client.get("/health", timeout=5.0)
+            response = self.client.get("/health", timeout=self.config.health_timeout_seconds)
             return response.status_code == 200
         except (httpx.RequestError, httpx.TimeoutException, ValueError):
             return False

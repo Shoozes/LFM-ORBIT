@@ -239,6 +239,8 @@ async def run_ground_agent(stop_event: asyncio.Event | None = None) -> None:
                     after_window=dict(flag_payload.get("after_window", {})),
                     observation_source=str(flag_payload.get("observation_source", "unknown")),
                     demo_forced_anomaly=bool(flag_payload.get("demo_forced_anomaly", False)),
+                    use_case_id=str(mission.get("use_case_id") or "") if mission else None,
+                    target_pack_id=str(mission.get("target_pack_id") or "") if mission else None,
                 )
 
                 severity = analysis.get("severity", "low")

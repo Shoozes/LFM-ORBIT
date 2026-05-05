@@ -1715,7 +1715,7 @@ def test_ground_agent_chat_returns_operator_playbook():
     assert "mission object targets" in reply
     assert "proof mode" in reply
     assert "proposal-based" in reply
-    assert "Run Florida fire drought mission" in payload["suggestions"]
+    assert "Run Florida firewatch mission" in payload["suggestions"]
     assert "List replays" in payload["suggestions"]
 
 

@@ -1,7 +1,14 @@
+import asyncio
+import json
+
+import pytest
+from fastapi import WebSocketDisconnect
+
 from core.scanner import (
     _quality_gate_fallback_score,
     _rejection_reason_from_exception,
     _score_unavailable_fallback_score,
+    stream_region_scan,
 )
 
 
@@ -33,3 +40,27 @@ def test_quality_gate_fallback_score_blocks_alert_transmission():
     assert score["confidence"] == 0.0
     assert "quality_gate_failed" in score["reason_codes"]
     assert "suspected_canopy_loss" not in score["reason_codes"]
+
+
+def test_telemetry_stream_stays_idle_without_active_mission(monkeypatch):
+    messages = []
+
+    class FakeWebSocket:
+        async def send_text(self, payload: str):
+            messages.append(json.loads(payload))
+            if len(messages) >= 2:
+                raise WebSocketDisconnect()
+
+    monkeypatch.setattr("core.scanner.get_active_mission", lambda: None)
+
+    def fail_score(_cell_id, _observer=None):
+        raise AssertionError("scanner should not score cells without an active mission")
+
+    monkeypatch.setattr("core.scanner.score_cell_change", fail_score)
+
+    with pytest.raises(WebSocketDisconnect):
+        asyncio.run(stream_region_scan(FakeWebSocket()))
+
+    assert messages[0]["type"] == "grid_init"
+    assert messages[0]["data"]["features"] == []
+    assert messages[1] == {"type": "scan_complete"}

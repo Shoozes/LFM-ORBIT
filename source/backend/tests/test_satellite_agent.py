@@ -110,3 +110,26 @@ def test_build_heartbeat_message_zero_cells():
     hb = _build_heartbeat_message(cells_scanned=0, total_cells=100, cycle=1)
     assert hb["cells_scanned"] == 0
     assert "0/100" in hb["note"]
+
+
+def test_scan_features_for_mission_uses_mission_bbox():
+    from core.grid import cell_to_latlng
+    from core.satellite_agent import _scan_features_for_mission
+
+    bbox = [-83.2, 29.0, -81.3, 30.7]
+    features = _scan_features_for_mission({"bbox": bbox})
+
+    assert features
+    assert len(features) > 100
+    sample_ids = [str(feature["id"]) for feature in features[:10]]
+    assert all(cell_id.startswith("sq_") for cell_id in sample_ids)
+    assert any(29.0 <= cell_to_latlng(str(feature["id"]))[0] <= 30.7 for feature in features)
+    assert all(-84.0 < cell_to_latlng(str(feature["id"]))[1] < -80.0 for feature in features[:20])
+
+
+def test_seeded_cache_promotion_is_deforestation_only():
+    from core.satellite_agent import _seeded_cache_can_promote
+
+    assert _seeded_cache_can_promote({"use_case_id": "deforestation", "target_pack_id": "deforestation"})
+    assert not _seeded_cache_can_promote({"use_case_id": "wildfire", "target_pack_id": "fireline"})
+    assert not _seeded_cache_can_promote(None)

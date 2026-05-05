@@ -12,6 +12,7 @@ from core.config import (
     runtime_truth_mode_for_source,
     scoring_basis_for_source,
 )
+from core.analyzer import is_proxy_only_firewatch_signal
 from core.grid import generate_scan_grid, generate_grid_for_bbox, cell_to_latlng
 from core.metrics import record_cycle_complete, record_cycle_start, record_scan_result
 from core.queue import estimate_payload_bytes, push_alert, upsert_candidate, remove_candidate
@@ -94,16 +95,10 @@ def _resume_progress_for_mission(mission: dict | None, total_cells: int) -> tupl
 async def stream_region_scan(websocket: WebSocket):
     mission = get_active_mission()
     mission_bbox = mission["bbox"] if mission else None
-    grid_data = (
-        generate_grid_for_bbox(mission_bbox)
-        if mission_bbox
-        else generate_scan_grid(
-            REGION.center_lat,
-            REGION.center_lng,
-            resolution=REGION.grid_resolution,
-            ring_size=REGION.ring_size,
-        )
-    )
+    grid_data = generate_grid_for_bbox(mission_bbox) if mission_bbox else {
+        "type": "FeatureCollection",
+        "features": [],
+    }
 
     await websocket.send_text(json.dumps(build_grid_init_message(grid_data)))
 
@@ -133,6 +128,11 @@ async def stream_region_scan(websocket: WebSocket):
             features = grid_data["features"]
             total_cells = len(features)
             await websocket.send_text(json.dumps(build_grid_init_message(grid_data)))
+
+        if mission is None:
+            await websocket.send_text(json.dumps({"type": "scan_complete"}))
+            await asyncio.sleep(1.0)
+            continue
 
         if mission_mode == "replay":
             if mission_id != replay_idle_mission_id:
@@ -200,6 +200,13 @@ async def stream_region_scan(websocket: WebSocket):
                             score = _score_unavailable_fallback_score(rejection_reason)
 
                     is_anomaly = score["change_score"] >= REGION.anomaly_threshold
+                    if is_anomaly and is_proxy_only_firewatch_signal(
+                        use_case_id=str(latest_mission.get("use_case_id") or "") if latest_mission else None,
+                        target_pack_id=str(latest_mission.get("target_pack_id") or "") if latest_mission else None,
+                        reason_codes=list(score.get("reason_codes", [])),
+                        observation_source=str(score.get("observation_source", "unknown")),
+                    ):
+                        is_anomaly = False
                     is_confirmed_anomaly = False
 
                     if is_anomaly:
