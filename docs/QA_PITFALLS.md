@@ -10,7 +10,7 @@ This doc is the regression-prevention checklist for generated media, mission sto
 
 Use a SimSat/Mapbox mission where the app can show the full loop: mission context, SAT-side pruning, retained evidence packets, Ground Agent review, compact proof JSON, and replayable audit artifacts.
 
-The current strongest public showcase track is Critical Minerals Expansion Watch over the Salar de Atacama / Escondida / Atacama mining corridor. It exercises the app's real shape: scan a mission bbox, prune low-value cells, keep contextual evidence, box retained extraction-site regions, reason over a compact evidence packet, and show why raw imagery does not need to downlink first. The current first-impression tutorial uses Rondonia frontier canopy-loss triage because it more clearly demonstrates select-tool operation, Ground Agent confirmation, temporal/static evidence, target-pack proof fields, Proof Mode, and tagged training export in one continuous walkthrough.
+The current strongest public showcase track is Critical Minerals Expansion Watch over the Salar de Atacama / Escondida / Atacama mining corridor. It exercises the app's real shape: scan a mission bbox, prune low-value cells, keep contextual evidence, box retained extraction-site regions, reason over a compact evidence packet, and show why raw imagery does not need to downlink first. The current first-impression tutorial uses Rondonia frontier canopy-loss triage because it clearly demonstrates chat-launched mission setup, grid scanning, space/ground agent handoff, temporal/static evidence, target-pack proof fields, Proof Mode, and tagged training export in one continuous walkthrough.
 
 ### Why not lead with every possible use case?
 

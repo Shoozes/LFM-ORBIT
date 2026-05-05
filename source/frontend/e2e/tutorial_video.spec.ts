@@ -5,8 +5,6 @@ import path from "node:path";
 import { promisify } from "node:util";
 import {
   gotoApp,
-  loadSeededReplay,
-  openMapContextMenu,
   resetRuntimeState,
   waitForBasemapReady,
   waitForLinkOpen,
@@ -14,7 +12,6 @@ import {
   waitForVideoReady,
 } from "./runtime";
 import {
-  drawMapBbox,
   hideSubtitle,
   moveMouseToHighlight,
   removeHighlight,
@@ -226,7 +223,7 @@ async function assertTutorialVideoQuality(videoPath: string) {
     videoPath,
   ]);
   const durationSeconds = Number(durationResult.stdout.trim());
-  if (!Number.isFinite(durationSeconds) || durationSeconds < 95 || durationSeconds > 190) {
+  if (!Number.isFinite(durationSeconds) || durationSeconds < 115 || durationSeconds > 240) {
     throw new Error(`Tutorial video should be a paced walkthrough, got ${durationSeconds.toFixed(2)}s.`);
   }
 
@@ -251,94 +248,102 @@ async function assertTutorialVideoQuality(videoPath: string) {
   }
 }
 
-test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request }, testInfo) => {
+test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, request }, testInfo) => {
   test.setTimeout(380_000);
 
   await mockTutorialVision(page);
   await resetRuntimeState(request);
-  await loadSeededReplay(request, RONDONIA_REPLAY_ID);
   await gotoApp(page, "/?demo=1&demoCase=forest");
   await waitForLinkOpen(page);
   await waitForBasemapReady(page);
-  await expect(page.getByText(`Replay Mission · ${RONDONIA_REPLAY_ID}`)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("New Mission", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Ready: selected area will be scanned.")).toBeVisible({ timeout: 15_000 });
   await waitForNextPaint(page, 8);
 
   await showVoiceoverSubtitle(
     page,
-    "LFM-ORBIT opens on a ready Rondonia mission. The map and replay load without live credentials.",
+    "LFM-ORBIT scans areas on a map, checks image FRAMES over time, and looks for the ANOMALY you ask for.",
+    5_800,
   );
   await expect(page.locator("#tutorial-subtitle-container")).toBeVisible();
 
-  await moveMouseToHighlight(page, "[data-testid='bbox-badge']");
   await showVoiceoverSubtitle(
     page,
-    "The focus area is already mapped. The SELECT TOOL can redraw or confirm it.",
+    "One AI is the SPACE AGENT. It prunes low-value tiles before downlink. One AI is the GROUND AGENT. It turns the evidence into something a person can review.",
+    7_400,
   );
-  await removeHighlight(page);
-  await page.getByTestId("bbox-badge").getByRole("button", { name: "Clear" }).click();
-
-  await moveMouseToHighlight(page, "[data-testid='draw-area-button']");
-  await showVoiceoverSubtitle(
-    page,
-    "The SELECT TOOL makes the review area explicit before agents spend compute or bandwidth.",
-  );
-  await page.getByTestId("draw-area-button").click();
-  await removeHighlight(page);
-  await drawMapBbox(page, { x: 0.34, y: 0.35 }, { x: 0.62, y: 0.61 });
-  await page.getByTestId("tab-mission").click();
-  await expect(page.getByTestId("bbox-badge")).toBeVisible({ timeout: 10_000 });
-
-  await moveMouseToHighlight(page, "[data-testid='bbox-badge']");
-  await showVoiceoverSubtitle(
-    page,
-    "The mission keeps one clear focus area. Target packs stay in the evidence packet, not as extra controls.",
-  );
-  await removeHighlight(page);
 
   await page.getByTestId("tab-agents").click();
   const chatInput = page.getByPlaceholder("Request replay, mission pack, link action...");
   await moveMouseToHighlight(page, "textarea[placeholder='Request replay, mission pack, link action...']");
   await showVoiceoverSubtitle(
     page,
-    "GROUND AGENT handles operator workflow. It proposes changes before the app state moves.",
+    "You can launch a mission with plain chat. No dashboard hunting: just ask for the search.",
+  );
+  await chatInput.fill("run a Rondonia deforestation mission");
+  await page.getByRole("button", { name: "Send" }).click();
+  await removeHighlight(page);
+
+  const missionProposal = page.getByTestId("ground-agent-proposal-card").last();
+  await expect(missionProposal).toBeVisible({ timeout: 15_000 });
+  await expect(missionProposal).toContainText("Amazon frontier deforestation");
+  await expect(missionProposal).toContainText("deforestation");
+  await showVoiceoverSubtitle(
+    page,
+    "The GROUND AGENT turns the request into a bbox, date range, target pack, and safety limits before anything changes.",
+  );
+
+  await moveMouseToHighlight(page, "[data-testid='ground-agent-run-proposal']");
+  await missionProposal.getByRole("button", { name: "Launch Mission" }).click();
+  await removeHighlight(page);
+  await expect(page.locator('[data-testid="mission-progress-status"], [data-testid="mission-complete-summary"]').first()).toBeVisible({ timeout: 30_000 });
+  await showVoiceoverSubtitle(
+    page,
+    "Mission launched. The SPACE AGENT starts sweeping the selected GRID cell by cell.",
+  );
+
+  await page.getByTestId("tab-mission").click();
+  await expect(page.locator('[data-testid="mission-progress-status"], [data-testid="mission-complete-summary"]').first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/cells scanned|cells recorded/i).first()).toBeVisible({ timeout: 30_000 });
+  await showVoiceoverSubtitle(
+    page,
+    "Each square is a map tile. The scan is reading cells in order and comparing FRAMES inside the mission time window.",
+    5_800,
+  );
+  await showVoiceoverSubtitle(
+    page,
+    "Most cells are noise. Possible ANOMALY packets get retained so the ground side can focus on evidence instead of hundreds of raw images.",
+    6_200,
+  );
+
+  await page.getByTestId("tab-agents").click();
+  await moveMouseToHighlight(page, "textarea[placeholder='Request replay, mission pack, link action...']");
+  await showVoiceoverSubtitle(
+    page,
+    "For a show-ready walkthrough, we ask the GROUND AGENT to load the same Rondonia story as a deterministic replay.",
   );
   await chatInput.fill("load the Rondonia deforestation replay and explain the clearing, road, exposed soil, and boundary targets");
   await page.getByRole("button", { name: "Send" }).click();
   await removeHighlight(page);
 
-  const proposal = page.getByTestId("ground-agent-proposal-card");
-  await expect(proposal).toBeVisible({ timeout: 15_000 });
-  await expect(proposal).toContainText("Rondonia Frontier Showcase Replay");
-  await expect(proposal).toContainText("proxy_bands");
-  await expect(proposal).toContainText("cached_api");
+  const replayProposal = page.getByTestId("ground-agent-proposal-card").last();
+  await expect(replayProposal).toBeVisible({ timeout: 15_000 });
+  await expect(replayProposal).toContainText("Rondonia Frontier Showcase Replay");
+  await expect(replayProposal).toContainText("proxy_bands");
+  await expect(replayProposal).toContainText("cached_api");
   await showVoiceoverSubtitle(
     page,
     "The action card shows truth mode, imagery source, scoring basis, reset impact, and refresh scope.",
   );
 
   await moveMouseToHighlight(page, "[data-testid='ground-agent-run-proposal']");
-  await proposal.getByRole("button", { name: "Run Replay" }).click();
+  await replayProposal.getByRole("button", { name: "Run Replay" }).click();
   await removeHighlight(page);
-  await expect(proposal.getByRole("button", { name: "Confirmed" })).toBeVisible({ timeout: 15_000 });
+  await expect(replayProposal.getByRole("button", { name: "Confirmed" })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(`Loaded replay \`${RONDONIA_REPLAY_ID}\``)).toBeVisible({ timeout: 15_000 });
   await showVoiceoverSubtitle(
     page,
-    "SATELLITE AGENT restores the completed scan: 9 cells swept, 4 retained, low-value cells pruned.",
-  );
-
-  await page.getByTestId("tab-mission").click();
-  await openMapContextMenu(page, { xRatio: 0.48, yRatio: 0.48 });
-  await page.getByText("Set Mission BBox Here").click();
-  await expect(page.getByTestId("bbox-badge")).toBeVisible({ timeout: 10_000 });
-  await moveMouseToHighlight(page, "[data-testid='bbox-badge']");
-  await showVoiceoverSubtitle(
-    page,
-    "Changing the bbox updates the selected review area without opening extra tool panels.",
-  );
-  await removeHighlight(page);
-  await showVoiceoverSubtitle(
-    page,
-    "The map remains the operational view. Scanned cells and retained alerts carry the evidence trail.",
+    "The replay restores a completed scan: cells swept, low-value areas pruned, and retained evidence ready for review.",
   );
 
   await page.getByTestId("tab-logs").click();
@@ -346,7 +351,7 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
   await expect(page.getByTestId("alert-button").filter({ hasText: RONDONIA_PRIMARY_CELL })).toBeVisible({ timeout: 10_000 });
   await showVoiceoverSubtitle(
     page,
-    "Logs show pruning value: the ground side receives retained evidence packets, not every raw frame.",
+    "Logs show the point of AI in space: the ground side receives retained evidence packets, not every raw frame.",
   );
   await moveMouseToHighlight(page, "[data-testid='alert-button']");
   await page.getByTestId("alert-button").filter({ hasText: RONDONIA_PRIMARY_CELL }).click();
@@ -358,21 +363,21 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
   await waitForVideoReady(page, "video", 20_000);
   await showVoiceoverSubtitle(
     page,
-    "TIMELAPSE shows change across acquisitions: canopy baseline, road-edge opening, then persistent clearing.",
+    "TIMELAPSE shows acquisition FRAMES over time: canopy baseline, road-edge opening, then persistent clearing.",
   );
 
   await page.getByText("After Window").scrollIntoViewIfNeeded();
   await expect(page.getByText("2025-01-15").first()).toBeVisible({ timeout: 10_000 });
   await showVoiceoverSubtitle(
     page,
-    "STATIC FRAME means one acquisition time. This retained frame is 2025-01-15.",
+    "A STATIC FRAME is one date. A timelapse is the sequence that makes change visible.",
   );
 
   await page.getByText("Object Evidence").first().scrollIntoViewIfNeeded();
   await expect(page.getByTestId("inspect-object-evidence")).toContainText("clearing candidate");
   await showVoiceoverSubtitle(
     page,
-    "Inspect keeps provenance together: capture time, bbox, scoring basis, proxy deltas, and CV regions.",
+    "CV BOXES turn pixels into SEMANTIC DATA: clearing candidate, road expansion, canopy-loss boundary.",
   );
 
   await moveMouseToHighlight(page, "[data-testid='analyze-button']");
@@ -381,7 +386,7 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
   await expect(page.getByText("offline_lfm_v1", { exact: true }).first()).toBeVisible({ timeout: 15_000 });
   await showVoiceoverSubtitle(
     page,
-    "GROUND AGENT and the local model summarize the finding without overclaiming.",
+    "The local model summarizes the finding without overclaiming. This matters for HIGH-STAKES review.",
   );
 
   await page.getByText("Model Training Export").scrollIntoViewIfNeeded();
@@ -394,7 +399,7 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
   await moveMouseToHighlight(page, "[data-testid='proof-mode-button']");
   await showVoiceoverSubtitle(
     page,
-    "COMPACT PROOF JSON is the downlink story: raw imagery stays local; the audit packet is small.",
+    "COMPACT PROOF JSON is the downlink story: raw imagery can stay local while the audit packet stays small.",
   );
   await page.getByTestId("proof-mode-button").click();
   await removeHighlight(page);
@@ -409,21 +414,21 @@ test("Tutorial: Rondonia end-to-end product walkthrough", async ({ page, request
   await waitForNextPaint(page, 10);
   await showVoiceoverSubtitle(
     page,
-    "The final proof shows retained evidence, confidence, provenance, CV BOXES, and compact JSON.",
+    "The final PROOF shows retained evidence, confidence, provenance, CV BOXES, and compact JSON.",
   );
 
   await hideSubtitle(page);
   await showTutorialCard(
     page,
     {
-      title: "Persistent land-use-change evidence retained for review.",
-      body: "Rondonia replay evidence shows a clearing candidate with road-edge expansion and proxy-band support. Action: human review. Payload: compact proof JSON. Export: tagged training sample.",
+      title: "AI-in-space triage, AI-on-ground proof.",
+      body: "Plain request -> mission -> grid scan -> retained evidence -> proof JSON. Rondonia replay evidence shows clearing candidates, road-edge expansion, and proxy-band support with provenance attached.",
       tags: [
-        "deforestation_candidate",
-        "clearing_region",
-        "road_expansion",
-        "temporal_change",
-        "retained_evidence",
+        "ai_in_space",
+        "ground_agent",
+        "grid_scan",
+        "semantic_data",
+        "proof_json",
         "candidate_review",
       ],
     },

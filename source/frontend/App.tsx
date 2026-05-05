@@ -77,12 +77,12 @@ const DEMO_STEPS_BY_CASE: Record<DemoCase, string[]> = {
     "Step 6: Proof packet ready",
   ],
   forest: [
-    "Step 1: Rondonia replay ready",
-    "Step 2: Select tool confirms bbox",
-    "Step 3: Ground Agent action approved",
-    "Step 4: CV regions retained",
-    "Step 5: Compact proof JSON",
-    "Step 6: Training tags exported",
+    "Step 1: Clean map ready",
+    "Step 2: Ground Agent chat",
+    "Step 3: Mission scan grid",
+    "Step 4: Replay proof loaded",
+    "Step 5: CV regions retained",
+    "Step 6: Proof JSON + training tags",
   ],
   eclipse: [
     "Step 1: Maritime mission loaded",

@@ -143,4 +143,4 @@ Model/runtime:
 - Focused Playwright Mission target-pack guard passed `3` on alternate ports because local `8000` was already occupied.
 - Media contact-sheet review passed for promoted README images and docs videos; next refresh should trim black Proof Mode loading transition frames.
 - Latest pushed CI and CodeQL runs on `main` passed after the tutorial pacing update.
-- Current tutorial WebM duration is about `151.84s`, paced for future voiceover.
+- Current tutorial WebM duration is about `171.00s`; it now starts clean, launches the Rondonia mission through Ground Agent chat, shows the grid scan, then loads replay-backed proof.

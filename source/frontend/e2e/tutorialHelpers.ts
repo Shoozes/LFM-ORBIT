@@ -5,14 +5,22 @@ export async function showSubtitle(page: Page, text: string, durationMs = 3000) 
     const highlightTerms: Record<string, string> = {
       "GROUND AGENT": "#34d399",
       "SATELLITE AGENT": "#60a5fa",
+      "SPACE AGENT": "#60a5fa",
+      "AI": "#f0abfc",
+      "ANOMALY": "#facc15",
+      "GRID": "#facc15",
+      "FRAMES": "#c084fc",
       "SELECT TOOL": "#facc15",
       "TIMELAPSE": "#c084fc",
       "STATIC FRAME": "#f97316",
       "CV BOXES": "#22d3ee",
       "COMPACT PROOF JSON": "#67e8f9",
       "PROOF JSON": "#67e8f9",
+      "PROOF": "#67e8f9",
+      "SEMANTIC DATA": "#86efac",
       "TAGGED TRAINING DATA": "#86efac",
       "TRAINING DATA": "#86efac",
+      "HIGH-STAKES": "#fb7185",
     };
     const escapeHtml = (value: string) => value
       .replace(/&/g, "&amp;")
