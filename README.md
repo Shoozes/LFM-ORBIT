@@ -1,12 +1,10 @@
 # LFM-ORBIT
 
-LFM-ORBIT is a satellite-image timelapse scanner: pick an area on a map, choose a time window, and ask the system to find the anomaly that matters.
+LFM-ORBIT is a local-first satellite timelapse triage system. A space-side agent scans map cells and prunes low-value frames before downlink; a ground-side agent reviews retained evidence packets with provenance, timelapse context, CV boxes, local model reasoning, and compact proof JSON.
 
-It runs from space to ground. A satellite-side pruner sweeps map tiles and image frames, rejects low-value data before downlink, and keeps only candidate evidence. A ground-side validator reconstructs the story with timelapse context, model reasoning, provenance, CV boxes, and compact proof JSON.
+The default showcase is deterministic, credential-free, and release-verifiable. It proves the pipeline without claiming unattended autonomy or direct image-conditioned production inference.
 
-A 1-2 KB alert with bbox, confidence, provenance, model output, and payload accounting can move during a narrow contact window. Raw imagery can wait, or never be sent.
-
-[Hackathon event](https://luma.com/n9cw58h0) | [Docs](docs/README.md) | [Demo guide](docs/user/DEMO_GUIDE.md) | [Tutorial video](docs/media/videos/tutorial_video.webm)
+[Hackathon event](https://luma.com/n9cw58h0) | [Docs](docs/README.md) | [Demo guide](docs/user/DEMO_GUIDE.md) | [Tutorial video](docs/media/videos/tutorial_video.webm) | [Validation snapshot](#validation-snapshot)
 
 ![What is LFM-ORBIT?](docs/media/infographics/what-is-lfm-orbit-info.png)
 
@@ -127,14 +125,14 @@ Current runtime: SimSat-first imagery lane, deterministic replay fixtures for re
 | Check | Current State |
 |---|---|
 | Root verify | `.\run.ps1 -Verify` passing |
-| Backend tests | `456 passed` |
+| Backend tests | `460 passed` |
 | Frontend | typecheck + build passing |
-| Playwright E2E | `95 passed`, `6 skipped` |
+| Playwright E2E | `97 passed`, `6 skipped` |
 | Docs/import guards | `22 passed` |
 | Clean-start smoke | Idle on Atacama context, no auto replay, no default scan |
 | Florida firewatch smoke | Recent 30-day window, `378/378` cells, `0` confirmed flags |
 | Recorded demos | showcase, payload, provenance, abstain, eclipse, tutorial; legacy object-evidence audit retained |
-| Dataset export | `200` samples, `11` replay-cache rows, `185` mission metadata rows, `15` timelapse rows |
+| Dataset export | `33` raw replay/cache samples, `25` replay-cache rows, `0` mission metadata rows, `26` timelapse rows |
 | Retagged training set | `163` assets, `15` temporal sequences |
 | Dataset | [Shoozes/LFM-Orbit-SatData](https://huggingface.co/datasets/Shoozes/LFM-Orbit-SatData) |
 | Trained model | [Shoozes/lfm2.5-450m-vl-orbit-satellite](https://huggingface.co/Shoozes/lfm2.5-450m-vl-orbit-satellite) |

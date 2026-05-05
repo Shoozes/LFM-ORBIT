@@ -105,7 +105,7 @@ Target-pack wording: target packs are attached to missions, alerts, replay snaps
 
 Legacy target-pack port recordings live under `source/frontend/e2e/artifacts/object-evidence/` for audit history only. They must not be treated as normal Mission-tab UX, and they must not reopen exact/singular object boxes such as the rejected `channel vessel` box.
 
-The visual use-case story builder writes every generated story plate and manifest under `source/backend/assets/seeded_data/visual_story_frames/`. Only promoted, visually audited public plates are copied to `docs/media/story-plates/`; currently that public set is Critical Minerals Expansion Watch and the port target-pack plate. Public plates must carry `visual_audit_status=approved`, and their box labels must read as areas, groups, zones, samples, corridors, or candidates unless a true object-scale model path supports a singular-object claim. The builder reads Sentinel Hub OAuth credentials from environment variables, `.tools/.secrets/sentinel.txt`, or `.tools/.secrets/sh.txt`, then stores reusable frames and provenance in `source/backend/assets/seeded_data/visual_story_frames/`.
+The visual use-case story builder writes every generated story plate and manifest under `source/backend/assets/seeded_data/visual_story_frames/`. Only promoted, visually audited public plates are copied to `docs/media/story-plates/`; currently that public set is Critical Minerals Expansion Watch and the port target-pack plate. Public plates must carry `visual_audit_status=approved`, and their box labels must read as areas, groups, zones, samples, corridors, or candidates unless a true object-scale model path supports a singular-object claim. Development-only Sentinel Hub credentials are loaded from environment variables or ignored local secret files, then reusable frames and provenance are stored in `source/backend/assets/seeded_data/visual_story_frames/`.
 
 The story plates are visual proof assets, not hidden model claims. Sentinel Hub is used for broad satellite-context plates and timelapse-friendly development frames. Esri World Imagery context is used only where object-scale roofs/shelters need to be visible; those plates label `imagery_origin=esri_context`. All story boxes label `box_source=visual_story_fixture`, and the roof plate calls out sample boxes rather than an exhaustive roof count, so they are not confused with live model-backed detections. The cached story frames can be recycled into dataset exports with `python scripts/export_orbit_dataset.py --include-seeded-cache ...`, and the Playwright visual-story spec still verifies the real app can draw glowing CV boxes, legends, and provenance tooltips without overwriting README proof plates.
 
@@ -139,15 +139,7 @@ cd source/backend
 uv run --no-sync python scripts/seed_sentinel_cache.py --target rondoniaWS --grid 3 --cell-dim 0.05 --start 2023-01 --end 2025-01 --force --skip-vlm-metadata
 ```
 
-This is useful for local real-data testing and dataset refreshes. It is not part of the DPhi SimSat showcase path. Credentials can come from environment variables, `.tools/.secrets/sentinel.txt`, or `.tools/.secrets/sh.txt`. The Process API path needs an OAuth client id and client secret, either as `SH_CLIENT_ID`/`SH_CLIENT_SECRET` assignments or the legacy two-line secret-then-id format. A single OGC/WMS instance id is only usable if its `GetCapabilities` endpoint is valid; it is not enough for Process API seeding.
-
-The current local `sh.txt` label format is also supported:
-
-```txt
-API <optional-ogc-instance-id>
-CLIENTID <oauth-client-id>
-CLIENT <oauth-client-secret>
-```
+This is useful for local real-data testing and dataset refreshes. It is not part of the DPhi SimSat showcase path. The Process API path needs a Sentinel Hub OAuth client id and client secret through environment variables or ignored local secret files. A single OGC/WMS instance id is only usable if its `GetCapabilities` endpoint is valid; it is not enough for Process API seeding.
 
 Current cached development replay assets:
 

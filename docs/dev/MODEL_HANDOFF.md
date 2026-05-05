@@ -80,7 +80,7 @@ The training target is reviewed Orbit evidence tuples with image chip, bbox, tas
 The normal launcher path is:
 
 ```powershell
-cd C:\Users\jc816\OneDrive\Desktop\Gen-App\LFM Orbit
+cd <repo-root>
 .\run.ps1 -Install
 ```
 
@@ -93,14 +93,14 @@ The production launcher path downloads the trained handoff, installs the `model`
 Direct script usage:
 
 ```powershell
-cd C:\Users\jc816\OneDrive\Desktop\Gen-App\LFM Orbit\source\backend
+cd <repo-root>\source\backend
 python scripts\fetch_satellite_model.py
 ```
 
 Using a local handoff manifest:
 
 ```powershell
-cd C:\Users\jc816\OneDrive\Desktop\Gen-App\LFM Orbit\source\backend
+cd <repo-root>\source\backend
 python scripts\fetch_satellite_model.py `
   --source-manifest C:\path\to\model-bundle\orbit_model_handoff.json
 ```
