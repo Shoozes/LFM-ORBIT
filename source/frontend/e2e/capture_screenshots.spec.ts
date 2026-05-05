@@ -178,7 +178,7 @@ test("screenshot: Ground Agent operator playbook", async ({ page, request }) => 
   });
 });
 
-test("screenshot: Ground Agent proposes wildfire replay from chat", async ({ page, request }) => {
+test("screenshot: Ground Agent proposes critical minerals replay from chat", async ({ page, request }) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 1440, height: 1600 });
   await resetRuntimeState(request);
@@ -190,18 +190,18 @@ test("screenshot: Ground Agent proposes wildfire replay from chat", async ({ pag
   await waitForAgentDialogue(page);
 
   const chatInput = page.getByPlaceholder("Request replay, mission pack, link action...");
-  await chatInput.fill("replay a wildfire mission");
+  await chatInput.fill("replay the critical minerals mission");
   await page.getByRole("button", { name: "Send" }).click();
 
   const userMessage = page
     .getByTestId("ground-agent-message-user")
-    .filter({ hasText: "replay a wildfire mission" });
+    .filter({ hasText: "replay the critical minerals mission" });
   const proposal = page.getByTestId("ground-agent-proposal-card");
   await expect(proposal).toBeVisible({ timeout: 15_000 });
   await expect(userMessage).toBeVisible();
-  await expect(proposal.getByText("Load replay: Highway 82 Wildfire Candidate Replay")).toBeVisible();
-  await expect(proposal.getByText("georgia_wildfire_replay")).toBeVisible();
-  await expect(proposal.getByText("replay a wildfire mission")).toBeVisible();
+  await expect(proposal.getByText("Load replay: Critical Minerals Expansion Watch")).toBeVisible();
+  await expect(proposal.getByText("atacama_mining_replay")).toBeVisible();
+  await expect(proposal.getByText("replay the critical minerals mission")).toBeVisible();
   await expect(proposal.getByText("cached_api")).toBeVisible();
   await expect(proposal.getByText("State Impact")).toBeVisible();
   await expect(proposal.getByRole("button", { name: "Run Replay" })).toBeVisible();
@@ -210,14 +210,21 @@ test("screenshot: Ground Agent proposes wildfire replay from chat", async ({ pag
   });
   await settleScreenshotFrame(page);
 
+  const mapCanvasBox = await page.locator(".maplibregl-canvas").first().boundingBox();
+  expect(mapCanvasBox).not.toBeNull();
   await page.screenshot({
     path: "../../docs/media/readme/readme-ground-agent-chat-action.png",
-    fullPage: false,
+    clip: {
+      x: Math.round(mapCanvasBox!.width),
+      y: 0,
+      width: Math.round(1440 - mapCanvasBox!.width),
+      height: 1120,
+    },
   });
 
   await page.getByTestId("ground-agent-run-proposal").click();
-  await expect(page.getByText("Loaded replay `georgia_wildfire_replay`")).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("load replay - georgia_wildfire_replay")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("Loaded replay `atacama_mining_replay`")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("load replay - atacama_mining_replay")).toBeVisible({ timeout: 10_000 });
 });
 
 test("screenshot: Ground Agent semantic location camera context", async ({ page, request }) => {

@@ -2,6 +2,8 @@
   "replay_id": "manchar_flood_replay",
   "title": "Manchar Lake Flood Replay",
   "description": "Completed flood-extent mission replay using the seeded Pakistan Manchar Lake Sentinel-2 sequence.",
+  "use_case_id": "flood_extent",
+  "target_pack_id": "waterline",
   "task_text": "Find new surface water and overflow around Pakistan's Manchar Lake during the 2022 flood sequence.",
   "summary": "A compact replay showing raw flood imagery staying local while a single water-extent alert is pushed as downlink-ready JSON.",
   "bbox": [67.63, 26.31, 67.87, 26.55],

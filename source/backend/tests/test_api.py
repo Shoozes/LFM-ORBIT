@@ -1541,6 +1541,26 @@ def test_ground_agent_chat_proposes_wildfire_replay_before_loading():
     assert proposal["details"]["imagery_origin"] == "cached_api"
 
 
+def test_ground_agent_chat_proposes_critical_minerals_replay_before_loading():
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "replay the critical minerals mission"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "load_replay"
+    assert proposal["title"] == "Load replay: Critical Minerals Expansion Watch"
+    assert proposal["confirm_label"] == "Run Replay"
+    assert proposal["details"]["replay_id"] == "atacama_mining_replay"
+    assert proposal["details"]["use_case_id"] == "mining_expansion"
+    assert proposal["details"]["target_pack_id"] == "critical_minerals"
+    assert proposal["details"]["runtime_truth_mode"] == "replay"
+    assert proposal["details"]["imagery_origin"] == "cached_api"
+
+
 def test_ground_agent_chat_proposes_rondonia_replay_with_proxy_band_basis():
     response = client.post(
         "/api/agent/chat",

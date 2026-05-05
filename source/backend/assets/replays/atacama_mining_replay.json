@@ -4,6 +4,7 @@
   "description": "Completed critical-minerals expansion replay with provider, bbox, prompt provenance, region boxes, and compact proof JSON attached.",
   "task_text": "Run Critical Minerals Expansion Watch over the Salar de Atacama / Escondida / Atacama mining corridor. Compare historical and current satellite imagery for evaporation pond regions, tailings regions, open-pit expansion, industrial roads, facility clusters, exposed soil, and surface color change without claiming illegal mining, pollution confirmation, or production output.",
   "summary": "A centerpiece replay for long-term industrial extraction change: visually clear region evidence, commercial relevance, environmental relevance, and safe region-level CV labels.",
+  "use_case_id": "mining_expansion",
   "target_pack_id": "critical_minerals",
   "object_targets": [
     {"label": "evaporation pond region", "prompt": "Find evaporation pond regions", "class_key": "water_industrial", "enabled": true},

@@ -147,7 +147,7 @@
       ]
     },
     "issue_group_docs_artifact_integrity": {
-      "note": "Docs/media artifact integrity lane: public docs media is organized under docs/media, referenced markdown links are checked relative to each owning file, promoted README images are checked as nonblank, explicit public WebMs are checked as nonblank and temporal, and summary_bank file references must remain repo-relative and existing. May 4 refreshed README screenshots, recorded demo WebMs, tutorial WebM, object-evidence audit media, and Greenland timelapse GIF/WebM; contact-sheet review confirmed app content first frames, grouped port candidates, proof panels, and distinct timelapse slices. May 5 refreshed screenshots/videos for the map-side Area Tools UX, including Ground Agent screenshots, payload/provenance/orbital proof shots, recorded proof WebMs, and the paced tutorial WebM; visual contact sheets confirmed the Area Tools card is visible on map-side selection flows. Object-evidence video is now held long enough to clear the public temporal duration guard. Docs artifact integrity covers nested docs/**/*.md links in addition to README/root docs/source data docs. The docs surface was later pruned back to one root index plus focused docs, and stale docs-root media wording points at docs/media/videos/.",
+      "note": "Docs/media artifact integrity lane: public docs media is organized under docs/media, referenced markdown links are checked relative to each owning file, promoted README images are checked as nonblank, explicit public WebMs are checked as nonblank and temporal, and summary_bank file references must remain repo-relative and existing. May 4 refreshed README screenshots, recorded demo WebMs, tutorial WebM, object-evidence audit media, and Greenland timelapse GIF/WebM; contact-sheet review confirmed app content first frames, grouped port candidates, proof panels, and distinct timelapse slices. May 5 refreshed screenshots/videos for the map-side Area Tools UX, including Ground Agent screenshots, payload/provenance/orbital proof shots, recorded proof WebMs, and the paced tutorial WebM; visual contact sheets confirmed the Area Tools card is visible on map-side selection flows. The latest May 5 publishability pass regenerated the screenshot set, proof videos, and tutorial video, then replaced the Ground Agent proposal README image with a critical-minerals replay proposal so the operator proof matches the main Atacama story. Object-evidence video is now held long enough to clear the public temporal duration guard. Docs artifact integrity covers nested docs/**/*.md links in addition to README/root docs/source data docs. The docs surface was later pruned back to one root index plus focused docs, and stale docs-root media wording points at docs/media/videos/.",
       "files": [
         "README.md",
         "docs/user/DEMO_GUIDE.md",
@@ -306,11 +306,10 @@
         "source/backend/scripts/build_visual_story_proofs.py",
         "source/backend/scripts/gee_auth.py",
         "source/backend/scripts/seed_nasa_cache.py",
+        "source/backend/scripts/probe_sentinel_wms.py",
         "source/backend/scripts/seed_sentinel_cache.py",
         "source/backend/scripts/smoke_satellite_model.py",
         "source/backend/start_edge.py",
-        "source/backend/test_evalscript.py",
-        "source/backend/test_wms.py",
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_evaluate_object_evidence.py",
         "source/backend/tests/test_import_contracts.py",
@@ -1008,7 +1007,7 @@
       ]
     },
     "feature_group_provider_pipeline_and_seed_scripts": {
-      "note": "Provider resolution, offline-safe cold-start defaults, DPhi SimSat Sentinel as the hackathon primary lane, optional SimSat Mapbox routing with any non-empty local token treated as configured but empty image payloads rejected before scoring, optional Sentinel Hub secret-file compatibility including current labeled sh.txt shape for development-only cache refreshes, fallback order, cached real API replay assets, optional event-window Sentinel seeding for development, Sentinel close-look documentation, SCL-gated frame rejection where metadata exists, burn-scar visual composites, observation-record integrity, and debug diagnostics for safe fallback paths. May 5 Lochloosa West Fire dev seed used sh.txt manually, accepted the pre-fire frame, rejected the May 4-5 event window for no-data/insufficient valid pixels, and wrote no one-frame timelapse, preserving the timelapse-integrity contract and SimSat default runtime.",
+      "note": "Provider resolution, offline-safe cold-start defaults, DPhi SimSat Sentinel as the hackathon primary lane, optional SimSat Mapbox routing with any non-empty local token treated as configured but empty image payloads rejected before scoring, optional Sentinel Hub secret-file compatibility including current labeled sh.txt shape for development-only cache refreshes, fallback order, cached real API replay assets, optional event-window Sentinel seeding for development, Sentinel close-look documentation, SCL-gated frame rejection where metadata exists, burn-scar visual composites, observation-record integrity, and debug diagnostics for safe fallback paths. May 5 Lochloosa West Fire dev seed used sh.txt manually, accepted the pre-fire frame, rejected the May 4-5 event window for no-data/insufficient valid pixels, and wrote no one-frame timelapse, preserving the timelapse-integrity contract and SimSat default runtime. Manual WMS connectivity/evalscript checks are consolidated under scripts/probe_sentinel_wms.py so root-level test_*.py probes do not look like pytest coverage.",
       "files": [
         ".env.example",
         "source/backend/core/config.py",
@@ -1023,9 +1022,8 @@
         "source/backend/scripts/drift_simulator.py",
         "source/backend/scripts/gee_auth.py",
         "source/backend/scripts/seed_nasa_cache.py",
+        "source/backend/scripts/probe_sentinel_wms.py",
         "source/backend/scripts/seed_sentinel_cache.py",
-        "source/backend/test_evalscript.py",
-        "source/backend/test_wms.py",
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_config.py",
         "source/backend/tests/test_loader.py",
@@ -1156,7 +1154,7 @@
       ]
     },
     "qa_suite_and_demo_flows": {
-      "note": "Current QA/demo flow lane: backend docs artifact guards cover promoted images, explicit public WebMs, summary-bank file refs, stale retired-UI docs claims, and temporal/nonblank video quality; import-contract tests guard backend entrypoints. Frontend Playwright covers API smoke, clean startup/no auto mission, Agent-first shell, Ground Agent actions, lean Mission plan/replay controls, map-side Area Tools selection/clear/draw state, retired evidence-tool absence, stale demo-query isolation, visual stories, screenshot export, dual-agent demo, and the Rondonia tutorial. The tutorial now starts clean, launches a Rondonia deforestation mission through Ground Agent chat, points at the Area Tools card for bbox/cell-count/draw/clear context, shows the grid scan and space/ground agent handoff, then loads replay-backed proof with timelapse, CV boxes, compact proof JSON, and training tags. Demo exports use npm run demo:record and npm run demo:tutorial; the old object-evidence recording command is intentionally gone. May 5 validation passed frontend lint, docs artifact pytest, demo record, tutorial record, and full Playwright 94 passed / 6 intentional skips.",
+      "note": "Current QA/demo flow lane: backend docs artifact guards cover promoted images, explicit public WebMs, summary-bank file refs, stale retired-UI docs claims, and temporal/nonblank video quality; import-contract tests guard backend entrypoints. Frontend Playwright covers API smoke, clean startup/no auto mission, Agent-first shell, Ground Agent actions, lean Mission plan/replay controls, map-side Area Tools selection/clear/draw state, retired evidence-tool absence, stale demo-query isolation, visual stories, screenshot export, dual-agent demo, and the Rondonia tutorial. The tutorial now starts clean, launches a Rondonia deforestation mission through Ground Agent chat, points at the Area Tools card for bbox/cell-count/draw/clear context, shows the grid scan and space/ground agent handoff, then loads replay-backed proof with timelapse, CV boxes, compact proof JSON, and training tags. Demo exports use npm run demo:record and npm run demo:tutorial; the old object-evidence recording command is intentionally gone. May 5 validation passed frontend lint/build, docs artifact pytest, demo record, tutorial record, and full Playwright 95 passed / 6 intentional skips.",
       "files": [
         "source/backend/tests/test_docs_artifacts.py",
         "source/backend/tests/test_import_contracts.py",
@@ -1203,8 +1201,7 @@
         "source/backend/satellite_debug.py",
         "source/backend/scripts/fetch_satellite_model.py",
         "source/backend/start_edge.py",
-        "source/backend/test_evalscript.py",
-        "source/backend/test_wms.py",
+        "source/backend/scripts/probe_sentinel_wms.py",
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_autonomous_agent.py",
         "source/backend/tests/test_evaluate_object_evidence.py",
@@ -1544,7 +1541,7 @@
       ]
     },
     "issue_group_area_selection_discoverability": {
-      "note": "Map area selection discoverability cleanup: flyover/location actions and default startup bbox state now surface through a compact map-side Area Tools card with selected/drawing/scanning status, selected grid-cell count, bbox summary, Draw, and Clear. This keeps selection management out of hidden Mission-tab-only controls while preserving the lean Mission panel and existing spatial context menu. May 5 hardening moved active draw gestures onto a dedicated map hitbox so immediate click-drag selection commits a bbox/grid instead of racing MapLibre pan/listener startup; focused bbox Playwright now includes a real drag-to-grid assertion and a visually checked screenshot artifact under output/playwright/selection-tool-drawn-grid.png.",
+      "note": "Map area selection discoverability cleanup: flyover/location actions and default startup bbox state now surface through a compact map-side Area Tools card with selected/drawing/scanning status, selected grid-cell count, bbox summary, Draw, and Clear. This keeps selection management out of hidden Mission-tab-only controls while preserving the lean Mission panel and existing spatial context menu. May 5 hardening moved active draw gestures onto a dedicated map hitbox so immediate click-drag selection commits a bbox/grid instead of racing MapLibre pan/listener startup; focused bbox Playwright now includes a real drag-to-grid assertion and local visual sampling confirmed the grid overlay.",
       "files": [
         "source/frontend/App.tsx",
         "source/frontend/components/MissionControl.tsx",
@@ -1555,7 +1552,7 @@
       ]
     },
     "issue_group_launcher_clean_start_verify": {
-      "note": "Windows clean-start and verify hardening: run.ps1 now stops stale repo-owned backend/frontend listeners, refuses unrelated port owners, captures backend startup logs under runtime-data/logs, fails early with backend error tails when health never comes up, and checks external command exit codes for npm, npx, uv, Playwright, model fetch, and dev server startup. The E2E suite was updated for the lean UI contract: clean startup stays idle, scan-progress tests explicitly start a smoke mission, map-side Area Tools replaced hidden draw controls, and retired visual-overlay UI specs are intentionally skipped. Cold reset plus option-1 equivalent startup succeeded, Playwright/node_modules dependency checks resolved cleanly, and full run.ps1 -Verify passed with backend 453 passed, GGUF smoke, frontend lint/build, and Playwright 94 passed / 6 intentional skips.",
+      "note": "Windows clean-start and verify hardening: run.ps1 now stops stale repo-owned backend/frontend listeners, refuses unrelated port owners, captures backend startup logs under runtime-data/logs, fails early with backend error tails when health never comes up, and checks external command exit codes for npm, npx, uv, Playwright, model fetch, and dev server startup. The E2E suite was updated for the lean UI contract: clean startup stays idle, scan-progress tests explicitly start a smoke mission, map-side Area Tools replaced hidden draw controls, and retired visual-overlay UI specs are intentionally skipped. Cold reset plus option-1 equivalent startup succeeded, Playwright/node_modules dependency checks resolved cleanly, and full run.ps1 -Verify passed with backend 456 passed, GGUF smoke, frontend lint/build, and Playwright 95 passed / 6 intentional skips.",
       "files": [
         "run.ps1",
         "source/frontend/e2e/app.spec.ts",
@@ -1567,6 +1564,26 @@
         "docs/media/readme/readme-ground-agent-chat-action.png",
         "docs/media/readme/readme-location-camera-context.png",
         "docs/media/videos/tutorial_video.webm",
+        "summary_bank.json"
+      ]
+    },
+    "issue_group_replay_metadata_contract": {
+      "note": "Curated replay metadata cleanup: replay JSON now carries explicit use_case_id values, replay catalog rows expose target_pack_id when present, Ground Agent replay proposals include use_case_id and target_pack_id, and tests guard the critical-minerals replay proposal plus curated replay catalog metadata. This keeps replay loads, proof surfaces, dataset exports, and docs media connected by mission use case instead of relying on title text or target-pack inference.",
+      "files": [
+        "source/backend/assets/replays/atacama_mining_replay.json",
+        "source/backend/assets/replays/camp_shelter_count_replay.json",
+        "source/backend/assets/replays/delhi_urban_replay.json",
+        "source/backend/assets/replays/georgia_wildfire_replay.json",
+        "source/backend/assets/replays/manchar_flood_replay.json",
+        "source/backend/assets/replays/plastic_pollution_candidate_replay.json",
+        "source/backend/assets/replays/port_supply_chain_replay.json",
+        "source/backend/assets/replays/southeast_fireline_object_replay.json",
+        "source/backend/core/ground_agent_knowledge.py",
+        "source/backend/core/replay.py",
+        "source/backend/tests/test_api.py",
+        "source/backend/tests/test_replay.py",
+        "source/frontend/e2e/capture_screenshots.spec.ts",
+        "docs/dev/TODO.md",
         "summary_bank.json"
       ]
     }

@@ -65,6 +65,15 @@ def test_replay_catalog_lists_seeded_showcase_pack(tmp_path, monkeypatch):
     assert "seeded_cache_sh_cc0e95b7" not in replay_ids
 
 
+def test_curated_replays_expose_use_case_metadata():
+    payload = replay_catalog()
+    curated = [item for item in payload["replays"] if item["source_kind"] == "curated_replay"]
+
+    assert curated
+    assert [item["replay_id"] for item in curated if not item.get("use_case_id")] == []
+    assert next(item for item in curated if item["replay_id"] == "atacama_mining_replay")["target_pack_id"] == "critical_minerals"
+
+
 def test_replay_load_seeds_runtime_surfaces(tmp_path, monkeypatch):
     monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
     monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))

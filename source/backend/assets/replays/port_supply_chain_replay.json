@@ -2,6 +2,7 @@
   "replay_id": "port_supply_chain_replay",
   "title": "Port Supply Chain Object Replay",
   "description": "Deterministic replay for visually audited Suez port area evidence.",
+  "use_case_id": "maritime_activity",
   "task_text": "Run a port activity scan. Look for shipping container clusters, docked-vessel groups, and berth basin context without claiming exact vessel counts.",
   "bbox": [32.515, 29.9, 32.575, 29.955],
   "target_pack_id": "port",

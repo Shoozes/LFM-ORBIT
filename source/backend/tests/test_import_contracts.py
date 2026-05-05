@@ -20,6 +20,7 @@ SCRIPT_MODULES = (
     "scripts.fetch_satellite_model",
     "scripts.gee_auth",
     "scripts.import_boundaries",
+    "scripts.probe_sentinel_wms",
     "scripts.retag_training_assets",
     "scripts.retag_training_assets_ui",
     "scripts.seed_nasa_cache",
@@ -33,8 +34,6 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 MANUAL_ENTRYPOINTS = (
     "satellite_debug",
     "start_edge",
-    "test_evalscript",
-    "test_wms",
 )
 
 
@@ -71,6 +70,11 @@ def test_backend_scratch_probe_modules_are_pruned():
         return
 
     assert sorted(path.name for path in scratch_dir.glob("*.py")) == []
+
+
+def test_backend_root_has_no_pytest_named_probe_files():
+    """Keep manual probes out of root-level test_*.py names."""
+    assert sorted(path.name for path in BACKEND_ROOT.glob("test_*.py")) == []
 
 
 def test_launchers_keep_minimal_runtime_guards_documented():

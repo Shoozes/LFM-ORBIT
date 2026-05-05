@@ -728,6 +728,7 @@ def _replay_proposal(kind: str, replay_id: str) -> dict[str, Any]:
         "replay_id": replay_id,
         "title": title,
         "use_case_id": use_case_id,
+        "target_pack_id": item.get("target_pack_id") or "",
         "runtime_truth_mode": "replay" if kind == "load_replay" else "realtime",
         "imagery_origin": "cached_api" if kind == "load_replay" else "provider_chain",
         "scoring_basis": scoring_basis if kind == "load_replay" else "current_runtime",

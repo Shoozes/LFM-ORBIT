@@ -2,6 +2,7 @@
   "replay_id": "delhi_urban_replay",
   "title": "Delhi NCR Urban Expansion Replay",
   "description": "Urban construction progression replay with winter windows chosen to reduce cloud interference.",
+  "use_case_id": "urban_expansion",
   "task_text": "Track a bare-ground construction footprint becoming persistent built surface.",
   "summary": "A four-frame Sentinel-2 urban replay for built-surface growth review across 2023, 2024, 2025, and 2026 winter windows.",
   "bbox": [77.41, 28.46, 77.49, 28.54],

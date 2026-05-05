@@ -2,6 +2,7 @@
   "replay_id": "plastic_pollution_candidate_replay",
   "title": "Coastal Debris / Slick Candidate Watch Object Replay",
   "description": "Deterministic candidate replay for coastal debris, slick, foam-line, and storm-debris evidence. This is not a garbage-patch mass or material-identification claim.",
+  "use_case_id": "temporal_change_generic",
   "task_text": "Run Coastal Debris / Slick Candidate Watch. Look for coastal debris candidate regions, slick candidate areas, foam line regions, and storm debris zones near visible coastal context.",
   "bbox": [90.36, 22.18, 90.46, 22.28],
   "target_pack_id": "plastic",

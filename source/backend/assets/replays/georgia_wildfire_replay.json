@@ -2,6 +2,8 @@
   "replay_id": "georgia_wildfire_replay",
   "title": "Highway 82 Wildfire Candidate Replay",
   "description": "Current-event wildfire candidate replay using SWIR/NIR/Red Sentinel-2 burn-scar composites.",
+  "use_case_id": "wildfire",
+  "target_pack_id": "fireline",
   "task_text": "Review the Highway 82 wildfire near Atkinson and Waynesville, Georgia for smoke, burn scar, and vegetation stress.",
   "summary": "A candidate-quality wildfire replay. It keeps source dates visible and treats the sequence as review evidence, not a retroactive certainty claim.",
   "bbox": [-81.916, 31.143, -81.756, 31.303],

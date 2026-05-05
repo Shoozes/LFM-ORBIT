@@ -45,7 +45,7 @@ type MapVisualizerProps = {
   onMenuAssignBBox?: (bbox: number[]) => void;
   onMenuAgentVideoEval?: (bbox: number[]) => void;
   onMenuGenerateTimelapse?: (bbox: number[]) => void;
-  /** Active bounding boxes provided by optional visual evidence tools */
+  /** Active proof/evidence bounding boxes supplied by replay or model output */
   vlmBoxes?: VlmBox[];
   /** Durable scan paint replayed after map source or tab refreshes */
   scanCellState?: ScanCellState;

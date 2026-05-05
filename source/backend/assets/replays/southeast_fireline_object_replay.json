@@ -2,6 +2,7 @@
   "replay_id": "southeast_fireline_object_replay",
   "title": "Southeast Fireline Object Evidence Replay",
   "description": "Deterministic object-evidence replay for fireline triage.",
+  "use_case_id": "wildfire",
   "task_text": "Run Southeast Fireline Watch. Look for dark smoke, burn scar, road obstruction, buildings, and vehicle queues.",
   "summary": "Object Evidence Mode replay with boxed fireline and lifeline candidates.",
   "bbox": [-81.916, 31.143, -81.756, 31.303],

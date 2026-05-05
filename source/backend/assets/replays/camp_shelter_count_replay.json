@@ -2,6 +2,7 @@
   "replay_id": "camp_shelter_count_replay",
   "title": "Humanitarian Shelter Count Object Replay",
   "description": "Deterministic object-evidence replay for shelter and aid-infrastructure counting.",
+  "use_case_id": "civilian_lifeline_disruption",
   "task_text": "Run a humanitarian shelter count. Look for shelters, tents, vehicles, water tanks, and clinic roofs.",
   "bbox": [34.24, 0.58, 34.29, 0.63],
   "target_pack_id": "camp",
