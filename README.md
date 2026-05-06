@@ -4,7 +4,9 @@ LFM-ORBIT is a local-first satellite timelapse triage system. A space-side agent
 
 The default showcase is deterministic, credential-free, and release-verifiable. It proves the pipeline without claiming unattended autonomy or direct image-conditioned production inference.
 
-[Hackathon event](https://luma.com/n9cw58h0) | [Docs](docs/README.md) | [Demo guide](docs/user/DEMO_GUIDE.md) | [Tutorial video](docs/media/videos/tutorial_video.webm) | [Validation snapshot](#validation-snapshot)
+[Hackathon event](https://luma.com/n9cw58h0) | [Docs](docs/README.md) | [Demo guide](docs/user/DEMO_GUIDE.md) | [Validation snapshot](#validation-snapshot)
+
+Public playback links will point to YouTube once published. The generated WebM media stays tracked under `docs/media/videos/` for release assets and local audit.
 
 ![What is LFM-ORBIT?](docs/media/infographics/what-is-lfm-orbit-info.png)
 
