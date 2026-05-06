@@ -763,7 +763,7 @@
       ]
     },
     "feature_group_model_runtime_and_handoff": {
-      "note": "Manifest-based satellite artifact resolution, runtime status exposure, nested fenced JSON tool-call parsing, default NM-UNI trained Orbit GGUF pull from Shoozes/lfm2.5-450m-vl-orbit-satellite, latest checked model revision 560b0c6e4eb68696527630b8e652cc34850a82b9 for task orbit-satellite-triage, local smoke passed with loaded=true, image-text training manifest with 1611 train rows / 1611 multimodal rows / 1878 image blocks / 179 eval rows, status-only multimodal runtime capability reporting, shared Satellite Pruner and Ground Validator GGUF evidence-packet reasoning when loaded, deterministic ground fallback when not loaded, model fetch handoff tooling with nonempty GGUF/mmproj guards, launcher FetchModel integration, and required trained-model smoke checks for the production launcher path.",
+      "note": "Manifest-based satellite artifact resolution, runtime status exposure, nested fenced JSON tool-call parsing, default NM-UNI trained Orbit GGUF pull from Shoozes/lfm2.5-450m-vl-orbit-satellite, latest checked model revision 2a8c57cbb7f4dda26d5faff2ec3e31a5cbd2f4b8 for task wildfire_detection, local smoke passed with loaded=true, image-text training manifest with 5670 train rows / 5670 multimodal rows / 6758 image blocks / 630 eval rows, status-only multimodal runtime capability reporting, shared Satellite Pruner and Ground Validator GGUF evidence-packet reasoning when loaded, deterministic ground fallback when not loaded, model fetch handoff tooling with nonempty GGUF/mmproj guards, launcher FetchModel integration, and required trained-model smoke checks for the production launcher path.",
       "files": [
         ".env.example",
         "README.md",

@@ -69,11 +69,11 @@ Default trained Orbit bundle:
 - Training manifest: `training_result_manifest.json`
 - Base model: `LFM2.5-VL-450M`
 - Training method: `vlm_sft`
-- Task: `orbit-satellite-triage`
-- Training rows: `1611`
-- Multimodal rows: `1611`
-- Image blocks: `1878`
-- Eval rows: `179`
+- Task: `wildfire_detection`
+- Training rows: `5670`
+- Multimodal rows: `5670`
+- Image blocks: `6758`
+- Eval rows: `630`
 
 The training target is reviewed Orbit evidence tuples with image chip, bbox, task, model answer, confidence, provenance, and abstain labels. Promotion metrics should cover downlink decision precision/recall, abstain precision, and grounded bbox agreement.
 
@@ -140,10 +140,10 @@ Current expected fields for the published NM-UNI handoff are:
 {
   "training_modality": "image_text",
   "image_training_verified": true,
-  "training_train_rows": 1611,
-  "training_multimodal_rows": 1611,
-  "training_image_blocks": 1878,
-  "training_eval_rows": 179,
+  "training_train_rows": 5670,
+  "training_multimodal_rows": 5670,
+  "training_image_blocks": 6758,
+  "training_eval_rows": 630,
   "mmproj_present": false,
   "runtime_inference_mode": "text_evidence_packet",
   "image_conditioned_runtime_enabled": false
@@ -181,13 +181,13 @@ Orbit is responsible for consuming that bundle and validating it against SimSat/
 Current published bundle:
 
 - repo: `Shoozes/lfm2.5-450m-vl-orbit-satellite`
-- generated at: `2026-05-03T17:44:11.333888Z`
+- generated at: `2026-05-05T22:38:11.908556Z`
 - training method: `vlm_sft`
-- task: `orbit-satellite-triage`
-- train rows: `1611`
-- multimodal rows: `1611`
-- image blocks: `1878`
-- eval rows: `179`
+- task: `wildfire_detection`
+- train rows: `5670`
+- multimodal rows: `5670`
+- image blocks: `6758`
+- eval rows: `630`
 - promotion gate: not required in `training_result_manifest.json`
 
 Treat this as the trained runtime artifact for evidence-packet and bbox JSON reasoning. Its training manifest now includes image-text rows, but Orbit still must not describe runtime inference as image-conditioned until a runtime adapter passes pixels into the model and a smoke test proves image-sensitive output.
@@ -269,7 +269,7 @@ Current raw replay/cache export after including the Florida firewatch seed:
 
 Hugging Face upload is wired and completed locally. The dataset is published at `Shoozes/LFM-Orbit-SatData`, with latest raw export commit `b6ef429d958a21dc7690d3f4b7cc4f3bd2088d25`: `records=33`, `seeded_cache_records=25`, `mission_metadata_records=0`, and the Florida firewatch sample tagged as `wildfire` / `fireline` with Sentinel-2 `B12/B08/B04` frame stats. The earlier retagged training export remains reusable for model work when raw replay/cache rows need SFT conversion.
 
-The trained model handoff bundle is published at `Shoozes/lfm2.5-450m-vl-orbit-satellite`. Latest checked revision: `560b0c6e4eb68696527630b8e652cc34850a82b9`. Local fetch with `--force` refreshed `runtime-data/models/lfm2.5-vlm-450m/`; `scripts/smoke_satellite_model.py --require-present --max-tokens 8` passed with `loaded=true` in the launcher-managed Windows backend environment. The manifest reports task `orbit-satellite-triage`, base model `LiquidAI/LFM2.5-VL-450M`, GGUF runtime, `training_modality=image_text`, `image_training_verified=true`, `1611` train rows, `1611` multimodal rows, `1878` image blocks, and `179` eval rows. Runtime remains `text_evidence_packet` because no `mmproj` or direct image-conditioned adapter is wired.
+The trained model handoff bundle is published at `Shoozes/lfm2.5-450m-vl-orbit-satellite`. Latest checked revision: `2a8c57cbb7f4dda26d5faff2ec3e31a5cbd2f4b8`. Local fetch with `--force` refreshed `runtime-data/models/lfm2.5-vlm-450m/`; `scripts/smoke_satellite_model.py --require-present --max-tokens 8` passed with `loaded=true` in the launcher-managed Windows backend environment. The manifest reports task `wildfire_detection`, base model `LiquidAI/LFM2.5-VL-450M`, GGUF runtime, `training_modality=image_text`, `image_training_verified=true`, `5670` train rows, `5670` multimodal rows, `6758` image blocks, and `630` eval rows. Runtime remains `text_evidence_packet` because no `mmproj` or direct image-conditioned adapter is wired.
 
 ## Integration Sequence
 
