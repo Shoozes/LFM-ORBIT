@@ -1,0 +1,30 @@
+{
+  "schema_version": "2",
+  "created_at": "2026-05-06T00:00:00Z",
+  "updated_at": "2026-05-06T00:00:00Z",
+  "training": {
+    "job_id": "orbit-public-model-refresh-2026-05-06",
+    "method": "vlm_sft",
+    "source_model_path": "LiquidAI/LFM2.5-VL-450M",
+    "output_model_dir": "hf://Shoozes/lfm2.5-450m-vl-orbit-satellite/hf-checkpoint",
+    "dataset_path": "hf://datasets/Shoozes/LFM-Orbit-SatData"
+  },
+  "artifact_provenance": {
+    "dataset_path": "hf://datasets/Shoozes/LFM-Orbit-SatData"
+  },
+  "dataset_summary": {
+    "rows": 7245,
+    "multimodal_rows": 7245,
+    "image_blocks": 8335
+  },
+  "evaluation_metadata": {
+    "eval_rows": 805,
+    "source_dataset": "hf://datasets/Shoozes/LFM-Orbit-SatData",
+    "latest_evaluation": "local_validation_snapshot_2026_05_06"
+  },
+  "base_model": "LiquidAI/LFM2.5-VL-450M",
+  "source_model": "LiquidAI/LFM2.5-VL-450M",
+  "task_type": "orbit-satellite-triage",
+  "train_rows": 7245,
+  "eval_rows": 805
+}

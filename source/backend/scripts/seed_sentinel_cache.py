@@ -2,8 +2,7 @@
 seed_sentinel_cache.py — Seeds a seeded_data WebM timelapse cache using Sentinel Hub Process API.
 
 Fetches real Sentinel-2 L2A imagery (with leastCC true-color composites)
-from Sentinel Hub using environment credentials or `.tools/.secrets/sentinel.txt`
-or `.tools/.secrets/sh.txt`.
+from Sentinel Hub using environment credentials or local developer secret files.
 Stores WebM timelapses + rich training metadata to assets/seeded_data/.
 Also writes observation records to assets/observation_store/ for agent reuse.
 
@@ -666,8 +665,7 @@ def main():
     if not creds.available:
         logger.error(
             "Sentinel Hub credentials unavailable. Set SENTINEL_CLIENT_ID and "
-            "SENTINEL_CLIENT_SECRET, or fill .tools/.secrets/sentinel.txt or "
-            ".tools/.secrets/sh.txt."
+            "SENTINEL_CLIENT_SECRET, or configure a local developer secret file."
         )
         sys.exit(1)
 

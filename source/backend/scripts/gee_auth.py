@@ -8,7 +8,7 @@ The script exchanges it for access + refresh tokens and caches them.
 Run once:
     python scripts/gee_auth.py
 
-After auth, the backend reads .tools/.secrets/gee_token.json automatically.
+After auth, the backend reads the local cached GEE token automatically.
 """
 
 import json

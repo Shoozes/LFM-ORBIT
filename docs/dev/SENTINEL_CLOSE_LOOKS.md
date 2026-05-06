@@ -109,7 +109,7 @@ uv run --no-sync python scripts/seed_sentinel_cache.py `
   --skip-vlm-metadata
 ```
 
-May 5, 2026 status: credentials resolved from `.tools/.secrets/sh.txt`, the pre-fire window returned a real Sentinel-2 L2A frame, and the May 4-5 event window was rejected for no-data/insufficient valid pixels. The seeder correctly refused to save a one-frame timelapse. Rerun after the next accepted Sentinel pass or widen the event window only if the resulting metadata still proves the after-fire frame is source-backed and not just a pre-fire least-cloud mosaic.
+May 5, 2026 status: credentials resolved from a local developer secret file, the pre-fire window returned a real Sentinel-2 L2A frame, and the May 4-5 event window was rejected for no-data/insufficient valid pixels. The seeder correctly refused to save a one-frame timelapse. Rerun after the next accepted Sentinel pass or widen the event window only if the resulting metadata still proves the after-fire frame is source-backed and not just a pre-fire least-cloud mosaic.
 
 SR-26/Balu Forest development close look, for the April 15, 2026 wildfire east of Gainesville:
 
@@ -135,7 +135,7 @@ uv run --no-sync python scripts/seed_sentinel_cache.py `
   --force
 ```
 
-May 5, 2026 status: credentials resolved from `.tools/.secrets/sh.txt`; the baseline, prefire, and active-fire windows returned accepted Sentinel-2 L2A SWIR/NIR/Red frames, while the April 19-May 5 postfire window was rejected for insufficient valid pixels. The cache was promoted as `source/backend/assets/seeded_data/sh_83e3aea2.webm` with frame PNGs under `source/backend/assets/seeded_data/sh_83e3aea2_frames/`, `wildfire` category tags, `fireline` target-pack tags, and curated replay `florida_sr26_wildfire_replay`. Keep the wording candidate-only until a later accepted postfire pass is cached.
+May 5, 2026 status: credentials resolved from a local developer secret file; the baseline, prefire, and active-fire windows returned accepted Sentinel-2 L2A SWIR/NIR/Red frames, while the April 19-May 5 postfire window was rejected for insufficient valid pixels. The cache was promoted as `source/backend/assets/seeded_data/sh_83e3aea2.webm` with frame PNGs under `source/backend/assets/seeded_data/sh_83e3aea2_frames/`, `wildfire` category tags, `fireline` target-pack tags, and curated replay `florida_sr26_wildfire_replay`. Keep the wording candidate-only until a later accepted postfire pass is cached.
 
 ## README Highlight
 
@@ -178,7 +178,7 @@ cd source/backend
 python scripts/build_visual_story_proofs.py --force-fetch
 ```
 
-This reads Sentinel Hub OAuth credentials from environment variables, `.tools/.secrets/sentinel.txt`, or `.tools/.secrets/sh.txt`. Sentinel Hub frames are cached under:
+This reads Sentinel Hub OAuth credentials from environment variables or local developer secret files. Sentinel Hub frames are cached under:
 
 ```text
 source/backend/assets/seeded_data/visual_story_frames/

@@ -85,7 +85,7 @@ Generated `nasa_*` and `sh_*` WebM/meta pairs are ignored by default. Promote on
 
 The seeder requests Sentinel SCL quality data before each visual frame. Cloud shadow, medium/high cloud probability, cirrus, no-data, and defective pixels are quality-gated before WebM creation. Accepted frames store `frame_quality` metadata; rejected windows are stored in `_meta.json` under `rejected_windows`.
 
-Credentials can come from environment variables, `.tools/.secrets/sentinel.txt`, or `.tools/.secrets/sh.txt`. The Sentinel Hub Process API uses OAuth credentials. Supported local forms include `SH_CLIENT_ID=...` / `SH_CLIENT_SECRET=...`, two-line legacy secret-then-id files, or labeled trial bundles:
+Credentials can come from environment variables or local developer secret files. The Sentinel Hub Process API uses OAuth credentials. Supported local forms include `SH_CLIENT_ID=...` / `SH_CLIENT_SECRET=...`, two-line legacy secret-then-id files, or labeled trial bundles:
 
 ```txt
 API <optional-ogc-instance-id>
@@ -292,7 +292,7 @@ uv run --no-sync python scripts\upload_orbit_dataset_hf.py `
   --private
 ```
 
-The helper reads `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or `.tools/.secrets/hf.txt`, then calls the `hf` CLI with the token in process environment only. Use `--dry-run` to inspect the upload command without network calls. Use repeated `--delete` patterns when a cleaned export should replace generated Hub files such as `samples/**`, `samples.jsonl`, and `manifest.json`.
+The helper reads `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or a local developer token file, then calls the `hf` CLI with the token in process environment only. Use `--dry-run` to inspect the upload command without network calls. Use repeated `--delete` patterns when a cleaned export should replace generated Hub files such as `samples/**`, `samples.jsonl`, and `manifest.json`.
 
 Current raw replay/cache export result after the Florida firewatch seed refresh:
 

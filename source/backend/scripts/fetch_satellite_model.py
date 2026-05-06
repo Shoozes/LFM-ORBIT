@@ -5,7 +5,7 @@ Examples:
         --repo-id Shoozes/lfm2.5-450m-vl-orbit-satellite
 
     python source/backend/scripts/fetch_satellite_model.py ^
-        --source-manifest C:\\path\\to\\model-bundle\\orbit_model_handoff.json
+        --source-manifest path/to/model-bundle/orbit_model_handoff.json
 """
 
 from __future__ import annotations

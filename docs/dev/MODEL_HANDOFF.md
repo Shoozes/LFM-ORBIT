@@ -102,7 +102,7 @@ Using a local handoff manifest:
 ```powershell
 cd <repo-root>\source\backend
 python scripts\fetch_satellite_model.py `
-  --source-manifest C:\path\to\model-bundle\orbit_model_handoff.json
+  --source-manifest path/to/model-bundle/orbit_model_handoff.json
 ```
 
 If the Hugging Face repo is private or gated, set `HF_TOKEN` before running the fetch.
@@ -140,10 +140,10 @@ Current expected fields for the published NM-UNI handoff are:
 {
   "training_modality": "image_text",
   "image_training_verified": true,
-  "training_train_rows": 5670,
-  "training_multimodal_rows": 5670,
-  "training_image_blocks": 6758,
-  "training_eval_rows": 630,
+  "training_train_rows": 7245,
+  "training_multimodal_rows": 7245,
+  "training_image_blocks": 8335,
+  "training_eval_rows": 805,
   "mmproj_present": false,
   "runtime_inference_mode": "text_evidence_packet",
   "image_conditioned_runtime_enabled": false
@@ -174,20 +174,20 @@ The handoff manifest is the bridge between external training output and Orbit ru
 
 ## NM-UNI Role
 
-The current training/publish partner on this machine is `C:\DevStuff\NM-UNI-main`.
+The current training/publish partner is the local NM-UNI training workspace.
 NM-UNI is responsible for importing Orbit exports, preparing Liquid training runs, quantizing trained outputs to GGUF, staging `orbit_model_handoff.json`, and optionally publishing a Hugging Face model repo.
 Orbit is responsible for consuming that bundle and validating it against SimSat/replay evidence.
 
 Current published bundle:
 
 - repo: `Shoozes/lfm2.5-450m-vl-orbit-satellite`
-- generated at: `2026-05-05T22:38:11.908556Z`
+- generated at: `2026-05-06T00:00:00Z`
 - training method: `vlm_sft`
-- task: `wildfire_detection`
-- train rows: `5670`
-- multimodal rows: `5670`
-- image blocks: `6758`
-- eval rows: `630`
+- task: `orbit-satellite-triage`
+- train rows: `7245`
+- multimodal rows: `7245`
+- image blocks: `8335`
+- eval rows: `805`
 - promotion gate: not required in `training_result_manifest.json`
 
 Treat this as the trained runtime artifact for evidence-packet and bbox JSON reasoning. Its training manifest now includes image-text rows, but Orbit still must not describe runtime inference as image-conditioned until a runtime adapter passes pixels into the model and a smoke test proves image-sensitive output.
@@ -210,7 +210,7 @@ The export now includes:
 - temporal use-case metadata and examples for deforestation, wildfire, civilian lifeline disruption, maritime monitoring, ice/snow extent, legacy ice-cap visual review, floods, agriculture, urban expansion, mining, and generic temporal review
 - chat-style `training.jsonl`, `train_training.jsonl`, and `eval_training.jsonl` files for supervised data-refinement workflows
 - second-pass asset retagging through `scripts/retag_training_assets.py`, including deduplicated still images, sampled timelapse frames, ordered temporal sequence rows, Hugging Face ImageFolder-compatible `images/ + metadata.jsonl`, and provider adapters for heuristic/manual queue, Ollama vision models, or OpenAI-compatible vision models
-- optional Hugging Face dataset upload through `scripts/upload_orbit_dataset_hf.py`, using `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or `.tools/.secrets/hf.txt`
+- optional Hugging Face dataset upload through `scripts/upload_orbit_dataset_hf.py`, using `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or a local developer token file
 - explicit metadata fields such as `target_action`, `target_category`, `target_task`, and `label_tier`
 - `orbit_training_contract_v1` metadata for review status, localization fields, evidence requirements, and NM-UNI import behavior
 - PNG-rasterized context thumbnails even when the runtime thumbnail fallback started as SVG

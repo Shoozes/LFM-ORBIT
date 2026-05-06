@@ -109,7 +109,7 @@ def main() -> int:
 
     token, source = resolve_hf_token()
     if not token and not args.dry_run:
-        raise RuntimeError("HF token unavailable. Set HF_TOKEN or fill .tools/.secrets/hf.txt.")
+        raise RuntimeError("HF token unavailable. Set HF_TOKEN or configure a local developer token file.")
 
     upload_command = build_upload_command(
         repo_id=args.repo_id,

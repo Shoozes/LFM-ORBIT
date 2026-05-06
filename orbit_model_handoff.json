@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "producer": {
+    "name": "NM-UNI",
+    "generated_at": "2026-05-06T00:00:00Z",
+    "training_result_manifest": "training_result_manifest.json"
+  },
+  "source": {
+    "kind": "huggingface",
+    "repo_id": "Shoozes/lfm2.5-450m-vl-orbit-satellite",
+    "revision": "main"
+  },
+  "runtime": {
+    "model_subdir": "lfm2.5-vlm-450m",
+    "model_filename": "LFM2.5-VL-450M-Q4_0.gguf",
+    "mmproj_filename": "",
+    "native_checkpoint_subdir": "hf-checkpoint",
+    "adapter_subdir": "lora-adapter"
+  },
+  "artifact": {
+    "base_model": "LiquidAI/LFM2.5-VL-450M",
+    "quantization": "q4_0",
+    "task": "orbit-satellite-triage"
+  },
+  "repo_id": "Shoozes/lfm2.5-450m-vl-orbit-satellite",
+  "revision": "main",
+  "model_filename": "LFM2.5-VL-450M-Q4_0.gguf",
+  "training_result_manifest": "training_result_manifest.json"
+}

@@ -8,11 +8,11 @@ OR via a plain API-key-only request (which GEE supports for thumbnail endpoints
 when the project is allowlisted).
 
 Auth strategy (in order):
-  1. Cached access token on disk (.tools/.secrets/gee_token.json)
+  1. Cached access token on disk in the local developer secrets directory
   2. API key only — works for thumbnails.create if the project has API key auth enabled
   3. Return None — caller falls back to NASA GIBS
 
-GEE credentials from .tools/.secrets/gee.txt:
+GEE credentials from a local developer secret file:
   Line 1: API key (GOCSPX-...)
   Line 2: OAuth2 client ID (NNN-....apps.googleusercontent.com)
 """

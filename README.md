@@ -125,7 +125,7 @@ Current runtime: SimSat/Mapbox hackathon satellite-data API family, default SimS
 | Check | Current State |
 |---|---|
 | Root verify | `.\run.ps1 -Verify` passing |
-| Backend tests | `463 passed` |
+| Backend tests | `465 passed` |
 | Frontend | typecheck + build passing |
 | Playwright E2E | `98 passed`, `6 skipped` |
 | Docs/import guards | `22 passed` |
@@ -133,7 +133,7 @@ Current runtime: SimSat/Mapbox hackathon satellite-data API family, default SimS
 | Florida firewatch smoke | Recent 30-day window, `378/378` cells, `0` confirmed flags |
 | Recorded demos | showcase, payload, provenance, abstain, eclipse, tutorial; legacy object-evidence audit retained |
 | Dataset export | `33` raw replay/cache samples, `25` replay-cache rows, `0` mission metadata rows, `26` timelapse rows |
-| Retagged training set | `163` assets, `15` temporal sequences |
+| Retagged training set | `179` assets, `26` temporal sequences |
 | Dataset | [Shoozes/LFM-Orbit-SatData](https://huggingface.co/datasets/Shoozes/LFM-Orbit-SatData) |
 | Trained model | [Shoozes/lfm2.5-450m-vl-orbit-satellite](https://huggingface.co/Shoozes/lfm2.5-450m-vl-orbit-satellite) |
 
@@ -182,6 +182,10 @@ API: `http://127.0.0.1:8000`
 - DPhi SimSat scoring is truthfully labeled `proxy_bands`.
 - Multispectral claims are limited to direct/replay metadata lanes such as ice/snow NDSI with SCL rejection and persistence.
 - Fallback paths must stay labeled as fallback and must not become high-confidence detections.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
 
 ## Docs
 

@@ -74,3 +74,30 @@ def test_generate_serializes_llama_completion_calls(monkeypatch):
     worker.join(timeout=2)
     assert entered.is_set()
     assert completed.is_set()
+
+
+def test_stream_tokens_serializes_llama_streaming_calls(monkeypatch):
+    entered = threading.Event()
+    completed = threading.Event()
+
+    class FakeModel:
+        def create_chat_completion(self, **_kwargs):
+            entered.set()
+            yield {"choices": [{"delta": {"content": "locked"}}]}
+
+    monkeypatch.setattr(inference, "_get_model", lambda: FakeModel())
+
+    with inference._generation_lock:
+        worker = threading.Thread(
+            target=lambda: (
+                list(inference.stream_tokens("hello", max_tokens=4)),
+                completed.set(),
+            )
+        )
+        worker.start()
+        assert not entered.wait(0.15)
+        assert not completed.is_set()
+
+    worker.join(timeout=2)
+    assert entered.is_set()
+    assert completed.is_set()

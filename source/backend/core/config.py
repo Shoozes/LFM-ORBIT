@@ -58,7 +58,7 @@ TIMELAPSE_PROVIDER_ORDER = (
 # ---------------------------------------------------------------------------
 # Resolution order:
 #   1. Environment variable
-#   2. File fallback         .tools/.secrets/*.txt  (local/dev only)
+#   2. File fallback         local developer secret files
 #   3. Unavailable
 # ---------------------------------------------------------------------------
 
@@ -312,7 +312,7 @@ class GeeCredentials:
 
 
 def resolve_gee_credentials(secrets_path: Path | None = None) -> GeeCredentials:
-    """Resolve GEE credentials from env or .tools/.secrets/gee.txt."""
+    """Resolve GEE credentials from env or a local developer secret file."""
     env_key = os.environ.get("GEE_API_KEY", "").strip()
     env_cid = os.environ.get("GEE_CLIENT_ID", "").strip()
     if env_key:

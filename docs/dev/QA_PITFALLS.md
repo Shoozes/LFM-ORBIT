@@ -138,7 +138,7 @@ Mission metadata belongs in `mission_metadata.jsonl`, not in single-image SFT ro
 
 ### What if Hugging Face CLI auth looks stale?
 
-Do not print or paste tokens. Use `scripts/upload_orbit_dataset_hf.py` so the token resolves from `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or `.tools/.secrets/hf.txt` into the subprocess environment only. A stale global `hf auth whoami` login should not block the helper when the local secret is valid.
+Do not print or paste tokens. Use `scripts/upload_orbit_dataset_hf.py` so the token resolves from `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or a local developer token file into the subprocess environment only. A stale global `hf auth whoami` login should not block the helper when the local secret is valid.
 
 ### How do we verify a Hub refresh?
 
