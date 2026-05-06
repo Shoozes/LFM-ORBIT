@@ -130,14 +130,30 @@ function Find-UvCommand {
     return $null
 }
 
+function Add-ToolDirToPath {
+    param([Parameter(Mandatory = $true)][string]$ToolPath)
+
+    $toolDir = Split-Path -Parent $ToolPath
+    if (-not $toolDir) {
+        return
+    }
+
+    $pathEntries = @($env:PATH -split ";" | Where-Object { $_ })
+    if ($pathEntries -notcontains $toolDir) {
+        $env:PATH = "$toolDir;$env:PATH"
+    }
+}
+
 function Ensure-Uv {
     if ($script:UvCommand) {
+        Add-ToolDirToPath -ToolPath $script:UvCommand
         return $script:UvCommand
     }
 
     $uv = Find-UvCommand
     if ($uv) {
         $script:UvCommand = $uv
+        Add-ToolDirToPath -ToolPath $script:UvCommand
         return $script:UvCommand
     }
 
@@ -159,8 +175,11 @@ function Ensure-Uv {
         throw "uv bootstrap virtualenv did not contain $venvPython."
     }
 
-    & $venvPython -m pip install --upgrade pip uv
+    $pipOutput = & $venvPython -m pip install --upgrade pip uv 2>&1
     if ($LASTEXITCODE -ne 0) {
+        if ($pipOutput) {
+            Write-Host ($pipOutput -join "`n") -ForegroundColor Red
+        }
         throw "Failed to install uv into $UvVenvDir."
     }
 
@@ -169,6 +188,7 @@ function Ensure-Uv {
     }
 
     $script:UvCommand = $UvBootstrapExe
+    Add-ToolDirToPath -ToolPath $script:UvCommand
     return $script:UvCommand
 }
 

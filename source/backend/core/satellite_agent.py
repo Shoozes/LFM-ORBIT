@@ -502,7 +502,7 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                 reply["payload"].get("note", ""),
             )
 
-            # Let the satellite agent "watch" the timelapse and confirm
+            # Let the satellite agent review the timelapse-derived evidence packet.
             if reply["msg_type"] == "confirmation":
                 conf_cell_id = reply.get("cell_id")
                 timelapse_analysis = reply["payload"].get("timelapse_analysis")
@@ -510,7 +510,7 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                 if conf_cell_id and timelapse_analysis:
                     from core.inference import generate
                     
-                    system_prompt = "You are the Satellite VLM Agent observing a sequence of orbital frames."
+                    system_prompt = "You are the Satellite evidence-packet reviewer analyzing timelapse-derived orbital evidence."
                     user_prompt = (
                         f"The ground station has linked a visual timelapse for cell {conf_cell_id} showing the following signals: "
                         f"'{timelapse_analysis}'. "

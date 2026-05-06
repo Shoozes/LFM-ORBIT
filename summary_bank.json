@@ -113,7 +113,7 @@
       ]
     },
     "docs_model_runtime_and_handoff": {
-      "note": "Supplemental model and fine-tuning handoff docs. README remains product-facing; ARCHITECTURE, TODO, and handoff docs carry implementation detail. NM-UNI is the external dataset-import, model training, GGUF quantization, model-bundle staging, and Hugging Face model-publish lane; Orbit surfaces manifest-backed training/runtime capability status while keeping direct image-conditioned runtime claims gated behind a real image runtime. May 6 retrained model refresh #2 forced Shoozes/lfm2.5-450m-vl-orbit-satellite@main from remote revision 40a2ebdfeab056a7e0da8c41677d592e8bd2199d; the local handoff reports task wildfire_detection, 7245 train/multimodal rows, 8335 image blocks, 805 eval rows, and GGUF SHA256 7A0A6535BB144487AEBFFD947C56BEDCDC15A1F7F72B9E0D83A63308FB37B4E3.",
+      "note": "Supplemental model and fine-tuning handoff docs. README remains product-facing; ARCHITECTURE, TODO, and handoff docs carry implementation detail. NM-UNI is the external dataset-import, model training, GGUF quantization, model-bundle staging, and Hugging Face model-publish lane; Orbit surfaces manifest-backed training/runtime capability status while keeping image-conditioned runtime claims gated behind a real image runtime. The current local handoff reports task orbit-satellite-triage, 7245 train/multimodal rows, 8335 image blocks, 805 eval rows, and GGUF SHA256 7A0A6535BB144487AEBFFD947C56BEDCDC15A1F7F72B9E0D83A63308FB37B4E3. The retained-frame image review lane is opt-in, status-gated, selects its review image through a backend gallery helper, stores compact visual_model_review payloads, and preserves them through replay snapshots and dataset/training exports.",
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
@@ -763,7 +763,7 @@
       ]
     },
     "feature_group_model_runtime_and_handoff": {
-      "note": "Manifest-based satellite artifact resolution, runtime status exposure, nested fenced JSON tool-call parsing, default NM-UNI trained Orbit GGUF pull from Shoozes/lfm2.5-450m-vl-orbit-satellite, latest checked model revision 2a8c57cbb7f4dda26d5faff2ec3e31a5cbd2f4b8 for task wildfire_detection, local smoke passed with loaded=true, image-text training manifest with 5670 train rows / 5670 multimodal rows / 6758 image blocks / 630 eval rows, status-only multimodal runtime capability reporting, shared Satellite Pruner and Ground Validator GGUF evidence-packet reasoning when loaded, deterministic ground fallback when not loaded, model fetch handoff tooling with nonempty GGUF/mmproj guards, launcher FetchModel integration, and required trained-model smoke checks for the production launcher path.",
+      "note": "Manifest-based satellite artifact resolution, runtime status exposure, nested fenced JSON tool-call parsing, default NM-UNI trained Orbit GGUF pull from Shoozes/lfm2.5-450m-vl-orbit-satellite, local smoke passed with loaded=true, image-text training manifest with 7245 train/multimodal rows, 8335 image blocks, 805 eval rows, runtime-gated image review capability reporting, shared Satellite Pruner and Ground Validator GGUF evidence-packet reasoning when loaded, deterministic ground fallback when not loaded, model fetch handoff tooling with nonempty GGUF/mmproj guards, launcher FetchModel integration, required trained-model smoke checks for the production launcher path, and Proof Mode image-review UI/proof JSON status that uses the backend retained-image selector and stays unavailable-safe when the adapter is disabled.",
       "files": [
         ".env.example",
         "README.md",
@@ -786,6 +786,8 @@
         "source/backend/core/inference.py",
         "source/backend/core/model_manifest.py",
         "source/backend/core/multimodal_inference.py",
+        "source/backend/core/queue.py",
+        "source/backend/core/replay_snapshot.py",
         "source/backend/core/object_evidence.py",
         "source/backend/core/vlm.py",
         "source/backend/scripts/build_visual_story_proofs.py",
@@ -795,8 +797,10 @@
         "source/backend/tests/test_evaluate_object_evidence.py",
         "source/backend/tests/test_fetch_satellite_model.py",
         "source/backend/tests/test_inference.py",
+        "source/backend/tests/test_inference_image_api.py",
         "source/backend/tests/test_model_manifest.py",
         "source/backend/tests/test_multimodal_inference.py",
+        "source/backend/tests/test_queue.py",
         "source/backend/tests/test_object_evidence.py",
         "source/backend/tests/test_replay.py",
         "source/backend/tests/test_vlm.py",
@@ -807,7 +811,7 @@
       ]
     },
     "feature_group_dataset_export_and_eval_lane": {
-      "note": "Orbit dataset export, replay-cache export with frame-quality/rejected-window cloud metadata, evidence-mode fields for runtime truth, imagery origin, and scoring basis, orbit_training_contract_v1 metadata for NM-UNI import/review/localization, SVG fallback rasterization to PNG before retagging, monitor-frame asset validation to avoid dead before/after refs, Qwen/prior-tag retagging for API-cost discipline, prior-tag reuse for already-tagged image hashes, generated image/frame cleanup to prevent stale upload orphans, portable retag manifests without local absolute workspace paths, frame-safe timelapse extraction namespaced by video SHA-256, mission_metadata passthrough for operator task text / target packs / object targets / bbox intent, optional Tkinter retag UI with HF upload controls, Hugging Face upload helper with successful publication to Shoozes/LFM-Orbit-SatData, viewer-safe dataset-card configs with replay-cache wording for mixed JSONL schemas, current raw replay/cache export at 33 records with 25 replay-cache rows, 0 mission_metadata rows, 26 timelapse rows, Florida wildfire/fireline seeded data, and the reusable retagged training set still at 163 assets / 15 temporal sequences. Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead replay missions, ice/snow seeded-cache provenance fixtures, visual story CV evidence rows, object_evidence_gold frozen eval at case_count=2 with schema/bbox/label/action/grounding_iou_at_0_5 all 1.0, grounding_mean_iou=1.0, payload_reduction_ratio=1098.3, and eval tooling now including orbit_eval_v2 baseline-vs-candidate comparison and promotion.json artifacts. Latest refresh added offline context-thumbnail export mode, generated-samples cleanup before export, and explicit --reuse-existing-only retag refreshes so stalled local Ollama retagging preserves reusable prior tags while new hashes receive deterministic heuristic labels.",
+      "note": "Orbit dataset export, replay-cache export with frame-quality/rejected-window cloud metadata, evidence-mode fields for runtime truth, imagery origin, and scoring basis, optional visual_model_review passthrough from alerts/replays into samples and SFT-style training JSONL metadata, orbit_training_contract_v1 metadata for NM-UNI import/review/localization, SVG fallback rasterization to PNG before retagging, monitor-frame asset validation to avoid dead before/after refs, Qwen/prior-tag retagging for API-cost discipline, prior-tag reuse for already-tagged image hashes, generated image/frame cleanup to prevent stale upload orphans, portable retag manifests without local absolute workspace paths, frame-safe timelapse extraction namespaced by video SHA-256, mission_metadata passthrough for operator task text / target packs / object targets / bbox intent, optional Tkinter retag UI with HF upload controls, Hugging Face upload helper with successful publication to Shoozes/LFM-Orbit-SatData, viewer-safe dataset-card configs with replay-cache wording for mixed JSONL schemas, current raw replay/cache export at 33 records with 25 replay-cache rows, 0 mission_metadata rows, 26 timelapse rows, Florida wildfire/fireline seeded data, and the reusable retagged training set at 179 assets / 26 temporal sequences. Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead replay missions, ice/snow seeded-cache provenance fixtures, visual story CV evidence rows, object_evidence_gold frozen eval at case_count=2 with schema/bbox/label/action/grounding_iou_at_0_5 all 1.0, grounding_mean_iou=1.0, payload_reduction_ratio=1098.3, and eval tooling now including orbit_eval_v2 baseline-vs-candidate comparison and promotion.json artifacts. Latest refresh added offline context-thumbnail export mode, generated-samples cleanup before export, explicit --reuse-existing-only retag refreshes, and compact image-review export tests so rows without visual review stay valid while reviewed chips remain training-ready.",
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
@@ -845,6 +849,9 @@
         "source/backend/assets/seeded_data/sh_f03170dc_meta.json",
         "source/backend/assets/seeded_data/visual_story_frames/port_esri_meta.json",
         "source/backend/assets/seeded_data/visual_story_frames/visual_story_manifest.json",
+        "source/backend/core/queue.py",
+        "source/backend/core/replay_snapshot.py",
+        "source/backend/core/temporal_use_cases.py",
         "source/backend/core/monitor_reports.py",
         "source/backend/core/object_evidence.py",
         "source/backend/core/vlm.py",
@@ -860,7 +867,9 @@
         "source/backend/tests/test_evaluate_model.py",
         "source/backend/tests/test_evaluate_object_evidence.py",
         "source/backend/tests/test_export_orbit_dataset.py",
+        "source/backend/tests/test_inference_image_api.py",
         "source/backend/tests/test_object_evidence.py",
+        "source/backend/tests/test_queue.py",
         "source/backend/tests/test_replay.py",
         "source/backend/tests/test_retag_training_assets.py",
         "source/backend/tests/test_retag_training_assets_ui.py",
@@ -1556,7 +1565,7 @@
       ]
     },
     "issue_group_launcher_clean_start_verify": {
-      "note": "Windows clean-start and verify hardening: run.ps1 now stops stale repo-owned backend/frontend listeners, refuses unrelated port owners, captures backend startup logs under runtime-data/logs, fails early with backend error tails when health never comes up, and checks external command exit codes for npm, npx, uv, Playwright, model fetch, and dev server startup. The E2E suite was updated for the lean UI contract: clean startup stays idle, scan-progress tests explicitly start a smoke mission, map-side Area Tools replaced hidden draw controls, and retired visual-overlay UI specs are intentionally skipped. Cold reset plus option-1 equivalent startup succeeded, Playwright/node_modules dependency checks resolved cleanly, and full run.ps1 -Verify passed with backend 464 passed, GGUF smoke, frontend lint/build, and Playwright passing. May 6 launcher hardening makes option 1 / -Install / --install refresh moving Hugging Face refs like main so retrained public models are not masked by a stale local manifest.",
+      "note": "Windows clean-start and verify hardening: run.ps1 now stops stale repo-owned backend/frontend listeners, refuses unrelated port owners, captures backend startup logs under runtime-data/logs, fails early with backend error tails when health never comes up, and checks external command exit codes for npm, npx, uv, Playwright, model fetch, and dev server startup. The E2E suite was updated for the lean UI contract: clean startup stays idle, scan-progress tests explicitly start a smoke mission, map-side Area Tools replaced hidden draw controls, and retired visual-overlay UI specs are intentionally skipped. Cold reset plus option-1 equivalent startup succeeded, Playwright/node_modules dependency checks resolved cleanly, and local verification now reports backend 479 passed, run.ps1 -Verify passing with GGUF smoke coverage, frontend lint/build, Playwright 98 passed / 6 skipped, docs/import guards passing, demo:record 5 passed, and demo:tutorial 1 passed with visually sampled nonblank media. The launcher now keeps repo-local uv bootstrap output out of the PowerShell return stream and prepends the resolved uv directory to process PATH so Playwright webServer child processes work when only Python and Node/npm are available. May 6 launcher hardening makes option 1 / -Install / --install refresh moving Hugging Face refs like main so retrained public models are not masked by a stale local manifest.",
       "files": [
         "run.ps1",
         "run.sh",

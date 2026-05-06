@@ -40,7 +40,7 @@ The backend runs two long-lived loops during app lifespan:
 18. `core/overlays/attribution.py` adds governance/boundary context when available.
 19. `core/telemetry.py` emits typed `scan_result` payloads defined in `core/contracts.py`.
 20. `core/queue.py` persists confirmed alerts for `Logs`, `Inspect`, and recent-alert APIs.
-21. `core/gallery.py` expands confirmed alerts into imagery/timelapse evidence and now reuses local replay cache imagery for thumbnail fallback before dropping to offline chips; dataset export rasterizes SVG fallbacks to PNG.
+21. `core/gallery.py` expands confirmed alerts into imagery/timelapse evidence, selects the retained image passed to visual review, and reuses local replay cache imagery for thumbnail fallback before dropping to offline chips; dataset export rasterizes SVG fallbacks to PNG.
 22. `core/replay.py` can reset runtime state and load a completed mission directly into the same mission, queue, gallery, metrics, and dialogue stores used by realtime operations. It also exposes cached API WebMs as Fast Replay entries and can rescan replay metadata through the current runtime/model stack while preserving replay target packs when present.
 23. `ValidationPanel.tsx` and `TimelapseViewer.tsx` expand a selected alert into imagery, analysis, exports, and timelapse context. Mission-tab timelapse output stays separate from mission setup so active temporal video evidence remains visible.
 24. `SettingsPanel.tsx` queries provider, SimSat, analysis, and depth status endpoints independently, with short retries so one transient miss does not force a false offline settings surface.
@@ -82,7 +82,7 @@ The backend runs two long-lived loops during app lifespan:
 - `source/backend/core/observability.py`
   Runtime observer, structured production logging, throttled warning summaries, and latency/rejection metrics.
 - `source/backend/core/queue.py`
-  Alert persistence and recent-alert retrieval.
+  Alert persistence and recent-alert retrieval, including compact object-evidence and optional image-conditioned `visual_model_review` payloads.
 - `source/backend/core/metrics.py`
   Aggregated counters, flagged examples, observability rollups, rejection-reason counts, and low-valid-coverage rates surfaced in Logs and decision-gate output.
 - `source/backend/core/paths.py`
@@ -92,13 +92,13 @@ The backend runs two long-lived loops during app lifespan:
 - `source/backend/core/inference.py`
   GGUF text/evidence-packet inference path plus runtime capability status for the local satellite model.
 - `source/backend/core/multimodal_inference.py`
-  Status-only image-runtime adapter contract. It reports feature flags, backend selection, `mmproj`/checkpoint readiness, and structured unavailable provenance until real image-conditioned inference is wired.
+  Runtime-gated image review adapter. It reports feature flags, backend selection, `mmproj`/checkpoint readiness, decodes request images, returns structured unavailable or blank-image abstain payloads, and only reports image-conditioned review enabled after a real adapter has loaded.
 - `source/backend/core/depth_anything.py`
   Optional Depth Anything V3 adapter, `/api/depth/*` status/toggle support, package detection, and compact depth-map statistics.
 - `source/backend/core/mission.py`
   Mission lifecycle and operator-run state, including `live` vs `replay` mission modes, auto-selected temporal use-case metadata, `target_pack_id`, and normalized `object_targets`.
 - `source/backend/core/temporal_use_cases.py`
-  Temporal use-case catalog, examples, classifier, API-prep plan builder, and chat-style training JSONL row builder.
+  Temporal use-case catalog, examples, classifier, API-prep plan builder, and chat-style training JSONL row builder with provenance and visual-review metadata passthrough.
 - `source/backend/core/lifeline_monitoring.py`
   Civilian lifeline before/after candidate validation, frame-pair preservation, distinct-frame downlink gating, eval metrics, and acceptance checks.
 - `source/backend/core/maritime_monitoring.py`
@@ -110,11 +110,11 @@ The backend runs two long-lived loops during app lifespan:
 - `source/backend/core/agent_bus.py`
   SAT/GND/operator message queue, pins, replay-safe read-state helpers, and targeted message-id read marking for DTN proof flushes.
 - `source/backend/core/gallery.py`
-  Ground-confirmed imagery/timelapse evidence store.
+  Ground-confirmed imagery/timelapse evidence store and retained visual-review image selector.
 - `source/backend/core/replay.py`
   Replay catalog/loading path that hydrates the existing runtime tables for showcase walkthroughs and fixture-driven demos, dynamically catalogs valid cached API WebMs, and starts realtime rescans from replay metadata.
 - `source/backend/core/replay_snapshot.py`
-  Portable runtime snapshot export/import for completed missions. It packages mission, object targets, alert, gallery, pin, dialogue, and metrics surfaces without changing the bundled replay manifest format.
+  Portable runtime snapshot export/import for completed missions. It packages mission, object targets, alert, visual-review, gallery, pin, dialogue, and metrics surfaces without changing the bundled replay manifest format.
 - `source/backend/core/monitor_reports.py`
   Runtime persistence helper for API-generated maritime and lifeline monitor reports under `runtime-data/monitor-reports/`.
 - `source/backend/core/timelapse.py`
@@ -126,7 +126,7 @@ The backend runs two long-lived loops during app lifespan:
 - `source/backend/scripts/fetch_satellite_model.py`
   Fetch utility that stages a published artifact into `runtime-data/models/` and writes the local runtime manifest.
 - `source/backend/scripts/export_orbit_dataset.py`
-  Dataset exporter for recent alerts, fetched/cached API imagery, local gallery evidence, weak reject controls, cached API observations, direct replay-cache rows, persisted maritime/lifeline monitor reports, current/archived mission metadata, enriched sample JSONL, and SFT-style training JSONL.
+  Dataset exporter for recent alerts, image-conditioned visual reviews, fetched/cached API imagery, local gallery evidence, weak reject controls, cached API observations, direct replay-cache rows, persisted maritime/lifeline monitor reports, current/archived mission metadata, enriched sample JSONL, and SFT-style training JSONL.
 - `source/backend/scripts/retag_training_assets.py`
   Standalone second-pass retagger for exported data directories. It deduplicates images/frames by SHA-256, extracts sampled timelapse frames, writes ordered temporal sequence JSONL, and can use heuristic/manual queue, Ollama vision, or OpenAI-compatible vision providers.
 - `source/backend/scripts/retag_training_assets_ui.py`
@@ -223,10 +223,10 @@ Cached replay imagery can still carry `scoring_basis=multispectral_bands` when t
 - Optional manifest-resolved local GGUF: `runtime-data/models/lfm2.5-vlm-450m/model_manifest.json`
 - Default GGUF target artifact: `runtime-data/models/lfm2.5-vlm-450m/LFM2.5-VL-450M-Q4_0.gguf`
 - Default trained GGUF source: `Shoozes/lfm2.5-450m-vl-orbit-satellite`, generated by the NM-UNI training pipeline.
-- Latest checked model revision: `4b7015dfd9742d469fd1e2f55dff4160874851bb`, task `orbit-satellite-triage`, `training_modality=image_text`, `image_training_verified=true`, `7245` train rows, `8335` image blocks, and `805` eval rows.
+- Current checked model handoff: task `orbit-satellite-triage`, `training_modality=image_text`, `image_training_verified=true`, `7245` train rows, `8335` image blocks, and `805` eval rows.
 - Optional remote handoff path: `source/backend/scripts/fetch_satellite_model.py` fetches the published Hugging Face artifact, preserves `orbit_model_handoff.json` / `training_result_manifest.json`, and writes the local runtime manifest
-- Runtime capability contract: `core/model_manifest.py` parses `training_result_manifest.json` for `training_method`, `training_modality`, row counts, `image_blocks`, HF checkpoint, and LoRA adapter presence; `core/multimodal_inference.py` reports direct image runtime as unavailable until an adapter actually passes pixels into the model.
-- Image runtime flags: `ORBIT_IMAGE_CONDITIONED_INFERENCE=false`, `ORBIT_IMAGE_INFERENCE_BACKEND=none`, and `ORBIT_REQUIRE_MMPROJ_FOR_IMAGE_INFERENCE=true` keep image-conditioned inference opt-in and capability-gated.
+- Runtime capability contract: `core/model_manifest.py` parses `training_result_manifest.json` for `training_method`, `training_modality`, row counts, `image_blocks`, HF checkpoint, and LoRA adapter presence; `core/multimodal_inference.py` reports image-conditioned review as enabled only after an adapter actually passes pixels into the model.
+- Image runtime flags: `ORBIT_IMAGE_CONDITIONED_INFERENCE=false`, `ORBIT_IMAGE_INFERENCE_BACKEND=none`, and `ORBIT_REQUIRE_MMPROJ_FOR_IMAGE_INFERENCE=true` keep image-conditioned review opt-in and capability-gated. The current implemented adapter label is `transformers_vlm`; `llama_cpp_mmproj` remains unavailable until a compatible projector path is wired.
 - Optional NM-UNI handoff producer: the local NM-UNI training workspace, which imports Orbit exports, prepares training/quantization, stages `orbit_model_handoff.json`, and can publish model bundles for Orbit to fetch
 - Optional visual evidence actions: safe offline fallback responses when compatible transformers paths are unavailable
 - Optional Depth Anything V3: disabled by default through `DEPTH_ANYTHING_V3_ENABLED=false`; when enabled, `/api/depth/status` reports package/model/device readiness, and malformed image payloads are rejected before optional model loading.
@@ -243,8 +243,8 @@ Architecture docs describe the guard suite; run-by-run totals live in `README.md
 
 ## Known Constraints
 
-- The Satellite Pruner and Ground Validator share the same manifest-resolved GGUF for text evidence-packet reasoning when it is loaded. Ground validation keeps deterministic severity gates and falls back to `offline_lfm_v1` only if the GGUF runtime is unavailable. Production image-conditioned `mmproj` or native VLM inference is not wired into runtime yet.
-- The current trained Orbit bundle includes image-text training rows, but it should not be described as direct image-conditioned runtime inference unless `/api/analysis/status` reports `image_conditioned_runtime_enabled=true`.
+- The Satellite Pruner and Ground Validator share the same manifest-resolved GGUF for text evidence-packet reasoning when it is loaded. Ground validation keeps deterministic severity gates and falls back to `offline_lfm_v1` only if the GGUF runtime is unavailable. Image-conditioned retained-frame review is a separate opt-in path under `/api/inference/image`.
+- The current trained Orbit bundle includes image-text training rows, but it should not be described as image-conditioned runtime inference unless `/api/analysis/status` reports `image_conditioned_runtime_enabled=true`.
 - The mission-evidence grounding path works with available dependencies; broader visual helper APIs stay backend-compatible but are not exposed as primary operator controls.
 - Depth Anything V3 is integrated as an optional adapter and Settings toggle. Depth statistics are not part of the live alert scoring or promotion gate, and per-frame timelapse inference remains opt-in due runtime cost.
 - Tool-call parsing supports nested fenced JSON arguments for local LFM output. Inline JSON extraction remains intentionally conservative to avoid over-parsing normal prose.

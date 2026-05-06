@@ -198,7 +198,7 @@ def _build_frame(tile_bytes: bytes, iso_label: str, source: str) -> np.ndarray:
 
 def generate_vlm_metadata(lat: float, lon: float, location_name: str, start_ym: str, end_ym: str) -> str:
     prompt = (
-        f"[SYSTEM] You are the Satellite VLM Agent observing a Landsat/MODIS orbital sequence.\n\n"
+        f"[SYSTEM] You are the Satellite evidence-packet reviewer analyzing Landsat/MODIS orbital sequence metadata.\n\n"
         f"Location: {location_name} (lat={lat:.3f}, lon={lon:.3f})\n"
         f"Time span: {start_ym} to {end_ym}\n"
         f"This region is a known deforestation hotspot in the Brazilian Amazon.\n\n"
@@ -207,7 +207,7 @@ def generate_vlm_metadata(lat: float, lon: float, location_name: str, start_ym: 
         "(2) what specific vegetation changes are evident in the multi-year sequence to support this, "
         "and (3) the ecological significance of this occurrence."
     )
-    logger.info("  Running LFM VLM inference for metadata…")
+    logger.info("  Running LFM evidence-packet inference for metadata...")
     result = generate(prompt=prompt, max_tokens=200)
     return result.get("response", "").strip() if isinstance(result, dict) else str(result).strip()
 

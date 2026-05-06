@@ -198,6 +198,28 @@ def _bbox_center(bbox: Any) -> tuple[float | None, float | None]:
     return (south + north) / 2.0, (west + east) / 2.0
 
 
+def _clean_visual_model_review(review: Any) -> dict[str, Any] | None:
+    if not isinstance(review, dict):
+        return None
+    cleaned = {
+        "enabled": bool(review.get("enabled", review.get("image_conditioned", False))),
+        "image_conditioned": bool(review.get("image_conditioned", False)),
+        "runtime_backend": str(review.get("runtime_backend") or ""),
+        "runtime_inference_mode": str(review.get("runtime_inference_mode") or ""),
+        "response": str(review.get("response") or "").strip(),
+        "reason": str(review.get("reason") or "").strip(),
+        "visual_model": str(review.get("visual_model") or ""),
+        "image_source": str(review.get("image_source") or ""),
+        "frame_id": str(review.get("frame_id") or ""),
+    }
+    bbox = review.get("bbox")
+    cleaned["bbox"] = bbox[:4] if isinstance(bbox, list) else []
+    reviewed_at = str(review.get("reviewed_at") or "").strip()
+    if reviewed_at:
+        cleaned["reviewed_at"] = reviewed_at
+    return cleaned
+
+
 def _read_monitor_reports(monitor_reports_dir: Path | None) -> list[tuple[Path, dict[str, Any]]]:
     if monitor_reports_dir is None:
         return []
@@ -222,6 +244,7 @@ def _build_alert_record(alert: dict[str, Any], *, eval_ratio: float) -> dict[str
     has_gallery = gallery_item is not None
     sample_id = _sample_id(str(alert.get("event_id") or cell_id), cell_id)
     lat, lng = _resolve_record_coordinates({"cell_id": cell_id})
+    visual_review = _clean_visual_model_review(alert.get("visual_model_review"))
     return {
         "sample_id": sample_id,
         "split": _split_for_key(sample_id, eval_ratio),
@@ -240,12 +263,21 @@ def _build_alert_record(alert: dict[str, Any], *, eval_ratio: float) -> dict[str
         "priority": str(alert.get("priority") or ""),
         "reason_codes": list(alert.get("reason_codes", [])),
         "observation_source": alert.get("observation_source", "unknown"),
+        "runtime_truth_mode": alert.get("runtime_truth_mode", "unknown"),
+        "imagery_origin": alert.get("imagery_origin", "unknown"),
+        "scoring_basis": alert.get("scoring_basis", "unknown"),
         "demo_forced_anomaly": bool(alert.get("demo_forced_anomaly", False)),
         "before_window": alert.get("before_window"),
         "after_window": alert.get("after_window"),
         "boundary_context": alert.get("boundary_context"),
         "confirmation_source": "ground_gallery" if has_gallery else "alert_queue",
         "timelapse_analysis": gallery_item.get("timelapse_analysis") if gallery_item else None,
+        "visual_model_review": visual_review,
+        "visual_model_response": visual_review.get("response") if visual_review else "",
+        "visual_model_backend": visual_review.get("runtime_backend") if visual_review else "",
+        "review_status": "image_conditioned_reviewed" if visual_review and visual_review.get("image_conditioned") else "evidence_packet_review",
+        "frame_id": visual_review.get("frame_id") if visual_review else "",
+        "image_source": visual_review.get("image_source") if visual_review else "",
         "rejection_reason": None,
         "lat": lat,
         "lng": lng,

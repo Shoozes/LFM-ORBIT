@@ -56,6 +56,33 @@ def _encode_png_data_url(img: Image.Image) -> str:
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
+def _split_data_url(data_url: str | None) -> tuple[str, bytes] | None:
+    if not data_url or "," not in data_url:
+        return None
+    header, encoded = data_url.split(",", 1)
+    if ";base64" not in header:
+        return None
+    try:
+        return header, base64.b64decode(encoded, validate=True)
+    except Exception:
+        return None
+
+
+def _timelapse_representative_frame(timelapse_b64: str | None, size: int = _THUMBNAIL_SIZE) -> str | None:
+    parsed = _split_data_url(timelapse_b64)
+    if not parsed:
+        return None
+    _header, raw = parsed
+    try:
+        frames = iio.imiter(BytesIO(raw), plugin="pyav")
+        first_frame = next(frames)
+        img = Image.fromarray(first_frame).convert("RGB").resize((size, size), Image.LANCZOS)
+        return _encode_png_data_url(img)
+    except Exception as exc:
+        logger.debug("[GALLERY] Failed to decode timelapse representative frame: %s", exc)
+        return None
+
+
 def _load_cached_thumbnail(sig: str, size: int) -> str | None:
     for prefix in ("sh", "nasa"):
         webm_path = _SEEDED_DIR / f"{prefix}_{sig}.webm"
@@ -288,3 +315,51 @@ def get_gallery_item(cell_id: str) -> dict[str, Any] | None:
             "SELECT * FROM gallery_items WHERE cell_id = ?", (cell_id,)
         ).fetchone()
     return dict(row) if row else None
+
+
+def get_visual_review_image(cell_id: str, frame_selector: str = "after_best") -> dict[str, Any]:
+    """Return the retained image that should be passed to image-conditioned review."""
+    item = get_gallery_item(cell_id)
+    if not item:
+        return {
+            "available": False,
+            "cell_id": cell_id,
+            "frame_selector": frame_selector,
+            "reason": "cell not in gallery",
+        }
+
+    context_thumb = str(item.get("context_thumb") or "")
+    context_source = str(item.get("context_thumb_source") or "")
+    if context_thumb.startswith("data:image/") and not context_thumb.startswith("data:image/svg+xml"):
+        return {
+            "available": True,
+            "cell_id": cell_id,
+            "image_b64": context_thumb,
+            "frame_id": f"{frame_selector}_context_thumb",
+            "source": context_source or "gallery_context_thumb",
+            "runtime_truth_mode": "replay" if context_source == "seeded_cache" else "realtime",
+            "imagery_origin": context_source or "gallery_context_thumb",
+            "bbox": _thumb_bbox(float(item["lat"]), float(item["lng"])),
+        }
+
+    timelapse_frame = _timelapse_representative_frame(item.get("timelapse_b64"))
+    if timelapse_frame:
+        timelapse_source = str(item.get("timelapse_source") or "gallery_timelapse")
+        return {
+            "available": True,
+            "cell_id": cell_id,
+            "image_b64": timelapse_frame,
+            "frame_id": f"{frame_selector}_timelapse_frame",
+            "source": timelapse_source,
+            "runtime_truth_mode": "replay" if timelapse_source == "replay" else "realtime",
+            "imagery_origin": timelapse_source,
+            "bbox": _thumb_bbox(float(item["lat"]), float(item["lng"])),
+        }
+
+    return {
+        "available": False,
+        "cell_id": cell_id,
+        "frame_selector": frame_selector,
+        "reason": "retained evidence image unavailable",
+        "source": context_source or str(item.get("timelapse_source") or ""),
+    }

@@ -52,8 +52,24 @@ def test_write_dataset_export_writes_manifest_records_and_assets(tmp_path, monke
         reason_codes=["suspected_canopy_loss"],
         payload_bytes=256,
         observation_source="seeded_cache",
+        runtime_truth_mode="replay",
+        imagery_origin="cached_api",
+        scoring_basis="multispectral_bands",
         before_window={"label": "2024-06", "quality": 0.9, "nir": 0.7, "red": 0.1, "swir": 0.2, "ndvi": 0.6, "nbr": 0.4, "evi2": 0.5, "ndmi": 0.3, "soil_ratio": 0.2, "flags": []},
         after_window={"label": "2025-06", "quality": 0.85, "nir": 0.3, "red": 0.15, "swir": 0.28, "ndvi": 0.25, "nbr": 0.12, "evi2": 0.2, "ndmi": 0.1, "soil_ratio": 0.4, "flags": []},
+        visual_model_review={
+            "enabled": True,
+            "image_conditioned": True,
+            "runtime_backend": "transformers_vlm",
+            "runtime_inference_mode": "image_conditioned_review",
+            "response": "Visible clearing expands along a road-edge corridor.",
+            "reason": "ok",
+            "visual_model": "test-vlm",
+            "image_source": "cached_api",
+            "frame_id": "after_window_2025-06",
+            "bbox": [-60.03, -3.15, -60.01, -3.13],
+            "local_debug_path": "C:/Users/local/chip.png",
+        },
     )
 
     add_gallery_item(
@@ -98,6 +114,16 @@ def test_write_dataset_export_writes_manifest_records_and_assets(tmp_path, monke
     assert record["api_prep"]["auto_build"] is True
     assert record["training_contract"]["schema"] == "orbit_training_contract_v1"
     assert record["training_contract"]["nm_uni_import"]["role"] == "satellite_vlm_training_bridge"
+    assert record["runtime_truth_mode"] == "replay"
+    assert record["imagery_origin"] == "cached_api"
+    assert record["scoring_basis"] == "multispectral_bands"
+    assert record["review_status"] == "image_conditioned_reviewed"
+    assert record["frame_id"] == "after_window_2025-06"
+    assert record["image_source"] == "cached_api"
+    assert record["visual_model_backend"] == "transformers_vlm"
+    assert record["visual_model_response"] == "Visible clearing expands along a road-edge corridor."
+    assert record["visual_model_review"]["image_conditioned"] is True
+    assert "local_debug_path" not in record["visual_model_review"]
     assert record["assets"]["context_thumb"] == "context_thumb.png"
     assert record["assets"]["timelapse"] == "timelapse.webm"
 
@@ -112,6 +138,10 @@ def test_write_dataset_export_writes_manifest_records_and_assets(tmp_path, monke
     ]
     assert training_rows[0]["format"] == "orbit_temporal_sft_v1"
     assert training_rows[0]["metadata"]["use_case_id"] == "deforestation"
+    assert training_rows[0]["metadata"]["review_status"] == "image_conditioned_reviewed"
+    assert training_rows[0]["metadata"]["visual_model_backend"] == "transformers_vlm"
+    user_payload = json.loads(training_rows[0]["messages"][1]["content"])
+    assert user_payload["visual_model_review"]["response"] == "Visible clearing expands along a road-edge corridor."
 
 
 def test_write_dataset_export_backfills_context_and_includes_ground_reject_controls(tmp_path, monkeypatch):

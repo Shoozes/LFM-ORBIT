@@ -50,7 +50,7 @@ from core.depth_anything import (
     get_depth_anything_status,
     set_depth_anything_enabled,
 )
-from core.gallery import list_gallery, get_gallery_item
+from core.gallery import list_gallery, get_gallery_item, get_visual_review_image
 from core.ground_agent import run_ground_agent
 from core.inference import model_status as llm_model_status, runtime_capabilities
 from core.ice_snow_monitoring import score_ice_snow_extent
@@ -1331,6 +1331,17 @@ def get_gallery_cell(cell_id: str = Path(...)):
     return item
 
 
+@app.get("/api/gallery/{cell_id}/visual-review-image")
+def get_gallery_visual_review_image(
+    cell_id: str = Path(...),
+    frame_selector: str = Query(default="after_best", min_length=1, max_length=80),
+):
+    """Return the retained image/frame selected for image-conditioned review."""
+    payload = get_visual_review_image(cell_id, frame_selector=frame_selector)
+    status_code = 200 if payload.get("available") else 404
+    return JSONResponse(status_code=status_code, content=payload)
+
+
 # ---------------------------------------------------------------------------
 # Timelapse endpoints
 # ---------------------------------------------------------------------------
@@ -1372,6 +1383,7 @@ class ImageInferenceBody(BaseModel):
     image_path: str | None = Field(default=None, max_length=1000)
     cell_id: str | None = Field(default=None, max_length=80)
     event_id: str | None = Field(default=None, max_length=120)
+    metadata: dict[str, Any] = Field(default_factory=dict)
     max_tokens: int = Field(default=256, ge=1, le=1024)
 
     @field_validator("prompt", mode="before")
@@ -1395,16 +1407,18 @@ class ImageInferenceBody(BaseModel):
 
 @app.post("/api/inference/image")
 def inference_image(body: ImageInferenceBody):
-    """Status-safe image inference endpoint; unavailable until a real image adapter is wired."""
+    """Image-conditioned review endpoint; unavailable until a real image adapter is configured."""
+    metadata = {
+        **body.metadata,
+        "cell_id": body.cell_id or body.metadata.get("cell_id", ""),
+        "event_id": body.event_id or body.metadata.get("event_id", ""),
+    }
     return generate_with_image(
         body.prompt,
         image_path=body.image_path,
         image_b64=body.image_b64,
         max_tokens=body.max_tokens,
-        metadata={
-            "cell_id": body.cell_id or "",
-            "event_id": body.event_id or "",
-        },
+        metadata=metadata,
     )
 
 
@@ -1432,7 +1446,7 @@ def analysis_status():
     image_conditioned_runtime_enabled = capabilities.get("image_conditioned_runtime_enabled", False)
     image_conditioned_runtime_reason = capabilities.get(
         "image_conditioned_runtime_reason",
-        "direct image runtime adapter is not wired",
+        "image-conditioned review runtime is unavailable",
     )
     return _public_status_payload({
         "default_model": gnd["model"],

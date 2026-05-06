@@ -20,6 +20,18 @@ type GalleryItem = {
   timelapse_analysis: string | null;
 };
 
+type VisualReviewImage = {
+  available?: boolean;
+  cell_id?: string;
+  image_b64?: string;
+  frame_id?: string;
+  source?: string;
+  runtime_truth_mode?: string;
+  imagery_origin?: string;
+  bbox?: number[];
+  reason?: string;
+};
+
 type MissionTimelapse = {
   video_b64: string;
   frames_count: number;
@@ -59,6 +71,17 @@ type VlmVqaResponse = {
 
 type VlmCaptionResponse = {
   caption?: string;
+};
+
+type ImageReviewResponse = {
+  available?: boolean;
+  image_conditioned?: boolean;
+  runtime_backend?: string;
+  runtime_inference_mode?: string;
+  response?: string;
+  reason?: string;
+  abstained?: boolean;
+  provenance?: Record<string, unknown>;
 };
 
 type ProofJson = {
@@ -854,6 +877,7 @@ export default function ProofModePanel({
     demoMode ? DEMO_PROFILES[demoCase].caption : "Current mission proof uses mission metadata until retained imagery is selected.",
   );
   const [observedLatencyMs, setObservedLatencyMs] = useState<number | null>(null);
+  const [visualReview, setVisualReview] = useState<ImageReviewResponse | null>(null);
   const [proof, setProof] = useState<ProofJson>(() => (
     demoMode ? buildFallbackProof(demoCase) : buildMissionProof(mission, demoCase)
   ));
@@ -893,6 +917,7 @@ export default function ProofModePanel({
     if (!demoMode) {
       setProof(buildMissionProof(mission, demoCase, missionAlert));
       setGroundingResults([]);
+      setVisualReview(null);
     }
   }, [demoCase, demoMode, mission, missionAlert]);
 
@@ -918,9 +943,14 @@ export default function ProofModePanel({
         ? resolvedScopedAlerts.find((alert) => alert.cell_id === selectedCellId) ?? resolvedScopedAlerts[0] ?? null
         : resolvedScopedAlerts[0] ?? null;
 
+      let resolvedGallery: GalleryItem | null = null;
+      let visualReviewImage: VisualReviewImage | null = null;
       if (usesReplayEvidence && resolvedAlert?.cell_id) {
-        const galleryPayload = await fetchJson<GalleryItem>(`${apiBaseUrl}/api/gallery/${resolvedAlert.cell_id}`);
-        if (!cancelled) setGalleryItem(galleryPayload);
+        [resolvedGallery, visualReviewImage] = await Promise.all([
+          fetchJson<GalleryItem>(`${apiBaseUrl}/api/gallery/${resolvedAlert.cell_id}`),
+          fetchJson<VisualReviewImage>(`${apiBaseUrl}/api/gallery/${resolvedAlert.cell_id}/visual-review-image`),
+        ]);
+        if (!cancelled) setGalleryItem(resolvedGallery);
       }
 
       if (usesReplayEvidence) {
@@ -929,7 +959,34 @@ export default function ProofModePanel({
         const bbox = mission?.bbox ?? SHOWCASE_BBOX;
         const replayPrompt = mission?.task_text ?? SHOWCASE_PROMPT;
         const startedAt = performance.now();
-        const [groundingPayload, vqaPayload, captionPayload] = await Promise.all([
+        const reviewImage = visualReviewImage?.available && visualReviewImage.image_b64
+          ? visualReviewImage
+          : null;
+        const imageReviewRequest = reviewImage
+          ? fetchJson<ImageReviewResponse>(`${apiBaseUrl}/api/inference/image`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                prompt: "Describe visible land-cover or object change. Do not infer cause beyond visible evidence.",
+                image_b64: reviewImage.image_b64,
+                max_tokens: 160,
+                metadata: {
+                  cell_id: resolvedAlert?.cell_id ?? "",
+                  frame_id: reviewImage.frame_id ?? resolvedAlert?.after_window?.label ?? "retained_evidence_frame",
+                  runtime_truth_mode: mission?.replay_id ? "replay" : "realtime",
+                  imagery_origin: reviewImage.imagery_origin ?? reviewImage.source ?? resolvedAlert?.observation_source ?? "unknown",
+                  bbox: reviewImage.bbox ?? bbox,
+                },
+              }),
+            })
+          : Promise.resolve<ImageReviewResponse | null>({
+              available: false,
+              image_conditioned: false,
+              runtime_inference_mode: "text_evidence_packet",
+              reason: visualReviewImage?.reason ?? "retained evidence image unavailable",
+              response: "",
+            });
+        const [groundingPayload, vqaPayload, captionPayload, imageReviewPayload] = await Promise.all([
           fetchJson<VlmGroundingResponse>(`${apiBaseUrl}/api/vlm/grounding`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -945,6 +1002,7 @@ export default function ProofModePanel({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ bbox }),
           }),
+          imageReviewRequest,
         ]);
         const elapsedMs = Math.max(1, Math.round(performance.now() - startedAt));
 
@@ -952,6 +1010,7 @@ export default function ProofModePanel({
         if (groundingPayload?.results?.length) setGroundingResults(groundingPayload.results);
         if (vqaPayload?.answer) setVqaAnswer(vqaPayload.answer);
         if (captionPayload?.caption) setCaption(captionPayload.caption);
+        setVisualReview(imageReviewPayload);
         setObservedLatencyMs(elapsedMs);
       } else {
         await sleep(500);
@@ -961,6 +1020,7 @@ export default function ProofModePanel({
           setGroundingResults([{ label: profile.groundingLabel, bbox: profile.groundingBox }]);
           setVqaAnswer(profile.vqa);
           setCaption(profile.caption);
+          setVisualReview(null);
         } else {
           setGroundingResults([]);
           const hasFindings = Boolean(resolvedAlert) || Number(mission?.flags_found ?? 0) > 0;
@@ -974,6 +1034,7 @@ export default function ProofModePanel({
               ? "Current mission proof uses retained alert metadata and mission context."
               : "Mission completed with no retained flags; the related timelapse is context only.",
           );
+          setVisualReview(null);
           setMissionTimelapse(null);
           setMissionTimelapseError(null);
           if (mission?.bbox) {
@@ -1079,12 +1140,36 @@ export default function ProofModePanel({
       : profile.result;
     const prompt = usesReplayEvidence ? mission?.task_text ?? profile.prompt : profile.prompt;
     const confidenceStack = buildConfidenceContributors(demoCase, evidenceAlert, Boolean(compactDetectionSummary));
+    const visualModelReview = visualReview
+      ? {
+          enabled: Boolean(visualReview.image_conditioned),
+          image_conditioned: Boolean(visualReview.image_conditioned),
+          runtime_backend: visualReview.runtime_backend ?? "none",
+          runtime_inference_mode: visualReview.runtime_inference_mode ?? "text_evidence_packet",
+          response: visualReview.response ?? "",
+          reason: visualReview.reason ?? "",
+          image_source: String(visualReview.provenance?.image_source ?? ""),
+          frame_id: String(visualReview.provenance?.frame_id ?? ""),
+          bbox: Array.isArray(visualReview.provenance?.bbox) ? visualReview.provenance.bbox : [],
+        }
+      : {
+          enabled: false,
+          image_conditioned: false,
+          runtime_backend: "none",
+          runtime_inference_mode: "text_evidence_packet",
+          response: "",
+          reason: "image-conditioned review unavailable",
+          image_source: "",
+          frame_id: "",
+          bbox: [],
+        };
     const outputJson = isAbstain
       ? {
           status: "abstained",
           reason: "imagery stale/cloudy/insufficient",
           confidence: "low",
           transmitted: false,
+          visual_model_review: visualModelReview,
         }
       : {
           status: "alert_ready",
@@ -1098,6 +1183,7 @@ export default function ProofModePanel({
           grounding: groundingResults,
           visual_summary: vqaAnswer,
           evidence_note: caption,
+          visual_model_review: visualModelReview,
           ...(missionObjectTargets.length > 0 ? { object_targets: missionObjectTargets } : {}),
           ...(compactDetectionSummary ? { detections: compactDetectionSummary } : {}),
           ...(compactObjectDeltas.length > 0 ? { object_deltas: compactObjectDeltas } : {}),
@@ -1141,7 +1227,7 @@ export default function ProofModePanel({
         trace: "Playwright report trace.zip",
       },
     });
-  }, [activeAlert, caption, demoCase, demoMode, dtnProof, flushedQueueCount, groundingResults, linkOffline, linkStatus, mission, missionAlert, queueCount, usesReplayEvidence, vqaAnswer]);
+  }, [activeAlert, caption, demoCase, demoMode, dtnProof, flushedQueueCount, groundingResults, linkOffline, linkStatus, mission, missionAlert, queueCount, usesReplayEvidence, visualReview, vqaAnswer]);
 
   const toggleOrbitalEclipse = async () => {
     if (!linkOffline) {
@@ -1522,6 +1608,23 @@ export default function ProofModePanel({
               <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">Evidence note</p>
               <p className="mt-1 text-xs font-semibold text-white">{proof.abstained ? "No note transmitted" : caption}</p>
             </div>
+          </div>
+          <div
+            data-testid="proof-image-conditioned-review"
+            className={`mt-3 rounded border p-3 ${
+              visualReview?.image_conditioned
+                ? "border-emerald-500/30 bg-emerald-500/10"
+                : "border-zinc-800 bg-zinc-950"
+            }`}
+          >
+            <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">
+              {visualReview?.image_conditioned ? "Image-conditioned review" : "Image-conditioned review unavailable"}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-white">
+              {visualReview?.image_conditioned
+                ? visualReview.response || "Visual review returned no text."
+                : visualReview?.reason || "Retained evidence image was not reviewed by an image-conditioned runtime."}
+            </p>
           </div>
         </section>
 

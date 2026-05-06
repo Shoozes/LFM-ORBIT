@@ -213,3 +213,43 @@ def test_detection_summary_and_object_deltas_round_trip_compactly(tmp_path):
     assert "debug_mask" not in alert["detection_summary"]["top_boxes"][0]
     assert alert["object_deltas"] == object_deltas
     assert alert["payload_bytes"] == payload_bytes
+
+
+def test_visual_model_review_round_trips_without_debug_fields(tmp_path):
+    db_path = tmp_path / "alerts_visual_review.sqlite"
+    os.environ["CANOPY_SENTINEL_DB_PATH"] = str(db_path)
+
+    init_db(reset=True)
+
+    push_alert(
+        event_id="evt_visual_review",
+        region_id="amazonas_region_alpha",
+        cell_id="cell_visual",
+        change_score=0.66,
+        confidence=0.88,
+        priority="high",
+        reason_codes=["visual_review"],
+        payload_bytes=128,
+        visual_model_review={
+            "enabled": True,
+            "image_conditioned": True,
+            "runtime_backend": "transformers_vlm",
+            "runtime_inference_mode": "image_conditioned_review",
+            "response": "Visible clearing expands near a road edge.",
+            "reason": "ok",
+            "visual_model": "test-vlm",
+            "image_source": "cached_api",
+            "frame_id": "after_window_2025-01-15",
+            "bbox": [-63.05, -10.05, -62.95, -9.95],
+            "debug_path": "C:/Users/local/secret.png",
+        },
+    )
+
+    alert = get_recent_alerts(limit=1)["alerts"][0]
+    review = alert["visual_model_review"]
+
+    assert review["image_conditioned"] is True
+    assert review["runtime_backend"] == "transformers_vlm"
+    assert review["response"] == "Visible clearing expands near a road edge."
+    assert review["bbox"] == [-63.05, -10.05, -62.95, -9.95]
+    assert "debug_path" not in review

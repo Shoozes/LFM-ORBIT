@@ -268,7 +268,7 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
   const imageRuntimeReason = (
     analysisStatus?.image_conditioned_runtime_reason
     ?? modelRuntime?.image_conditioned_runtime_reason
-    ?? "direct image runtime adapter is not wired"
+    ?? "image-conditioned review runtime is unavailable"
   );
   const activeProviderInfo = providerStatus?.providers[providerStatus.active_provider];
   const activeProviderAvailable = activeProviderInfo?.available ?? false;
@@ -470,7 +470,7 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
                   </div>
                   {!imageRuntimeEnabled && (
                     <p className="mt-2 text-[11px] text-zinc-500">
-                      Direct image inference is unavailable until mmproj or native VLM runtime is present. {imageRuntimeReason}
+                      Image-conditioned review is unavailable until an opt-in runtime adapter is loaded. {imageRuntimeReason}
                     </p>
                   )}
                 </div>

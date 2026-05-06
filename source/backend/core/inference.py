@@ -128,7 +128,7 @@ def model_status() -> dict:
 
 
 def runtime_capabilities() -> dict:
-    """Report GGUF load state separately from direct image-runtime capability."""
+    """Report GGUF load state separately from image-review runtime capability."""
     artifact = resolve_satellite_model_artifact()
     payload = multimodal_status(artifact)
     payload["gguf_loaded"] = _model is not None

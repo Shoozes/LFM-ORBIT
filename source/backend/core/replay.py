@@ -410,6 +410,7 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
             after_window=dict(alert.get("after_window") or {}),
             detection_summary=alert.get("detection_summary") if isinstance(alert.get("detection_summary"), dict) else None,
             object_deltas=alert.get("object_deltas") if isinstance(alert.get("object_deltas"), list) else None,
+            visual_model_review=alert.get("visual_model_review") if isinstance(alert.get("visual_model_review"), dict) else None,
             downlinked=True,
         )
 
@@ -468,6 +469,7 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
                 "after_window": dict(alert.get("after_window") or {}),
                 "detection_summary": alert.get("detection_summary") if isinstance(alert.get("detection_summary"), dict) else None,
                 "object_deltas": alert.get("object_deltas") if isinstance(alert.get("object_deltas"), list) else None,
+                "visual_model_review": alert.get("visual_model_review") if isinstance(alert.get("visual_model_review"), dict) else None,
             },
         )
         post_message(

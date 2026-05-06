@@ -100,6 +100,9 @@ def _migrate_alerts_schema(connection: sqlite3.Connection):
     if "object_deltas" not in columns:
         connection.execute("ALTER TABLE alerts ADD COLUMN object_deltas TEXT")
 
+    if "visual_model_review" not in columns:
+        connection.execute("ALTER TABLE alerts ADD COLUMN visual_model_review TEXT")
+
     connection.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_alerts_event_id
@@ -157,6 +160,7 @@ def push_alert(
     boundary_context: list[dict] | None = None,
     detection_summary: dict | None = None,
     object_deltas: list[dict] | None = None,
+    visual_model_review: dict | None = None,
     downlinked: bool = False,
 ):
     with _connect() as connection:
@@ -182,8 +186,9 @@ def push_alert(
                 after_window,
                 boundary_context,
                 detection_summary,
-                object_deltas
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                object_deltas,
+                visual_model_review
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event_id,
@@ -209,6 +214,7 @@ def push_alert(
                 json.dumps(boundary_context) if boundary_context else None,
                 json.dumps(_compact_detection_summary(detection_summary)) if detection_summary else None,
                 json.dumps(object_deltas) if object_deltas else None,
+                json.dumps(_compact_visual_model_review(visual_model_review)) if visual_model_review else None,
             ),
         )
         connection.commit()
@@ -271,6 +277,29 @@ def _compact_detection_summary(summary: dict | None) -> dict | None:
     return compact
 
 
+def _compact_visual_model_review(review: dict | None) -> dict | None:
+    if not isinstance(review, dict):
+        return None
+    compact: dict[str, Any] = {
+        "enabled": bool(review.get("enabled", review.get("image_conditioned", False))),
+        "image_conditioned": bool(review.get("image_conditioned", False)),
+        "runtime_backend": str(review.get("runtime_backend") or ""),
+        "runtime_inference_mode": str(review.get("runtime_inference_mode") or ""),
+        "response": str(review.get("response") or "").strip(),
+        "reason": str(review.get("reason") or "").strip(),
+        "visual_model": str(review.get("visual_model") or ""),
+        "image_source": str(review.get("image_source") or ""),
+        "frame_id": str(review.get("frame_id") or ""),
+    }
+    bbox = review.get("bbox")
+    if isinstance(bbox, list):
+        compact["bbox"] = bbox[:4]
+    reviewed_at = str(review.get("reviewed_at") or "").strip()
+    if reviewed_at:
+        compact["reviewed_at"] = reviewed_at
+    return compact
+
+
 def get_alert_counts() -> dict[str, int]:
     with _connect() as connection:
         _migrate_alerts_schema(connection)
@@ -324,7 +353,8 @@ def get_recent_alerts(limit: int = 50) -> RecentAlertsResponse:
                 after_window,
                 boundary_context,
                 detection_summary,
-                object_deltas
+                object_deltas,
+                visual_model_review
             FROM alerts
             ORDER BY id DESC
             LIMIT ?
@@ -380,6 +410,7 @@ def get_recent_alerts(limit: int = 50) -> RecentAlertsResponse:
                 "boundary_context": json.loads(row["boundary_context"]) if "boundary_context" in row.keys() and row["boundary_context"] else None,
                 "detection_summary": json.loads(row["detection_summary"]) if "detection_summary" in row.keys() and row["detection_summary"] else None,
                 "object_deltas": json.loads(row["object_deltas"]) if "object_deltas" in row.keys() and row["object_deltas"] else None,
+                "visual_model_review": json.loads(row["visual_model_review"]) if "visual_model_review" in row.keys() and row["visual_model_review"] else None,
             }
         )
 

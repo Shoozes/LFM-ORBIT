@@ -15,7 +15,7 @@ LFM-ORBIT is a local-first satellite timelapse triage system. A space-side agent
 ## Validation
 
 - Root verify passing
-- Backend tests: 465 passed
+- Backend tests: 479 passed
 - Frontend typecheck/build passing
 - Playwright passing with intentional skips
 - Demo media regenerated
@@ -27,4 +27,5 @@ LFM-ORBIT is a local-first satellite timelapse triage system. A space-side agent
 - SimSat Mapbox is optional imagery/context support when configured.
 - Replay fixtures are deterministic review assets.
 - The local GGUF runtime performs evidence-packet reasoning.
-- Direct image-conditioned production inference is not claimed until mmproj/native VLM runtime support is wired and smoke-tested.
+- Image-conditioned retained-frame review is available only when the opt-in image runtime reports enabled; otherwise Orbit stays in evidence-packet reasoning mode with structured unavailable or abstain responses.
+- Proof JSON carries `visual_model_review` so enabled reviews and unavailable fallback states stay auditable.

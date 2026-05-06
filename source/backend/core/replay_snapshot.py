@@ -119,6 +119,9 @@ def import_replay_snapshot(snapshot: dict[str, Any], *, reset: bool = True) -> d
             before_window=alert.get("before_window") if isinstance(alert.get("before_window"), dict) else None,
             after_window=alert.get("after_window") if isinstance(alert.get("after_window"), dict) else None,
             boundary_context=alert.get("boundary_context") if isinstance(alert.get("boundary_context"), list) else None,
+            detection_summary=alert.get("detection_summary") if isinstance(alert.get("detection_summary"), dict) else None,
+            object_deltas=alert.get("object_deltas") if isinstance(alert.get("object_deltas"), list) else None,
+            visual_model_review=alert.get("visual_model_review") if isinstance(alert.get("visual_model_review"), dict) else None,
             downlinked=_coerce_bool(alert.get("downlinked")),
         )
         alert_count += 1

@@ -159,7 +159,7 @@ class SatelliteModelArtifact:
         payload.update(self.training_status_dict())
         payload["runtime_inference_mode"] = "text_evidence_packet"
         payload["image_conditioned_runtime_enabled"] = False
-        payload["image_conditioned_runtime_reason"] = "direct image runtime adapter is not wired"
+        payload["image_conditioned_runtime_reason"] = "image-conditioned review runtime is unavailable"
         return payload
 
 

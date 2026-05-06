@@ -23,8 +23,9 @@ That means:
 
 - Orbit can resolve a trained artifact through a manifest instead of one hardcoded file path
 - Orbit can report whether the NM-UNI training manifest contains image rows through `/api/analysis/status`; the current fetched bundle reports image-text training rows and image blocks
-- Orbit does not yet run a fully image-conditioned multimodal `mmproj` inference path in production
-- a published `mmproj` can still be carried in a future handoff manifest so the artifact chain is ready for the next adapter step
+- Orbit does not route its GGUF SAT/GND evidence-packet reasoning through image pixels
+- `/api/inference/image` can run a bounded retained-frame image-conditioned review only when the opt-in image runtime is configured and loaded
+- a published `mmproj` can still be carried in a future handoff manifest so the artifact chain is ready for a GGUF projector path
 - the current NM-UNI Orbit bundle is a trained GGUF handoff without an `mmproj` file
 
 ## Orbit Runtime Contract
@@ -69,11 +70,11 @@ Default trained Orbit bundle:
 - Training manifest: `training_result_manifest.json`
 - Base model: `LFM2.5-VL-450M`
 - Training method: `vlm_sft`
-- Task: `wildfire_detection`
-- Training rows: `5670`
-- Multimodal rows: `5670`
-- Image blocks: `6758`
-- Eval rows: `630`
+- Task: `orbit-satellite-triage`
+- Training rows: `7245`
+- Multimodal rows: `7245`
+- Image blocks: `8335`
+- Eval rows: `805`
 
 The training target is reviewed Orbit evidence tuples with image chip, bbox, task, model answer, confidence, provenance, and abstain labels. Promotion metrics should cover downlink decision precision/recall, abstain precision, and grounded bbox agreement.
 
@@ -122,13 +123,13 @@ These are useful for local testing and temporary artifact swaps.
 
 The published GGUF contains a newer Hugging Face chat template that older local `llama_cpp` builds do not parse because of the Jinja `{% generation %}` tag. Orbit therefore defaults `CANOPY_SENTINEL_LLAMACPP_CHAT_FORMAT=chatml` and `CANOPY_SENTINEL_LLAMACPP_PATCH_CHAT_TEMPLATE=true` so the local runtime can load the GGUF and use Orbit's own evidence-packet prompt format.
 
-Direct image inference remains explicitly gated:
+Image-conditioned review remains explicitly gated:
 
 - `ORBIT_IMAGE_CONDITIONED_INFERENCE=false`
 - `ORBIT_IMAGE_INFERENCE_BACKEND=none`
 - `ORBIT_REQUIRE_MMPROJ_FOR_IMAGE_INFERENCE=true`
 
-Supported backend labels are `none`, `llama_cpp_mmproj`, and `transformers_vlm`. The current Orbit code reports these as status flags only; it does not claim `image_conditioned_runtime_enabled=true` until an adapter passes real image pixels into the runtime.
+Supported backend labels are `none`, `llama_cpp_mmproj`, and `transformers_vlm`. The current Orbit code can run `transformers_vlm` retained-frame review when configured; it does not claim `image_conditioned_runtime_enabled=true` until an adapter passes real image pixels into the runtime. The `llama_cpp_mmproj` label remains unavailable until a compatible projector path is wired.
 
 ## Runtime Capability Contract
 
@@ -155,10 +156,10 @@ The correct operator wording is:
 ```text
 Training modality: image-text SFT in the fetched handoff
 Runtime mode: text evidence-packet reasoning
-Direct image inference: unavailable until mmproj/native VLM runtime is present
+Image-conditioned review: available only when `/api/analysis/status` reports `image_conditioned_runtime_enabled=true`
 ```
 
-Do not say the GGUF sees images unless a runtime adapter and smoke test prove image-sensitive output from actual image inputs.
+Do not say the GGUF sees images unless a GGUF runtime adapter and smoke test prove image-sensitive output from actual image inputs. The separate `/api/inference/image` path may be described as image-conditioned retained-frame review only when status reports enabled.
 
 ## Recommended Bundle Shape
 
@@ -190,7 +191,7 @@ Current published bundle:
 - eval rows: `805`
 - promotion gate: not required in `training_result_manifest.json`
 
-Treat this as the trained runtime artifact for evidence-packet and bbox JSON reasoning. Its training manifest now includes image-text rows, but Orbit still must not describe runtime inference as image-conditioned until a runtime adapter passes pixels into the model and a smoke test proves image-sensitive output.
+Treat this as the trained runtime artifact for evidence-packet and bbox JSON reasoning. Its training manifest now includes image-text rows, but Orbit still must not describe the GGUF SAT/GND path as image-conditioned. Image-conditioned retained-frame review is only claimed through the separate runtime-gated `/api/inference/image` adapter.
 
 Do not move NM-UNI's training UI or provider management into Orbit. Keep Orbit's hackathon path centered on DPhi SimSat (`simsat_sentinel`), bundled replay fixtures, and manifest-driven model consumption.
 
@@ -269,7 +270,7 @@ Current raw replay/cache export after including the Florida firewatch seed:
 
 Hugging Face upload is wired and completed locally. The dataset is published at `Shoozes/LFM-Orbit-SatData`, with latest raw export commit `b6ef429d958a21dc7690d3f4b7cc4f3bd2088d25`: `records=33`, `seeded_cache_records=25`, `mission_metadata_records=0`, and the Florida firewatch sample tagged as `wildfire` / `fireline` with Sentinel-2 `B12/B08/B04` frame stats. The earlier retagged training export remains reusable for model work when raw replay/cache rows need SFT conversion.
 
-The trained model handoff bundle is published at `Shoozes/lfm2.5-450m-vl-orbit-satellite`. Latest checked revision: `2a8c57cbb7f4dda26d5faff2ec3e31a5cbd2f4b8`. Local fetch with `--force` refreshed `runtime-data/models/lfm2.5-vlm-450m/`; `scripts/smoke_satellite_model.py --require-present --max-tokens 8` passed with `loaded=true` in the launcher-managed Windows backend environment. The manifest reports task `wildfire_detection`, base model `LiquidAI/LFM2.5-VL-450M`, GGUF runtime, `training_modality=image_text`, `image_training_verified=true`, `5670` train rows, `5670` multimodal rows, `6758` image blocks, and `630` eval rows. Runtime remains `text_evidence_packet` because no `mmproj` or direct image-conditioned adapter is wired.
+The trained model handoff bundle is published at `Shoozes/lfm2.5-450m-vl-orbit-satellite`. Local fetch with `--force` refreshed `runtime-data/models/lfm2.5-vlm-450m/`; `scripts/smoke_satellite_model.py --require-present --max-tokens 8` passed with `loaded=true` in the launcher-managed Windows backend environment. The manifest reports task `orbit-satellite-triage`, base model `LiquidAI/LFM2.5-VL-450M`, GGUF runtime, `training_modality=image_text`, `image_training_verified=true`, `7245` train rows, `7245` multimodal rows, `8335` image blocks, and `805` eval rows. The SAT/GND GGUF runtime remains `text_evidence_packet`; retained-frame image review is a separate opt-in `transformers_vlm` adapter path.
 
 ## Integration Sequence
 
@@ -285,10 +286,8 @@ The trained model handoff bundle is published at `Shoozes/lfm2.5-450m-vl-orbit-s
 
 ## Tracked Runtime Gaps
 
-This handoff closes artifact resolution and publication flow. The runtime gaps below are tracked in `TODO.md`:
+This handoff closes artifact resolution, publication flow, and dataset export passthrough for image-review metadata. The runtime gaps below are tracked in `TODO.md`:
 
-- a production multimodal image-input adapter inside Orbit
 - automatic `mmproj` use in the current `llama_cpp` path when a compatible projector exists
-- native `transformers_vlm` runtime support if the HF checkpoint/LoRA path is the safer image-conditioned adapter
-- an image-conditioned smoke test that proves output changes when image pixels change
+- a GGUF-native `mmproj` image path if a compatible projector exists
 - replacement visual-summary runtimes for the final selected local model family

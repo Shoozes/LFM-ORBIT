@@ -26,7 +26,7 @@ SimSat/Mapbox is the primary hackathon runtime lane and map context source. It s
 
 ### What can the trained model actually claim today?
 
-It can support text evidence-packet and bbox JSON reasoning from the NM-UNI handoff. Do not claim direct image-conditioned Orbit inference unless `image_conditioned_runtime_enabled=true` after an adapter passes a two-image smoke test where different images change the output.
+It can support text evidence-packet and bbox JSON reasoning from the NM-UNI handoff. Do not claim image-conditioned Orbit inference unless `image_conditioned_runtime_enabled=true` after an adapter passes a two-image smoke test where different images change the output.
 
 ## Generated Media Gates
 

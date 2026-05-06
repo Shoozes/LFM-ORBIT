@@ -2,11 +2,11 @@
 
 LFM-ORBIT is a local-first satellite timelapse triage system. A space-side agent scans map cells and prunes low-value frames before downlink; a ground-side agent reviews retained evidence packets with provenance, timelapse context, CV boxes, local model reasoning, and compact proof JSON.
 
-The default showcase is deterministic, credential-free, and release-verifiable. It proves the pipeline without claiming unattended autonomy or direct image-conditioned production inference.
+The default showcase is deterministic, credential-free, and release-verifiable. It proves the pipeline without claiming unattended autonomy. Image-conditioned review is optional and only claimed when the configured image runtime reports enabled.
 
 [Hackathon event](https://luma.com/n9cw58h0) | [Docs](docs/README.md) | [Demo guide](docs/user/DEMO_GUIDE.md) | [Validation snapshot](#validation-snapshot)
 
-Public playback links will point to YouTube once published. The generated WebM media stays tracked under `docs/media/videos/` for release assets and local audit.
+Public video playback is handled outside GitHub. The generated WebM media stays tracked under `docs/media/videos/` for release assets and local audit.
 
 ![What is LFM-ORBIT?](docs/media/infographics/what-is-lfm-orbit-info.png)
 
@@ -120,14 +120,14 @@ flowchart LR
   H --> I[Audit UI + dataset export]
 ```
 
-Current runtime: SimSat/Mapbox hackathon satellite-data API family, default SimSat Sentinel scanning lane, optional SimSat Mapbox imagery/context lane, deterministic replay fixtures for repeatable demos, and shared Satellite/Ground Liquid evidence-packet reasoning when the manifest-resolved local GGUF runtime is available. NM-UNI training proof is surfaced from `training_result_manifest.json`; production image-conditioned inference is not claimed unless `mmproj` or native VLM runtime support is present and wired.
+Current runtime: SimSat/Mapbox hackathon satellite-data API family, default SimSat Sentinel scanning lane, optional SimSat Mapbox imagery/context lane, deterministic replay fixtures for repeatable demos, and shared Satellite/Ground Liquid evidence-packet reasoning when the manifest-resolved local GGUF runtime is available. NM-UNI training proof is surfaced from `training_result_manifest.json`. Selected retained frames can use the opt-in `/api/inference/image` image-conditioned review path when `ORBIT_IMAGE_CONDITIONED_INFERENCE=true` and a real `transformers_vlm` adapter is loaded; otherwise Orbit remains in evidence-packet reasoning mode and returns structured unavailable or abstain responses.
 
 ## Validation Snapshot
 
 | Check | Current State |
 |---|---|
 | Root verify | `.\run.ps1 -Verify` passing |
-| Backend tests | `465 passed` |
+| Backend tests | `479 passed` |
 | Frontend | typecheck + build passing |
 | Playwright E2E | `98 passed`, `6 skipped` |
 | Docs/import guards | `22 passed` |
@@ -156,7 +156,7 @@ This writes `model_manifest.json`, preserves `orbit_model_handoff.json` as `sour
 ```text
 Training modality: image-text SFT in the fetched handoff
 Runtime mode: text evidence-packet reasoning
-Direct image inference: unavailable until mmproj/native VLM runtime is present
+Image-conditioned review: available only when `/api/analysis/status` reports `image_conditioned_runtime_enabled=true`
 ```
 
 The production launcher path installs `llama-cpp-python` and runs the trained-model smoke check. If the GGUF runtime cannot load, option 1 fails before the app starts instead of silently running the hackathon path without the trained model.
@@ -189,6 +189,8 @@ API: `http://127.0.0.1:8000`
 
 MIT. See [LICENSE](LICENSE).
 
+NM-UNI is our unreleased companion training/evaluation pipeline. NM-UNI may use Liquid AI's open-source Leap Tune plugin during tuning workflow support; Leap Tune remains Liquid AI-owned/open-source tooling.
+
 ## Docs
 
 | Doc | Purpose |
@@ -199,6 +201,7 @@ MIT. See [LICENSE](LICENSE).
 | [docs/user/OBJECT_EVIDENCE_MODE.md](docs/user/OBJECT_EVIDENCE_MODE.md) | Target-pack proof contracts, safety scope, and current UI boundaries |
 | [docs/dev/DATASET_CYCLE_TUTORIAL.md](docs/dev/DATASET_CYCLE_TUTORIAL.md) | Seed, export, retag, and Hugging Face cycle |
 | [docs/dev/MODEL_HANDOFF.md](docs/dev/MODEL_HANDOFF.md) | Model bundle and dataset handoff contract |
+| [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) | NM-UNI and third-party tooling attribution |
 | [docs/dev/FUTURE_SENTINEL_LANES.md](docs/dev/FUTURE_SENTINEL_LANES.md) | Post-handoff Sentinel lane boundaries |
 | [docs/dev/TODO.md](docs/dev/TODO.md) | Compact active backlog and verification checklist |
 

@@ -63,7 +63,7 @@ These routes support backend contracts, fixtures, replay proof, and future model
 - Fixture boxes must disclose `box_source=visual_story_fixture` and must not be described as live model detections.
 - Critical-minerals output stays region-level unless independently validated.
 - Coastal debris/slick and HAB-style outputs stay candidate-only without external confirmation.
-- Image-trained artifacts are not described as direct image-conditioned runtime inference unless `/api/analysis/status` reports `image_conditioned_runtime_enabled=true`.
+- Image-trained artifacts are not described as image-conditioned runtime inference unless `/api/analysis/status` reports `image_conditioned_runtime_enabled=true`.
 
 ## Data Flow
 

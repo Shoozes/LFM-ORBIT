@@ -111,3 +111,76 @@ def test_add_gallery_item_stores_evidence_provenance(monkeypatch, tmp_path):
     assert item is not None
     assert item["context_thumb_source"] == "seeded_cache"
     assert item["timelapse_source"] == "replay"
+
+
+def test_visual_review_image_prefers_retained_context_thumb(monkeypatch, tmp_path):
+    db_path = tmp_path / "agent_bus.sqlite"
+    monkeypatch.setenv("AGENT_BUS_PATH", str(db_path))
+
+    gallery.init_gallery(reset=True)
+    gallery.add_gallery_item(
+        cell_id="sq_review_context",
+        lat=10.0,
+        lng=20.0,
+        severity="medium",
+        change_score=0.5,
+        fetch_thumb=False,
+        context_thumb="data:image/png;base64,provided",
+        context_thumb_source="seeded_cache",
+        timelapse_b64="data:video/webm;base64,video",
+        timelapse_source="replay",
+    )
+
+    result = gallery.get_visual_review_image("sq_review_context")
+
+    assert result["available"] is True
+    assert result["image_b64"] == "data:image/png;base64,provided"
+    assert result["frame_id"] == "after_best_context_thumb"
+    assert result["source"] == "seeded_cache"
+    assert result["runtime_truth_mode"] == "replay"
+    assert result["imagery_origin"] == "seeded_cache"
+    assert result["bbox"] == [19.95, 9.95, 20.05, 10.05]
+
+
+def test_visual_review_image_falls_back_to_timelapse_frame(monkeypatch, tmp_path):
+    db_path = tmp_path / "agent_bus.sqlite"
+    monkeypatch.setenv("AGENT_BUS_PATH", str(db_path))
+    monkeypatch.setattr(
+        gallery,
+        "_timelapse_representative_frame",
+        lambda value: "data:image/png;base64,timelapse-frame",
+    )
+
+    gallery.init_gallery(reset=True)
+    gallery.add_gallery_item(
+        cell_id="sq_review_timelapse",
+        lat=10.0,
+        lng=20.0,
+        severity="medium",
+        change_score=0.5,
+        fetch_thumb=False,
+        context_thumb="data:image/svg+xml;base64,offline",
+        context_thumb_source="offline_svg",
+        timelapse_b64="data:video/webm;base64,video",
+        timelapse_source="replay",
+    )
+
+    result = gallery.get_visual_review_image("sq_review_timelapse", frame_selector="after_window")
+
+    assert result["available"] is True
+    assert result["image_b64"] == "data:image/png;base64,timelapse-frame"
+    assert result["frame_id"] == "after_window_timelapse_frame"
+    assert result["source"] == "replay"
+
+
+def test_visual_review_image_reports_structured_unavailable(monkeypatch, tmp_path):
+    db_path = tmp_path / "agent_bus.sqlite"
+    monkeypatch.setenv("AGENT_BUS_PATH", str(db_path))
+
+    gallery.init_gallery(reset=True)
+
+    result = gallery.get_visual_review_image("sq_missing")
+
+    assert result["available"] is False
+    assert result["cell_id"] == "sq_missing"
+    assert result["reason"] == "cell not in gallery"

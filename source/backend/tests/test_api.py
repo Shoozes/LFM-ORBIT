@@ -579,6 +579,46 @@ def test_image_inference_endpoint_rejects_missing_image_payload():
     assert response.status_code == 422
 
 
+def test_gallery_visual_review_image_endpoint_returns_retained_image(monkeypatch, tmp_path):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    from core.gallery import add_gallery_item, init_gallery
+
+    init_gallery(reset=True)
+    add_gallery_item(
+        cell_id="sq_api_visual",
+        lat=10.0,
+        lng=20.0,
+        severity="medium",
+        change_score=0.5,
+        fetch_thumb=False,
+        context_thumb="data:image/png;base64,provided",
+        context_thumb_source="seeded_cache",
+    )
+
+    response = client.get("/api/gallery/sq_api_visual/visual-review-image")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["available"] is True
+    assert data["image_b64"] == "data:image/png;base64,provided"
+    assert data["source"] == "seeded_cache"
+    assert data["bbox"] == [19.95, 9.95, 20.05, 10.05]
+
+
+def test_gallery_visual_review_image_endpoint_reports_missing_cell(monkeypatch, tmp_path):
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    from core.gallery import init_gallery
+
+    init_gallery(reset=True)
+
+    response = client.get("/api/gallery/sq_missing/visual-review-image")
+
+    assert response.status_code == 404
+    data = response.json()
+    assert data["available"] is False
+    assert data["reason"] == "cell not in gallery"
+
+
 def test_analysis_alert_endpoint_returns_ground_result(monkeypatch):
     """Analysis alert endpoint must return a ground model result for valid input."""
     monkeypatch.setenv("ORBIT_GROUND_GGUF_ANALYSIS", "false")

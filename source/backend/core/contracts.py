@@ -135,6 +135,20 @@ class ObjectEvidencePayload(TypedDict):
     object_deltas: NotRequired[list[ObjectDelta]]
 
 
+class VisualModelReview(TypedDict):
+    enabled: bool
+    image_conditioned: bool
+    runtime_backend: str
+    runtime_inference_mode: str
+    response: str
+    reason: str
+    visual_model: NotRequired[str]
+    image_source: NotRequired[str]
+    frame_id: NotRequired[str]
+    bbox: NotRequired[list[float]]
+    reviewed_at: NotRequired[str]
+
+
 class AlertRecord(TypedDict):
     event_id: str
     region_id: str
@@ -156,6 +170,7 @@ class AlertRecord(TypedDict):
     boundary_context: NotRequired[list[BoundaryContext]]
     detection_summary: NotRequired[DetectionSummary]
     object_deltas: NotRequired[list[ObjectDelta]]
+    visual_model_review: NotRequired[VisualModelReview]
 
 
 class MetricsFlaggedExample(TypedDict):
