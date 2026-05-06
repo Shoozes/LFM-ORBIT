@@ -12,11 +12,13 @@ import {
   waitForVideoReady,
 } from "./runtime";
 import {
+  clickWithPulse,
   hideSubtitle,
   moveMouseToHighlight,
   removeHighlight,
   showSubtitle,
   showTutorialCard,
+  typeLikeOperator,
 } from "./tutorialHelpers";
 
 test.use({
@@ -281,15 +283,15 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
   );
   await removeHighlight(page);
 
-  await page.getByTestId("tab-agents").click();
+  await clickWithPulse(page, page.getByTestId("tab-agents"), "OPEN");
   const chatInput = page.getByPlaceholder("Request replay, mission pack, link action...");
   await moveMouseToHighlight(page, "textarea[placeholder='Request replay, mission pack, link action...']");
   await showVoiceoverSubtitle(
     page,
     "You can launch a mission with plain chat. Just ask the GROUND AGENT for the search you want.",
   );
-  await chatInput.fill("run a Rondonia deforestation mission");
-  await page.getByRole("button", { name: "Send" }).click();
+  await typeLikeOperator(page, chatInput, "run a Rondonia deforestation mission", { label: "TYPE" });
+  await clickWithPulse(page, page.getByRole("button", { name: "Send" }), "SEND");
   await removeHighlight(page);
 
   const missionProposal = page.getByTestId("ground-agent-proposal-card").last();
@@ -302,7 +304,7 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
   );
 
   await moveMouseToHighlight(page, "[data-testid='ground-agent-run-proposal']");
-  await missionProposal.getByRole("button", { name: "Launch Mission" }).click();
+  await clickWithPulse(page, missionProposal.getByRole("button", { name: "Launch Mission" }), "LAUNCH");
   await removeHighlight(page);
   await expect(page.locator('[data-testid="mission-progress-status"], [data-testid="mission-complete-summary"]').first()).toBeVisible({ timeout: 30_000 });
   await showVoiceoverSubtitle(
@@ -310,7 +312,7 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
     "Mission launched. The SPACE AGENT starts sweeping the selected GRID, cell by cell.",
   );
 
-  await page.getByTestId("tab-mission").click();
+  await clickWithPulse(page, page.getByTestId("tab-mission"), "OPEN");
   await expect(page.locator('[data-testid="mission-progress-status"], [data-testid="mission-complete-summary"]').first()).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/cells scanned|cells recorded/i).first()).toBeVisible({ timeout: 30_000 });
   await moveMouseToHighlight(page, "[data-testid='map-area-tools']");
@@ -326,14 +328,19 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
     8_200,
   );
 
-  await page.getByTestId("tab-agents").click();
+  await clickWithPulse(page, page.getByTestId("tab-agents"), "OPEN");
   await moveMouseToHighlight(page, "textarea[placeholder='Request replay, mission pack, link action...']");
   await showVoiceoverSubtitle(
     page,
     "For a clean demo, we ask the GROUND AGENT to load a deterministic Rondonia replay. That keeps the proof repeatable.",
   );
-  await chatInput.fill("load the Rondonia deforestation replay and explain the clearing, road, exposed soil, and boundary targets");
-  await page.getByRole("button", { name: "Send" }).click();
+  await typeLikeOperator(
+    page,
+    chatInput,
+    "load the Rondonia deforestation replay and explain the clearing, road, exposed soil, and boundary targets",
+    { label: "TYPE", delayMs: 32 },
+  );
+  await clickWithPulse(page, page.getByRole("button", { name: "Send" }), "SEND");
   await removeHighlight(page);
 
   const replayProposal = page.getByTestId("ground-agent-proposal-card").last();
@@ -347,7 +354,7 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
   );
 
   await moveMouseToHighlight(page, "[data-testid='ground-agent-run-proposal']");
-  await replayProposal.getByRole("button", { name: "Run Replay" }).click();
+  await clickWithPulse(page, replayProposal.getByRole("button", { name: "Run Replay" }), "RUN");
   await removeHighlight(page);
   await expect(page.getByText(`REPLAY ACTIVE: ${RONDONIA_REPLAY_ID}`)).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("tab-inspect")).toHaveClass(/border-zinc-900/);
@@ -356,7 +363,7 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
     "The replay restores a completed scan: grid cells swept, low-value imagery pruned, and retained evidence ready for review.",
   );
 
-  await page.getByTestId("tab-logs").click();
+  await clickWithPulse(page, page.getByTestId("tab-logs"), "OPEN");
   await expect(page.getByText(`Replay Bundle · ${RONDONIA_REPLAY_ID}`)).toBeVisible({ timeout: 10_000 });
   await expect(page.getByTestId("alert-button").filter({ hasText: RONDONIA_PRIMARY_CELL })).toBeVisible({ timeout: 10_000 });
   await showVoiceoverSubtitle(
@@ -364,7 +371,7 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
     "Logs show the point of AI in space: the ground side receives retained evidence packets, not every raw image.",
   );
   await moveMouseToHighlight(page, "[data-testid='alert-button']");
-  await page.getByTestId("alert-button").filter({ hasText: RONDONIA_PRIMARY_CELL }).click();
+  await clickWithPulse(page, page.getByTestId("alert-button").filter({ hasText: RONDONIA_PRIMARY_CELL }), "INSPECT");
   await removeHighlight(page);
 
   await expect(page.getByText("Cached API Replay Evidence")).toBeVisible({ timeout: 15_000 });
@@ -396,7 +403,7 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
   await removeHighlight(page);
 
   await moveMouseToHighlight(page, "[data-testid='analyze-button']");
-  await page.locator("[data-testid='analyze-button']").click();
+  await clickWithPulse(page, "[data-testid='analyze-button']", "ANALYZE");
   await removeHighlight(page);
   await expect(page.getByText(/offline_lfm_v1|LFM2\.5-VL-450M-Q4_0\.gguf/).first()).toBeVisible({ timeout: 15_000 });
   await showVoiceoverSubtitle(
@@ -416,7 +423,7 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
     page,
     "COMPACT PROOF JSON is the downlink story: raw imagery can stay local while the audit packet stays small.",
   );
-  await page.getByTestId("proof-mode-button").click();
+  await clickWithPulse(page, page.getByTestId("proof-mode-button"), "PROOF");
   await removeHighlight(page);
   await expect(page.getByTestId("proof-mode-panel")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("demo-title")).toContainText("Rondonia land-use-change proof", { timeout: 30_000 });

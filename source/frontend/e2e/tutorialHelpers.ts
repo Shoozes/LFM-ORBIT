@@ -1,4 +1,10 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
+
+type TutorialTarget = Locator | string;
+
+function targetLocator(page: Page, target: TutorialTarget): Locator {
+  return typeof target === "string" ? page.locator(target).first() : target.first();
+}
 
 export async function showSubtitle(page: Page, text: string, durationMs = 3000) {
   await page.evaluate((msg) => {
@@ -24,6 +30,8 @@ export async function showSubtitle(page: Page, text: string, durationMs = 3000) 
       "TAGGED TRAINING DATA": "#86efac",
       "TRAINING DATA": "#86efac",
       "HIGH-STAKES": "#fb7185",
+      "CLICK": "#fde047",
+      "TYPE": "#fde047",
     };
     const escapeHtml = (value: string) => value
       .replace(/&/g, "&amp;")
@@ -162,9 +170,89 @@ export async function moveMouseToHighlight(page: Page, selector: string) {
   });
 }
 
+export async function showClickPulse(
+  page: Page,
+  target: TutorialTarget,
+  label = "CLICK",
+) {
+  const el = targetLocator(page, target);
+  await expect(el).toBeVisible();
+  const box = await el.boundingBox();
+  if (!box) {
+    return;
+  }
+
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y, { steps: 12 });
+  await page.evaluate(({ xPos, yPos, text }) => {
+    const styleId = "tutorial-click-pulse-style";
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement("style");
+      style.id = styleId;
+      style.textContent = `
+        @keyframes tutorial-click-ring {
+          0% { opacity: 0; transform: translate(-50%, -50%) scale(0.42); }
+          18% { opacity: 1; transform: translate(-50%, -50%) scale(0.7); }
+          100% { opacity: 0; transform: translate(-50%, -50%) scale(1.55); }
+        }
+        @keyframes tutorial-click-dot {
+          0%, 100% { transform: translate(-50%, -50%) scale(1); }
+          50% { transform: translate(-50%, -50%) scale(1.18); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    const pulse = document.createElement("div");
+    pulse.className = "tutorial-click-pulse";
+    pulse.style.position = "fixed";
+    pulse.style.left = `${xPos}px`;
+    pulse.style.top = `${yPos}px`;
+    pulse.style.zIndex = "100001";
+    pulse.style.pointerEvents = "none";
+    pulse.innerHTML = `
+      <div style="position:absolute;left:0;top:0;width:78px;height:78px;border:4px solid #fde047;border-radius:999px;box-shadow:0 0 36px rgba(253,224,71,0.72);animation:tutorial-click-ring 1320ms ease-out both"></div>
+      <div style="position:absolute;left:0;top:0;width:18px;height:18px;background:#fde047;border:2px solid #111827;border-radius:999px;box-shadow:0 0 24px rgba(253,224,71,0.95);animation:tutorial-click-dot 520ms ease-out both"></div>
+      <div style="position:absolute;left:34px;top:28px;background:rgba(17,24,39,0.94);color:#fde047;border:1px solid rgba(253,224,71,0.65);border-radius:999px;padding:6px 9px;font-family:system-ui,sans-serif;font-size:11px;font-weight:900;letter-spacing:0.17em;text-transform:uppercase;white-space:nowrap">${text}</div>
+    `;
+    document.body.appendChild(pulse);
+    window.setTimeout(() => pulse.remove(), 1_560);
+  }, { xPos: x, yPos: y, text: label });
+  await page.waitForTimeout(640);
+}
+
+export async function clickWithPulse(
+  page: Page,
+  target: TutorialTarget,
+  label = "CLICK",
+  pauseAfterMs = 520,
+) {
+  const el = targetLocator(page, target);
+  await showClickPulse(page, el, label);
+  await el.click();
+  await page.waitForTimeout(pauseAfterMs);
+}
+
+export async function typeLikeOperator(
+  page: Page,
+  target: TutorialTarget,
+  text: string,
+  options: { label?: string; delayMs?: number; pauseAfterMs?: number } = {},
+) {
+  const el = targetLocator(page, target);
+  await expect(el).toBeVisible();
+  await showClickPulse(page, el, options.label ?? "TYPE");
+  await el.click();
+  await el.fill("");
+  await el.pressSequentially(text, { delay: options.delayMs ?? 38 });
+  await page.waitForTimeout(options.pauseAfterMs ?? 850);
+}
+
 export async function removeHighlight(page: Page) {
   await page.evaluate(() => {
     document.getElementById("tutorial-highlight")?.remove();
+    document.querySelectorAll(".tutorial-click-pulse").forEach((node) => node.remove());
   });
 }
 
