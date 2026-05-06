@@ -454,8 +454,14 @@ ensure_trained_model() {
     else
         local model_repo_id="${LFM_MODEL_REPO_ID:-${CANOPY_SENTINEL_MODEL_REPO_ID:-$DEFAULT_MODEL_REPO_ID}}"
         local model_revision="${LFM_MODEL_REVISION:-${CANOPY_SENTINEL_MODEL_REVISION:-$DEFAULT_MODEL_REVISION}}"
+        local moving_model_revision=false
+        case "$model_revision" in
+            main|master|latest|MAIN|MASTER|LATEST)
+                moving_model_revision=true
+                ;;
+        esac
 
-        if "$PYTHON_CMD" - "$MODEL_MANIFEST" "$MODEL_FILE" "$model_repo_id" "$model_revision" "$min_size_bytes" <<'PY'
+        if [[ "$moving_model_revision" != true ]] && "$PYTHON_CMD" - "$MODEL_MANIFEST" "$MODEL_FILE" "$model_repo_id" "$model_revision" "$min_size_bytes" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -477,6 +483,9 @@ PY
         then
             echo "[i] Trained Orbit GGUF already present from $model_repo_id@$model_revision."
             return
+        fi
+        if [[ "$moving_model_revision" == true && -f "$MODEL_FILE" ]]; then
+            echo "[i] Moving Hugging Face revision '$model_revision' requested. Refreshing trained Orbit GGUF..."
         fi
 
         echo "[*] Fetching trained Orbit GGUF bundle..."

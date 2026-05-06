@@ -442,6 +442,7 @@ function Ensure-TrainedModel {
         $modelRevision = $env:LFM_MODEL_REVISION
         if (-not $modelRevision) { $modelRevision = $env:CANOPY_SENTINEL_MODEL_REVISION }
         if (-not $modelRevision) { $modelRevision = $DefaultModelRevision }
+        $movingModelRevision = ([string]$modelRevision).ToLowerInvariant() -in @("main", "master", "latest")
 
         $installedRepoId = ""
         $installedRevision = ""
@@ -460,10 +461,14 @@ function Ensure-TrainedModel {
         if (Test-Path $ModelFile) {
             $fileSize = (Get-Item $ModelFile).Length
             if ($fileSize -ge $minSizeBytes -and $installedRepoId -eq $modelRepoId -and $installedRevision -eq $modelRevision) {
-                Write-Host "    Trained Orbit GGUF already present from $modelRepoId@$modelRevision ($([Math]::Round($fileSize / 1MB, 1)) MB)." -ForegroundColor Gray
-                return
+                if (-not $movingModelRevision) {
+                    Write-Host "    Trained Orbit GGUF already present from $modelRepoId@$modelRevision ($([Math]::Round($fileSize / 1MB, 1)) MB)." -ForegroundColor Gray
+                    return
+                }
+                Write-Host "    Moving Hugging Face revision '$modelRevision' requested. Refreshing trained Orbit GGUF..." -ForegroundColor Yellow
+            } else {
+                Write-Host "    Existing GGUF is missing or does not match the trained Orbit handoff. Refreshing..." -ForegroundColor Yellow
             }
-            Write-Host "    Existing GGUF is missing or does not match the trained Orbit handoff. Refreshing..." -ForegroundColor Yellow
         }
 
         Write-Host "[*] Fetching trained Orbit GGUF bundle..." -ForegroundColor Cyan

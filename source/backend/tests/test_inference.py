@@ -1,3 +1,6 @@
+import threading
+
+import core.inference as inference
 from core.inference import _llama_init_kwargs, _should_patch_llama_chat_templates, parse_output
 
 
@@ -44,3 +47,30 @@ def test_parse_output_extracts_valid_tool_json():
     assert parsed["tool_calls"] == [
         {"name": "zoom", "arguments": {"cell_id": "sq_1_2"}}
     ]
+
+
+def test_generate_serializes_llama_completion_calls(monkeypatch):
+    entered = threading.Event()
+    completed = threading.Event()
+
+    class FakeModel:
+        def create_chat_completion(self, **_kwargs):
+            entered.set()
+            return {"choices": [{"message": {"content": "locked completion"}}]}
+
+    monkeypatch.setattr(inference, "_get_model", lambda: FakeModel())
+
+    with inference._generation_lock:
+        worker = threading.Thread(
+            target=lambda: (
+                inference.generate("hello", max_tokens=4),
+                completed.set(),
+            )
+        )
+        worker.start()
+        assert not entered.wait(0.15)
+        assert not completed.is_set()
+
+    worker.join(timeout=2)
+    assert entered.is_set()
+    assert completed.is_set()

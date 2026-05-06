@@ -1,6 +1,6 @@
 # TODO
 
-Updated **May 5, 2026**.
+Updated **May 6, 2026**.
 
 This is the compact backlog and integrity checklist. Keep run-by-run history in `summary_bank.json`; keep product proof in `README.md`; keep implementation contracts in focused docs.
 
@@ -29,6 +29,8 @@ See [QA_PITFALLS.md](QA_PITFALLS.md) for the detailed guardrail checklist.
 - Frontend reloads must not restart an active mission from the first scan cell or let stale demo query params override a live mission.
 - Public README proof currently centers on Critical Minerals, target-pack proof, payload reduction, orbital eclipse queueing, provenance, abstain safety, Greenland timelapse context, Ground Agent flow, and semantic map context.
 - The current trained NM-UNI bundle is fetched from `Shoozes/lfm2.5-450m-vl-orbit-satellite`; Orbit still treats it as evidence-packet reasoning until a direct image-conditioned adapter is wired and smoke-tested.
+- Option 1 / `-Install` / `--install` refresh moving Hugging Face model refs such as `main` instead of assuming the installed manifest is current.
+- The shared trained GGUF runtime serializes completion calls so simultaneous satellite/ground-agent generations cannot crash the native llama.cpp context.
 - Docs are split by audience: `docs/user/` is for demo/review operators, `docs/dev/` is for architecture, data/model handoff, future lanes, QA, and backlog work.
 - Tracked ad hoc backend scratch probes are pruned; use maintained scripts, tests, or documented manual provider probes instead.
 - Manual Sentinel WMS connectivity/evalscript checks live in `source/backend/scripts/probe_sentinel_wms.py`; root-level `test_*.py` probes are intentionally blocked by import-contract tests.
@@ -125,6 +127,7 @@ Model/runtime:
 - Image-trained artifacts are not described as direct image-conditioned Orbit inference unless `/api/analysis/status` reports `image_conditioned_runtime_enabled=true`.
 - `/api/inference/image` stays structured and provenance-rich when unavailable.
 - A future image-conditioned adapter must prove different image inputs affect output before enabling runtime image claims.
+- Shared local GGUF inference must remain process-serialized unless the runtime is replaced with a concurrency-safe server or per-agent model context.
 
 ## Verification Commands
 
@@ -152,3 +155,5 @@ Model/runtime:
 - May 6 retrained model refresh: fetched `Shoozes/lfm2.5-450m-vl-orbit-satellite@main` revision `2a8c57cbb7f4dda26d5faff2ec3e31a5cbd2f4b8`; the local manifest reports task `wildfire_detection`, `5670` train rows, `5670` multimodal rows, `6758` image blocks, and `630` eval rows. GGUF smoke passed and `.\run.ps1 -Verify` passed with backend `463`, frontend lint/build, and Playwright `98`/`6` skipped.
 - May 6 tutorial refresh: `npx playwright test e2e/tutorial_video.spec.ts` passed and regenerated a `237s` paced walkthrough that frames the app in plain language, launches a mission from Ground Agent chat, explains grid scanning and acquisition frames, shows retained semantic evidence, and ends on Proof Mode plus a final anomaly-found result card.
 - May 6 tutorial interaction polish: the tutorial helper now records visible click pulses and operator-style typed Ground Agent prompts; `npx playwright test e2e/tutorial_video.spec.ts` passed and regenerated a `260s` walkthrough with clearer Send/Launch/Run/Inspect/Analyze/Proof action cues.
+- May 6 retrained model refresh #2: cold reset passed, the latest `Shoozes/lfm2.5-450m-vl-orbit-satellite@main` was forced from remote revision `40a2ebdfeab056a7e0da8c41677d592e8bd2199d`, local training metadata reports task `wildfire_detection`, `7245` train/multimodal rows, `8335` image blocks, and `805` eval rows, and GGUF SHA256 is `7A0A6535BB144487AEBFFD947C56BEDCDC15A1F7F72B9E0D83A63308FB37B4E3`. A concurrent llama.cpp crash found during tutorial Playwright was fixed by serializing shared GGUF completions; `.\run.ps1 -Verify` passed with backend `464 passed`, GGUF smoke, frontend lint/build, and Playwright passing.
+- May 6 public media refresh #2: `npx playwright test e2e/tutorial_video.spec.ts` passed, `npm run demo:record` passed `5`, and docs/import guards passed `22`; regenerated public WebMs remain under `docs/media/videos/`.

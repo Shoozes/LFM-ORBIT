@@ -32,6 +32,7 @@ _TOP_P = 0.9
 
 _model = None
 _model_lock = threading.Lock()
+_generation_lock = threading.RLock()
 _load_attempted = False
 
 
@@ -228,18 +229,19 @@ def stream_tokens(prompt: str, max_tokens: int = _MAX_TOKENS) -> Iterator[str]:
         messages = [
             {"role": "user", "content": prompt}
         ]
-        stream = model.create_chat_completion(
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=_TEMPERATURE,
-            top_p=_TOP_P,
-            stream=True,
-        )
-        for chunk in stream:
-            if "content" in chunk["choices"][0]["delta"]:
-                token = chunk["choices"][0]["delta"]["content"]
-                if token:
-                    yield token
+        with _generation_lock:
+            stream = model.create_chat_completion(
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=_TEMPERATURE,
+                top_p=_TOP_P,
+                stream=True,
+            )
+            for chunk in stream:
+                if "content" in chunk["choices"][0]["delta"]:
+                    token = chunk["choices"][0]["delta"]["content"]
+                    if token:
+                        yield token
     except Exception as exc:
         logger.error("[INF] Stream error: %s", exc)
 
@@ -264,12 +266,13 @@ def generate(prompt: str, max_tokens: int = _MAX_TOKENS) -> dict:
             {"role": "user", "content": prompt}
         ]
         
-        result = model.create_chat_completion(
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=_TEMPERATURE,
-            top_p=_TOP_P,
-        )
+        with _generation_lock:
+            result = model.create_chat_completion(
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=_TEMPERATURE,
+                top_p=_TOP_P,
+            )
         raw = result["choices"][0]["message"]["content"]
         return parse_output(raw)
     except Exception as exc:
