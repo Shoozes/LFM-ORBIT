@@ -4,8 +4,6 @@ Updated **May 6, 2026**.
 
 This is the compact backlog and integrity checklist. Keep run-by-run history in `summary_bank.json`; keep product proof in `README.md`; keep implementation contracts in focused docs.
 
-See [QA_PITFALLS.md](QA_PITFALLS.md) for the detailed guardrail checklist.
-
 ## Current State
 
 - LFM Orbit is a demo-ready, local-first mission-control prototype, not an unattended production deployment.
@@ -34,7 +32,7 @@ See [QA_PITFALLS.md](QA_PITFALLS.md) for the detailed guardrail checklist.
 - Replay rescans start a live mission from replay metadata and now return current model review metadata (`review_model_filename`, `review_model_revision`, `reviewed_at`, presence booleans) without exposing local paths.
 - Option 1 / `-Install` / `--install` refresh moving Hugging Face model refs such as `main` instead of assuming the installed manifest is current.
 - The shared trained GGUF runtime serializes completion calls so simultaneous satellite/ground-agent generations cannot crash the native llama.cpp context.
-- Docs are split by audience: `docs/user/` is for demo/review operators, `docs/dev/` is for architecture, data/model handoff, future lanes, QA, and backlog work.
+- Docs are split by audience: `docs/user/` is for demo/review operators, `docs/dev/` is for active architecture, data/model handoff, and backlog work; older planning notes stay under `docs/dev/archive/`.
 - Tracked ad hoc backend scratch probes are pruned; use maintained scripts, tests, or documented manual provider probes instead.
 - Manual Sentinel WMS connectivity/evalscript checks live in `source/backend/scripts/probe_sentinel_wms.py`; root-level `test_*.py` probes are intentionally blocked by import-contract tests.
 - Manual Sentinel Hub cache refreshes are allowed for development/source-backed replay assets only. The May 5 Lochloosa West Fire seed attempt proved this path stays manual: `sh.txt` credentials resolved, the pre-fire Sentinel-2 L2A frame loaded, the May 4-5 event window was rejected for no-data/insufficient valid pixels, and no one-frame timelapse was written. The SR-26/Balu Forest fire seed succeeded as `sh_83e3aea2` with three real Sentinel-2 L2A burn-scar frames, frame PNGs, and curated replay `florida_sr26_wildfire_replay`; the postfire window remains rejected, so wording stays candidate-only.
@@ -53,7 +51,7 @@ See [QA_PITFALLS.md](QA_PITFALLS.md) for the detailed guardrail checklist.
 - Keep Proof Mode media pre-warmed or trimmed so recorded videos do not linger on black loading states.
 - Promote additional camera/location targets only with semantic profiles: aliases, bbox, center, camera, location type, terrain context, mission context, safe evidence guidance, and tags.
 - Add optional external geocoding behind `/api/location/resolve` only if arbitrary place lookup becomes required. Keep the vetted local registry as the offline/default provider.
-- Keep `marine_debris` and live HAB scoring as post-handoff Sentinel lanes; the combined plan lives in [FUTURE_SENTINEL_LANES.md](FUTURE_SENTINEL_LANES.md).
+- Keep `marine_debris` and live HAB scoring as post-handoff Sentinel lanes. Planning notes are archived under [archive/FUTURE_SENTINEL_LANES.md](archive/FUTURE_SENTINEL_LANES.md).
 
 ## Scope Lock
 

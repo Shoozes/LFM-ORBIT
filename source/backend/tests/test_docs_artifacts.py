@@ -221,20 +221,21 @@ def test_docs_user_and_dev_surfaces_are_separated():
     docs_root = REPO_ROOT / "docs"
     user_docs = sorted(path.name for path in (docs_root / "user").glob("*.md"))
     dev_docs = sorted(path.name for path in (docs_root / "dev").glob("*.md"))
+    archive_docs = sorted(path.name for path in (docs_root / "dev" / "archive").glob("*.md"))
+    release_docs = sorted(path.name for path in (docs_root / "release").glob("*.md"))
     root_docs = sorted(path.name for path in docs_root.glob("*.md"))
 
     assert user_docs == ["DEMO_GUIDE.md", "OBJECT_EVIDENCE_MODE.md"]
+    assert dev_docs == ["ARCHITECTURE.md", "DATASET_CYCLE_TUTORIAL.md", "MODEL_HANDOFF.md", "TODO.md"]
+    assert release_docs == ["v0.4.0-public-proof.md"]
     assert root_docs == ["README.md"]
     assert {
         "AGENT_GROWTH_LOOP.md",
-        "ARCHITECTURE.md",
-        "DATASET_CYCLE_TUTORIAL.md",
         "FUTURE_SENTINEL_LANES.md",
-        "MODEL_HANDOFF.md",
+        "Liquid_AI_x_DPhi_Space_Hackathon_Criteria.md",
         "QA_PITFALLS.md",
         "SENTINEL_CLOSE_LOOKS.md",
-        "TODO.md",
-    }.issubset(set(dev_docs))
+    }.issubset(set(archive_docs))
 
 
 def test_docs_media_files_are_referenced_by_markdown():
@@ -303,11 +304,10 @@ def test_readme_keeps_showcase_first_product_shape():
     required_sections = [
         "![What is LFM-ORBIT?](docs/media/infographics/what-is-lfm-orbit-info.png)",
         "## Run The Showcase",
-        "## Highlights",
+        "## What It Proves",
         "## Proof Gallery",
-        "## Architecture In 60 Seconds",
         "## Validation Snapshot",
-        "## Model And Dataset Handoff",
+        "## Model + Training Loop",
         "## Run Locally",
         "## Limits",
         "## Docs",
@@ -319,8 +319,10 @@ def test_readme_keeps_showcase_first_product_shape():
 
     pre_showcase = markdown[: positions[1]]
     assert "\n## " not in pre_showcase
+    assert "## Architecture In 60 Seconds" not in markdown
+    assert "Public video playback is handled outside GitHub" not in markdown
     assert "## Verified Object Evidence" not in markdown
-    assert "## Timelapse Highlight" not in markdown
+    assert "## Usage To Training Loop" not in markdown
 
 
 def test_readme_documents_minimal_cold_start_prerequisites():
@@ -330,7 +332,6 @@ def test_readme_documents_minimal_cold_start_prerequisites():
     assert "Node.js `20.19.0`" in markdown
     assert "Node.js `22.12.0+`" in markdown
     assert "bootstrap repo-local `uv`" in markdown
-    assert "not a separate manual prerequisite" in markdown
 
 
 def test_summary_bank_file_references_are_repo_relative():

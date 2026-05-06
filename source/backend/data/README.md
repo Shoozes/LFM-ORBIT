@@ -17,7 +17,7 @@ The goal is a closed loop: collect evidence in Orbit, package it cleanly, retag 
 
 ![LFM-ORBIT data cycle](../../../docs/media/infographics/image-to-training-data-flow-info.png)
 
-The app-growth loop starts even earlier: real operator prompts become confirmable actions, tests, docs, local semantics rows, and then future model/app improvements. The full method lives in `../../../docs/dev/AGENT_GROWTH_LOOP.md`.
+The app-growth loop starts even earlier: real operator prompts become confirmable actions, tests, docs, local semantics rows, and then model/app improvements. The archived method note lives in `../../../docs/dev/archive/AGENT_GROWTH_LOOP.md`.
 
 ![App usage to agent growth loop](../../../docs/media/infographics/app-usage-to-agent-growth-info.png)
 
@@ -73,7 +73,7 @@ If a context thumbnail falls back to an offline SVG chip, the exporter rasterize
 
 The file must stay local to the repo and should not be uploaded to Hugging Face. It is too small and product-specific for public training value. It also must not become a hidden gazetteer: location names still resolve through explicit vetted targets or a future geocoding provider behind `/api/location/resolve`.
 
-Future marine-debris examples should stay out of the active fixture until `start_marine_debris_scan` exists in the backend whitelist, scan path, and UI. Prototype those rows in `ground_agent_tool_semantics.local.jsonl` only; future Sentinel lane boundaries live in `../../../docs/dev/FUTURE_SENTINEL_LANES.md`.
+Future marine-debris examples should stay out of the active fixture until `start_marine_debris_scan` exists in the backend whitelist, scan path, and UI. Prototype those rows in `ground_agent_tool_semantics.local.jsonl` only; archived Sentinel lane boundaries live in `../../../docs/dev/archive/FUTURE_SENTINEL_LANES.md`.
 
 ## Optional Sentinel Replay Data
 

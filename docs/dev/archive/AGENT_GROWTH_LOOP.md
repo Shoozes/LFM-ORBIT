@@ -4,7 +4,7 @@ Updated **May 3, 2026**.
 
 This document turns real app usage into repeatable app and agent improvement work. It is the operating method for prompts that reveal product gaps, semantics misses, UX friction, timing issues, or evidence-boundary risk.
 
-![App usage to agent growth loop](../media/infographics/app-usage-to-agent-growth-info.png)
+![App usage to agent growth loop](../../media/infographics/app-usage-to-agent-growth-info.png)
 
 ## Method
 

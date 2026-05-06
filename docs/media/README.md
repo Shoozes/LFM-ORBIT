@@ -12,6 +12,30 @@ This folder keeps generated and hand-polished media out of the main docs root.
 
 Keep `docs/*.md` as the written docs layer. Put new visual artifacts under the appropriate media subfolder, link them from a doc when they are public proof, and update `source/backend/tests/test_docs_artifacts.py` when the artifact is part of the public proof surface. Unreferenced public media is treated as stale. Raw Playwright screenshots should stay under `source/frontend/e2e/screenshots/` or `source/frontend/test-results/` until promoted and visually audited.
 
+## Promoted Media Inventory
+
+- `media/infographics/what-is-lfm-orbit-info.png`
+- `media/infographics/image-to-training-data-flow-info.png`
+- `media/infographics/app-usage-to-agent-growth-info.png`
+- `media/infographics/LFM-ORBIT_Orbital_Edge_Intelligence_Deck.pdf`
+- `media/readme/readme-payload-reduction.png`
+- `media/readme/readme-orbital-eclipse.png`
+- `media/readme/readme-provenance.png`
+- `media/readme/readme-ground-agent-playbook.png`
+- `media/readme/readme-ground-agent-chat-action.png`
+- `media/readme/readme-location-camera-context.png`
+- `media/story-plates/story-critical-minerals-expansion.png`
+- `media/story-plates/story-object-evidence-port.png`
+- `media/timelapse/highlight-greenland-ice-timelapse.gif`
+- `media/timelapse/highlight-greenland-ice-timelapse.webm`
+- `media/videos/showcase-demo.webm`
+- `media/videos/payload-reduction-demo.webm`
+- `media/videos/provenance-demo.webm`
+- `media/videos/abstain-safety-demo.webm`
+- `media/videos/object-evidence-demo.webm`
+- `media/videos/orbital-eclipse-demo.webm`
+- `media/videos/tutorial_video.webm`
+
 ## Truth Rules
 
 - Public README media must show app state that exists in the current build.

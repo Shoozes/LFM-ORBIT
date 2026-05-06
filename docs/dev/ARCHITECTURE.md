@@ -18,6 +18,20 @@ The backend runs two long-lived loops during app lifespan:
 - `core/satellite_agent.py`: orbital scan loop, provider fetch, QC gate, scoring, telemetry emission.
 - `core/ground_agent.py`: message-bus listener, confirmation, gallery/timelapse enrichment, operator-facing validation.
 
+```mermaid
+flowchart LR
+  A[DPhi SimSat imagery] --> B[Scene QC]
+  B --> C[Agent 1: scan + prune]
+  C -->|discard noise/cloud/empty cells| D[No downlink]
+  C -->|candidate anomaly| E[Evidence packet]
+  E --> F[Agent 2: evidence reasoning]
+  F --> G[Compact proof JSON]
+  G -->|link online| H[Ground Validator]
+  G -->|link offline| Q[DTN queue]
+  Q -->|restore| H
+  H --> I[Audit UI + dataset export]
+```
+
 ## End-to-End Flow
 
 1. `MissionControl.tsx` posts mission state to `/api/mission/start` and exposes one-click maritime/lifeline monitor preview cards.

@@ -1,5 +1,4 @@
 ---
-license: mit
 pretty_name: LFM Orbit SatData
 size_categories:
 - n<1K

@@ -142,7 +142,7 @@ May 5, 2026 status: credentials resolved from a local developer secret file; the
 The README uses an animated GIF because it renders through standard Markdown image syntax:
 
 ```markdown
-![Greenland ice/snow Sentinel-2 timelapse](../media/timelapse/highlight-greenland-ice-timelapse.gif)
+![Greenland ice/snow Sentinel-2 timelapse](../../media/timelapse/highlight-greenland-ice-timelapse.gif)
 ```
 
 The current GIF is generated from:
