@@ -27,9 +27,9 @@ test.use({
 const execFileAsync = promisify(execFile);
 const RONDONIA_REPLAY_ID = "rondonia_frontier_showcase";
 const RONDONIA_PRIMARY_CELL = "sq_-10.0_-63.0";
-const VOICEOVER_WORDS_PER_MINUTE = 135;
-const VOICEOVER_PAD_MS = 1_200;
-const VOICEOVER_MIN_MS = 4_600;
+const VOICEOVER_WORDS_PER_MINUTE = 122;
+const VOICEOVER_PAD_MS = 1_900;
+const VOICEOVER_MIN_MS = 5_600;
 
 const FOREST_BOXES = [
   {
@@ -223,7 +223,7 @@ async function assertTutorialVideoQuality(videoPath: string) {
     videoPath,
   ]);
   const durationSeconds = Number(durationResult.stdout.trim());
-  if (!Number.isFinite(durationSeconds) || durationSeconds < 115 || durationSeconds > 240) {
+  if (!Number.isFinite(durationSeconds) || durationSeconds < 150 || durationSeconds > 300) {
     throw new Error(`Tutorial video should be a paced walkthrough, got ${durationSeconds.toFixed(2)}s.`);
   }
 
@@ -249,7 +249,7 @@ async function assertTutorialVideoQuality(videoPath: string) {
 }
 
 test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, request }, testInfo) => {
-  test.setTimeout(380_000);
+  test.setTimeout(460_000);
 
   await mockTutorialVision(page);
   await resetRuntimeState(request);
@@ -262,22 +262,22 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
 
   await showVoiceoverSubtitle(
     page,
-    "LFM-ORBIT scans areas on a map, checks image FRAMES over time, and looks for the ANOMALY you ask for.",
-    5_800,
+    "LFM-ORBIT scans an area on a map, checks the image FRAMES inside a time window, and looks for the ANOMALY you ask for.",
+    7_200,
   );
   await expect(page.locator("#tutorial-subtitle-container")).toBeVisible();
 
   await showVoiceoverSubtitle(
     page,
-    "One AI is the SPACE AGENT. It prunes low-value tiles before downlink. One AI is the GROUND AGENT. It turns the evidence into something a person can review.",
-    7_400,
+    "There are two agents. The SPACE AGENT sweeps the grid and prunes low-value imagery. The GROUND AGENT turns the retained evidence into something a person can review.",
+    8_600,
   );
 
   await moveMouseToHighlight(page, "[data-testid='map-area-tools']");
   await showVoiceoverSubtitle(
     page,
-    "Area Tools now stay on the map. This is where you see the selected bbox, cell count, Draw, and Clear.",
-    5_200,
+    "The selected area stays visible on the map: bbox, cell count, Draw, and Clear are always close to the imagery.",
+    6_400,
   );
   await removeHighlight(page);
 
@@ -286,7 +286,7 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
   await moveMouseToHighlight(page, "textarea[placeholder='Request replay, mission pack, link action...']");
   await showVoiceoverSubtitle(
     page,
-    "You can launch a mission with plain chat. No dashboard hunting: just ask for the search.",
+    "You can launch a mission with plain chat. Just ask the GROUND AGENT for the search you want.",
   );
   await chatInput.fill("run a Rondonia deforestation mission");
   await page.getByRole("button", { name: "Send" }).click();
@@ -298,7 +298,7 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
   await expect(missionProposal).toContainText("deforestation");
   await showVoiceoverSubtitle(
     page,
-    "The GROUND AGENT turns the request into a bbox, date range, target pack, and safety limits before anything changes.",
+    "Before it changes the app, the GROUND AGENT proposes the bbox, date range, search target, and safety limits.",
   );
 
   await moveMouseToHighlight(page, "[data-testid='ground-agent-run-proposal']");
@@ -307,7 +307,7 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
   await expect(page.locator('[data-testid="mission-progress-status"], [data-testid="mission-complete-summary"]').first()).toBeVisible({ timeout: 30_000 });
   await showVoiceoverSubtitle(
     page,
-    "Mission launched. The SPACE AGENT starts sweeping the selected GRID cell by cell.",
+    "Mission launched. The SPACE AGENT starts sweeping the selected GRID, cell by cell.",
   );
 
   await page.getByTestId("tab-mission").click();
@@ -316,21 +316,21 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
   await moveMouseToHighlight(page, "[data-testid='map-area-tools']");
   await showVoiceoverSubtitle(
     page,
-    "Each square is a map tile. Area Tools shows the active selection while the scan reads cells and compares FRAMES inside the time window.",
-    5_800,
+    "Each square is a map tile. Inside each tile, the app compares ACQUISITION FRAMES from the mission time window.",
+    7_000,
   );
   await removeHighlight(page);
   await showVoiceoverSubtitle(
     page,
-    "Most cells are noise. Possible ANOMALY packets get retained so the ground side can focus on evidence instead of hundreds of raw images.",
-    6_200,
+    "Most cells are noise. The important part is fast triage through hundreds or thousands of images without making a person inspect every frame.",
+    8_200,
   );
 
   await page.getByTestId("tab-agents").click();
   await moveMouseToHighlight(page, "textarea[placeholder='Request replay, mission pack, link action...']");
   await showVoiceoverSubtitle(
     page,
-    "For a show-ready walkthrough, we ask the GROUND AGENT to load the same Rondonia story as a deterministic replay.",
+    "For a clean demo, we ask the GROUND AGENT to load a deterministic Rondonia replay. That keeps the proof repeatable.",
   );
   await chatInput.fill("load the Rondonia deforestation replay and explain the clearing, road, exposed soil, and boundary targets");
   await page.getByRole("button", { name: "Send" }).click();
@@ -343,7 +343,7 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
   await expect(replayProposal).toContainText("cached_api");
   await showVoiceoverSubtitle(
     page,
-    "The action card shows truth mode, imagery source, scoring basis, reset impact, and refresh scope.",
+    "The action card shows what will happen: truth mode, imagery source, scoring basis, and what state will be refreshed.",
   );
 
   await moveMouseToHighlight(page, "[data-testid='ground-agent-run-proposal']");
@@ -353,7 +353,7 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
   await expect(page.getByTestId("tab-inspect")).toHaveClass(/border-zinc-900/);
   await showVoiceoverSubtitle(
     page,
-    "The replay restores a completed scan: cells swept, low-value areas pruned, and retained evidence ready for review.",
+    "The replay restores a completed scan: grid cells swept, low-value imagery pruned, and retained evidence ready for review.",
   );
 
   await page.getByTestId("tab-logs").click();
@@ -361,7 +361,7 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
   await expect(page.getByTestId("alert-button").filter({ hasText: RONDONIA_PRIMARY_CELL })).toBeVisible({ timeout: 10_000 });
   await showVoiceoverSubtitle(
     page,
-    "Logs show the point of AI in space: the ground side receives retained evidence packets, not every raw frame.",
+    "Logs show the point of AI in space: the ground side receives retained evidence packets, not every raw image.",
   );
   await moveMouseToHighlight(page, "[data-testid='alert-button']");
   await page.getByTestId("alert-button").filter({ hasText: RONDONIA_PRIMARY_CELL }).click();
@@ -371,24 +371,29 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
   await expect(page.getByTestId("inspect-object-evidence")).toContainText("deforestation", { timeout: 15_000 });
   await expect(page.getByText("Timelapse Evidence", { exact: true })).toBeVisible({ timeout: 15_000 });
   await waitForVideoReady(page, "video", 20_000);
+  await moveMouseToHighlight(page, "video");
   await showVoiceoverSubtitle(
     page,
-    "TIMELAPSE shows acquisition FRAMES over time: canopy baseline, road-edge opening, then persistent clearing.",
+    "This is the visual part: a TIMELAPSE of ACQUISITION FRAMES. Baseline canopy, road-edge opening, then persistent clearing.",
+    8_800,
   );
+  await removeHighlight(page);
 
   await page.getByText("After Window").scrollIntoViewIfNeeded();
   await expect(page.getByText("2025-01-15").first()).toBeVisible({ timeout: 10_000 });
   await showVoiceoverSubtitle(
     page,
-    "A STATIC FRAME is one date. A timelapse is the sequence that makes change visible.",
+    "A STATIC FRAME is one date. The sequence is what makes change visible and reviewable.",
   );
 
   await page.getByText("Object Evidence").first().scrollIntoViewIfNeeded();
   await expect(page.getByTestId("inspect-object-evidence")).toContainText("clearing candidate");
+  await moveMouseToHighlight(page, "[data-testid='inspect-object-evidence']");
   await showVoiceoverSubtitle(
     page,
     "CV BOXES turn pixels into SEMANTIC DATA: clearing candidate, road expansion, canopy-loss boundary.",
   );
+  await removeHighlight(page);
 
   await moveMouseToHighlight(page, "[data-testid='analyze-button']");
   await page.locator("[data-testid='analyze-button']").click();
@@ -396,14 +401,14 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
   await expect(page.getByText(/offline_lfm_v1|LFM2\.5-VL-450M-Q4_0\.gguf/).first()).toBeVisible({ timeout: 15_000 });
   await showVoiceoverSubtitle(
     page,
-    "The local model summarizes the finding without overclaiming. This matters for HIGH-STAKES review.",
+    "The local model summarizes the evidence without overclaiming. That matters when the review may be HIGH-STAKES.",
   );
 
   await page.getByText("Model Training Export").scrollIntoViewIfNeeded();
   await expect(page.getByText("Export Assets")).toBeVisible({ timeout: 10_000 });
   await showVoiceoverSubtitle(
     page,
-    "TAGGED TRAINING DATA keeps the task, bbox, date, source, scores, boxes, and review action.",
+    "The same packet can become TAGGED TRAINING DATA: task, bbox, date, source, scores, boxes, and review action.",
   );
 
   await moveMouseToHighlight(page, "[data-testid='proof-mode-button']");
@@ -422,27 +427,37 @@ test("Tutorial: chat-launched map scan to proof walkthrough", async ({ page, req
   await expect(page.getByTestId("proof-json")).toContainText("confidence_stack");
   await expect(page.getByTestId("proof-json")).toContainText("detections");
   await waitForNextPaint(page, 10);
+  await moveMouseToHighlight(page, "[data-testid='proof-cv-box']");
   await showVoiceoverSubtitle(
     page,
-    "The final PROOF shows retained evidence, confidence, provenance, CV BOXES, and compact JSON.",
+    "FOUND: retained evidence for clearing candidates, road-edge expansion, and a canopy-loss boundary.",
+    7_200,
   );
+  await removeHighlight(page);
+  await moveMouseToHighlight(page, "[data-testid='proof-json']");
+  await showVoiceoverSubtitle(
+    page,
+    "The final PROOF ties it together: where it was found, why it was retained, confidence, provenance, CV BOXES, and compact JSON.",
+    8_800,
+  );
+  await removeHighlight(page);
 
   await hideSubtitle(page);
   await showTutorialCard(
     page,
     {
-      title: "AI-in-space triage, AI-on-ground proof.",
-      body: "Plain request -> mission -> grid scan -> retained evidence -> proof JSON. Rondonia replay evidence shows clearing candidates, road-edge expansion, and proxy-band support with provenance attached.",
+      title: "Result: anomaly found, evidence retained, proof ready.",
+      body: "LFM-ORBIT turns a plain request into a map scan, lets the space agent prune the imagery, lets the ground agent review the retained evidence, and ends with proof JSON a human can audit.",
       tags: [
         "ai_in_space",
         "ground_agent",
         "grid_scan",
+        "anomaly_found",
         "semantic_data",
         "proof_json",
-        "candidate_review",
       ],
     },
-    8_500,
+    13_000,
   );
   await expect(page.getByTestId("tutorial-final-card")).toBeVisible();
 
