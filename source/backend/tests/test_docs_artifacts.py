@@ -309,7 +309,6 @@ def test_readme_keeps_showcase_first_product_shape():
         "## Validation Snapshot",
         "## Model + Training Loop",
         "## Run Locally",
-        "## Limits",
         "## Docs",
     ]
 

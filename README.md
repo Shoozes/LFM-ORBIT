@@ -145,14 +145,6 @@ API: `http://127.0.0.1:8000`
 
 Prerequisites are Python `3.10+` and Node.js `20.19.0` from `.nvmrc` or Node.js `22.12.0+`. The launchers bootstrap repo-local `uv` when it is not already installed.
 
-## Limits
-
-- Demo-ready research prototype, not unattended production autonomy.
-- DPhi SimSat scoring is labeled `proxy_bands`.
-- Replay fixtures are deterministic review assets, not live scans.
-- Fallback paths stay labeled as fallback and must not become high-confidence detections.
-- Image-conditioned review is claimed only when the image runtime reports enabled.
-
 ## Docs
 
 - [Docs index](docs/README.md)
