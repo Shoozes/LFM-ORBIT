@@ -22,7 +22,7 @@ def test_resolve_satellite_model_artifact_defaults(monkeypatch, tmp_path):
 
 def test_resolve_satellite_model_artifact_reads_manifest(monkeypatch, tmp_path):
     runtime_dir = tmp_path / "runtime-data"
-    model_dir = runtime_dir / "models" / "nm-uni-orbit"
+    model_dir = runtime_dir / "models" / "leap-tune-orbit"
     model_dir.mkdir(parents=True, exist_ok=True)
     (model_dir / "hf-checkpoint").mkdir()
     (model_dir / "lora-adapter").mkdir()
@@ -55,9 +55,9 @@ def test_resolve_satellite_model_artifact_reads_manifest(monkeypatch, tmp_path):
     "repo_id": "example/orbit-satellite",
     "revision": "release-1"
   },
-  "model_subdir": "nm-uni-orbit",
-  "model_filename": "nm-uni-orbit-q4.gguf",
-  "mmproj_filename": "nm-uni-orbit-mmproj.gguf",
+  "model_subdir": "leap-tune-orbit",
+  "model_filename": "leap-tune-orbit-q4.gguf",
+  "mmproj_filename": "leap-tune-orbit-mmproj.gguf",
   "base_model": "LiquidAI/LFM2.5-VL-450M",
   "quantization": "Q4_0",
   "task": "deforestation-triage",
@@ -68,7 +68,7 @@ def test_resolve_satellite_model_artifact_reads_manifest(monkeypatch, tmp_path):
     )
     monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(runtime_dir))
     monkeypatch.delenv("CANOPY_SENTINEL_MODEL_MANIFEST", raising=False)
-    monkeypatch.setenv("CANOPY_SENTINEL_MODEL_SUBDIR", "nm-uni-orbit")
+    monkeypatch.setenv("CANOPY_SENTINEL_MODEL_SUBDIR", "leap-tune-orbit")
 
     artifact = model_manifest.resolve_satellite_model_artifact()
 
@@ -76,8 +76,8 @@ def test_resolve_satellite_model_artifact_reads_manifest(monkeypatch, tmp_path):
     assert artifact.revision == "release-1"
     assert artifact.source == "huggingface"
     assert artifact.model_dir == model_dir
-    assert artifact.model_path == model_dir / "nm-uni-orbit-q4.gguf"
-    assert artifact.mmproj_path == model_dir / "nm-uni-orbit-mmproj.gguf"
+    assert artifact.model_path == model_dir / "leap-tune-orbit-q4.gguf"
+    assert artifact.mmproj_path == model_dir / "leap-tune-orbit-mmproj.gguf"
     assert artifact.base_model == "LiquidAI/LFM2.5-VL-450M"
     assert artifact.quantization == "Q4_0"
     assert artifact.task == "deforestation-triage"
@@ -103,7 +103,7 @@ def test_resolve_satellite_model_artifact_reads_manifest(monkeypatch, tmp_path):
     assert status["image_conditioned_runtime_enabled"] is False
 
 
-def test_training_status_reads_nested_nm_uni_manifest(monkeypatch, tmp_path):
+def test_training_status_reads_nested_leap_tune_manifest(monkeypatch, tmp_path):
     runtime_dir = tmp_path / "runtime-data"
     model_dir = runtime_dir / "models" / "lfm2.5-vlm-450m"
     model_dir.mkdir(parents=True, exist_ok=True)

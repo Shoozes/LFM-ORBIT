@@ -281,8 +281,10 @@ def _compact_visual_model_review(review: dict | None) -> dict | None:
     if not isinstance(review, dict):
         return None
     compact: dict[str, Any] = {
+        "status": str(review.get("status") or ("image_conditioned" if review.get("image_conditioned") else "unavailable")),
         "enabled": bool(review.get("enabled", review.get("image_conditioned", False))),
         "image_conditioned": bool(review.get("image_conditioned", False)),
+        "abstained": bool(review.get("abstained", False)),
         "runtime_backend": str(review.get("runtime_backend") or ""),
         "runtime_inference_mode": str(review.get("runtime_inference_mode") or ""),
         "response": str(review.get("response") or "").strip(),
@@ -290,6 +292,10 @@ def _compact_visual_model_review(review: dict | None) -> dict | None:
         "visual_model": str(review.get("visual_model") or ""),
         "image_source": str(review.get("image_source") or ""),
         "frame_id": str(review.get("frame_id") or ""),
+        "runtime_truth_mode": str(review.get("runtime_truth_mode") or ""),
+        "imagery_origin": str(review.get("imagery_origin") or ""),
+        "scoring_basis": str(review.get("scoring_basis") or ""),
+        "model_revision": str(review.get("model_revision") or ""),
     }
     bbox = review.get("bbox")
     if isinstance(bbox, list):

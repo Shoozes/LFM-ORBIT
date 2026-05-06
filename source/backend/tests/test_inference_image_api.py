@@ -23,12 +23,16 @@ def _png_b64() -> str:
 def _configure_fake_image_runtime(monkeypatch):
     monkeypatch.setenv("ORBIT_IMAGE_CONDITIONED_INFERENCE", "true")
     monkeypatch.setenv("ORBIT_IMAGE_INFERENCE_BACKEND", "transformers_vlm")
+    monkeypatch.setenv("ORBIT_IMAGE_VLM_MODEL", "LiquidAI/LFM2.5-VL-450M")
+    monkeypatch.setenv("ORBIT_IMAGE_VLM_TASK", "image-text-to-text")
 
     class FakePipeline:
-        def __call__(self, *, image, question, top_k):
+        def __call__(self, *, text, max_new_tokens, return_full_text):
+            image = text[0]["content"][0]["image"]
             return [{"answer": f"reviewed {image.size[0]}x{image.size[1]} evidence chip"}]
 
     monkeypatch.setattr(multimodal_inference, "_IMAGE_REVIEW_PIPELINE", FakePipeline())
+    monkeypatch.setattr(multimodal_inference, "_IMAGE_RUNTIME_VALIDATED", False)
 
 
 def test_image_inference_api_returns_visual_review_with_metadata(monkeypatch):
@@ -55,6 +59,7 @@ def test_image_inference_api_returns_visual_review_with_metadata(monkeypatch):
     assert data["image_conditioned"] is True
     assert data["runtime_backend"] == "transformers_vlm"
     assert data["runtime_inference_mode"] == "image_conditioned_review"
+    assert data["visual_model"] == "LiquidAI/LFM2.5-VL-450M"
     assert data["response"] == "reviewed 12x12 evidence chip"
     assert data["provenance"]["image_conditioned"] is True
     assert data["provenance"]["image_source"] == "cached_api"
@@ -71,7 +76,7 @@ def test_image_inference_api_rejects_missing_image_payload():
     assert response.status_code == 422
 
 
-def test_image_inference_api_does_not_leak_local_paths(monkeypatch, tmp_path):
+def test_image_inference_api_rejects_public_image_path(monkeypatch, tmp_path):
     _configure_fake_image_runtime(monkeypatch)
     image_path = tmp_path / "review-chip.png"
     Image.new("RGB", (12, 12), (20, 90, 35)).save(image_path)
@@ -85,8 +90,6 @@ def test_image_inference_api_does_not_leak_local_paths(monkeypatch, tmp_path):
         },
     )
 
-    assert response.status_code == 200
-    data = response.json()
-    payload_text = response.text
-    assert data["provenance"]["image_path"] == "review-chip.png"
-    assert str(tmp_path) not in payload_text
+    assert response.status_code == 400
+    assert "image_b64 only" in response.text
+    assert str(tmp_path) not in response.text

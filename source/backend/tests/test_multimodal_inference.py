@@ -19,9 +19,12 @@ def _clear_image_runtime_env(monkeypatch):
         "CANOPY_SENTINEL_MODEL_MMPROJ_FILENAME",
         "ORBIT_IMAGE_VLM_MODEL",
         "ORBIT_IMAGE_VLM_TASK",
+        "ORBIT_IMAGE_REVIEW_MAX_TOKENS",
+        "ORBIT_IMAGE_REVIEW_DEVICE",
     ):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setattr(multimodal_inference, "_IMAGE_REVIEW_PIPELINE", None)
+    monkeypatch.setattr(multimodal_inference, "_IMAGE_RUNTIME_VALIDATED", False)
 
 
 def _png_b64(*, blank: bool = False, clearing: bool = False) -> str:
@@ -121,12 +124,16 @@ def test_generate_with_image_calls_loaded_transformers_adapter(monkeypatch, tmp_
     monkeypatch.setenv("ORBIT_IMAGE_INFERENCE_BACKEND", "transformers_vlm")
 
     class FakePipeline:
-        def __call__(self, *, image, question, top_k):
-            assert question == "Describe visible land-cover change."
-            assert top_k == 1
+        def __call__(self, *, text, max_new_tokens, return_full_text):
+            message = text[0]
+            image = message["content"][0]["image"]
+            question = message["content"][1]["text"]
+            assert "Describe visible land-cover change." in question
+            assert max_new_tokens == 160
+            assert return_full_text is False
             pixel = image.getpixel((0, 0))
             answer = "green canopy remains visible" if pixel[1] > pixel[0] else "exposed clearing is visible"
-            return [{"answer": answer}]
+            return [{"generated_text": answer}]
 
     monkeypatch.setattr(multimodal_inference, "_IMAGE_REVIEW_PIPELINE", FakePipeline())
 
@@ -147,7 +154,8 @@ def test_generate_with_image_calls_loaded_transformers_adapter(monkeypatch, tmp_
     assert payload["runtime_inference_mode"] == "image_conditioned_review"
     assert payload["response"] == "green canopy remains visible"
     assert payload["provenance"]["image_conditioned"] is True
-    assert payload["provenance"]["visual_model"] == "dandelin/vilt-b32-finetuned-vqa"
+    assert payload["visual_model"] == "LiquidAI/LFM2.5-VL-450M"
+    assert payload["provenance"]["visual_model"] == "LiquidAI/LFM2.5-VL-450M"
     assert payload["provenance"]["image_source"] == "cached_api"
     assert payload["provenance"]["frame_id"] == "after_window_2025-01-15"
     assert payload["provenance"]["bbox"] == [-63.05, -10.05, -62.95, -9.95]
@@ -160,11 +168,12 @@ def test_image_review_pixel_sensitivity_smoke(monkeypatch, tmp_path):
     monkeypatch.setenv("ORBIT_IMAGE_INFERENCE_BACKEND", "transformers_vlm")
 
     class FakePipeline:
-        def __call__(self, *, image, question, top_k):
+        def __call__(self, *, text, max_new_tokens, return_full_text):
+            image = text[0]["content"][0]["image"]
             pixel = image.getpixel((0, 0))
             if pixel[1] > pixel[0]:
-                return [{"answer": "vegetation-dominant chip"}]
-            return [{"answer": "exposed-soil-dominant chip"}]
+                return [{"generated_text": "vegetation-dominant chip"}]
+            return [{"generated_text": "exposed-soil-dominant chip"}]
 
     monkeypatch.setattr(multimodal_inference, "_IMAGE_REVIEW_PIPELINE", FakePipeline())
 
@@ -188,5 +197,13 @@ def test_multimodal_status_flips_true_after_adapter_loaded(monkeypatch, tmp_path
     monkeypatch.setattr(multimodal_inference, "_IMAGE_REVIEW_PIPELINE", object())
 
     status_after = multimodal_status()
-    assert status_after["image_conditioned_runtime_enabled"] is True
+    assert status_after["adapter_loaded"] is True
+    assert status_after["image_conditioned_runtime_enabled"] is False
+    assert status_after["image_conditioned_runtime_reason"] == "transformers_vlm image adapter loaded; image smoke has not passed yet"
+
+    monkeypatch.setattr(multimodal_inference, "_IMAGE_RUNTIME_VALIDATED", True)
+    validated_status = multimodal_status()
+    assert validated_status["image_conditioned_runtime_enabled"] is True
+    assert validated_status["adapter_validated"] is True
+    assert validated_status["runtime_inference_mode"] == "image_conditioned_review"
     assert status_after["runtime_inference_mode"] == "image_conditioned_review"

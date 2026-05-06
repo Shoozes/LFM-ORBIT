@@ -113,17 +113,20 @@
       ]
     },
     "docs_model_runtime_and_handoff": {
-      "note": "Supplemental model and fine-tuning handoff docs. README remains product-facing; ARCHITECTURE, TODO, and handoff docs carry implementation detail. NM-UNI is the external dataset-import, model training, GGUF quantization, model-bundle staging, and Hugging Face model-publish lane; Orbit surfaces manifest-backed training/runtime capability status while keeping image-conditioned runtime claims gated behind a real image runtime. The current local handoff reports task orbit-satellite-triage, 7245 train/multimodal rows, 8335 image blocks, 805 eval rows, and GGUF SHA256 7A0A6535BB144487AEBFFD947C56BEDCDC15A1F7F72B9E0D83A63308FB37B4E3. The retained-frame image review lane is opt-in, status-gated, selects its review image through a backend gallery helper, stores compact visual_model_review payloads, and preserves them through replay snapshots and dataset/training exports.",
+      "note": "Supplemental model and fine-tuning handoff docs. README remains product-facing; ARCHITECTURE, TODO, and handoff docs carry implementation detail. LiquidAI Leap Tune-compatible workflows cover dataset import, model training, GGUF quantization, model-bundle staging, and Hugging Face model publishing; Orbit surfaces manifest-backed training/runtime capability status while keeping SAT/GND GGUF claims limited to evidence-packet reasoning. The current local handoff reports task orbit-satellite-triage, 7245 train/multimodal rows, 8335 image blocks, 805 eval rows, and GGUF SHA256 7A0A6535BB144487AEBFFD947C56BEDCDC15A1F7F72B9E0D83A63308FB37B4E3. The retained-frame image review lane is now first-class but opt-in: launchers expose the vision extra through LFM_ORBIT_INSTALL_IMAGE_RUNTIME, with Transformers 5.8+, Torch, Torchvision, Accelerate, and Pillow, .env.example documents LiquidAI/LFM2.5-VL-450M image-text-to-text controls, docs describe the LiquidAI Leap Tune-compatible scan-review-export-train-handoff-replay loop once, and THIRD_PARTY_NOTICES separates LFM-ORBIT, Liquid AI, Leap Tune, and upstream model ownership.",
       "files": [
         "README.md",
+        "RELEASE_NOTES.md",
+        "THIRD_PARTY_NOTICES.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/user/DEMO_GUIDE.md",
+        "docs/dev/DATASET_CYCLE_TUTORIAL.md",
         "docs/dev/MODEL_HANDOFF.md",
-        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "source/backend/assets/evals/object_evidence_gold.jsonl",
         "source/backend/assets/object_targets/default_target_packs.json",
         "source/backend/assets/replays/port_supply_chain_replay.json",
@@ -147,7 +150,7 @@
       ]
     },
     "issue_group_docs_artifact_integrity": {
-      "note": "Docs/media artifact integrity lane: public docs media is organized under docs/media, referenced markdown links are checked relative to each owning file, promoted README images are checked as nonblank, explicit public WebMs are checked as nonblank and temporal, and summary_bank file references must remain repo-relative and existing. May 4 refreshed README screenshots, recorded demo WebMs, tutorial WebM, object-evidence audit media, and Greenland timelapse GIF/WebM; contact-sheet review confirmed app content first frames, grouped port candidates, proof panels, and distinct timelapse slices. May 5 refreshed screenshots/videos for the map-side Area Tools UX, including Ground Agent screenshots, payload/provenance/orbital proof shots, recorded proof WebMs, and the paced tutorial WebM; visual contact sheets confirmed the Area Tools card is visible on map-side selection flows. The latest May 5 publishability pass regenerated the screenshot set, proof videos, and tutorial video, then replaced the Ground Agent proposal README image with a critical-minerals replay proposal so the operator proof matches the main Atacama story. May 6 tutorial media refresh produced a 260s plain-language walkthrough with typed Ground Agent prompts, visible click pulses, chat mission launch, grid scanning, acquisition-frame timelapse, semantic evidence, Proof Mode, and a held anomaly-found result card. May 6 model-refresh validation reran the tutorial video and demo:record, regenerating public WebMs after the shared-GGUF concurrency fix. Object-evidence video is now held long enough to clear the public temporal duration guard. Docs artifact integrity covers nested docs/**/*.md links in addition to README/root docs/source data docs. The docs surface was later pruned back to one root index plus focused docs, and stale docs-root media wording points at docs/media/videos/.",
+      "note": "Docs/media artifact integrity lane: public docs media is organized under docs/media, referenced markdown links are checked relative to each owning file, promoted README images are checked as nonblank, explicit public WebMs are checked as nonblank and temporal, and summary_bank file references must remain repo-relative and existing. May 4 refreshed README screenshots, recorded demo WebMs, tutorial WebM, object-evidence audit media, and Greenland timelapse GIF/WebM; contact-sheet review confirmed app content first frames, grouped port candidates, proof panels, and distinct timelapse slices. May 5 refreshed screenshots/videos for the map-side Area Tools UX, including Ground Agent screenshots, payload/provenance/orbital proof shots, recorded proof WebMs, and the paced tutorial WebM; visual contact sheets confirmed the Area Tools card is visible on map-side selection flows. The latest May 5 publishability pass regenerated the screenshot set, proof videos, and tutorial video, then replaced the Ground Agent proposal README image with a critical-minerals replay proposal so the operator proof matches the main Atacama story. May 6 tutorial media refresh produced a 260s plain-language walkthrough with typed Ground Agent prompts, visible click pulses, chat mission launch, grid scanning, acquisition-frame timelapse, semantic evidence, Proof Mode, and a held anomaly-found result card. May 6 model-refresh validation reran the tutorial video and demo:record, regenerating public WebMs after the shared-GGUF concurrency fix. Final May 6 integrity work fixed Ground Agent playbook screenshot capture to load the seeded Atacama replay before capture, made Proof Mode image-review E2E deterministic with sidecar VLM mocks, and kept docs-video suites serialized on shared ports. Object-evidence video is now held long enough to clear the public temporal duration guard. Docs artifact integrity covers nested docs/**/*.md links in addition to README/root docs/source data docs. The docs surface was later pruned back to one root index plus focused docs, and stale docs-root media wording points at docs/media/videos/.",
       "files": [
         "README.md",
         "docs/user/DEMO_GUIDE.md",
@@ -387,7 +390,7 @@
       ]
     },
     "issue_group_integrity_scalability_review": {
-      "note": "Current May 5 integrity/scalability lane: progress docs stay consolidated into README/product, docs/user/operator review, docs/dev/system-maintenance, QA_PITFALLS/regression checklist, TODO/current backlog, and summary_bank/file groups. The latest pass made the user/dev split explicit, moved dataset/future/Sentinel/agent-growth docs into dev, kept demo/proof contracts in user docs, added a docs guard for that split, and pruned tracked ad hoc backend scratch probes. Recent runtime integrity work also covers scanner resume after frontend reload, stale demo-query isolation from active live missions, telemetry idle-without-mission behavior, SimSat/Mapbox hackathon API positioning with SimSat Sentinel as default and SimSat Mapbox as optional imagery/context, GGUF fetch expectations, public model/status API path sanitization, 3D popup removal, firewatch proxy-only filtering, shared SAT/GND GGUF status, lean Mission UI boundaries, and visible map-side Area Tools for flyover/drawn bbox status and clearing.",
+      "note": "Current May 6 integrity/scalability lane: progress docs stay consolidated into README/product, docs/user/operator review, docs/dev/system-maintenance, QA_PITFALLS/regression checklist, TODO/current backlog, and summary_bank/file groups. The latest pass made the user/dev split explicit, moved dataset/future/Sentinel/agent-growth docs into dev, kept demo/proof contracts in user docs, added a docs guard for that split, and pruned tracked ad hoc backend scratch probes. Recent runtime integrity work also covers scanner resume after frontend reload, stale demo-query isolation from active live missions, telemetry idle-without-mission behavior, SimSat/Mapbox hackathon API positioning with SimSat Sentinel as default and SimSat Mapbox as optional imagery/context, GGUF fetch expectations, public model/status API path sanitization, 3D popup removal, firewatch proxy-only filtering, shared SAT/GND GGUF status, lean Mission UI boundaries, visible map-side Area Tools for flyover/drawn bbox status and clearing, optional image-conditioned retained-frame review, cold-start launcher reproducibility with Python plus Node/npm, and path-safe replay-rescan model metadata.",
       "files": [
         "README.md",
         "docs/README.md",
@@ -763,18 +766,18 @@
       ]
     },
     "feature_group_model_runtime_and_handoff": {
-      "note": "Manifest-based satellite artifact resolution, runtime status exposure, nested fenced JSON tool-call parsing, default NM-UNI trained Orbit GGUF pull from Shoozes/lfm2.5-450m-vl-orbit-satellite, local smoke passed with loaded=true, image-text training manifest with 7245 train/multimodal rows, 8335 image blocks, 805 eval rows, runtime-gated image review capability reporting, shared Satellite Pruner and Ground Validator GGUF evidence-packet reasoning when loaded, deterministic ground fallback when not loaded, model fetch handoff tooling with nonempty GGUF/mmproj guards, launcher FetchModel integration, required trained-model smoke checks for the production launcher path, and Proof Mode image-review UI/proof JSON status that uses the backend retained-image selector and stays unavailable-safe when the adapter is disabled.",
+      "note": "Manifest-based satellite artifact resolution, runtime status exposure, default LiquidAI Leap Tune-compatible trained Orbit GGUF pull from Shoozes/lfm2.5-450m-vl-orbit-satellite, local GGUF smoke checks, and image-text training manifest proof with 7245 train/multimodal rows, 8335 image blocks, and 805 eval rows. SAT/GND GGUF calls remain serialized text evidence-packet reasoning. The separate /api/inference/image lane now targets LiquidAI/LFM2.5-VL-450M through Transformers image-text-to-text, accepts public image_b64 only, rejects public image_path, caps bounded prompts/tokens, returns unavailable/abstain/success states without faking visual evidence, and flips image_conditioned_runtime_enabled only after a real adapter call validates pixel input. Launcher support for the optional vision extra including mandatory Torchvision for Liquid image processors, .env controls, CI-safe fake-adapter tests, and scripts/smoke_image_review.py provide the installable and testable real image-runtime gate. The latest real-runtime smoke passed with a retained seeded frame returning image_conditioned=true and a blank control abstaining, while Transformers generation deprecation warnings are suppressed inside the adapter call so real errors stay visible.",
       "files": [
         ".env.example",
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/user/DEMO_GUIDE.md",
         "docs/dev/MODEL_HANDOFF.md",
-        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "run.ps1",
         "run.sh",
         "source/backend/api/main.py",
@@ -786,12 +789,15 @@
         "source/backend/core/inference.py",
         "source/backend/core/model_manifest.py",
         "source/backend/core/multimodal_inference.py",
-        "source/backend/core/queue.py",
-        "source/backend/core/replay_snapshot.py",
         "source/backend/core/object_evidence.py",
+        "source/backend/core/queue.py",
+        "source/backend/core/replay.py",
+        "source/backend/core/replay_snapshot.py",
         "source/backend/core/vlm.py",
+        "source/backend/pyproject.toml",
         "source/backend/scripts/build_visual_story_proofs.py",
         "source/backend/scripts/fetch_satellite_model.py",
+        "source/backend/scripts/smoke_image_review.py",
         "source/backend/scripts/smoke_satellite_model.py",
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_evaluate_object_evidence.py",
@@ -800,10 +806,11 @@
         "source/backend/tests/test_inference_image_api.py",
         "source/backend/tests/test_model_manifest.py",
         "source/backend/tests/test_multimodal_inference.py",
-        "source/backend/tests/test_queue.py",
         "source/backend/tests/test_object_evidence.py",
+        "source/backend/tests/test_queue.py",
         "source/backend/tests/test_replay.py",
         "source/backend/tests/test_vlm.py",
+        "source/backend/uv.lock",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
@@ -811,19 +818,19 @@
       ]
     },
     "feature_group_dataset_export_and_eval_lane": {
-      "note": "Orbit dataset export, replay-cache export with frame-quality/rejected-window cloud metadata, evidence-mode fields for runtime truth, imagery origin, and scoring basis, optional visual_model_review passthrough from alerts/replays into samples and SFT-style training JSONL metadata, orbit_training_contract_v1 metadata for NM-UNI import/review/localization, SVG fallback rasterization to PNG before retagging, monitor-frame asset validation to avoid dead before/after refs, Qwen/prior-tag retagging for API-cost discipline, prior-tag reuse for already-tagged image hashes, generated image/frame cleanup to prevent stale upload orphans, portable retag manifests without local absolute workspace paths, frame-safe timelapse extraction namespaced by video SHA-256, mission_metadata passthrough for operator task text / target packs / object targets / bbox intent, optional Tkinter retag UI with HF upload controls, Hugging Face upload helper with successful publication to Shoozes/LFM-Orbit-SatData, viewer-safe dataset-card configs with replay-cache wording for mixed JSONL schemas, current raw replay/cache export at 33 records with 25 replay-cache rows, 0 mission_metadata rows, 26 timelapse rows, Florida wildfire/fireline seeded data, and the reusable retagged training set at 179 assets / 26 temporal sequences. Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead replay missions, ice/snow seeded-cache provenance fixtures, visual story CV evidence rows, object_evidence_gold frozen eval at case_count=2 with schema/bbox/label/action/grounding_iou_at_0_5 all 1.0, grounding_mean_iou=1.0, payload_reduction_ratio=1098.3, and eval tooling now including orbit_eval_v2 baseline-vs-candidate comparison and promotion.json artifacts. Latest refresh added offline context-thumbnail export mode, generated-samples cleanup before export, explicit --reuse-existing-only retag refreshes, and compact image-review export tests so rows without visual review stay valid while reviewed chips remain training-ready.",
+      "note": "Orbit dataset export, replay-cache export with frame-quality/rejected-window cloud metadata, evidence-mode fields for runtime truth, imagery origin, and scoring basis, and compact visual_model_review passthrough from alerts/replays into samples. Successful image-conditioned retained-frame reviews now export as orbit_visual_review_sft_v1 image/text rows with assistant visual responses plus source, target, bbox, frame_id, image_source, visual_model, backend, review_status, runtime_truth_mode, imagery_origin, and scoring_basis metadata. Rows without visual review remain valid orbit_temporal_sft_v1 evidence-packet rows. The lane still covers orbit_training_contract_v1 metadata for LiquidAI Leap Tune-compatible import/review/localization, SVG fallback rasterization, monitor-frame asset validation, prior-tag reuse, Hugging Face upload helpers, 179 retagged assets, 26 temporal sequences, portable manifests without local absolute paths, and eval tooling including orbit_eval_v2 baseline-vs-candidate promotion artifacts.",
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
         "docs/dev/DATASET_CYCLE_TUTORIAL.md",
-        "docs/user/DEMO_GUIDE.md",
         "docs/dev/MODEL_HANDOFF.md",
-        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "source/backend/assets/evals/object_evidence_gold.jsonl",
         "source/backend/assets/object_targets/default_target_packs.json",
         "source/backend/assets/replays/port_supply_chain_replay.json",
@@ -849,11 +856,11 @@
         "source/backend/assets/seeded_data/sh_f03170dc_meta.json",
         "source/backend/assets/seeded_data/visual_story_frames/port_esri_meta.json",
         "source/backend/assets/seeded_data/visual_story_frames/visual_story_manifest.json",
+        "source/backend/core/monitor_reports.py",
+        "source/backend/core/object_evidence.py",
         "source/backend/core/queue.py",
         "source/backend/core/replay_snapshot.py",
         "source/backend/core/temporal_use_cases.py",
-        "source/backend/core/monitor_reports.py",
-        "source/backend/core/object_evidence.py",
         "source/backend/core/vlm.py",
         "source/backend/data/HF_DATASET_CARD.md",
         "source/backend/data/README.md",
@@ -1166,7 +1173,7 @@
       ]
     },
     "qa_suite_and_demo_flows": {
-      "note": "Current QA/demo flow lane: backend docs artifact guards cover promoted images, explicit public WebMs, summary-bank file refs, stale retired-UI docs claims, and temporal/nonblank video quality; import-contract tests guard backend entrypoints. Frontend Playwright covers API smoke, clean startup/no auto mission, Agent-first shell, Ground Agent actions, lean Mission plan/replay controls, map-side Area Tools selection/clear/draw state, retired evidence-tool absence, stale demo-query isolation, visual stories, screenshot export, dual-agent demo, and the Rondonia tutorial. The tutorial now starts clean, frames LFM-ORBIT as map scanning over time-window acquisition frames, launches a Rondonia deforestation mission through typed Ground Agent chat, points at the Area Tools card for bbox/cell-count/draw/clear context, uses visible click pulses for Send/Launch/Run/Inspect/Analyze/Proof actions, shows grid scanning and space/ground agent handoff, loads replay-backed proof, highlights timelapse frames, CV boxes, semantic evidence, local-model review, compact proof JSON, and ends deliberately on an anomaly-found result card. Demo exports use npm run demo:record and npm run demo:tutorial; the old object-evidence recording command is intentionally gone. May 6 model-refresh validation passed cold reset, forced GGUF fetch, targeted inference/analyzer pytest 34, full run.ps1 -Verify with backend 464, model smoke, frontend lint/build, Playwright, tutorial video, demo:record 5, and docs/import guards 22.",
+      "note": "Current QA/demo flow lane: backend docs artifact guards cover promoted images, explicit public WebMs, summary-bank file refs, stale retired-UI docs claims, and temporal/nonblank video quality; import-contract tests guard backend entrypoints. Frontend Playwright covers API smoke, clean startup/no auto mission, Agent-first shell, Ground Agent actions, lean Mission plan/replay controls, map-side Area Tools selection/clear/draw state, retired evidence-tool absence, stale demo-query isolation, visual stories, screenshot export, Proof Mode image-review enabled/unavailable/abstain states, dual-agent demo, and the Rondonia tutorial. The tutorial now starts clean, frames LFM-ORBIT as map scanning over time-window acquisition frames, launches a Rondonia deforestation mission through typed Ground Agent chat, points at the Area Tools card for bbox/cell-count/draw/clear context, uses visible click pulses for Send/Launch/Run/Inspect/Analyze/Proof actions, shows grid scanning and space/ground agent handoff, loads replay-backed proof, highlights timelapse frames, CV boxes, semantic evidence, local-model review, compact proof JSON, and ends deliberately on an anomaly-found result card. Demo exports use npm run demo:record and npm run demo:tutorial; the old object-evidence recording command is intentionally gone. Latest May 6 verification passed backend 480, run.ps1 -Verify with GGUF smoke, frontend lint/build, Playwright 101 passed / 6 skipped, docs/import guards, optional image smoke, demo:record 5, demo:tutorial 1, and cold-start launcher bootstrap with only Python plus Node/npm.",
       "files": [
         "source/backend/tests/test_docs_artifacts.py",
         "source/backend/tests/test_import_contracts.py",
@@ -1179,6 +1186,7 @@
         "source/frontend/e2e/capture_screenshots.spec.ts",
         "source/frontend/e2e/demos/demoHelpers.ts",
         "source/frontend/e2e/monitor_features.spec.ts",
+        "source/frontend/e2e/proof-mode-image-review.spec.ts",
         "source/frontend/e2e/qa_verification.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "source/frontend/e2e/tutorialHelpers.ts",
@@ -1190,7 +1198,7 @@
       ]
     },
     "runtime_entrypoints_and_tools": {
-      "note": "Operator entrypoints, Python 3.10+ and Node 20.19.0 / 22.12.0+ prerequisite checks, Python 3.10 typing_extensions compatibility for NotRequired contracts, launcher-managed repo-local uv bootstrap under runtime-data/tools when uv is absent, WSL node.exe fallback when native Linux node is absent, resolved npm/npx commands for Bash frontend install/build/test/dev work, pinned local runtimes, reproducible install/run/verify tooling with repo-root smoke coverage, verified Windows cold-start cycle via .\\run.ps1 -Clean followed by .\\run.ps1 -Verify, verified WSL/Linux Bash cold-start cycle via bash run.sh --clean followed by bash run.sh --verify, cross-platform line-ending guardrails, platform-specific backend virtualenvs, production option 1 requiring llama-cpp plus trained-GGUF smoke before app startup, moving Hugging Face refs such as main refresh during production fetch instead of silently reusing stale manifests, safe manual provider probes, and retired legacy entrypoint guardrails.",
+      "note": "Operator entrypoints, Python 3.10+ and Node 20.19.0 / 22.12.0+ prerequisite checks, launcher-managed repo-local uv bootstrap under runtime-data/tools when uv is absent, WSL node.exe fallback when native Linux node is absent, resolved npm/npx commands for Bash work, platform-specific backend virtualenvs, reproducible install/run/verify tooling, and production option 1 requiring llama-cpp plus trained-GGUF smoke before app startup. Latest entrypoint work adds LFM_ORBIT_INSTALL_IMAGE_RUNTIME=true for the optional Liquid/Transformers vision extra, including mandatory Torchvision for image processors, keeps GGUF model install coupled when image runtime is requested, adds scripts/smoke_image_review.py for the real adapter gate, and adds scripts/probe_live_observation.py to verify live SimSat Sentinel/Mapbox imagery without falling back to fixtures. Cold-start reproducibility was verified with user-level uv hidden from PATH and generated dependency folders removed; run.ps1 bootstrapped repo-local uv from Python and exposed it to Playwright child servers, confirming Python plus Node/npm are the manual prerequisites.",
       "files": [
         ".env.example",
         ".gitattributes",
@@ -1200,12 +1208,12 @@
         ".nvmrc",
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/user/DEMO_GUIDE.md",
         "docs/dev/MODEL_HANDOFF.md",
-        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "run.bat",
         "run.ps1",
         "run.sh",
@@ -1213,8 +1221,10 @@
         "source/backend/core/model_manifest.py",
         "source/backend/satellite_debug.py",
         "source/backend/scripts/fetch_satellite_model.py",
-        "source/backend/start_edge.py",
+        "source/backend/scripts/probe_live_observation.py",
         "source/backend/scripts/probe_sentinel_wms.py",
+        "source/backend/scripts/smoke_image_review.py",
+        "source/backend/start_edge.py",
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_autonomous_agent.py",
         "source/backend/tests/test_evaluate_object_evidence.py",
@@ -1327,15 +1337,15 @@
       ]
     },
     "issue_group_runtime_truth_provenance_and_modes": {
-      "note": "Current truth/provenance split: runtime_truth_mode distinguishes realtime, replay, fallback, and unknown; imagery_origin captures provider/source family; scoring_basis captures multispectral, proxy, visual-only, fallback-none, or unknown scoring. Replay means stored real API imagery with date/provenance; fallback means degraded runtime behavior and must not promote generated or forced positives. Replay manifests and seeded-cache export preserve the evidence triplet, including multispectral ice/snow replay metadata. Frontend evidence labels now use cached-API replay wording consistently, and Proof Mode JSON carries explicit payload_accounting plus DTN queue provenance.",
+      "note": "Current truth/provenance split: runtime_truth_mode distinguishes realtime, replay, fallback, and unknown; imagery_origin captures provider/source family; scoring_basis captures multispectral, proxy, visual-only, fallback-none, or unknown scoring. Replay means stored real API imagery with date/provenance; fallback means degraded runtime behavior and must not promote generated or forced positives. Retained-frame visual review now carries image_conditioned, abstained, runtime_backend, runtime_inference_mode, visual_model, response/reason, frame_id, image_source, runtime_truth_mode, imagery_origin, scoring_basis, bbox, and model metadata through Proof Mode and dataset export. The live provider probe returns available/realtime frames only when SimSat imagery bytes are actually retrieved and refuses fallback positives.",
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "source/backend/api/main.py",
         "source/backend/assets/evals/object_evidence_gold.jsonl",
         "source/backend/assets/object_targets/default_target_packs.json",
@@ -1346,6 +1356,7 @@
         "source/backend/core/config.py",
         "source/backend/core/contracts.py",
         "source/backend/core/metrics.py",
+        "source/backend/core/multimodal_inference.py",
         "source/backend/core/object_evidence.py",
         "source/backend/core/queue.py",
         "source/backend/core/replay.py",
@@ -1356,6 +1367,7 @@
         "source/backend/data/HF_DATASET_CARD.md",
         "source/backend/scripts/build_visual_story_proofs.py",
         "source/backend/scripts/export_orbit_dataset.py",
+        "source/backend/scripts/probe_live_observation.py",
         "source/backend/tests/test_api.py",
         "source/backend/tests/test_config.py",
         "source/backend/tests/test_evaluate_object_evidence.py",
@@ -1385,12 +1397,10 @@
       ]
     },
     "feature_group_proof_demo_mode": {
-      "note": "Showcase-ready deterministic proof lane with guided UI flow, explicit Proof Mode entry, Playwright video/screenshots, proof JSON export with payload_accounting, SimSat/Mapbox README positioning, backend-derived DTN queue proof, Liquid evidence-packet wording, target-pack proof metadata, replay-specific Proof Mode titles/context/story lines, and preloaded mission/replay starts that avoid generic cold-start scans. Public demos cover Critical Minerals, payload reduction, provenance, abstain safety, orbital eclipse, and paced Rondonia tutorial flow; the legacy port audit remains linked as cautious target-pack proof history, not a normal Mission-tab tool.",
+      "note": "Showcase-ready deterministic proof lane with guided UI flow, explicit Proof Mode entry, Playwright video/screenshots, proof JSON export with payload_accounting, SimSat/Mapbox README positioning, backend-derived DTN queue proof, Liquid evidence-packet wording, target-pack proof metadata, replay-specific Proof Mode titles/context/story lines, and preloaded mission/replay starts that avoid generic cold-start scans. Proof Mode and Inspect now request the backend retained visual-review image, call /api/inference/image with base64 image data, render Image-conditioned/Unavailable/Abstained states, show model/runtime/frame/source, and include visual_model_review in proof JSON only as returned by the endpoint. The new Playwright proof-mode image-review spec covers enabled, unavailable, and abstain UI/proof JSON states.",
       "files": [
         "README.md",
         "docs/dev/ARCHITECTURE.md",
-        "docs/user/DEMO_GUIDE.md",
-        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "docs/dev/QA_PITFALLS.md",
         "docs/dev/TODO.md",
         "docs/media/readme/readme-ground-agent-playbook.png",
@@ -1400,6 +1410,8 @@
         "docs/media/story-plates/story-object-evidence-port.png",
         "docs/media/videos/object-evidence-demo.webm",
         "docs/media/videos/showcase-demo.webm",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
         "source/backend/api/main.py",
         "source/backend/assets/evals/object_evidence_gold.jsonl",
         "source/backend/assets/object_targets/default_target_packs.json",
@@ -1429,6 +1441,7 @@
         "source/frontend/components/GroundAgent.tsx",
         "source/frontend/components/MissionControl.tsx",
         "source/frontend/components/ProofModePanel.tsx",
+        "source/frontend/components/ValidationPanel.tsx",
         "source/frontend/e2e/bbox.spec.ts",
         "source/frontend/e2e/demos/abstain-safety.demo.spec.ts",
         "source/frontend/e2e/demos/demoHelpers.ts",
@@ -1436,6 +1449,7 @@
         "source/frontend/e2e/demos/payload-reduction.demo.spec.ts",
         "source/frontend/e2e/demos/provenance.demo.spec.ts",
         "source/frontend/e2e/demos/showcase.demo.spec.ts",
+        "source/frontend/e2e/proof-mode-image-review.spec.ts",
         "source/frontend/e2e/visual-stories.spec.ts",
         "source/frontend/e2e/vlm.spec.ts",
         "source/frontend/package.json",
@@ -1565,7 +1579,7 @@
       ]
     },
     "issue_group_launcher_clean_start_verify": {
-      "note": "Windows clean-start and verify hardening: run.ps1 now stops stale repo-owned backend/frontend listeners, refuses unrelated port owners, captures backend startup logs under runtime-data/logs, fails early with backend error tails when health never comes up, and checks external command exit codes for npm, npx, uv, Playwright, model fetch, and dev server startup. The E2E suite was updated for the lean UI contract: clean startup stays idle, scan-progress tests explicitly start a smoke mission, map-side Area Tools replaced hidden draw controls, and retired visual-overlay UI specs are intentionally skipped. Cold reset plus option-1 equivalent startup succeeded, Playwright/node_modules dependency checks resolved cleanly, and local verification now reports backend 479 passed, run.ps1 -Verify passing with GGUF smoke coverage, frontend lint/build, Playwright 98 passed / 6 skipped, docs/import guards passing, demo:record 5 passed, and demo:tutorial 1 passed with visually sampled nonblank media. The launcher now keeps repo-local uv bootstrap output out of the PowerShell return stream and prepends the resolved uv directory to process PATH so Playwright webServer child processes work when only Python and Node/npm are available. May 6 launcher hardening makes option 1 / -Install / --install refresh moving Hugging Face refs like main so retrained public models are not masked by a stale local manifest.",
+      "note": "Windows clean-start and verify hardening: run.ps1 stops stale repo-owned backend/frontend listeners, refuses unrelated port owners, captures backend startup logs under runtime-data/logs, fails early with backend error tails when health never comes up, and checks external command exit codes for npm, npx, uv, Playwright, model fetch, and dev server startup. The E2E suite tracks the lean UI contract: clean startup stays idle, scan-progress tests explicitly start a smoke mission, map-side Area Tools replaced hidden draw controls, retired visual-overlay UI specs are intentionally skipped, and the new Proof Mode image-review spec covers enabled/unavailable/abstain proof JSON. Latest local verification reports backend 480 passed, run.ps1 -Verify passing with GGUF smoke coverage, frontend lint/build, Playwright 101 passed / 6 skipped, docs/import guards passing, optional LiquidAI/LFM2.5-VL-450M image smoke passing after the vision extra install, demo:record 5 passed, and demo:tutorial 1 passed with visually sampled nonblank media. The launcher keeps repo-local uv bootstrap output out of the PowerShell return stream and prepends the resolved uv directory to process PATH so Playwright webServer child processes work when only Python and Node/npm are available. May 6 launcher hardening makes option 1 / -Install / --install refresh moving Hugging Face refs like main so retrained public models are not masked by a stale local manifest.",
       "files": [
         "run.ps1",
         "run.sh",
@@ -1582,7 +1596,7 @@
       ]
     },
     "issue_group_replay_metadata_contract": {
-      "note": "Curated replay metadata cleanup: replay JSON now carries explicit use_case_id values, replay catalog rows expose target_pack_id when present, Ground Agent replay proposals include use_case_id and target_pack_id, and tests guard the critical-minerals replay proposal plus curated replay catalog metadata. This keeps replay loads, proof surfaces, dataset exports, and docs media connected by mission use case instead of relying on title text or target-pack inference.",
+      "note": "Curated replay metadata cleanup: replay JSON now carries explicit use_case_id values, replay catalog rows expose target_pack_id when present, Ground Agent replay proposals include use_case_id and target_pack_id, and tests guard the critical-minerals replay proposal plus curated replay catalog metadata. Replay rescans now return source replay id plus path-safe current model review metadata (`review_model_filename`, `review_model_revision`, `reviewed_at`, model/mmproj presence booleans) so current-runtime reruns have an audit handle before full post-run diffing is added. This keeps replay loads, proof surfaces, dataset exports, docs media, and rescan actions connected by mission use case and model handoff instead of relying on title text or target-pack inference.",
       "files": [
         "source/backend/assets/replays/atacama_mining_replay.json",
         "source/backend/assets/replays/camp_shelter_count_replay.json",

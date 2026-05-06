@@ -512,10 +512,10 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                     
                     system_prompt = "You are the Satellite evidence-packet reviewer analyzing timelapse-derived orbital evidence."
                     user_prompt = (
-                        f"The ground station has linked a visual timelapse for cell {conf_cell_id} showing the following signals: "
+                        f"The ground station has linked a timelapse-derived evidence packet for cell {conf_cell_id} with these signals: "
                         f"'{timelapse_analysis}'. "
-                        "Review this visual sequence data. Answer in exactly 1-2 short sentences: explicitly explain "
-                        "what you see from orbit and confirm the structural decay."
+                        "Review the evidence packet. Answer in exactly 1-2 short sentences: explain what the retained "
+                        "orbital evidence indicates and whether the structural-decay claim is supported."
                     )
                     
                     try:
@@ -584,7 +584,7 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                             cell_id=conf_cell_id,
                             payload={
                                 "note": vlm_explanation.strip(),
-                                "action": "Visual orbital confirmation complete.",
+                                "action": "Evidence-packet confirmation complete.",
                             }
                         )
                     except Exception as e:

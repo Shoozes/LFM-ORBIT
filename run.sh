@@ -150,12 +150,25 @@ find_existing_uv() {
     return 1
 }
 
+add_tool_dir_to_path() {
+    local tool_path="$1"
+    local tool_dir
+    tool_dir="$(dirname "$tool_path")"
+    [[ -n "$tool_dir" ]] || return 0
+    case ":$PATH:" in
+        *":$tool_dir:"*) ;;
+        *) export PATH="$tool_dir:$PATH" ;;
+    esac
+}
+
 ensure_uv() {
     if [[ -n "$UV_CMD" ]]; then
+        add_tool_dir_to_path "$UV_CMD"
         return
     fi
 
     if UV_CMD="$(find_existing_uv)"; then
+        add_tool_dir_to_path "$UV_CMD"
         return
     fi
 
@@ -181,6 +194,7 @@ ensure_uv() {
     "$venv_python" -m pip install --upgrade pip uv
 
     if UV_CMD="$(find_existing_uv)"; then
+        add_tool_dir_to_path "$UV_CMD"
         return
     fi
 
@@ -375,8 +389,15 @@ install_backend_deps() {
     echo "[*] Syncing backend dependencies from uv.lock..."
     local sync_args=(sync --extra dev --locked)
     local include_model_runtime=false
+    local include_image_runtime=false
     case "${LFM_ORBIT_INSTALL_MODEL_RUNTIME:-}" in
         1|true|TRUE|yes|YES|on|ON)
+            include_model_runtime=true
+            ;;
+    esac
+    case "${LFM_ORBIT_INSTALL_IMAGE_RUNTIME:-}" in
+        1|true|TRUE|yes|YES|on|ON)
+            include_image_runtime=true
             include_model_runtime=true
             ;;
     esac
@@ -395,6 +416,10 @@ install_backend_deps() {
             echo "    Install build-essential, gcc/g++, or clang, then rerun option 1." >&2
             exit 1
         fi
+    fi
+    if [[ "$include_image_runtime" == true ]]; then
+        sync_args+=(--extra vision)
+        echo "[i] Installing optional Liquid image-conditioned review runtime dependencies."
     fi
 
     (

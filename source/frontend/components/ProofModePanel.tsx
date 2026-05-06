@@ -78,6 +78,7 @@ type ImageReviewResponse = {
   image_conditioned?: boolean;
   runtime_backend?: string;
   runtime_inference_mode?: string;
+  visual_model?: string;
   response?: string;
   reason?: string;
   abstained?: boolean;
@@ -473,6 +474,48 @@ function buildPayloadAccounting(isAbstain: boolean): ProofJson["payload_accounti
   };
 }
 
+function buildVisualModelReview(visualReview: ImageReviewResponse | null | undefined) {
+  if (visualReview) {
+    return {
+      status: visualReview.image_conditioned
+        ? "image_conditioned"
+        : visualReview.abstained
+          ? "abstained"
+          : "unavailable",
+      enabled: Boolean(visualReview.image_conditioned),
+      image_conditioned: Boolean(visualReview.image_conditioned),
+      abstained: Boolean(visualReview.abstained),
+      visual_model: String(visualReview.visual_model ?? visualReview.provenance?.visual_model ?? ""),
+      runtime_backend: visualReview.runtime_backend ?? "none",
+      runtime_inference_mode: visualReview.runtime_inference_mode ?? "text_evidence_packet",
+      response: visualReview.response ?? "",
+      reason: visualReview.reason ?? "",
+      image_source: String(visualReview.provenance?.image_source ?? ""),
+      frame_id: String(visualReview.provenance?.frame_id ?? ""),
+      runtime_truth_mode: String(visualReview.provenance?.runtime_truth_mode ?? ""),
+      imagery_origin: String(visualReview.provenance?.imagery_origin ?? ""),
+      bbox: Array.isArray(visualReview.provenance?.bbox) ? visualReview.provenance.bbox : [],
+    };
+  }
+
+  return {
+    status: "unavailable",
+    enabled: false,
+    image_conditioned: false,
+    abstained: false,
+    visual_model: "",
+    runtime_backend: "none",
+    runtime_inference_mode: "text_evidence_packet",
+    response: "",
+    reason: "image-conditioned review unavailable",
+    image_source: "",
+    frame_id: "",
+    runtime_truth_mode: "",
+    imagery_origin: "",
+    bbox: [],
+  };
+}
+
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T | null> {
   try {
     const response = await fetch(url, init);
@@ -542,7 +585,12 @@ function buildMissionPayloadAccounting(hasRetainedAlert: boolean): ProofJson["pa
   };
 }
 
-function buildMissionProof(mission: Mission | null, demoCase: DemoCase, evidenceAlert: AlertItem | null = null): ProofJson {
+function buildMissionProof(
+  mission: Mission | null,
+  demoCase: DemoCase,
+  evidenceAlert: AlertItem | null = null,
+  visualReview: ImageReviewResponse | null = null,
+): ProofJson {
   const base = buildFallbackProof(demoCase);
   if (!mission) return base;
   const dateRange = [mission.start_date, mission.end_date].filter(Boolean).join(" to ") || "current mission window";
@@ -604,6 +652,7 @@ function buildMissionProof(mission: Mission | null, demoCase: DemoCase, evidence
       imagery_origin: evidenceAlert?.imagery_origin ?? "simsat",
       scoring_basis: evidenceAlert?.scoring_basis ?? "mission_metadata",
       object_targets: targets,
+      visual_model_review: buildVisualModelReview(visualReview),
       grounding: [],
     },
   };
@@ -1082,7 +1131,7 @@ export default function ProofModePanel({
 
   useEffect(() => {
     if (!demoMode && mission) {
-      setProof(buildMissionProof(mission, demoCase, missionAlert));
+      setProof(buildMissionProof(mission, demoCase, missionAlert, visualReview));
       return;
     }
     const isAbstain = demoCase === "abstain";
@@ -1140,29 +1189,7 @@ export default function ProofModePanel({
       : profile.result;
     const prompt = usesReplayEvidence ? mission?.task_text ?? profile.prompt : profile.prompt;
     const confidenceStack = buildConfidenceContributors(demoCase, evidenceAlert, Boolean(compactDetectionSummary));
-    const visualModelReview = visualReview
-      ? {
-          enabled: Boolean(visualReview.image_conditioned),
-          image_conditioned: Boolean(visualReview.image_conditioned),
-          runtime_backend: visualReview.runtime_backend ?? "none",
-          runtime_inference_mode: visualReview.runtime_inference_mode ?? "text_evidence_packet",
-          response: visualReview.response ?? "",
-          reason: visualReview.reason ?? "",
-          image_source: String(visualReview.provenance?.image_source ?? ""),
-          frame_id: String(visualReview.provenance?.frame_id ?? ""),
-          bbox: Array.isArray(visualReview.provenance?.bbox) ? visualReview.provenance.bbox : [],
-        }
-      : {
-          enabled: false,
-          image_conditioned: false,
-          runtime_backend: "none",
-          runtime_inference_mode: "text_evidence_packet",
-          response: "",
-          reason: "image-conditioned review unavailable",
-          image_source: "",
-          frame_id: "",
-          bbox: [],
-        };
+    const visualModelReview = buildVisualModelReview(visualReview);
     const outputJson = isAbstain
       ? {
           status: "abstained",
@@ -1614,17 +1641,51 @@ export default function ProofModePanel({
             className={`mt-3 rounded border p-3 ${
               visualReview?.image_conditioned
                 ? "border-emerald-500/30 bg-emerald-500/10"
+                : visualReview?.abstained
+                  ? "border-amber-500/30 bg-amber-500/10"
                 : "border-zinc-800 bg-zinc-950"
             }`}
           >
             <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">
-              {visualReview?.image_conditioned ? "Image-conditioned review" : "Image-conditioned review unavailable"}
+              {visualReview?.image_conditioned
+                ? "Image-conditioned review"
+                : visualReview?.abstained
+                  ? "Image-conditioned review abstained"
+                  : "Image-conditioned review unavailable"}
             </p>
             <p className="mt-1 text-xs font-semibold text-white">
               {visualReview?.image_conditioned
                 ? visualReview.response || "Visual review returned no text."
-                : visualReview?.reason || "Retained evidence image was not reviewed by an image-conditioned runtime."}
+                : visualReview?.abstained
+                  ? visualReview.response || visualReview.reason || "The retained frame was too low-information for visual review."
+                  : visualReview?.reason || "Retained evidence image was not reviewed by an image-conditioned runtime."}
             </p>
+            <dl className="mt-3 grid grid-cols-2 gap-2 text-[10px] uppercase tracking-[0.12em] text-zinc-500">
+              <div>
+                <dt>Model</dt>
+                <dd className="mt-0.5 normal-case tracking-normal text-zinc-200">
+                  {visualReview?.visual_model ?? String(visualReview?.provenance?.visual_model ?? "not loaded")}
+                </dd>
+              </div>
+              <div>
+                <dt>Runtime</dt>
+                <dd className="mt-0.5 normal-case tracking-normal text-zinc-200">
+                  {visualReview?.runtime_inference_mode ?? "text_evidence_packet"}
+                </dd>
+              </div>
+              <div>
+                <dt>Frame</dt>
+                <dd className="mt-0.5 normal-case tracking-normal text-zinc-200">
+                  {String(visualReview?.provenance?.frame_id ?? "unavailable")}
+                </dd>
+              </div>
+              <div>
+                <dt>Source</dt>
+                <dd className="mt-0.5 normal-case tracking-normal text-zinc-200">
+                  {formatSourceLabel(String(visualReview?.provenance?.imagery_origin ?? visualReview?.provenance?.image_source ?? "unknown"))}
+                </dd>
+              </div>
+            </dl>
           </div>
         </section>
 

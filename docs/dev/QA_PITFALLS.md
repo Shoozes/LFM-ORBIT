@@ -1,6 +1,6 @@
 # QA Pitfalls
 
-Current as of **May 5, 2026**.
+Current as of **May 6, 2026**.
 
 This doc is the regression-prevention checklist for generated media, mission stories, agent behavior, and model claims. Treat it as a question-and-answer gate before promoting screenshots, videos, story plates, or demo copy into public docs.
 
@@ -26,7 +26,13 @@ SimSat/Mapbox is the primary hackathon runtime lane and map context source. It s
 
 ### What can the trained model actually claim today?
 
-It can support text evidence-packet and bbox JSON reasoning from the NM-UNI handoff. Do not claim image-conditioned Orbit inference unless `image_conditioned_runtime_enabled=true` after an adapter passes a two-image smoke test where different images change the output.
+It can support text evidence-packet and bbox JSON reasoning from the LiquidAI Leap Tune-compatible handoff. Do not claim image-conditioned Orbit inference unless `image_conditioned_runtime_enabled=true` after an adapter passes a two-image smoke test where different images change the output.
+
+### What proves retained-frame image review is real?
+
+The proof path is `/api/inference/image` with `image_b64`, not a server file path and not a text-only GGUF prompt. It must decode the retained evidence frame, pass pixels into the configured LiquidAI/LFM2.5-VL-450M Transformers image-text-to-text adapter, return `image_conditioned=true` only after success, and return structured unavailable or abstain states for missing dependencies, invalid images, blank/no-data frames, or failed model loading.
+
+The CI-safe unit/API tests should fake the adapter. The real runtime gate is `scripts/smoke_image_review.py --require-present` with the `vision` extra installed. A release pass should include that smoke whenever the model revision, Transformers/Torch/Torchvision stack, or image adapter code changes.
 
 ## Generated Media Gates
 
@@ -74,7 +80,7 @@ Public docs media must be linked from markdown and covered by `source/backend/te
 
 If a promoted WebM is referenced from README or the demo guide, it must also be included in the explicit public-video temporal/nonblank guard. The May 3, 2026 media refresh found `object-evidence-demo.webm` linked from README but missing from that explicit video list, which made the docs feel stale even though the file existed. The fix is to list the video in both `docs/user/DEMO_GUIDE.md` and `test_public_demo_videos_are_temporal_and_nonblank`.
 
-Recorded docs-video suites should own their ports one at a time. Do not run `npm run demo:record` and `npm run demo:tutorial` in parallel unless the configs are moved to separate API/debug/Vite ports; both suites expect the default `8000`, `8080`, and `5173` launch path.
+Recorded docs-video suites should own their ports one at a time. Do not run `npm run demo:record`, `npm run demo:tutorial`, screenshot capture, or targeted Playwright specs as separate parallel commands unless the configs are moved to separate API/debug/Vite ports; these suites expect the default `8000`, `8080`, and `5173` launch path. The Playwright configs already use one worker internally, so the risk is parallel shell commands, not normal suite execution.
 
 ### What if `summary_bank.json --auto-add` over-expands groups?
 
@@ -161,18 +167,31 @@ For Florida Fire/Drought Watch, reject proxy-only vegetation or canopy-loss chan
 Run:
 
 ```powershell
-python scripts\build_visual_story_proofs.py
-python -m pytest tests/test_docs_artifacts.py tests/test_import_contracts.py
+.\run.ps1 -Verify
 ```
 
-from `source/backend`, then:
+For targeted backend integrity after docs/model changes:
 
-```powershell
-npx playwright test e2e/visual-stories.spec.ts
-npx playwright test e2e/vlm.spec.ts
+```bash
+cd source/backend
+uv run --no-sync pytest tests/test_docs_artifacts.py tests/test_import_contracts.py tests/test_multimodal_inference.py tests/test_inference_image_api.py tests/test_replay.py -q
+```
+
+For targeted frontend/media integrity:
+
+```bash
+cd source/frontend
+npm run lint
+npx playwright test e2e/proof-mode-image-review.spec.ts
 npm run demo:record
 npm run demo:tutorial
-npm run lint
+```
+
+When the optional image runtime is installed:
+
+```bash
+cd source/backend
+uv run --extra dev --extra model --extra vision python scripts/smoke_image_review.py --require-present
 ```
 
 from `source/frontend`.

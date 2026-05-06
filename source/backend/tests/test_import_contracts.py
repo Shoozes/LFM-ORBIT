@@ -20,11 +20,13 @@ SCRIPT_MODULES = (
     "scripts.fetch_satellite_model",
     "scripts.gee_auth",
     "scripts.import_boundaries",
+    "scripts.probe_live_observation",
     "scripts.probe_sentinel_wms",
     "scripts.retag_training_assets",
     "scripts.retag_training_assets_ui",
     "scripts.seed_nasa_cache",
     "scripts.seed_sentinel_cache",
+    "scripts.smoke_image_review",
     "scripts.smoke_satellite_model",
     "scripts.upload_orbit_dataset_hf",
 )

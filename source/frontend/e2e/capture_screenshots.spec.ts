@@ -163,6 +163,7 @@ test("screenshot: Ground Agent operator playbook", async ({ page, request }) => 
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 1440, height: 1400 });
   await resetRuntimeState(request);
+  await loadSeededReplay(request, "atacama_mining_replay");
   await gotoApp(page);
   await waitForLinkOpen(page);
   await waitForBasemapReady(page);
@@ -171,6 +172,7 @@ test("screenshot: Ground Agent operator playbook", async ({ page, request }) => 
   await waitForAgentDialogue(page);
   await expect(page.getByTestId("agent-role-strip")).toContainText("Satellite Pruner");
   await expect(page.getByTestId("ground-agent-operator-playbook")).toContainText("Operator Playbook");
+  await settleScreenshotFrame(page);
 
   await page.screenshot({
     path: "../../docs/media/readme/readme-ground-agent-playbook.png",

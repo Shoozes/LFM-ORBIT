@@ -17,6 +17,7 @@ from core.agent_bus import mark_messages_read, post_message, upsert_pin
 from core.gallery import add_gallery_item, resolve_seeded_thumbnail
 from core.metrics import seed_metrics_summary
 from core.mission import get_mission, start_mission, update_mission_progress
+from core.model_manifest import resolve_satellite_model_artifact
 from core.queue import estimate_object_proof_payload_bytes, estimate_payload_bytes, push_alert
 from core.runtime_state import reset_runtime_state
 
@@ -27,6 +28,19 @@ _SEEDED_WEBM_INTEGRITY_CACHE: dict[str, bool] = {}
 
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
+def _current_model_review_metadata() -> dict[str, Any]:
+    artifact = resolve_satellite_model_artifact()
+    return {
+        "review_model_revision": artifact.revision,
+        "review_model_filename": artifact.model_filename,
+        "review_model_repo_id": artifact.repo_id or "",
+        "review_model_task": artifact.task or "",
+        "model_present": artifact.model_path.exists(),
+        "mmproj_present": bool(artifact.mmproj_path and artifact.mmproj_path.exists()),
+        "reviewed_at": _now(),
+    }
 
 
 def _replay_paths() -> list[Path]:
@@ -515,6 +529,7 @@ def rescan_seeded_replay(replay_id: str) -> dict[str, Any]:
     """Start a live mission from replay metadata so new model/runtime behavior can rescan it."""
     spec = _load_replay_spec(replay_id)
     reset_runtime_state()
+    review_metadata = _current_model_review_metadata()
     mission = start_mission(
         task_text=str(spec.get("task_text") or spec.get("title") or replay_id),
         bbox=spec.get("bbox"),
@@ -536,12 +551,14 @@ def rescan_seeded_replay(replay_id: str) -> dict[str, Any]:
             "task": mission["task_text"],
             "bbox": mission.get("bbox"),
             "source_replay_id": replay_id,
+            "review_metadata": review_metadata,
             "note": f"[RESCAN #{mission['id']}] Started live rescan from replay: {spec.get('title', replay_id)}",
         },
     )
     return {
         "source_replay_id": replay_id,
         "mission": mission,
+        "review_metadata": review_metadata,
         "title": str(spec.get("title") or replay_id),
         "summary": str(spec.get("summary") or ""),
     }

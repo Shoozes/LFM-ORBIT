@@ -63,7 +63,7 @@ The export writes:
 - `samples/<sample_id>/sample.json`
 - local assets such as `context_thumb.png` and `timelapse.webm`
 
-Export rows include target task/category/action, temporal use-case metadata, alert scores, agent evidence, optional `visual_model_review`, local imagery/video references, provenance, replay-cache timelapse rows when enabled, weak-negative reject rows when available, and `orbit_training_contract_v1` review/localization metadata for NM-UNI import.
+Export rows include target task/category/action, temporal use-case metadata, alert scores, agent evidence, optional `visual_model_review`, local imagery/video references, provenance, replay-cache timelapse rows when enabled, weak-negative reject rows when available, and `orbit_training_contract_v1` review/localization metadata for LiquidAI Leap Tune-compatible import.
 
 If a context thumbnail falls back to an offline SVG chip, the exporter rasterizes it to PNG before writing the sample asset. Use `--offline-context-thumbnails` for local refreshes that should not wait on ESRI thumbnail fetches. The exporter also clears generated `samples/` before writing the new footprint so retag loose scans do not pick up stale sample assets.
 

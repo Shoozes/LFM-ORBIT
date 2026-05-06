@@ -40,6 +40,7 @@ What it proves:
 8. Tutorial-style subtitles and visible UI flow before the proof panel
 9. Abstain and backend-derived link-outage queue behavior in the full demo set
 10. Target-pack proof metadata attached to alerts, replays, datasets, and Proof Mode without a separate Mission-tab evidence workspace
+11. Optional retained-frame image-conditioned review when the LiquidAI/LFM2.5-VL-450M Transformers runtime is installed and enabled
 
 Artifacts:
 
@@ -83,7 +84,7 @@ Current mission split:
 1. Main Showcase uses `Critical Minerals Expansion Watch` over the Salar de Atacama / Escondida / Atacama mining corridor. It boxes region-level extraction evidence: evaporation pond regions, tailings regions, open-pit expansion, industrial roads, facility clusters, exposed soil, and surface color change.
 2. Fireline-to-Lifeline Watch stays second. Wildfire remains useful proof-of-work and emergency relevance, but it is no longer the centerpiece.
 3. Maritime Activity Watch stays third and uses activity-level wording for vessel-like regions, wakes, and port clusters. It should not imply exact boat counts when resolution is insufficient.
-4. Glacier / Ice Retreat Watch is fourth and should use slower long-form pacing. Columbia Glacier is the preferred future public story because NASA has a long Landsat-backed retreat series; the current Greenland replay remains a spectral-confidence guard.
+4. Glacier / Ice Retreat Watch is fourth and should use slower long-form pacing. Columbia Glacier is the stronger later candidate because NASA has a long Landsat-backed retreat series; the current Greenland replay remains a spectral-confidence guard.
 5. Waterline Watch is fifth. Great Salt Lake or Lake Mead are better long-term water/lifeline examples than garbage-patch mass monitoring because the water boundary is visible and measurable.
 6. Coastal Debris / Slick Candidate Watch is experimental only. Use coastal, river-mouth, port, storm-aftermath, foam-line, slick, or debris-accumulation candidates. Do not frame it as Great Pacific Garbage Patch mass from optical imagery.
 
@@ -99,7 +100,43 @@ The tutorial walkthrough is now the plain-English product run-through. It starts
 
 Replay-backed proof mode can now keep the active replay instead of forcing Rondonia, so mission-specific proof copy stays attached to maritime, mining, flood, wildfire, and urban replay packs. Some development replay fixtures use visible Sentinel-2 L2A frames and explicitly reject invalid still-image color-shift timelapses. Their real monthly WebMs are kept in the legacy `source/backend/assets/seeded_data/` cache for dataset export and training, but they are not a Sentinel Hub dependency for the default demo.
 
-Current runtime wording: SimSat/Mapbox is the main hackathon satellite-data API family. SimSat Sentinel is the default realtime lane, SimSat Mapbox is optional imagery/context through the same SimSat path, and replay fixtures are used for deterministic demos. Liquid runtime currently reasons over scored evidence packets unless a manifest-resolved multimodal model bundle is installed.
+Current runtime wording: SimSat/Mapbox is the main hackathon satellite-data API family. SimSat Sentinel is the default realtime lane, SimSat Mapbox is optional imagery/context through the same SimSat path, and replay fixtures are used for deterministic demos. The SAT/GND GGUF runtime reasons over scored evidence packets. The separate `/api/inference/image` lane passes retained frames into LiquidAI/LFM2.5-VL-450M through Transformers when the optional image runtime is installed and enabled.
+
+Enable and smoke-test retained-frame image review. This uses the backend `vision` extra, which installs Transformers, Torch, Torchvision, Accelerate, and Pillow:
+
+```bash
+cd ../..
+export LFM_ORBIT_INSTALL_IMAGE_RUNTIME=true
+export ORBIT_IMAGE_CONDITIONED_INFERENCE=true
+export ORBIT_IMAGE_INFERENCE_BACKEND=transformers_vlm
+export ORBIT_IMAGE_VLM_MODEL=LiquidAI/LFM2.5-VL-450M
+./run.sh --install
+cd source/backend
+uv run --extra dev --extra model --extra vision python scripts/smoke_image_review.py --require-present
+```
+
+PowerShell equivalent:
+
+```powershell
+$env:LFM_ORBIT_INSTALL_IMAGE_RUNTIME="true"
+$env:ORBIT_IMAGE_CONDITIONED_INFERENCE="true"
+$env:ORBIT_IMAGE_INFERENCE_BACKEND="transformers_vlm"
+$env:ORBIT_IMAGE_VLM_MODEL="LiquidAI/LFM2.5-VL-450M"
+.\run.ps1 -Install
+cd source\backend
+uv run --extra dev --extra model --extra vision python scripts\smoke_image_review.py --require-present
+```
+
+Probe live SimSat Sentinel imagery without falling back to fixtures:
+
+```bash
+cd source/backend
+uv run --no-sync python scripts/probe_live_observation.py \
+  --provider simsat_sentinel \
+  --bbox="-63.1,-10.1,-62.9,-9.9" \
+  --start "2025-01-01" \
+  --end "2025-02-01"
+```
 
 Target-pack wording: target packs are attached to missions, alerts, replay snapshots, dataset exports, and Proof Mode. They are no longer a separate Mission-tab operator tool. The main public showcase pack is `critical_minerals`; `deforestation`, `fireline`, `port`, `glacier`, `waterline`, `lifeline`, `camp`, and cautious `plastic`/coastal-debris packs remain available through presets and backend contracts.
 

@@ -384,9 +384,17 @@ function Install-BackendDeps {
 
     $syncArgs = @("sync", "--extra", "dev", "--locked")
     $installModelRuntime = $FetchModel -or (Test-Path $ModelFile) -or ($env:LFM_ORBIT_INSTALL_MODEL_RUNTIME -match "^(1|true|yes|on)$")
+    $installImageRuntime = $env:LFM_ORBIT_INSTALL_IMAGE_RUNTIME -match "^(1|true|yes|on)$"
+    if ($installImageRuntime) {
+        $installModelRuntime = $true
+    }
     if ($installModelRuntime) {
         $syncArgs += @("--extra", "model")
         Write-Host "[i] Attempting llama-cpp model runtime install for GGUF inference." -ForegroundColor Gray
+    }
+    if ($installImageRuntime) {
+        $syncArgs += @("--extra", "vision")
+        Write-Host "[i] Installing optional Liquid image-conditioned review runtime dependencies." -ForegroundColor Gray
     }
 
     Push-Location $BackendDir

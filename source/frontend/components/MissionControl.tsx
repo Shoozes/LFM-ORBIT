@@ -461,7 +461,14 @@ export default function MissionControl({
     setErrorMsg("");
     try {
       const response = await fetch(`${apiBase}/api/replay/rescan/${replay.replay_id}`, { method: "POST" });
-      const payload = (await response.json()) as { error?: string; mission?: Mission };
+      const payload = (await response.json()) as {
+        error?: string;
+        mission?: Mission;
+        review_metadata?: {
+          review_model_filename?: string;
+          review_model_revision?: string;
+        };
+      };
       if (!response.ok || !payload.mission) {
         throw new Error(payload.error || "Replay rescan failed");
       }
@@ -475,7 +482,12 @@ export default function MissionControl({
       } else if (replay.bbox) {
         onPreviewBbox?.([...replay.bbox]);
       }
-      setReplayNotice("Live rescan started from replay metadata with the current model/runtime stack.");
+      const modelFilename = payload.review_metadata?.review_model_filename;
+      const modelRevision = payload.review_metadata?.review_model_revision;
+      const modelLabel = modelFilename
+        ? ` Model: ${modelFilename}${modelRevision ? ` @ ${modelRevision}` : ""}.`
+        : "";
+      setReplayNotice(`Live rescan started from replay metadata with the current model/runtime stack.${modelLabel}`);
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : "Replay rescan failed.");
     } finally {

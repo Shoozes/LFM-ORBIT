@@ -1,6 +1,6 @@
 # Orbit Model Handoff
 
-Updated May 3, 2026.
+Updated May 6, 2026.
 
 ## Purpose
 
@@ -22,11 +22,11 @@ Orbit's current local satellite inference path is still GGUF chat-style reasonin
 That means:
 
 - Orbit can resolve a trained artifact through a manifest instead of one hardcoded file path
-- Orbit can report whether the NM-UNI training manifest contains image rows through `/api/analysis/status`; the current fetched bundle reports image-text training rows and image blocks
+- Orbit can report whether the LiquidAI Leap Tune-compatible training manifest contains image rows through `/api/analysis/status`; the current fetched bundle reports image-text training rows and image blocks
 - Orbit does not route its GGUF SAT/GND evidence-packet reasoning through image pixels
-- `/api/inference/image` can run a bounded retained-frame image-conditioned review only when the opt-in image runtime is configured and loaded
+- `/api/inference/image` can run a bounded retained-frame image-conditioned review through LiquidAI/LFM2.5-VL-450M when the opt-in Transformers image runtime is configured and loaded
 - a published `mmproj` can still be carried in a future handoff manifest so the artifact chain is ready for a GGUF projector path
-- the current NM-UNI Orbit bundle is a trained GGUF handoff without an `mmproj` file
+- the current LiquidAI Leap Tune-compatible Orbit bundle is a trained GGUF handoff without an `mmproj` file
 
 ## Orbit Runtime Contract
 
@@ -126,16 +126,38 @@ The published GGUF contains a newer Hugging Face chat template that older local 
 Image-conditioned review remains explicitly gated:
 
 - `ORBIT_IMAGE_CONDITIONED_INFERENCE=false`
-- `ORBIT_IMAGE_INFERENCE_BACKEND=none`
+- `ORBIT_IMAGE_INFERENCE_BACKEND=transformers_vlm`
+- `ORBIT_IMAGE_VLM_MODEL=LiquidAI/LFM2.5-VL-450M`
+- `ORBIT_IMAGE_VLM_TASK=image-text-to-text`
+- `ORBIT_IMAGE_REVIEW_MAX_TOKENS=160`
+- `ORBIT_IMAGE_REVIEW_DEVICE=auto`
 - `ORBIT_REQUIRE_MMPROJ_FOR_IMAGE_INFERENCE=true`
 
-Supported backend labels are `none`, `llama_cpp_mmproj`, and `transformers_vlm`. The current Orbit code can run `transformers_vlm` retained-frame review when configured; it does not claim `image_conditioned_runtime_enabled=true` until an adapter passes real image pixels into the runtime. The `llama_cpp_mmproj` label remains unavailable until a compatible projector path is wired.
+Supported backend labels are `none`, `llama_cpp_mmproj`, and `transformers_vlm`. The current Orbit code can run `transformers_vlm` retained-frame review when configured and installed through the optional `vision` backend extra. That extra includes Transformers `5.8+`, Torch, Torchvision, Accelerate, and Pillow because the Liquid image processor requires Torchvision. Orbit does not claim `image_conditioned_runtime_enabled=true` until an adapter passes real image pixels into the runtime. The `llama_cpp_mmproj` label remains unavailable until a compatible projector path is wired.
+
+Install the optional image runtime through the launchers:
+
+```powershell
+$env:LFM_ORBIT_INSTALL_IMAGE_RUNTIME="true"
+.\run.ps1 -Install
+```
+
+```bash
+LFM_ORBIT_INSTALL_IMAGE_RUNTIME=true ./run.sh --install
+```
+
+Then run the opt-in real-runtime smoke test:
+
+```bash
+cd source/backend
+uv run --extra dev --extra model --extra vision python scripts/smoke_image_review.py --require-present
+```
 
 ## Runtime Capability Contract
 
 Orbit reports the handoff truth through `/api/inference/status` and `/api/analysis/status`.
 
-Current expected fields for the published NM-UNI handoff are:
+Current expected fields for the published LiquidAI Leap Tune-compatible handoff are:
 
 ```json
 {
@@ -173,11 +195,22 @@ Any external training or publishing workflow should stage a folder that contains
 
 The handoff manifest is the bridge between external training output and Orbit runtime.
 
-## NM-UNI Role
+## LiquidAI Leap Tune Role
 
-The current training/publish partner is the local NM-UNI training workspace.
-NM-UNI is responsible for importing Orbit exports, preparing Liquid training runs, quantizing trained outputs to GGUF, staging `orbit_model_handoff.json`, and optionally publishing a Hugging Face model repo.
+The current training/publish lane is LiquidAI Leap Tune-compatible.
+The tuning workflow imports Orbit exports, prepares Liquid training runs, quantizes trained outputs to GGUF, stages `orbit_model_handoff.json`, and can publish a Hugging Face model repo.
 Orbit is responsible for consuming that bundle and validating it against SimSat/replay evidence.
+
+Canonical loop:
+
+1. Orbit scans a selected area and time window.
+2. SAT/GND agents retain evidence packets with runtime truth mode, imagery origin, scoring basis, bbox, and target-pack context.
+3. Optional image-conditioned review passes selected retained frames into LiquidAI/LFM2.5-VL-450M through `/api/inference/image`.
+4. Orbit stores `visual_model_review` with alerts, gallery proof, replay snapshots, and dataset rows.
+5. Orbit exports reviewed evidence as image/text training rows when a visual review is present, while keeping evidence-packet rows valid for unreviewed samples.
+6. LiquidAI Leap Tune-compatible tooling imports the export and trains/evaluates during the tuning workflow.
+7. The tuning workflow packages `training_result_manifest.json` and `orbit_model_handoff.json`.
+8. Orbit fetches the updated handoff and can replay or rescan prior sessions against the current model metadata.
 
 Current published bundle:
 
@@ -193,7 +226,7 @@ Current published bundle:
 
 Treat this as the trained runtime artifact for evidence-packet and bbox JSON reasoning. Its training manifest now includes image-text rows, but Orbit still must not describe the GGUF SAT/GND path as image-conditioned. Image-conditioned retained-frame review is only claimed through the separate runtime-gated `/api/inference/image` adapter.
 
-Do not move NM-UNI's training UI or provider management into Orbit. Keep Orbit's hackathon path centered on DPhi SimSat (`simsat_sentinel`), bundled replay fixtures, and manifest-driven model consumption.
+Do not move training UI or provider management into Orbit. Keep Orbit's hackathon path centered on DPhi SimSat (`simsat_sentinel`), bundled replay fixtures, and manifest-driven model consumption.
 
 ## Orbit Dataset Bridge
 
@@ -213,7 +246,7 @@ The export now includes:
 - second-pass asset retagging through `scripts/retag_training_assets.py`, including deduplicated still images, sampled timelapse frames, ordered temporal sequence rows, Hugging Face ImageFolder-compatible `images/ + metadata.jsonl`, and provider adapters for heuristic/manual queue, Ollama vision models, or OpenAI-compatible vision models
 - optional Hugging Face dataset upload through `scripts/upload_orbit_dataset_hf.py`, using `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or a local developer token file
 - explicit metadata fields such as `target_action`, `target_category`, `target_task`, and `label_tier`
-- `orbit_training_contract_v1` metadata for review status, localization fields, evidence requirements, and NM-UNI import behavior
+- `orbit_training_contract_v1` metadata for review status, localization fields, evidence requirements, and LiquidAI Leap Tune-compatible import behavior
 - PNG-rasterized context thumbnails even when the runtime thumbnail fallback started as SVG
 
 Current ground rejects are useful as weak negatives because they come from the real validation loop, but they are still not the same as operator-reviewed gold controls.
@@ -290,4 +323,4 @@ This handoff closes artifact resolution, publication flow, and dataset export pa
 
 - automatic `mmproj` use in the current `llama_cpp` path when a compatible projector exists
 - a GGUF-native `mmproj` image path if a compatible projector exists
-- replacement visual-summary runtimes for the final selected local model family
+- completed replay-rescan diff output that compares current-model results with prior replay proof without overwriting the original audit record

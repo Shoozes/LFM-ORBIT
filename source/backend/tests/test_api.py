@@ -579,6 +579,23 @@ def test_image_inference_endpoint_rejects_missing_image_payload():
     assert response.status_code == 422
 
 
+def test_image_inference_endpoint_rejects_public_image_path(tmp_path):
+    image_path = tmp_path / "local-chip.png"
+    image_path.write_bytes(b"not-used")
+
+    response = client.post(
+        "/api/inference/image",
+        json={
+            "prompt": "Inspect this retained evidence frame.",
+            "image_path": str(image_path),
+        },
+    )
+
+    assert response.status_code == 400
+    assert "image_b64 only" in response.text
+    assert str(tmp_path) not in response.text
+
+
 def test_gallery_visual_review_image_endpoint_returns_retained_image(monkeypatch, tmp_path):
     monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
     from core.gallery import add_gallery_item, init_gallery

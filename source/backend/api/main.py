@@ -1384,7 +1384,7 @@ class ImageInferenceBody(BaseModel):
     cell_id: str | None = Field(default=None, max_length=80)
     event_id: str | None = Field(default=None, max_length=120)
     metadata: dict[str, Any] = Field(default_factory=dict)
-    max_tokens: int = Field(default=256, ge=1, le=1024)
+    max_tokens: int = Field(default=160, ge=1, le=1024)
 
     @field_validator("prompt", mode="before")
     @classmethod
@@ -1401,13 +1401,18 @@ class ImageInferenceBody(BaseModel):
     @model_validator(mode="after")
     def _has_image_payload(self) -> "ImageInferenceBody":
         if not self.image_b64 and not self.image_path:
-            raise ValueError("image_b64 or image_path is required")
+            raise ValueError("image_b64 is required")
         return self
 
 
 @app.post("/api/inference/image")
 def inference_image(body: ImageInferenceBody):
     """Image-conditioned review endpoint; unavailable until a real image adapter is configured."""
+    if body.image_path:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "public image inference accepts image_b64 only"},
+        )
     metadata = {
         **body.metadata,
         "cell_id": body.cell_id or body.metadata.get("cell_id", ""),

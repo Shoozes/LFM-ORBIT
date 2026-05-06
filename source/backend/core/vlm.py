@@ -75,7 +75,10 @@ def _load_pipeline(task: str, model: str) -> Callable[..., Any] | None:
     if _pipeline_import_failed:
         return None
     try:
-        from transformers import pipeline
+        try:
+            from transformers import pipeline
+        except ImportError:
+            from transformers.pipelines import pipeline
     except Exception as exc:  # pragma: no cover - depends on optional install
         _pipeline_import_failed = True
         logger.warning("[VLM] transformers unavailable; using offline fallback responses: %s", exc)

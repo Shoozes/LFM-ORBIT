@@ -366,6 +366,10 @@ def test_seeded_cache_replay_loads_and_rescans(tmp_path, monkeypatch):
     assert rescan_payload["mission"]["mission_mode"] == "live"
     assert rescan_payload["mission"]["bbox"] == seeded["bbox"]
     assert "current runtime/model stack" in rescan_payload["mission"]["summary"]
+    assert rescan_payload["review_metadata"]["review_model_filename"].endswith(".gguf")
+    assert rescan_payload["review_metadata"]["review_model_revision"]
+    assert rescan_payload["review_metadata"]["reviewed_at"].endswith("Z")
+    assert "model_path" not in rescan_payload["review_metadata"]
     assert get_recent_alerts(limit=5)["alerts"] == []
 
 

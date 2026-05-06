@@ -202,8 +202,10 @@ def _clean_visual_model_review(review: Any) -> dict[str, Any] | None:
     if not isinstance(review, dict):
         return None
     cleaned = {
+        "status": str(review.get("status") or ("image_conditioned" if review.get("image_conditioned") else "unavailable")),
         "enabled": bool(review.get("enabled", review.get("image_conditioned", False))),
         "image_conditioned": bool(review.get("image_conditioned", False)),
+        "abstained": bool(review.get("abstained", False)),
         "runtime_backend": str(review.get("runtime_backend") or ""),
         "runtime_inference_mode": str(review.get("runtime_inference_mode") or ""),
         "response": str(review.get("response") or "").strip(),
@@ -211,6 +213,10 @@ def _clean_visual_model_review(review: Any) -> dict[str, Any] | None:
         "visual_model": str(review.get("visual_model") or ""),
         "image_source": str(review.get("image_source") or ""),
         "frame_id": str(review.get("frame_id") or ""),
+        "runtime_truth_mode": str(review.get("runtime_truth_mode") or ""),
+        "imagery_origin": str(review.get("imagery_origin") or ""),
+        "scoring_basis": str(review.get("scoring_basis") or ""),
+        "model_revision": str(review.get("model_revision") or ""),
     }
     bbox = review.get("bbox")
     cleaned["bbox"] = bbox[:4] if isinstance(bbox, list) else []
@@ -581,11 +587,11 @@ def _training_contract(record: dict[str, Any]) -> dict[str, Any]:
         "evidence_requirements": {
             "temporal_pair_required": record.get("record_type") in {"positive", "control", "monitor_report", "seeded_cache"},
             "has_temporal_windows": bool(has_temporal_windows),
-            "context_thumb_required_for_nm_uni": not is_mission_metadata,
+            "context_thumb_required_for_leap_tune": not is_mission_metadata,
             "timelapse_optional": True,
             "spectral_bands_required": record.get("target_category") in {"deforestation", "cryosphere", "wildfire"},
         },
-        "nm_uni_import": {
+        "leap_tune_import": {
             "role": "satellite_vlm_training_bridge",
             "requires_context_thumb": not is_mission_metadata,
             "imports_context_thumb_as_image_path": True,
@@ -1189,7 +1195,7 @@ def write_dataset_export(
             "Persisted maritime and lifeline monitor-report JSON files can be imported as generated monitor rows.",
             "Mission metadata rows preserve operator task text, target packs, object targets, and bbox intent without making new satellite API calls.",
             "Ground rejections are weak negatives with explicit provenance rather than operator-reviewed gold controls.",
-            "Every sample carries orbit_training_contract_v1 metadata for NM-UNI import, review gating, and localization follow-up.",
+            "Every sample carries orbit_training_contract_v1 metadata for LiquidAI Leap Tune import, review gating, and localization follow-up.",
             "SVG fallback thumbnails are rasterized to PNG during export so vision tagging cycles receive image assets.",
             "Offline context thumbnails can be forced for local refreshes that should not wait on Esri imagery.",
         ],

@@ -945,6 +945,54 @@ def build_training_jsonl_row(record: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(decision, dict):
         decision = classify_temporal_use_case(record)
 
+    visual_review = record.get("visual_model_review") if isinstance(record.get("visual_model_review"), dict) else None
+    assets = record.get("assets") if isinstance(record.get("assets"), dict) else {}
+    image_asset = str(assets.get("context_thumb") or "")
+    visual_response = str(record.get("visual_model_response") or (visual_review or {}).get("response") or "").strip()
+    if visual_review and visual_review.get("image_conditioned") and visual_response and image_asset:
+        return {
+            "sample_id": record.get("sample_id", ""),
+            "split": record.get("split", "train"),
+            "format": "orbit_visual_review_sft_v1",
+            "image": image_asset,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": (
+                        "Review this retained satellite evidence frame for "
+                        f"{record.get('target_category') or decision['target_category']}. "
+                        "Describe only visible evidence."
+                    ),
+                },
+                {
+                    "role": "assistant",
+                    "content": visual_response,
+                },
+            ],
+            "metadata": {
+                "source": "lfm_orbit_visual_review",
+                "use_case_id": decision["id"],
+                "target_task": record.get("target_task") or decision["target_task"],
+                "target_category": record.get("target_category") or decision["target_category"],
+                "target_action": record.get("target_action") or decision["default_target_action"],
+                "target_pack_id": record.get("target_pack_id"),
+                "runtime_truth_mode": visual_review.get("runtime_truth_mode") or record.get("runtime_truth_mode", ""),
+                "imagery_origin": visual_review.get("imagery_origin") or record.get("imagery_origin", ""),
+                "scoring_basis": visual_review.get("scoring_basis") or record.get("scoring_basis", ""),
+                "frame_id": visual_review.get("frame_id") or record.get("frame_id", ""),
+                "image_source": visual_review.get("image_source") or record.get("image_source", ""),
+                "bbox": visual_review.get("bbox") or record.get("bbox") or [],
+                "visual_model": visual_review.get("visual_model", ""),
+                "visual_model_backend": visual_review.get("runtime_backend", ""),
+                "review_status": record.get("review_status", ""),
+                "training_contract_schema": (
+                    record.get("training_contract", {}).get("schema")
+                    if isinstance(record.get("training_contract"), dict)
+                    else ""
+                ),
+            },
+        }
+
     context = {
         "sample_id": record.get("sample_id", ""),
         "record_type": record.get("record_type", ""),

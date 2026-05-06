@@ -28,8 +28,10 @@ See [QA_PITFALLS.md](QA_PITFALLS.md) for the detailed guardrail checklist.
 - The retired target/monitor subtabs and visual-evidence tools panel must stay out of the submission UI unless deliberately reintroduced after review.
 - Frontend reloads must not restart an active mission from the first scan cell or let stale demo query params override a live mission.
 - Public README proof currently centers on Critical Minerals, target-pack proof, payload reduction, orbital eclipse queueing, provenance, abstain safety, Greenland timelapse context, Ground Agent flow, and semantic map context.
-- The current trained NM-UNI bundle is fetched from `Shoozes/lfm2.5-450m-vl-orbit-satellite`; SAT/GND GGUF calls remain evidence-packet reasoning. `/api/inference/image` provides a separate opt-in retained-frame image review path when `image_conditioned_runtime_enabled=true`.
-- Proof Mode asks the backend for the retained visual-review image, then calls the image-review endpoint, renders enabled/unavailable status, and includes `visual_model_review` in proof JSON. Alert persistence, replay snapshots, dataset export, and SFT-style training JSONL preserve the compact visual-review payload when present.
+- The current trained LiquidAI Leap Tune-compatible bundle is fetched from `Shoozes/lfm2.5-450m-vl-orbit-satellite`; SAT/GND GGUF calls remain evidence-packet reasoning. `/api/inference/image` provides a separate opt-in retained-frame LiquidAI/LFM2.5-VL-450M image-text-to-text review path when `image_conditioned_runtime_enabled=true`.
+- Proof Mode asks the backend for the retained visual-review image, then calls the image-review endpoint with `image_b64`, renders enabled/unavailable/abstain status, and includes `visual_model_review` in proof JSON. Alert persistence, replay snapshots, dataset export, and SFT-style training JSONL preserve the compact visual-review payload when present.
+- The backend `vision` extra and launchers support `LFM_ORBIT_INSTALL_IMAGE_RUNTIME=true`; the extra includes Transformers `5.8+`, Torch, Torchvision, Accelerate, and Pillow. `scripts/smoke_image_review.py --require-present` is the real-runtime smoke gate, and `scripts/probe_live_observation.py` proves configured live SimSat imagery without fallback.
+- Replay rescans start a live mission from replay metadata and now return current model review metadata (`review_model_filename`, `review_model_revision`, `reviewed_at`, presence booleans) without exposing local paths.
 - Option 1 / `-Install` / `--install` refresh moving Hugging Face model refs such as `main` instead of assuming the installed manifest is current.
 - The shared trained GGUF runtime serializes completion calls so simultaneous satellite/ground-agent generations cannot crash the native llama.cpp context.
 - Docs are split by audience: `docs/user/` is for demo/review operators, `docs/dev/` is for architecture, data/model handoff, future lanes, QA, and backlog work.
@@ -40,15 +42,15 @@ See [QA_PITFALLS.md](QA_PITFALLS.md) for the detailed guardrail checklist.
 ## Active Backlog
 
 - Rerun and review the Lochloosa West Fire Sentinel Hub seed after the next accepted post-event Sentinel pass before promoting Florida Fire/Drought Readiness Watch beyond candidate triage.
-- Add replay-rescan comparison metadata for current-vs-prior model handoff reviews without overwriting prior proof.
-- Add an optional live-data probe script for configured SimSat/Sentinel provider checks that exits clearly when realtime imagery is unavailable.
+- Add post-run replay-rescan diff output that compares completed current-model results against prior replay proof without overwriting the original proof.
+- Keep the optional LiquidAI/LFM2.5-VL-450M image smoke in the release gate whenever the model revision, Transformers stack, or `vision` lockfile changes.
 - Seed longer source-backed Atacama, Columbia Glacier, Great Salt Lake, and Lake Mead story assets before promoting those as README-level long-form proof.
 - Expand object-evidence eval fixtures beyond the first replay-safe fireline/port cases and add stable CI thresholds.
 - Add responsive/mobile coverage for the fixed right rail and Proof Mode panel.
 - Add a small frontend unit/component layer for high-churn pure logic and hooks.
 - Keep import/export guards current whenever scripts, entrypoints, or dataset row types change.
 - Keep the docs user/dev split enforced when adding new markdown files.
-- On the next demo-media refresh, pre-warm or trim Proof Mode transition frames so recorded videos do not linger on black loading states.
+- Keep Proof Mode media pre-warmed or trimmed so recorded videos do not linger on black loading states.
 - Promote additional camera/location targets only with semantic profiles: aliases, bbox, center, camera, location type, terrain context, mission context, safe evidence guidance, and tags.
 - Add optional external geocoding behind `/api/location/resolve` only if arbitrary place lookup becomes required. Keep the vetted local registry as the offline/default provider.
 - Keep `marine_debris` and live HAB scoring as post-handoff Sentinel lanes; the combined plan lives in [FUTURE_SENTINEL_LANES.md](FUTURE_SENTINEL_LANES.md).
@@ -131,6 +133,8 @@ Model/runtime:
 - `/api/inference/image` stays structured and provenance-rich when unavailable.
 - The image-conditioned adapter must prove different image inputs affect output before enabling runtime image claims.
 - Shared local GGUF inference must remain process-serialized unless the runtime is replaced with a concurrency-safe server or per-agent model context.
+- Replay rescans must preserve the source replay id and current model review metadata; completed comparison output must be additive so prior replay proof remains auditable.
+- Playwright suites that own the default backend/debug/frontend ports must run one at a time unless explicit alternate ports are configured.
 
 ## Verification Commands
 
@@ -138,6 +142,9 @@ Model/runtime:
 - Backend: `uv run --no-sync pytest -q` from `source/backend`
 - Docs/media guard: `uv run --no-sync pytest tests/test_docs_artifacts.py -q` from `source/backend`
 - Import/export guard: `uv run --no-sync pytest tests/test_import_contracts.py -q` from `source/backend`
+- Image review API guard: `uv run --no-sync pytest tests/test_multimodal_inference.py tests/test_inference_image_api.py -q` from `source/backend`
+- Optional real image runtime smoke: `uv run --extra dev --extra model --extra vision python scripts/smoke_image_review.py --require-present` from `source/backend`
+- Optional live provider probe: `uv run --no-sync python scripts/probe_live_observation.py --provider simsat_sentinel --bbox="-63.1,-10.1,-62.9,-9.9" --start "2025-01-01" --end "2025-02-01"` from `source/backend`
 - Frontend type/build guard: `npm run lint` and `npm run build` from `source/frontend`
 - Full browser guard: `npm run test:e2e` from `source/frontend`
 - Demo refresh: `npm run demo:record` and `npm run demo:tutorial` from `source/frontend`
@@ -146,9 +153,9 @@ Model/runtime:
 
 ## Latest Validation Snapshot
 
-- Current local verification: backend `479 passed`; `.\run.ps1 -Verify` passes end to end with GGUF smoke, frontend lint/build, and Playwright `98 passed` / `6 skipped`; docs/import guards passed `22`. A cold reproducibility run also passed after deleting generated backend/frontend dependency folders and hiding user-level `uv` from `PATH`; `run.ps1` bootstrapped repo-local `uv` from Python and exposed it to Playwright child servers.
+- Current local verification: backend `480 passed`; `.\run.ps1 -Verify` passes end to end with GGUF smoke, frontend lint/build, and Playwright `101 passed` / `6 skipped`; docs/import guards passed `22`. The optional LiquidAI/LFM2.5-VL-450M image-runtime smoke passed after installing the `vision` extra, with a real retained seeded frame returning `image_conditioned=true`, the blank control abstaining, no local path leakage, and status flipping `image_conditioned_runtime_enabled=true`. A cold reproducibility run also passed after deleting generated backend/frontend dependency folders and hiding user-level `uv` from `PATH`; `run.ps1` bootstrapped repo-local `uv` from Python and exposed it to Playwright child servers, confirming Python plus Node/npm are enough for the launcher path.
 - Current media verification: `npm run demo:record` passed `5`, `npm run demo:tutorial` passed `1`, the regenerated tutorial is about `264s`, and sampled contact sheets/screenshots are nonblank with expected Proof Mode fallback wording.
-- Current runtime boundary: SAT/GND GGUF calls remain text evidence-packet reasoning; `/api/inference/image` is optional image-conditioned retained-frame review and only reports enabled after a real adapter is loaded.
-- Current export boundary: alert persistence, replay snapshots, dataset samples, and training JSONL carry `visual_model_review` when present; rows without visual review remain valid evidence-packet rows.
+- Current runtime boundary: SAT/GND GGUF calls remain text evidence-packet reasoning; `/api/inference/image` is optional LiquidAI/LFM2.5-VL-450M image-conditioned retained-frame review and only reports enabled after a real adapter passes image pixels.
+- Current export boundary: alert persistence, replay snapshots, dataset samples, and training JSONL carry `visual_model_review` when present; rows with successful visual review export as image/text SFT rows, and rows without visual review remain valid evidence-packet rows.
 - Current public media boundary: generated WebMs stay tracked under `docs/media/videos/` for release assets and local audit; public playback is handled outside GitHub.
 - Historical run-by-run details live in `summary_bank.json`; keep this section limited to the latest release-relevant validation state.

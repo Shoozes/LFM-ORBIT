@@ -10,9 +10,10 @@ One cycle creates evidence like an operator would:
 2. Optionally fetch cloud-gated Sentinel-2 frames for cached replay fixtures.
 3. Save the replay as a cached real API WebM plus metadata.
 4. Export Orbit records into a local dataset pack.
-5. Retag deduplicated images and temporal sequences with `qwen3.6:27b`.
-6. Upload the retagged configs to Hugging Face.
-7. Verify the Hub loads each split.
+5. Preserve `visual_model_review` when the optional image-conditioned retained-frame review path is present.
+6. Retag deduplicated images and temporal sequences with `qwen3.6:27b`.
+7. Upload the retagged configs to Hugging Face.
+8. Verify the Hub loads each split.
 
 ## Current Cycle
 
@@ -103,13 +104,13 @@ uv run --no-sync python scripts\upload_orbit_dataset_hf.py `
 | Visual story frame rows | `0` |
 | Monitor-report rows | `0` |
 | Mission metadata rows | `185` |
-| Records with timelapse references | `15` |
-| Deduplicated training assets | `163` |
-| Temporal sequences | `15` |
+| Records with timelapse references | `26` |
+| Deduplicated training assets | `179` |
+| Temporal sequences | `26` |
 | External image calls | `0` |
 | External sequence calls | `0` |
-| Reused existing image tags | `163` |
-| Reused existing sequence tags | `15` |
+| Reused existing image tags | `179` |
+| Reused existing sequence tags | `26` |
 | Skipped assets | `0` |
 | Tagger failures | `0` |
 | Orphan or missing uploaded image files | `0` |
@@ -123,6 +124,7 @@ The sample count is a current runtime-cycle export, not a claim of total possibl
 - Static image recolors are invalid temporal evidence.
 - New exports rasterize offline SVG placeholder chips to PNG before retagging.
 - `--offline-context-thumbnails` keeps local refreshes from waiting on ESRI thumbnail requests, and generated sample folders are cleared before each export so loose scans do not see stale sample assets.
+- Successful retained-frame visual reviews export as `orbit_visual_review_sft_v1` image/text rows; rows without visual review stay valid `orbit_temporal_sft_v1` evidence-packet rows.
 - Monitor before/after frame references are exported only when their image files are resolvable, so retagging does not chase dead local paths.
 - Unsupported non-raster assets should still be skipped rather than forced into vision tagging.
 - Already-tagged image hashes are reused from the previous retag folder when `--reuse-existing-dir` is set.
@@ -136,7 +138,7 @@ Dataset: [Shoozes/LFM-Orbit-SatData](https://huggingface.co/datasets/Shoozes/LFM
 Current refresh:
 
 - Data/card commit: `2d5c5c400b61e869a1154881743ac6f1c1f77e3b`
-- Remote config verification: `default=163`, `temporal_sft=15`, `asset_metadata=163`, `retagged_assets=163`, `temporal_metadata=15`, `review_queue=163`, `mission_metadata=185`
+- Remote config verification: `default=179`, `temporal_sft=26`, `asset_metadata=179`, `retagged_assets=179`, `temporal_metadata=26`, `review_queue=179`, `mission_metadata=185`
 
 The Hub card keeps schemas separate:
 

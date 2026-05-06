@@ -113,7 +113,7 @@ def test_write_dataset_export_writes_manifest_records_and_assets(tmp_path, monke
     assert record["temporal_use_case"]["id"] == "deforestation"
     assert record["api_prep"]["auto_build"] is True
     assert record["training_contract"]["schema"] == "orbit_training_contract_v1"
-    assert record["training_contract"]["nm_uni_import"]["role"] == "satellite_vlm_training_bridge"
+    assert record["training_contract"]["leap_tune_import"]["role"] == "satellite_vlm_training_bridge"
     assert record["runtime_truth_mode"] == "replay"
     assert record["imagery_origin"] == "cached_api"
     assert record["scoring_basis"] == "multispectral_bands"
@@ -136,12 +136,21 @@ def test_write_dataset_export_writes_manifest_records_and_assets(tmp_path, monke
         json.loads(line)
         for line in (output_dir / "training.jsonl").read_text(encoding="utf-8").splitlines()
     ]
-    assert training_rows[0]["format"] == "orbit_temporal_sft_v1"
+    assert training_rows[0]["format"] == "orbit_visual_review_sft_v1"
+    assert training_rows[0]["image"] == "context_thumb.png"
+    assert training_rows[0]["messages"][0]["role"] == "user"
+    assert "Review this retained satellite evidence frame" in training_rows[0]["messages"][0]["content"]
+    assert training_rows[0]["messages"][1]["role"] == "assistant"
+    assert training_rows[0]["messages"][1]["content"] == "Visible clearing expands along a road-edge corridor."
+    assert training_rows[0]["metadata"]["source"] == "lfm_orbit_visual_review"
     assert training_rows[0]["metadata"]["use_case_id"] == "deforestation"
     assert training_rows[0]["metadata"]["review_status"] == "image_conditioned_reviewed"
     assert training_rows[0]["metadata"]["visual_model_backend"] == "transformers_vlm"
-    user_payload = json.loads(training_rows[0]["messages"][1]["content"])
-    assert user_payload["visual_model_review"]["response"] == "Visible clearing expands along a road-edge corridor."
+    assert training_rows[0]["metadata"]["visual_model"] == "test-vlm"
+    assert training_rows[0]["metadata"]["runtime_truth_mode"] == "replay"
+    assert training_rows[0]["metadata"]["imagery_origin"] == "cached_api"
+    assert training_rows[0]["metadata"]["scoring_basis"] == "multispectral_bands"
+    assert training_rows[0]["metadata"]["frame_id"] == "after_window_2025-06"
 
 
 def test_write_dataset_export_backfills_context_and_includes_ground_reject_controls(tmp_path, monkeypatch):
@@ -829,7 +838,7 @@ def test_dataset_export_preserves_current_and_archived_mission_metadata(tmp_path
     assert current["confirmation_source"] == "mission_state"
     assert current["target_pack_id"] == "fireline"
     assert "dark smoke" in current["object_target_labels"]
-    assert current["training_contract"]["evidence_requirements"]["context_thumb_required_for_nm_uni"] is False
+    assert current["training_contract"]["evidence_requirements"]["context_thumb_required_for_leap_tune"] is False
 
     reset_summary = reset_runtime_state()
     assert reset_summary["missions_archived"] == 1

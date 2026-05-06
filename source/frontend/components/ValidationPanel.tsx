@@ -17,6 +17,30 @@ type GalleryFull = {
   has_timelapse: number;
 };
 
+type VisualReviewImage = {
+  available?: boolean;
+  image_b64?: string;
+  frame_id?: string;
+  source?: string;
+  runtime_truth_mode?: string;
+  imagery_origin?: string;
+  scoring_basis?: string;
+  bbox?: number[];
+  reason?: string;
+};
+
+type ImageReviewResponse = {
+  available?: boolean;
+  image_conditioned?: boolean;
+  abstained?: boolean;
+  visual_model?: string;
+  runtime_backend?: string;
+  runtime_inference_mode?: string;
+  response?: string;
+  reason?: string;
+  provenance?: Record<string, unknown>;
+};
+
 type ValidationPanelProps = {
   selectedCellId: string | null;
   alert: AlertItem | null;
@@ -245,6 +269,8 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenTimelapse
   const [imageryLoading, setImageryLoading] = useState(false);
   const [galleryItem, setGalleryItem] = useState<GalleryFull | null>(null);
   const [galleryLoading, setGalleryLoading] = useState(false);
+  const [visualReview, setVisualReview] = useState<ImageReviewResponse | null>(null);
+  const [visualReviewLoading, setVisualReviewLoading] = useState(false);
   const apiBaseUrl = getApiBaseUrl();
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -254,6 +280,7 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenTimelapse
     setAnalysis(null);
     setAnalyzeError(null);
     setGalleryItem(null);
+    setVisualReview(null);
   }, [alertKey]);
 
   // Fetch gallery item (timelapse + analysis) for confirmed alerts
@@ -284,6 +311,73 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenTimelapse
       controller.abort();
     };
   }, [selectedCellId, alert, apiBaseUrl]);
+
+  useEffect(() => {
+    if (!selectedCellId || !alert) {
+      setVisualReview(null);
+      return;
+    }
+
+    const currentAlert = alert;
+    setVisualReview(null);
+    setVisualReviewLoading(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    async function runVisualReview() {
+      const imageResponse = await fetch(`${apiBaseUrl}/api/gallery/${selectedCellId}/visual-review-image`, {
+        signal: controller.signal,
+      });
+      const imagePayload = imageResponse.ok ? ((await imageResponse.json()) as VisualReviewImage) : null;
+      if (!imagePayload?.available || !imagePayload.image_b64) {
+        setVisualReview({
+          available: false,
+          image_conditioned: false,
+          runtime_inference_mode: "text_evidence_packet",
+          reason: imagePayload?.reason ?? "retained evidence image unavailable",
+          response: "",
+        });
+        return;
+      }
+
+      const reviewResponse = await fetch(`${apiBaseUrl}/api/inference/image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          prompt: mission?.task_text ?? "Review this retained satellite evidence frame for the configured concern.",
+          image_b64: imagePayload.image_b64,
+          metadata: {
+            cell_id: selectedCellId,
+            frame_id: imagePayload.frame_id ?? currentAlert.after_window?.label ?? "retained_evidence_frame",
+            runtime_truth_mode: imagePayload.runtime_truth_mode ?? (mission?.replay_id ? "replay" : "realtime"),
+            imagery_origin: imagePayload.imagery_origin ?? imagePayload.source ?? currentAlert.observation_source ?? "unknown",
+            scoring_basis: imagePayload.scoring_basis ?? "visual_review",
+            bbox: imagePayload.bbox ?? mission?.bbox ?? [],
+          },
+        }),
+      });
+      setVisualReview(reviewResponse.ok ? ((await reviewResponse.json()) as ImageReviewResponse) : null);
+    }
+
+    void runVisualReview()
+      .catch(() => setVisualReview({
+        available: false,
+        image_conditioned: false,
+        runtime_inference_mode: "text_evidence_packet",
+        reason: "image-conditioned review unavailable",
+        response: "",
+      }))
+      .finally(() => {
+        clearTimeout(timeoutId);
+        setVisualReviewLoading(false);
+      });
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [selectedCellId, alert, mission, apiBaseUrl]);
 
   // Fetch cell imagery whenever the selected cell changes
   useEffect(() => {
@@ -585,6 +679,62 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenTimelapse
               <span className="text-xs text-zinc-500 font-medium">Timelapse pending or unavailable.</span>
             </div>
           ) : null}
+        </div>
+      )}
+
+      {(visualReviewLoading || visualReview) && (
+        <div className="mb-4 rounded border border-zinc-200 bg-white p-3 shadow-sm">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Visual Review</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+              {visualReviewLoading
+                ? "reviewing"
+                : visualReview?.image_conditioned
+                  ? "image-conditioned"
+                  : visualReview?.abstained
+                    ? "abstained"
+                    : "unavailable"}
+            </p>
+          </div>
+          {visualReviewLoading && !visualReview ? (
+            <p className="text-xs font-medium text-zinc-500">Requesting retained-frame review...</p>
+          ) : (
+            <div className="space-y-2 text-xs">
+              <p className="font-semibold text-zinc-900">
+                {visualReview?.image_conditioned
+                  ? visualReview.response || "Image-conditioned runtime returned no text."
+                  : visualReview?.abstained
+                    ? visualReview.response || visualReview.reason || "The retained frame was too low-information for review."
+                    : visualReview?.reason || "Image-conditioned review unavailable."}
+              </p>
+              <div className="grid grid-cols-2 gap-2 text-[10px] uppercase tracking-wider text-zinc-500">
+                <div>
+                  <span className="font-semibold">Model:</span>{" "}
+                  <span className="normal-case tracking-normal text-zinc-800">
+                    {visualReview?.visual_model ?? String(visualReview?.provenance?.visual_model ?? "not loaded")}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-semibold">Runtime:</span>{" "}
+                  <span className="normal-case tracking-normal text-zinc-800">
+                    {visualReview?.runtime_inference_mode ?? "text_evidence_packet"}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-semibold">Frame:</span>{" "}
+                  <span className="normal-case tracking-normal text-zinc-800">
+                    {String(visualReview?.provenance?.frame_id ?? "unavailable")}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-semibold">Source:</span>{" "}
+                  <span className="normal-case tracking-normal text-zinc-800">
+                    {formatSourceLabel(String(visualReview?.provenance?.imagery_origin ?? visualReview?.provenance?.image_source ?? "unknown"))}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

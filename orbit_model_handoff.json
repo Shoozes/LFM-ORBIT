@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "producer": {
-    "name": "NM-UNI",
+    "name": "LiquidAI Leap Tune workflow",
     "generated_at": "2026-05-06T00:00:00Z",
     "training_result_manifest": "training_result_manifest.json"
   },
