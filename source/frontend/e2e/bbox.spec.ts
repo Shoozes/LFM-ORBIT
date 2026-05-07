@@ -71,7 +71,7 @@ test.describe("Bounding Box Draw Validation", () => {
 
   test("map actions button opens spatial options without right click", async ({ page }) => {
     await gotoApp(page);
-    await expect(page.locator(".maplibregl-canvas")).toBeVisible({ timeout: 10_000 });
+    await waitForBasemapReady(page);
 
     const mapActionsButton = page.getByRole("button", { name: "Open spatial options at map center" });
     await expect(mapActionsButton).toBeEnabled({ timeout: 10_000 });

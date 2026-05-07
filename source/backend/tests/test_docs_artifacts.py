@@ -222,11 +222,13 @@ def test_docs_user_and_dev_surfaces_are_separated():
     user_docs = sorted(path.name for path in (docs_root / "user").glob("*.md"))
     dev_docs = sorted(path.name for path in (docs_root / "dev").glob("*.md"))
     archive_docs = sorted(path.name for path in (docs_root / "dev" / "archive").glob("*.md"))
+    legal_docs = sorted(path.name for path in (docs_root / "legal").glob("*.md"))
     release_docs = sorted(path.name for path in (docs_root / "release").glob("*.md"))
     root_docs = sorted(path.name for path in docs_root.glob("*.md"))
 
     assert user_docs == ["DEMO_GUIDE.md", "OBJECT_EVIDENCE_MODE.md"]
     assert dev_docs == ["ARCHITECTURE.md", "DATASET_CYCLE_TUTORIAL.md", "MODEL_HANDOFF.md", "TODO.md"]
+    assert legal_docs == ["THIRD_PARTY_NOTICES.md"]
     assert release_docs == ["v0.4.0-public-proof.md"]
     assert root_docs == ["README.md"]
     assert {

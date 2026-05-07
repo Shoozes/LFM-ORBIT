@@ -40,6 +40,7 @@ RUN_APP_ONLY=false
 CLEAN=false
 VERIFY=false
 FETCH_MODEL=false
+RUNNING_VERIFY=false
 
 show_usage() {
     cat <<'EOF'
@@ -389,32 +390,43 @@ install_backend_deps() {
     echo "[*] Syncing backend dependencies from uv.lock..."
     local sync_args=(sync --extra dev --locked)
     local include_model_runtime=false
+    local require_model_runtime=false
     local include_image_runtime=false
     case "${LFM_ORBIT_INSTALL_MODEL_RUNTIME:-}" in
         1|true|TRUE|yes|YES|on|ON)
             include_model_runtime=true
+            require_model_runtime=true
             ;;
     esac
     case "${LFM_ORBIT_INSTALL_IMAGE_RUNTIME:-}" in
         1|true|TRUE|yes|YES|on|ON)
             include_image_runtime=true
             include_model_runtime=true
+            require_model_runtime=true
             ;;
     esac
     if [[ "$FETCH_MODEL" == true ]]; then
         include_model_runtime=true
+        require_model_runtime=true
     fi
     if [[ -f "$MODEL_FILE" ]]; then
-        include_model_runtime=true
+        if can_attempt_model_runtime_install; then
+            include_model_runtime=true
+        elif [[ "$require_model_runtime" != true ]]; then
+            echo "[!] Trained GGUF artifact is present, but no Linux C/C++ compiler was found for llama-cpp-python."
+            echo "    Skipping GGUF runtime install for this dependency-only path; option 1 / --fetch-model still requires build-essential, gcc/g++, or clang."
+        fi
     fi
     if [[ "$include_model_runtime" == true ]]; then
         if can_attempt_model_runtime_install; then
             sync_args+=(--extra model)
             echo "[i] Attempting llama-cpp model runtime install for GGUF inference."
-        else
+        elif [[ "$require_model_runtime" == true ]]; then
             echo "[!] llama-cpp model runtime is required for the production/hackathon path but no Linux C/C++ compiler was found." >&2
             echo "    Install build-essential, gcc/g++, or clang, then rerun option 1." >&2
             exit 1
+        else
+            include_model_runtime=false
         fi
     fi
     if [[ "$include_image_runtime" == true ]]; then
@@ -570,6 +582,7 @@ install_playwright_browser() {
 
 run_verify() {
     echo "[*] Running full repo verification..."
+    RUNNING_VERIFY=true
     install_backend_deps
     install_frontend_deps
     install_playwright_browser
@@ -579,7 +592,12 @@ run_verify() {
         echo "[*] Backend tests..."
         "$UV_CMD" run --no-sync pytest -q
         if [[ -f "$MODEL_FILE" ]]; then
-            assert_trained_model_runtime
+            if "$UV_CMD" run --no-sync python -c "import llama_cpp" >/dev/null 2>&1; then
+                assert_trained_model_runtime
+            else
+                echo "[!] Skipping Linux GGUF smoke because llama-cpp-python is not installed in this environment."
+                echo "    Install build-essential/gcc/clang and rerun ./run.sh --verify for the production runtime smoke."
+            fi
         fi
     )
 

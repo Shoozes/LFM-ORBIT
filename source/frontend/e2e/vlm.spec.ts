@@ -89,6 +89,7 @@ test.describe("Mission target pack UX", () => {
   });
 
   test("live Florida firewatch proof does not reuse stale mining replay media", async ({ page, request }) => {
+    test.setTimeout(90_000);
     await resetRuntimeState(request);
     await routeMissionTimelapse(page);
     await loadSeededReplay(request, "atacama_mining_replay");

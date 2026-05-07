@@ -107,24 +107,6 @@ Known map targets carry mission context and safe evidence guidance with the came
 
 LFM-ORBIT uses a manifest-resolved GGUF for SAT/GND evidence-packet reasoning. Optional retained-frame image review uses LiquidAI/LFM2.5-VL-450M through the backend `vision` extra when enabled.
 
-```powershell
-.\run.ps1 -Install
-```
-
-```bash
-./run.sh --install
-```
-
-Enable visual review:
-
-```powershell
-$env:LFM_ORBIT_INSTALL_IMAGE_RUNTIME="true"
-$env:ORBIT_IMAGE_CONDITIONED_INFERENCE="true"
-$env:ORBIT_IMAGE_INFERENCE_BACKEND="transformers_vlm"
-$env:ORBIT_IMAGE_VLM_MODEL="LiquidAI/LFM2.5-VL-450M"
-.\run.ps1 -Install
-```
-
 The status APIs report `image_conditioned_runtime_enabled=true` only after a real image adapter call succeeds.
 
 Orbit exports reviewed evidence for retagging and tuning. The updated model handoff can be fetched back into Orbit and used to replay or rescan prior sessions.

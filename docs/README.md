@@ -17,5 +17,6 @@ Start with the product [README](../README.md). Use the docs below only when you 
 ## Reference
 
 - [Release notes](release/v0.4.0-public-proof.md)
+- [Third-party notices](legal/THIRD_PARTY_NOTICES.md)
 - [Model manifests](model/)
 - [Media inventory](media/README.md)
