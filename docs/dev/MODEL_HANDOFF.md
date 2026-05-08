@@ -70,11 +70,11 @@ Default trained Orbit bundle:
 - Training manifest: `training_result_manifest.json`
 - Base model: `LFM2.5-VL-450M`
 - Training method: `vlm_sft`
-- Task: `orbit-satellite-triage`
-- Training rows: `7245`
-- Multimodal rows: `7245`
-- Image blocks: `8335`
-- Eval rows: `805`
+- Task: `multitask`
+- Training rows: `142688`
+- Multimodal rows: `142688`
+- Image blocks: `142772`
+- Eval rows: `62918`
 
 The training target is reviewed Orbit evidence tuples with image chip, bbox, task, model answer, confidence, provenance, and abstain labels. Promotion metrics should cover downlink decision precision/recall, abstain precision, and grounded bbox agreement.
 
@@ -163,10 +163,10 @@ Current expected fields for the published LiquidAI Leap Tune-compatible handoff 
 {
   "training_modality": "image_text",
   "image_training_verified": true,
-  "training_train_rows": 7245,
-  "training_multimodal_rows": 7245,
-  "training_image_blocks": 8335,
-  "training_eval_rows": 805,
+  "training_train_rows": 142688,
+  "training_multimodal_rows": 142688,
+  "training_image_blocks": 142772,
+  "training_eval_rows": 62918,
   "mmproj_present": false,
   "runtime_inference_mode": "text_evidence_packet",
   "image_conditioned_runtime_enabled": false
@@ -215,13 +215,13 @@ Canonical loop:
 Current published bundle:
 
 - repo: `Shoozes/lfm2.5-450m-vl-orbit-satellite`
-- generated at: `2026-05-06T00:00:00Z`
+- generated at: `2026-05-08T15:44:54.900513Z`
 - training method: `vlm_sft`
-- task: `orbit-satellite-triage`
-- train rows: `7245`
-- multimodal rows: `7245`
-- image blocks: `8335`
-- eval rows: `805`
+- task: `multitask`
+- train rows: `142688`
+- multimodal rows: `142688`
+- image blocks: `142772`
+- eval rows: `62918`
 - promotion gate: not required in `training_result_manifest.json`
 
 Treat this as the trained runtime artifact for evidence-packet and bbox JSON reasoning. Its training manifest now includes image-text rows, but Orbit still must not describe the GGUF SAT/GND path as image-conditioned. Image-conditioned retained-frame review is only claimed through the separate runtime-gated `/api/inference/image` adapter.
@@ -307,7 +307,7 @@ Current training-focused replay/cache export after the wildfire refresh:
 Hugging Face upload is wired and completed locally. The dataset is published at `Shoozes/LFM-Orbit-SatData`; the current refresh uses the retagged training folder as the Hub payload so the Dataset Viewer exposes separate single-image SFT, temporal SFT, asset metadata, full retag records, temporal metadata, review queue, and mission metadata configs.
 The May 7, 2026 dataset payload commit is `9ccff9ce7315e270ca1b280c82c39414ce591d01`; the Dataset Viewer verification commit is `2df07094f36037e71c7e14e28dfbd298343be359`; the final card documentation commit is `550c98f7c9b84eefbe3c0c6eb77b33a70028402a`. Dataset Viewer verified `1126` total rows with no pending or failed configs, including `70` wildfire image rows and `11` wildfire temporal rows.
 
-The trained model handoff bundle is published at `Shoozes/lfm2.5-450m-vl-orbit-satellite`. Local fetch with `--force` refreshed `runtime-data/models/lfm2.5-vlm-450m/`; `scripts/smoke_satellite_model.py --require-present --max-tokens 8` passed with `loaded=true` in the launcher-managed Windows backend environment. The manifest reports task `orbit-satellite-triage`, base model `LiquidAI/LFM2.5-VL-450M`, GGUF runtime, `training_modality=image_text`, `image_training_verified=true`, `7245` train rows, `7245` multimodal rows, `8335` image blocks, and `805` eval rows. The SAT/GND GGUF runtime remains `text_evidence_packet`; retained-frame image review is a separate opt-in `transformers_vlm` adapter path.
+The trained model handoff bundle is published at `Shoozes/lfm2.5-450m-vl-orbit-satellite`. Local fetch with `--force` refreshed `runtime-data/models/lfm2.5-vlm-450m/`; `scripts/smoke_satellite_model.py --require-present --max-tokens 8` passed against the refreshed GGUF in the launcher-managed Windows backend environment. The manifest reports task `multitask`, base model `LiquidAI/LFM2.5-VL-450M`, GGUF runtime, `training_modality=image_text`, `image_training_verified=true`, `142688` train rows, `142688` multimodal rows, `142772` image blocks, and `62918` eval rows. The SAT/GND GGUF runtime remains `text_evidence_packet`; retained-frame image review is a separate opt-in `transformers_vlm` adapter path.
 
 ## Integration Sequence
 

@@ -1,30 +1,61 @@
 {
   "schema_version": "2",
-  "created_at": "2026-05-06T00:00:00Z",
-  "updated_at": "2026-05-06T00:00:00Z",
+  "created_at": "2026-05-08T15:44:34.620781Z",
+  "updated_at": "2026-05-08T15:44:34.621017Z",
   "training": {
-    "job_id": "orbit-public-model-refresh-2026-05-06",
+    "job_id": "liquid-local-1778255074",
     "method": "vlm_sft",
     "source_model_path": "LiquidAI/LFM2.5-VL-450M",
     "output_model_dir": "hf://Shoozes/lfm2.5-450m-vl-orbit-satellite/hf-checkpoint",
-    "dataset_path": "hf://datasets/Shoozes/LFM-Orbit-SatData"
+    "dataset_path": "lfm-orbit-satdata-vrsbench/train.jsonl"
   },
+  "distillation": null,
   "artifact_provenance": {
-    "dataset_path": "hf://datasets/Shoozes/LFM-Orbit-SatData"
+    "dataset_path": "lfm-orbit-satdata-vrsbench/train.jsonl"
   },
   "dataset_summary": {
-    "rows": 7245,
-    "multimodal_rows": 7245,
-    "image_blocks": 8335
+    "rows": 142688,
+    "multimodal_rows": 142688,
+    "image_blocks": 142772
   },
   "evaluation_metadata": {
-    "eval_rows": 805,
-    "source_dataset": "hf://datasets/Shoozes/LFM-Orbit-SatData",
-    "latest_evaluation": "local_validation_snapshot_2026_05_06"
+    "source_dataset": null,
+    "latest_evaluation": null,
+    "latest_vs_baseline": null,
+    "regressions": {
+      "status": "not_evaluated",
+      "count": 0,
+      "items": []
+    }
+  },
+  "promotion_gate": {
+    "required": false,
+    "status": "not_required",
+    "label": "No held-out gate required",
+    "reason": "No Claw held-out promotion gate is attached to this training result.",
+    "source": null,
+    "validated_at": null,
+    "latest_compare": null
   },
   "base_model": "LiquidAI/LFM2.5-VL-450M",
   "source_model": "LiquidAI/LFM2.5-VL-450M",
-  "task_type": "orbit-satellite-triage",
-  "train_rows": 7245,
-  "eval_rows": 805
+  "task_type": "multitask",
+  "executor": "local_single_gpu",
+  "run_dir": "lfm-orbit-satdata-vrsbench-liquid-run",
+  "adapter_model_dir": "lfm-orbit-satdata-vrsbench-liquid-run/local_outputs/adapter",
+  "output_model_dir": "lfm-orbit-satdata-vrsbench-liquid-run/local_outputs/merged_model",
+  "eval_dataset_path": "lfm-orbit-satdata-vrsbench/eval.jsonl",
+  "train_rows": 142688,
+  "eval_rows": 62918,
+  "trainer_state": {
+    "global_step": 35672,
+    "max_steps": 35672,
+    "num_train_epochs": 4,
+    "epoch": 4.0,
+    "log_history_count": 3573,
+    "last_log": {
+      "epoch": 4.0,
+      "step": 35672
+    }
+  }
 }
