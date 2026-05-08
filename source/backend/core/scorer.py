@@ -23,18 +23,20 @@ def _window_is_cloud_degraded(window: dict) -> bool:
 
 def _to_window_payload(window: dict) -> WindowObservation:
     bands = window["bands"]
+    swir1 = bands.get("swir1", bands["swir"])
+    swir2 = bands.get("swir2", bands["swir"])
     ndvi = compute_ndvi(bands["nir"], bands["red"])
-    nbr = compute_nbr(bands["nir"], bands["swir"])
+    nbr = compute_nbr(bands["nir"], swir2)
     evi2 = compute_evi2(bands["nir"], bands["red"])
-    ndmi = compute_ndmi(bands["nir"], bands["swir"])
-    soil_ratio = compute_swir_nir_ratio(bands["nir"], bands["swir"])
+    ndmi = compute_ndmi(bands["nir"], swir1)
+    soil_ratio = compute_swir_nir_ratio(bands["nir"], swir2)
 
-    return {
+    payload: WindowObservation = {
         "label": window["label"],
         "quality": round(window["quality"], 4),
         "nir": round(bands["nir"], 4),
         "red": round(bands["red"], 4),
-        "swir": round(bands["swir"], 4),
+        "swir": round(swir2, 4),
         "ndvi": round(ndvi, 4),
         "nbr": round(nbr, 4),
         "evi2": round(evi2, 4),
@@ -42,6 +44,10 @@ def _to_window_payload(window: dict) -> WindowObservation:
         "soil_ratio": round(soil_ratio, 4),
         "flags": list(window["flags"]),
     }
+    for key in ("blue", "green", "swir1", "swir2", "scl_cloud_ratio", "cloud_probability", "valid_pixel_ratio"):
+        if key in bands:
+            payload[key] = round(float(bands[key]), 4)
+    return payload
 
 
 def score_cell_change(cell_id: str, observer: Any = None) -> dict:

@@ -49,8 +49,12 @@ type MapVisualizerProps = {
   vlmBoxes?: VlmBox[];
   /** Durable scan paint replayed after map source or tab refreshes */
   scanCellState?: ScanCellState;
-  /** True only while a live mission scan is actively moving across cells */
+  /** True while a live or cached replay scan is actively moving across cells */
   scanAnimationActive?: boolean;
+  /** Short status line shown while map cells are being scanned or restored */
+  scanStatusLabel?: string;
+  /** Short status line shown when an area is selected but no scan is active */
+  scanPausedLabel?: string;
   /** Changes when a new mission/replay context should clear prior scan paint */
   scanStateKey?: string | number | null;
   /** Programmatic camera target from Ground Agent or mission context */
@@ -178,6 +182,23 @@ function getCellIdFromProperties(properties: unknown): string | null {
   return typeof value === "string" || typeof value === "number" ? String(value) : null;
 }
 
+function getNearestCellId(
+  centroids: Record<string, [number, number]>,
+  lat: number,
+  lng: number,
+): string | null {
+  let nearestCellId: string | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const [cellId, [cellLng, cellLat]] of Object.entries(centroids)) {
+    const distance = Math.hypot(cellLng - lng, cellLat - lat);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestCellId = cellId;
+    }
+  }
+  return nearestCellId;
+}
+
 function formatConfidence(value: unknown): string {
   return typeof value === "number" && Number.isFinite(value) ? value.toFixed(2) : "candidate";
 }
@@ -220,9 +241,30 @@ function buildVlmTooltipHtml(properties: Record<string, unknown>): string {
 
 // ── Marker builders ──────────────────────────────────────────────────────────
 
-function buildMarkerEl(pin: MapPin, onRemove: (id: number) => void, onClick: (cellId: string) => void): HTMLElement {
+function markerOffsetForPin(pin: MapPin): PointLike {
+  if (pin.pin_type === "satellite") return [-18, -12];
+  if (pin.pin_type === "ground") return [18, 12];
+  return [0, -24];
+}
+
+function pinRoleLabel(pin: MapPin): string {
+  if (pin.pin_type === "satellite") return "Satellite";
+  if (pin.pin_type === "ground") return "Ground";
+  return "Operator";
+}
+
+function markerClickMessage(pin: MapPin): string {
+  const note = pin.note?.trim() || pin.label || "Marker selected.";
+  return `${pinRoleLabel(pin)} marker: ${note}`;
+}
+
+function buildMarkerEl(pin: MapPin, onRemove: (id: number) => void, onClick: (pin: MapPin) => void): HTMLElement {
   const el = document.createElement("div");
   el.className = "map-pin-root";
+  el.dataset.testid = `map-pin-${pin.pin_type}`;
+  el.setAttribute("role", "button");
+  el.setAttribute("aria-label", `${pinRoleLabel(pin)} marker. Open Inspect results for ${pin.label || pin.cell_id || "this location"}.`);
+  el.tabIndex = pin.cell_id ? 0 : -1;
   el.style.cssText = "cursor:pointer; user-select:none; z-index:1;";
 
   let symbol: string;
@@ -259,6 +301,7 @@ function buildMarkerEl(pin: MapPin, onRemove: (id: number) => void, onClick: (ce
 
   const bubble = document.createElement("div");
   bubble.className = "map-pin-bubble";
+  bubble.dataset.testid = `map-pin-${pin.pin_type}-bubble`;
   bubble.style.cssText = `
     display: flex; align-items: center; gap: ${pin.label ? "4px" : "0"};
     background: ${bg};
@@ -305,9 +348,17 @@ function buildMarkerEl(pin: MapPin, onRemove: (id: number) => void, onClick: (ce
 
   // Click to select
   if (pin.cell_id) {
-    el.addEventListener("click", (e) => {
+    const activateMarker = (e: MouseEvent | KeyboardEvent) => {
       e.stopPropagation();
-      onClick(pin.cell_id!);
+      onClick(pin);
+    };
+    el.addEventListener("click", (e) => {
+      activateMarker(e);
+    });
+    el.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      activateMarker(e);
     });
   }
 
@@ -338,6 +389,8 @@ export default function MapVisualizer({
   vlmBoxes = [],
   scanCellState = {},
   scanAnimationActive = true,
+  scanStatusLabel = "Scan in progress - watching selected cells",
+  scanPausedLabel = "Scan animation paused - selected area ready",
   scanStateKey = null,
   cameraRequest = null,
   onCameraRequestHandled,
@@ -1028,20 +1081,30 @@ export default function MapVisualizer({
     for (const pin of pins) {
       if (markerRefs.current[pin.id]) {
         markerRefs.current[pin.id].setLngLat([pin.lng, pin.lat]);
+        markerRefs.current[pin.id].setOffset(markerOffsetForPin(pin));
       } else {
-        const el = buildMarkerEl(pin, removePin, (cellId) => onCellClickRef.current(cellId));
-        const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+        const el = buildMarkerEl(pin, removePin, (selectedPin) => {
+          if (!selectedPin.cell_id) return;
+          onCellClickRef.current(selectedPin.cell_id);
+          showPinTooltip(markerClickMessage(selectedPin));
+        });
+        const marker = new maplibregl.Marker({ element: el, anchor: "center", offset: markerOffsetForPin(pin) })
           .setLngLat([pin.lng, pin.lat])
           .addTo(map);
         markerRefs.current[pin.id] = marker;
       }
       
-      // Upgrade grid color to Alert! if it's confirmed by ground agent
-      if (pin.pin_type === "ground" && pin.cell_id) {
-         setFeatureStateIfReady(map, "scan-grid", pin.cell_id, { isAlert: true, isAnomaly: false });
+      const visibleCellId = pin.cell_id && cellCentroidsRef.current[pin.cell_id]
+        ? pin.cell_id
+        : getNearestCellId(cellCentroidsRef.current, pin.lat, pin.lng);
+      if (pin.pin_type === "satellite" && visibleCellId) {
+        setFeatureStateIfReady(map, "scan-grid", visibleCellId, { isAnomaly: true, isDiscarded: false });
+      }
+      if (pin.pin_type === "ground" && visibleCellId) {
+        setFeatureStateIfReady(map, "scan-grid", visibleCellId, { isAlert: true, isAnomaly: false });
       }
     }
-  }, [pins, mapReady, removePin]);
+  }, [pins, mapReady, removePin, showPinTooltip, geoJsonGrid, scanStateKey]);
 
   // Sync optional visual evidence boxes
   const vlmGeoJson = useMemo(() => {
@@ -1280,19 +1343,19 @@ export default function MapVisualizer({
       {!scanAnimationActive && drawnBbox && (
         <div
           data-testid="map-scan-paused-hint"
-          className="pointer-events-none absolute left-5 bottom-24 z-20 rounded border border-amber-200/45 bg-zinc-950/72 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-100 shadow-lg backdrop-blur-md"
+          className="pointer-events-none absolute bottom-36 left-3 z-20 rounded border border-amber-200/45 bg-zinc-950/72 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-100 shadow-lg backdrop-blur-md lg:bottom-24 lg:left-5"
         >
-          Scan animation paused - selected area ready
+          {scanPausedLabel}
         </div>
       )}
 
       {scanAnimationActive && drawnBbox && (
         <div
           data-testid="map-scan-active-hint"
-          className="pointer-events-none absolute left-5 bottom-24 z-20 flex items-center gap-2 rounded border border-emerald-200/45 bg-zinc-950/72 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-100 shadow-lg backdrop-blur-md"
+          className="pointer-events-none absolute bottom-36 left-3 z-20 flex items-center gap-2 rounded border border-emerald-200/45 bg-zinc-950/72 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-100 shadow-lg backdrop-blur-md lg:bottom-24 lg:left-5"
         >
           <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-          <span>Scan in progress - watching selected cells</span>
+          <span>{scanStatusLabel}</span>
         </div>
       )}
 
@@ -1344,7 +1407,7 @@ export default function MapVisualizer({
         title="Open spatial options at map center"
         data-ui-tip="Spatial tools"
         data-ui-tip-position="left"
-        className="absolute bottom-5 right-5 z-20 rounded border border-white/15 bg-zinc-950/70 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100 shadow-lg backdrop-blur-md transition hover:border-cyan-300/60 hover:bg-cyan-950/70 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+        className="absolute bottom-48 right-3 z-20 rounded border border-white/15 bg-zinc-950/70 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100 shadow-lg backdrop-blur-md transition hover:border-cyan-300/60 hover:bg-cyan-950/70 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50 sm:bottom-20 lg:bottom-5 lg:right-5"
         disabled={!mapReady}
         onMouseDown={(event) => event.stopPropagation()}
         onClick={(event) => {
@@ -1437,19 +1500,23 @@ export default function MapVisualizer({
 
       {/* Pin dropped toast */}
       {pinTooltip && (
-        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 rounded-xl border border-amber-800/60 bg-black/80 px-4 py-2 text-xs text-amber-300 backdrop-blur-sm transition-all">
+        <div
+          data-testid="map-pin-tooltip"
+          aria-live="polite"
+          className="absolute bottom-24 left-1/2 max-w-[min(90%,34rem)] -translate-x-1/2 rounded-xl border border-amber-800/60 bg-black/80 px-4 py-2 text-xs leading-relaxed text-amber-300 shadow-lg backdrop-blur-sm transition-all lg:bottom-16"
+        >
           {pinTooltip}
         </div>
       )}
 
       {pinError && (
-        <div className="absolute bottom-16 left-1/2 max-w-[min(90%,32rem)] -translate-x-1/2 rounded-xl border border-red-900/60 bg-red-950/80 px-4 py-2 text-xs text-red-100 shadow-lg backdrop-blur-sm">
+        <div className="absolute bottom-24 left-1/2 max-w-[min(90%,32rem)] -translate-x-1/2 rounded-xl border border-red-900/60 bg-red-950/80 px-4 py-2 text-xs text-red-100 shadow-lg backdrop-blur-sm lg:bottom-16">
           {pinError}
         </div>
       )}
 
       {/* Basemap credit */}
-      <div className="absolute bottom-5 left-5 rounded-2xl border border-white/10 bg-zinc-900/40 px-4 py-3 text-xs text-zinc-300 backdrop-blur-md shadow-lg pointer-events-none">
+      <div data-testid="map-basemap-credit" className="pointer-events-none absolute bottom-20 left-3 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/10 bg-zinc-900/40 px-4 py-3 text-xs text-zinc-300 shadow-lg backdrop-blur-md lg:bottom-5 lg:left-5">
         <div className="mb-1 flex items-center gap-2">
           <p className="text-gray-500 tracking-[0.3em]">SATELLITE BASEMAP</p>
           <span className="rounded-full border border-cyan-900/70 bg-cyan-500/10 px-2 py-0.5 text-[9px] uppercase tracking-[0.24em] text-cyan-200">

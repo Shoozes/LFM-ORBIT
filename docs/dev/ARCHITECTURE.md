@@ -1,6 +1,6 @@
 # LFM Orbit Architecture
 
-Current as of **May 6, 2026**.
+Current as of **May 7, 2026**.
 
 ## System Shape
 
@@ -55,7 +55,7 @@ flowchart LR
 19. `core/telemetry.py` emits typed `scan_result` payloads defined in `core/contracts.py`.
 20. `core/queue.py` persists confirmed alerts for `Logs`, `Inspect`, and recent-alert APIs.
 21. `core/gallery.py` expands confirmed alerts into imagery/timelapse evidence, selects the retained image passed to visual review, and reuses local replay cache imagery for thumbnail fallback before dropping to offline chips; dataset export rasterizes SVG fallbacks to PNG.
-22. `core/replay.py` can reset runtime state and load a completed mission directly into the same mission, queue, gallery, metrics, and dialogue stores used by realtime operations. It also exposes cached API WebMs as Fast Replay entries and can rescan replay metadata through the current runtime/model stack while preserving replay target packs when present.
+22. `core/replay.py` can reset runtime state and load a completed mission directly into the same mission, queue, gallery, metrics, and dialogue stores used by realtime operations. It also exposes cached API WebMs as Replay Cache entries and can rescan the same retained frames/evidence through the current prompt/model review stack without provider fetches.
 23. `ValidationPanel.tsx` and `TimelapseViewer.tsx` expand a selected alert into imagery, analysis, exports, and timelapse context. Mission-tab timelapse output stays separate from mission setup so active temporal video evidence remains visible.
 24. `SettingsPanel.tsx` queries provider, SimSat, analysis, and depth status endpoints independently, with short retries so one transient miss does not force a false offline settings surface.
 25. `GroundAgent.tsx`, `/api/agent/chat`, and `/api/agent/action/confirm` provide a local action chat that proposes and confirms replay loads/rescans, mission packs, SAT/GND link changes, and map-navigation actions before mutating app state.
@@ -90,7 +90,9 @@ flowchart LR
 - `source/backend/core/analyzer.py`
   Mission-aware interpretation over scored packets. Firewatch can screen fuel-stress context, but proxy-only vegetation signals remain candidate/no-downlink until source-backed smoke, active-fire, burn-scar, hotspot, or fireline evidence appears.
 - `source/backend/core/indices.py`
-  Derived spectral index helpers.
+  Derived spectral index helpers, including Sentinel-2 NBR/NDMI/dNBR and visible-band smoke/cloud assist features.
+- `source/backend/core/wildfire_smoke.py`
+  Wildfire Confidence Assist scoring for source-backed Sentinel-2 frames. It combines cloud/SCL guardrails, blue/green smoke cues, NBR/dNBR/NDMI burn context, optional hotspot support, temporal persistence, and proxy-source confidence caps so white smoke/cloud ambiguity becomes `defer` or `review` instead of unsupported fire confirmation.
 - `source/backend/core/overlays/attribution.py`
   Boundary/governance overlap context.
 - `source/backend/core/observability.py`
@@ -161,7 +163,7 @@ flowchart LR
 ### Frontend Runtime
 
 - `source/frontend/App.tsx`
-  Shell layout, tab routing, top-level polling, map/sidebar coordination, and map-driven agent-evaluation error routing.
+  Shell layout, tab routing, top-level polling, map/sidebar coordination, mobile Chat/Map shell switching, and map-driven agent-evaluation error routing.
 - `source/frontend/hooks/useTelemetry.ts`
   Grid, alerts, selected cell, mission completion, websocket lifecycle.
 - `source/frontend/components/MapVisualizer.tsx`
@@ -169,7 +171,7 @@ flowchart LR
 - `source/frontend/utils/objectEvidence.ts`
   Shared semantic object-evidence colors plus normalized bbox conversion used by MapLibre overlays.
 - `source/frontend/components/MissionControl.tsx`
-  Mission entry form, preset selection, Fast Replay loader/rescan controls, temporal windows, bbox controls, stop/launch state.
+  Mission entry form, preset selection, Replay Cache loader/rescan controls, temporal windows, bbox controls, stop/launch state.
 - `source/frontend/components/SettingsPanel.tsx`
   Independent provider/SimSat/model/depth status fetches with retry, trimmed credential validation, optional Depth Anything V3 toggle, and runtime health surface.
 - `source/frontend/e2e/testUrls.ts`
@@ -181,7 +183,7 @@ flowchart LR
 - `source/frontend/e2e/tutorialHelpers.ts`
   Shared Playwright subtitle, highlight, and map-drawing helpers used by tutorial-style recording specs.
 - `source/frontend/playwright.config.ts`
-  Local/CI web-server orchestration; server reuse is opt-in through `PLAYWRIGHT_REUSE_SERVER=1` so stale local runtime state does not leak into normal test runs.
+  Local/CI web-server orchestration. Backend web servers use `uv run --locked` so fresh platform-specific virtualenvs can be created from `uv.lock`; server reuse is opt-in through `PLAYWRIGHT_REUSE_SERVER=1` so stale local runtime state does not leak into normal test runs.
 - `source/frontend/playwright.demo.config.ts`
   Separate demo recorder config with always-on video, trace, and screenshots; normal correctness tests stay on `playwright.config.ts`.
 - `source/frontend/components/AlertsLogs.tsx`
@@ -217,7 +219,7 @@ flowchart LR
 - Final safety net: local deterministic fallback data.
 - Cold-start `.env.example` sets `OBSERVATION_PROVIDER=simsat_sentinel` and `DISABLE_EXTERNAL_APIS=true` so fresh installs and hackathon demos do not depend on Sentinel Hub, NASA, GEE, or provider quota unless the operator explicitly opts in.
 - Direct Sentinel Hub credentials are supported only for local development, replay-cache refreshes, and dataset experiments. They resolve from environment variables first, then local developer secret files; the seeding path never logs credential values.
-- Current cached replay fixtures include Pakistan Manchar Lake flooding, Atacama mining, Suez maritime, Singapore Strait, Georgia wildfire candidate, Kansas crop phenology, Delhi urban expansion, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead WebMs in `source/backend/assets/seeded_data/`. These fixtures are preserved to avoid repeated API usage. The legacy Greenland ice-edge WebM is excluded from Fast Replay because it fails the structural timelapse-integrity gate. The first `ice_snow_extent` replay is metadata-scored and deliberately does not attach that static cache as timelapse proof.
+- Current cached replay fixtures include Pakistan Manchar Lake flooding, Atacama mining, Suez maritime, Singapore Strait, Florida SR-26 wildfire, Highway 82 Georgia wildfire, Pineland Road wildfire, Spain Larouco wildfire, Kansas crop phenology, Delhi urban expansion, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead WebMs in `source/backend/assets/seeded_data/`. These fixtures are preserved to avoid repeated API usage. The legacy Greenland ice-edge WebM is excluded from Replay Cache because it fails the structural timelapse-integrity gate. The first `ice_snow_extent` replay is metadata-scored and deliberately does not attach that static cache as timelapse proof. Promoted real-provider cache keys and reuse rules live in `docs/dev/SEEDED_DATA_REGISTRY.md`.
 
 ### Runtime Truth and Provenance
 
@@ -254,7 +256,7 @@ Architecture docs describe the guard suite; run-by-run totals live in `README.md
 - Artifact guard: README links, documented media, story-plate manifests, repo-relative summary-bank file references, proof-frame luminance, and timelapse integrity checks.
 - Wrapper guard: `.\run.ps1 -Verify` and `./run.sh --verify` run the repo-level install/runtime validation path with platform-specific backend virtualenvs.
 - State-isolation guard: normal Playwright runs start fresh local servers by default; stale server reuse is opt-in through `PLAYWRIGHT_REUSE_SERVER=1`.
-- Cold-start guard: the Windows launcher can bootstrap repo-local `uv` from Python, prepend it for Playwright child servers, install backend/frontend dependencies from a clean generated state, and verify with only Python plus Node/npm present.
+- Cold-start guard: the Windows launcher can bootstrap repo-local `uv` from Python, prepend it for Playwright child servers, install backend/frontend dependencies from a clean generated state, and verify with only Python plus Node/npm present. WSL/Linux cold-start validation requires native Linux `node`/`npm`/`npx`, `uv` on PATH for non-login child shells, and Playwright Chromium browser/dependency installation.
 
 ## Known Constraints
 
@@ -263,13 +265,14 @@ Architecture docs describe the guard suite; run-by-run totals live in `README.md
 - The mission-evidence grounding path works with available dependencies; broader visual helper APIs stay backend-compatible but are not exposed as primary operator controls.
 - Depth Anything V3 is integrated as an optional adapter and Settings toggle. Depth statistics are not part of the live alert scoring or promotion gate, and per-frame timelapse inference remains opt-in due runtime cost.
 - Tool-call parsing supports nested fenced JSON arguments for local LFM output. Inline JSON extraction remains intentionally conservative to avoid over-parsing normal prose.
-- The primary UI is desktop-operator oriented with a fixed right mission rail. The map now has a non-right-click action path, but responsive/mobile layout coverage remains follow-up work.
+- The primary UI remains desktop-operator oriented, but small screens now use a two-view Chat/Map shell. Wide desktop, 16:9 mobile landscape, and 9:16 mobile portrait have Playwright coverage; deeper Proof Mode mobile polish remains follow-up work.
 - The eval lane now writes baseline-vs-candidate promotion artifacts, but it still depends on exported labels and should not be treated as a substitute for operator-reviewed gold benchmarks.
-- The runtime supports curated replay loading, dynamic cached-API Fast Replay entries with rescan, and portable snapshot export/import. Bundled replay packs remain the stable showcase path.
-- Replay rescan returns source replay id plus current model review metadata (`review_model_filename`, `review_model_revision`, `reviewed_at`, presence booleans) so current-runtime reruns have an audit handle. Full completed-result diffing against prior proof remains additive follow-up work.
+- The runtime supports curated replay loading, dynamic cached-API Replay Cache entries with cached-data rescan, and portable snapshot export/import. Bundled replay packs remain the stable showcase path.
+- Replay rescan keeps `runtime_truth_mode=replay` and `imagery_origin=cached_api`, returns source replay id plus current model review metadata (`review_model_filename`, `review_model_revision`, `reviewed_at`, presence booleans), and rehydrates alerts/gallery/pins/messages/metrics with `scoring_basis=cached_rescan_current_model`. Full completed-result diffing against prior proof remains additive follow-up work.
 - Proof Mode is intentionally app-level demo UI, not a correctness substitute. Correctness remains covered by backend tests, frontend type checks, and normal Playwright specs.
 - Satellite/Ground GGUF reasoning is only active when a manifest-resolved model artifact and `llama-cpp-python` runtime are installed locally.
 - Normal startup opens on the known Atacama mining context but does not start a mission, auto-play the last replay, or scan the legacy default region. Live scanning begins only after operator-confirmed mission state exists.
 - Florida Fire/Drought Readiness Watch uses a recent 30-day operational window by default and rejects proxy-only vegetation changes before downlink, so it remains readiness/candidate triage rather than unsupported fire confirmation.
 - The current scan grid is the repo-local square-cell compatibility layer, which is sufficient for the SimSat hackathon demo. Production geospatial scale-out is intentionally parked outside the active scope.
 - Target-pack proof boxes are normalized to `unit_xyxy`; disabled targets are skipped, unsafe civilian-scope labels are rejected before persistence, and degenerate boxes are discarded before counts or proof JSON are emitted.
+- Expected first-run operator path: run `run.ps1` or `run.sh`, choose option 1 to install/start the app, open the frontend link, use a suggested Ground Agent prompt or selected map area, run the mission/replay, watch the scan state, then follow the glowing Proof Mode action after completion. Result review should show colored scan cells, SAT/GND map markers, and proof facts backed by the relevant replay or mission data within supported contexts such as wildfire and temporal-change review.

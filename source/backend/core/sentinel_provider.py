@@ -5,7 +5,7 @@ This module provides direct access to Sentinel Hub for local dev/testing
 when the SimSat API is not available. It implements:
 
   - WMS-based band retrieval directly using the instance ID.
-  - Real NDVI/NBR-ready band extraction (B04-red, B08-nir, B11-swir, SCL-quality)
+  - Real smoke/burn-ready band extraction (B02/B03/B04/B08/B11/B12/SCL/CLD/CLP)
   - Bbox/date handling for a single H3 cell
 
 Observation source label: ``sentinelhub_direct_imagery``
@@ -84,7 +84,19 @@ def _fetch_seasonal_baseline(bbox_coords: tuple, target_label: str, instance_id:
     year = int(parts[0])
     month = parts[1]
 
-    valid_nirs, valid_reds, valid_swirs, qualities = [], [], [], []
+    values: dict[str, list[float]] = {
+        "blue": [],
+        "green": [],
+        "red": [],
+        "nir": [],
+        "swir": [],
+        "swir1": [],
+        "swir2": [],
+        "scl_cloud_ratio": [],
+        "cloud_probability": [],
+        "valid_pixel_ratio": [],
+        "quality": [],
+    }
 
     for past_year in range(year - years_back, year):
         past_label = f"{past_year}-{month}"
@@ -92,31 +104,37 @@ def _fetch_seasonal_baseline(bbox_coords: tuple, target_label: str, instance_id:
 
         bands = _fetch_window_bands(bbox_coords, start_date, end_date, instance_id)
         if bands is not None and not bands.get("cloud_degraded"):
-            valid_nirs.append(bands["nir"])
-            valid_reds.append(bands["red"])
-            valid_swirs.append(bands["swir"])
-            qualities.append(bands["quality"])
+            for key in values:
+                if key in bands:
+                    values[key].append(float(bands[key]))
 
-    if not valid_nirs:
+    if not values["nir"]:
         return None
 
-    return {
-        "nir": round(sum(valid_nirs) / len(valid_nirs), 4),
-        "red": round(sum(valid_reds) / len(valid_reds), 4),
-        "swir": round(sum(valid_swirs) / len(valid_swirs), 4),
-        "quality": round(sum(qualities) / len(qualities), 4),
-        "cloud_degraded": False,
-    }
+    result = {key: round(sum(items) / len(items), 4) for key, items in values.items() if items}
+    result["cloud_degraded"] = False
+    return result
 
 EVALSCRIPT = """//VERSION=3
 function setup() {
   return {
-    input: [{ bands: ["B04", "B08", "B11", "SCL"], units: "DN" }],
-    output: { bands: 4, sampleType: "FLOAT32" }
+    input: [{ bands: ["B02", "B03", "B04", "B08", "B11", "B12", "SCL", "CLD", "CLP", "dataMask"] }],
+    output: { bands: 10, sampleType: "FLOAT32" }
   };
 }
 function evaluatePixel(sample) {
-  return [sample.B04 / 10000, sample.B08 / 10000, sample.B11 / 10000, sample.SCL];
+  return [
+    sample.B02,
+    sample.B03,
+    sample.B04,
+    sample.B08,
+    sample.B11,
+    sample.B12,
+    sample.SCL,
+    sample.CLD,
+    sample.CLP,
+    sample.dataMask
+  ];
 }
 """
 
@@ -148,44 +166,78 @@ def _fetch_window_bands(bbox_coords: tuple, start_date: str, end_date: str, inst
             return None
 
         # Merge all available frames (often just 1 or 2 good ones)
-        reds, nirs, swirs, scls = [], [], [], []
+        blues, greens, reds, nirs, swir1s, swir2s, clds, clps, scls = [], [], [], [], [], [], [], [], []
 
         for arr in data_list:
-            scl_band = arr[:, :, 3]
-            qc_result = evaluate_scene_quality(scl_band)
+            scl_band = arr[:, :, 6]
+            data_mask = arr[:, :, 9] > 0
+            qc_scl = np.where(data_mask, scl_band, 0)
+            qc_result = evaluate_scene_quality(qc_scl)
 
             if not qc_result["accepted"] and len(data_list) > 1:
                 # If we have multiple scenes and this one is entirely garbage, skip it
                 logger.debug(f"Skipping scene frame due to QC flags: {qc_result['reasons']}")
                 continue
 
-            valid_mask = ~np.isin(scl_band.astype(int), INVALID_SCL_CLASSES)
+            valid_mask = data_mask & ~np.isin(scl_band.astype(int), INVALID_SCL_CLASSES)
             valid_count = valid_mask.sum()
             pixel_count = arr.shape[0] * arr.shape[1]
 
             if valid_count > 0:
-                red_band = arr[:, :, 0]
-                nir_band = arr[:, :, 1]
-                swir_band = arr[:, :, 2]
+                blue_band = arr[:, :, 0]
+                green_band = arr[:, :, 1]
+                red_band = arr[:, :, 2]
+                nir_band = arr[:, :, 3]
+                swir1_band = arr[:, :, 4]
+                swir2_band = arr[:, :, 5]
+                cld_band = arr[:, :, 7]
+                clp_band = arr[:, :, 8]
+                blues.extend(blue_band[valid_mask].tolist())
+                greens.extend(green_band[valid_mask].tolist())
                 reds.extend(red_band[valid_mask].tolist())
                 nirs.extend(nir_band[valid_mask].tolist())
-                swirs.extend(swir_band[valid_mask].tolist())
-                scls.append((valid_count, pixel_count))
+                swir1s.extend(swir1_band[valid_mask].tolist())
+                swir2s.extend(swir2_band[valid_mask].tolist())
+                clds.extend(cld_band[data_mask].tolist())
+                clps.extend(clp_band[data_mask].tolist())
+                cloud_count = int((np.isin(scl_band.astype(int), [3, 8, 9, 10]) & data_mask).sum())
+                data_count = int(data_mask.sum())
+                scls.append((valid_count, pixel_count, cloud_count, data_count))
 
         if not reds:
             return None
 
-        total_valid = sum(v for v, p in scls)
-        total_pixels = sum(p for v, p in scls)
+        total_valid = sum(v for v, p, c, d in scls)
+        total_pixels = sum(p for v, p, c, d in scls)
         quality = round(total_valid / max(1, total_pixels), 4)
+        total_cloud = sum(c for v, p, c, d in scls)
+        total_data = sum(d for v, p, c, d in scls)
+        scl_cloud_ratio = round(total_cloud / max(1, total_data), 4)
+
+        def _probability_mean(values: list[float], scale: float) -> float:
+            if not values:
+                return 0.0
+            value = float(np.mean(values))
+            if value > 1.0:
+                value = value / scale
+            return round(max(0.0, min(1.0, value)), 4)
+
+        cloud_probability = max(_probability_mean(clds, 100.0), _probability_mean(clps, 255.0))
 
         from core.config import DETECTION
         cloud_flag = quality < DETECTION.min_quality_threshold
 
         return {
+            "blue": round(float(np.mean(blues)), 4),
+            "green": round(float(np.mean(greens)), 4),
             "nir": round(float(np.mean(nirs)), 4),
             "red": round(float(np.mean(reds)), 4),
-            "swir": round(float(np.mean(swirs)), 4),
+            "swir": round(float(np.mean(swir2s)), 4),
+            "swir1": round(float(np.mean(swir1s)), 4),
+            "swir2": round(float(np.mean(swir2s)), 4),
+            "scl_cloud_ratio": scl_cloud_ratio,
+            "cloud_probability": cloud_probability,
+            "valid_pixel_ratio": quality,
             "quality": quality,
             "cloud_degraded": cloud_flag,
         }
@@ -238,9 +290,16 @@ def fetch_sentinelhub_observations(
             "label": f"Baseline {REGION.after_label} (-2Y)",
             "quality": before_bands["quality"],
             "bands": {
+                "blue": before_bands["blue"],
+                "green": before_bands["green"],
                 "nir": before_bands["nir"],
                 "red": before_bands["red"],
                 "swir": before_bands["swir"],
+                "swir1": before_bands["swir1"],
+                "swir2": before_bands["swir2"],
+                "scl_cloud_ratio": before_bands["scl_cloud_ratio"],
+                "cloud_probability": before_bands["cloud_probability"],
+                "valid_pixel_ratio": before_bands["valid_pixel_ratio"],
             },
             "flags": before_flags,
         },
@@ -248,9 +307,16 @@ def fetch_sentinelhub_observations(
             "label": REGION.after_label,
             "quality": after_bands["quality"],
             "bands": {
+                "blue": after_bands["blue"],
+                "green": after_bands["green"],
                 "nir": after_bands["nir"],
                 "red": after_bands["red"],
                 "swir": after_bands["swir"],
+                "swir1": after_bands["swir1"],
+                "swir2": after_bands["swir2"],
+                "scl_cloud_ratio": after_bands["scl_cloud_ratio"],
+                "cloud_probability": after_bands["cloud_probability"],
+                "valid_pixel_ratio": after_bands["valid_pixel_ratio"],
             },
             "flags": after_flags,
         },

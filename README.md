@@ -8,7 +8,41 @@ It uses real satellite/timelapse evidence when configured, prunes low-value cell
 
 ![What is LFM-ORBIT?](docs/media/infographics/what-is-lfm-orbit-info.png)
 
-## Run The Showcase
+## Run The App
+
+```powershell
+.\run.ps1
+```
+
+Choose **1. Install/Repair + Fetch trained Orbit GGUF -> Run**.
+
+Direct Windows command:
+
+```powershell
+.\run.ps1 -Install
+```
+
+Linux/macOS:
+
+```bash
+./run.sh --install
+```
+
+App: `http://127.0.0.1:5173`
+
+The default hackathon path uses SimSat/Mapbox plus bundled cached replay proof. Sentinel Hub credentials are not required.
+
+Option 1 reuses an existing valid trained GGUF after the first download. Set `LFM_ORBIT_REFRESH_MODEL=true` only when you intentionally want to refresh the moving Hugging Face `main` handoff.
+
+## Reviewer Path
+
+1. Open **Mission**.
+2. Choose **Replay**.
+3. Load **Critical Minerals Expansion Watch** or **Spain Larouco Wildfire Burn-Scar Replay**.
+4. Review **Logs** and **Inspect** for the downlinked alert, retained timelapse, source metadata, and agent notes.
+5. Open **Agent -> Proof Mode** for the compact proof JSON and visual evidence.
+
+## Record The Showcase
 
 ```bash
 cd source/frontend
@@ -35,7 +69,7 @@ Full repo verification:
 - Retained timelapse evidence with provenance.
 - Optional LiquidAI/LFM2.5-VL-450M retained-frame review when the image runtime is enabled.
 - Compact proof JSON instead of raw-image downlink.
-- Saved and tagged evidence for export, retagging, tuning, replay, and rescan.
+- Saved and tagged evidence for export, retagging, tuning, replay, and cached-data rescan with newer prompts or models.
 
 ## Proof Gallery
 
@@ -92,14 +126,15 @@ Known map targets carry mission context and safe evidence guidance with the came
 | Check | Current State |
 |---|---|
 | Root verify | `.\run.ps1 -Verify` passing |
-| Backend tests | `480 passed` |
+| Backend tests | `499 passed` |
 | Frontend | typecheck + build passing |
-| Playwright E2E | `101 passed`, `6 skipped` |
-| Docs/import guards | `22 passed` |
+| Playwright E2E | `104 passed`, `6 skipped` |
+| Docs/import guards | passing |
+| Option 1 launch | backend `8000` and app `5173` ready |
 | Clean-start smoke | idle on Atacama context, no auto replay, no default scan |
 | Recorded demos | showcase, payload, provenance, abstain, eclipse, tutorial |
-| Dataset export | `33` raw replay/cache samples, `26` timelapse rows |
-| Retagged training set | `179` assets, `26` temporal sequences |
+| Dataset export | `46` raw replay/cache samples, `34` timelapse rows |
+| Retagged training set | `265` assets, `33` temporal sequences |
 | Dataset | [Shoozes/LFM-Orbit-SatData](https://huggingface.co/datasets/Shoozes/LFM-Orbit-SatData) |
 | Trained model | [Shoozes/lfm2.5-450m-vl-orbit-satellite](https://huggingface.co/Shoozes/lfm2.5-450m-vl-orbit-satellite) |
 
@@ -111,24 +146,13 @@ The status APIs report `image_conditioned_runtime_enabled=true` only after a rea
 
 Orbit exports reviewed evidence for retagging and tuning. The updated model handoff can be fetched back into Orbit and used to replay or rescan prior sessions.
 
-## Run Locally
+## Requirements
 
-```powershell
-.\run.ps1 -Install
-```
-
-```bash
-./run.sh --install
-```
-
-App: `http://127.0.0.1:5173`
-
-API: `http://127.0.0.1:8000`
-
-Prerequisites are Python `3.10+` and Node.js `20.19.0` from `.nvmrc` or Node.js `22.12.0+`. The launchers bootstrap repo-local `uv` when it is not already installed.
+Python `3.10+` and Node.js `20.19.0` from `.nvmrc` or Node.js `22.12.0+`. The launchers bootstrap repo-local `uv` when it is not already installed.
 
 ## Docs
 
+- [Demo Videos and Other Media](https://github.com/Shoozes/LFM-ORBIT/tree/main/docs/media)
 - [Docs index](docs/README.md)
 - [Demo guide](docs/user/DEMO_GUIDE.md)
 - [Architecture](docs/dev/ARCHITECTURE.md)

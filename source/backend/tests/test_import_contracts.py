@@ -84,6 +84,7 @@ def test_launchers_keep_minimal_runtime_guards_documented():
     repo_root = BACKEND_ROOT.parents[1]
     bash_launcher = (repo_root / "run.sh").read_text(encoding="utf-8")
     ps_launcher = (repo_root / "run.ps1").read_text(encoding="utf-8")
+    playwright_config = (repo_root / "source/frontend/playwright.config.ts").read_text(encoding="utf-8")
 
     assert "Python 3.10+" in bash_launcher
     assert "Python 3.10+" in ps_launcher
@@ -104,3 +105,6 @@ def test_launchers_keep_minimal_runtime_guards_documented():
     assert "Ensure-OrbitPortAvailable -Port 5173" in ps_launcher
     assert "stop_process_tree" in bash_launcher
     assert "Stop-OrbitProcessTree" in ps_launcher
+    assert "uv run --locked uvicorn api.main:app" in playwright_config
+    assert "uv run --locked uvicorn satellite_debug:app" in playwright_config
+    assert "uv run --no-sync uvicorn" not in playwright_config

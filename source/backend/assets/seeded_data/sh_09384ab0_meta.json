@@ -1,0 +1,286 @@
+{
+  "chunk_signature": "09384ab0",
+  "bbox": [
+    -7.3027999999999995,
+    42.23681,
+    -7.0228,
+    42.51681
+  ],
+  "lat": 42.37681,
+  "lon": -7.1628,
+  "location_name": "Spain Larouco wildfire burn-scar close look [+0,+0]",
+  "region_note": "August 2025 Larouco/Seadur wildfire in Ourense, Galicia; public reports describe roughly 30000 hectares burned and Copernicus Sentinel-2 imagery shows large Spain-Portugal border burn scars.",
+  "start_date": "2025-07-20",
+  "end_date": "2025-09-10",
+  "frames_count": 3,
+  "frame_dates": [
+    "baseline_2025_07_20",
+    "active_2025_08_16",
+    "postfire_2025_09_05"
+  ],
+  "frame_images": [
+    "source/backend/assets/seeded_data/sh_09384ab0_frames/01_baseline_2025_07_20.png",
+    "source/backend/assets/seeded_data/sh_09384ab0_frames/02_active_2025_08_16.png",
+    "source/backend/assets/seeded_data/sh_09384ab0_frames/03_postfire_2025_09_05.png"
+  ],
+  "date_windows": [
+    {
+      "label": "baseline_2025_07_20",
+      "start_date": "2025-07-20",
+      "end_date": "2025-08-05"
+    },
+    {
+      "label": "active_2025_08_16",
+      "start_date": "2025-08-16",
+      "end_date": "2025-08-20"
+    },
+    {
+      "label": "postfire_2025_09_05",
+      "start_date": "2025-09-05",
+      "end_date": "2025-09-10"
+    }
+  ],
+  "vlm_explanation": "Sentinel-2 L2A timelapse seeded for Spain Larouco wildfire burn-scar close look [+0,+0] from 2025-07-20 to 2025-09-10. Metadata inference was skipped for this cache refresh.",
+  "source": "Sentinel Hub Sentinel-2 L2A SWIR/NIR/Red burn-scar composite",
+  "visual_mode": "burn_scar",
+  "spectral_bands": {
+    "visual_mode": "burn_scar",
+    "requested_bands": [
+      "B12",
+      "B08",
+      "B04"
+    ],
+    "stats_requested_bands": [
+      "B02",
+      "B03",
+      "B04",
+      "B08",
+      "B11",
+      "B12",
+      "SCL",
+      "CLD",
+      "CLP",
+      "dataMask"
+    ],
+    "band_stats_by_frame": [
+      {
+        "label": "baseline_2025_07_20",
+        "bands": {
+          "B02_blue": {
+            "mean": 0.0316,
+            "p10": 0.0183,
+            "p90": 0.05
+          },
+          "B03_green": {
+            "mean": 0.0553,
+            "p10": 0.039,
+            "p90": 0.078
+          },
+          "B04_red": {
+            "mean": 0.0524,
+            "p10": 0.0255,
+            "p90": 0.0914
+          },
+          "B08_nir": {
+            "mean": 0.2844,
+            "p10": 0.1727,
+            "p90": 0.4267
+          },
+          "B12_swir2": {
+            "mean": 0.1073,
+            "p10": 0.0679,
+            "p90": 0.1642
+          },
+          "B11_swir1": {
+            "mean": 0.2013,
+            "p10": 0.1422,
+            "p90": 0.2725
+          }
+        },
+        "derived_indices": {
+          "ndvi": 0.6888,
+          "nbr_swir2": 0.4521,
+          "swir2_nir_ratio": 0.3773,
+          "ndmi_swir1": 0.1711,
+          "visible_whiteness": 0.5714,
+          "blue_green_haze_score": 0.0
+        },
+        "cloud_metrics": {
+          "scl_cloud_ratio": 0.0,
+          "cloud_probability_cld": 0.0005,
+          "cloud_probability_clp": 0.0161,
+          "data_mask_ratio": 1.0
+        },
+        "valid_pixel_ratio": 1.0,
+        "stats_source": "sentinelhub_process_b02_b03_b04_b08_b11_b12_scl_cld_clp",
+        "scl_cloud_pixels_included": false
+      },
+      {
+        "label": "active_2025_08_16",
+        "bands": {
+          "B02_blue": {
+            "mean": 0.1229,
+            "p10": 0.0614,
+            "p90": 0.1877
+          },
+          "B03_green": {
+            "mean": 0.1279,
+            "p10": 0.0716,
+            "p90": 0.1894
+          },
+          "B04_red": {
+            "mean": 0.1227,
+            "p10": 0.0687,
+            "p90": 0.1792
+          },
+          "B08_nir": {
+            "mean": 0.2253,
+            "p10": 0.1165,
+            "p90": 0.327
+          },
+          "B12_swir2": {
+            "mean": 0.1347,
+            "p10": 0.0812,
+            "p90": 0.1874
+          },
+          "B11_swir1": {
+            "mean": 0.1946,
+            "p10": 0.1279,
+            "p90": 0.2628
+          }
+        },
+        "derived_indices": {
+          "ndvi": 0.2948,
+          "nbr_swir2": 0.2517,
+          "swir2_nir_ratio": 0.5979,
+          "ndmi_swir1": 0.0731,
+          "visible_whiteness": 0.9593,
+          "blue_green_haze_score": 0.0162
+        },
+        "cloud_metrics": {
+          "scl_cloud_ratio": 0.0905,
+          "cloud_probability_cld": 0.0435,
+          "cloud_probability_clp": 0.4115,
+          "data_mask_ratio": 1.0
+        },
+        "valid_pixel_ratio": 0.9095,
+        "stats_source": "sentinelhub_process_b02_b03_b04_b08_b11_b12_scl_cld_clp",
+        "scl_cloud_pixels_included": false
+      },
+      {
+        "label": "postfire_2025_09_05",
+        "bands": {
+          "B02_blue": {
+            "mean": 0.0303,
+            "p10": 0.0156,
+            "p90": 0.0492
+          },
+          "B03_green": {
+            "mean": 0.0443,
+            "p10": 0.0277,
+            "p90": 0.0665
+          },
+          "B04_red": {
+            "mean": 0.05,
+            "p10": 0.0241,
+            "p90": 0.0829
+          },
+          "B08_nir": {
+            "mean": 0.1874,
+            "p10": 0.0483,
+            "p90": 0.342
+          },
+          "B12_swir2": {
+            "mean": 0.1233,
+            "p10": 0.0714,
+            "p90": 0.1893
+          },
+          "B11_swir1": {
+            "mean": 0.1718,
+            "p10": 0.0978,
+            "p90": 0.2515
+          }
+        },
+        "derived_indices": {
+          "ndvi": 0.5788,
+          "nbr_swir2": 0.2063,
+          "swir2_nir_ratio": 0.658,
+          "ndmi_swir1": 0.0434,
+          "visible_whiteness": 0.606,
+          "blue_green_haze_score": 0.0
+        },
+        "cloud_metrics": {
+          "scl_cloud_ratio": 0.0028,
+          "cloud_probability_cld": 0.0,
+          "cloud_probability_clp": 0.0421,
+          "data_mask_ratio": 1.0
+        },
+        "valid_pixel_ratio": 0.9972,
+        "stats_source": "sentinelhub_process_b02_b03_b04_b08_b11_b12_scl_cld_clp",
+        "scl_cloud_pixels_included": false
+      }
+    ],
+    "derived_indices": [
+      "ndvi",
+      "nbr_swir2",
+      "ndmi_swir1",
+      "swir2_nir_ratio",
+      "visible_whiteness",
+      "blue_green_haze_score"
+    ],
+    "note": "Band statistics are computed from accepted Sentinel-2 L2A pixels after SCL/dataMask quality filtering."
+  },
+  "cloud_policy": {
+    "min_valid_pixel_ratio": 0.65,
+    "invalid_scl_classes": [
+      0,
+      1,
+      3,
+      8,
+      9,
+      10
+    ],
+    "mosaicking_order": "leastCC",
+    "allow_smoke_cloud_frames": true,
+    "smoke_cloud_note": "Wildfire burn-scar seeding may keep active/ignition smoke frames for review when SCL flags likely smoke as cloud; those frames are not standalone positive detections."
+  },
+  "frame_quality": [
+    {
+      "label": "baseline_2025_07_20",
+      "valid_pixel_ratio": 1.0,
+      "cloud_pixel_ratio": 0.0,
+      "nodata_pixel_ratio": 0.0,
+      "reasons": [],
+      "review_only": false,
+      "acceptance_override": null,
+      "flags": []
+    },
+    {
+      "label": "active_2025_08_16",
+      "valid_pixel_ratio": 0.9095,
+      "cloud_pixel_ratio": 0.0905,
+      "nodata_pixel_ratio": 0.0,
+      "reasons": [],
+      "review_only": false,
+      "acceptance_override": null,
+      "flags": []
+    },
+    {
+      "label": "postfire_2025_09_05",
+      "valid_pixel_ratio": 0.9972,
+      "cloud_pixel_ratio": 0.0028,
+      "nodata_pixel_ratio": 0.0,
+      "reasons": [],
+      "review_only": false,
+      "acceptance_override": null,
+      "flags": []
+    }
+  ],
+  "rejected_windows": [],
+  "seeded_at": "2026-05-07",
+  "training_ready": true,
+  "use_case_id": "wildfire",
+  "target_category": "wildfire",
+  "target_pack_id": "fireline",
+  "target_task": "wildfire_close_look_candidate_review"
+}

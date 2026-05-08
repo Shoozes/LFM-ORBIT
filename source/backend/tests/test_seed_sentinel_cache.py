@@ -62,22 +62,101 @@ def test_frame_quality_from_scl_uses_data_mask_as_nodata():
 
 
 def test_band_stats_from_response_computes_wildfire_indices():
-    arr = np.zeros((4, 4, 5), dtype=np.float32)
-    arr[:, :, 0] = 0.05
-    arr[:, :, 1] = 0.30
-    arr[:, :, 2] = 0.15
-    arr[:, :, 3] = 4
-    arr[:, :, 4] = 1
+    arr = np.zeros((4, 4, 10), dtype=np.float32)
+    arr[:, :, 0] = 0.11
+    arr[:, :, 1] = 0.12
+    arr[:, :, 2] = 0.05
+    arr[:, :, 3] = 0.30
+    arr[:, :, 4] = 0.10
+    arr[:, :, 5] = 0.15
+    arr[:, :, 6] = 4
+    arr[:, :, 7] = 12
+    arr[:, :, 8] = 25.5
+    arr[:, :, 9] = 1
 
     stats = seed_sentinel_cache._band_stats_from_response(arr)
 
     assert stats is not None
+    assert stats["bands"]["B02_blue"]["mean"] == 0.11
+    assert stats["bands"]["B03_green"]["mean"] == 0.12
     assert stats["bands"]["B04_red"]["mean"] == 0.05
     assert stats["bands"]["B08_nir"]["mean"] == 0.3
+    assert stats["bands"]["B11_swir1"]["mean"] == 0.1
     assert stats["bands"]["B12_swir2"]["mean"] == 0.15
     assert stats["derived_indices"]["ndvi"] == 0.7143
     assert stats["derived_indices"]["nbr_swir2"] == 0.3333
+    assert stats["derived_indices"]["ndmi_swir1"] == 0.5
     assert stats["derived_indices"]["swir2_nir_ratio"] == 0.5
+    assert stats["derived_indices"]["visible_whiteness"] == 0.4167
+    assert stats["derived_indices"]["blue_green_haze_score"] == 0.39
+    assert stats["cloud_metrics"]["cloud_probability_cld"] == 0.12
+    assert stats["cloud_metrics"]["cloud_probability_clp"] == 0.1
+
+
+def test_band_stats_can_include_smoke_cloud_review_pixels():
+    arr = np.zeros((4, 4, 10), dtype=np.float32)
+    arr[:, :, 0] = 0.11
+    arr[:, :, 1] = 0.12
+    arr[:, :, 2] = 0.05
+    arr[:, :, 3] = 0.30
+    arr[:, :, 4] = 0.10
+    arr[:, :, 5] = 0.15
+    arr[:, :, 6] = 9
+    arr[:, :, 7] = 100
+    arr[:, :, 8] = 255
+    arr[:, :, 9] = 1
+
+    assert seed_sentinel_cache._band_stats_from_response(arr) is None
+
+    stats = seed_sentinel_cache._band_stats_from_response(arr, include_cloud_pixels=True)
+
+    assert stats is not None
+    assert stats["derived_indices"]["nbr_swir2"] == 0.3333
+    assert stats["cloud_metrics"]["scl_cloud_ratio"] == 1.0
+    assert stats["cloud_metrics"]["cloud_probability_cld"] == 1.0
+    assert stats["cloud_metrics"]["cloud_probability_clp"] == 1.0
+    assert stats["scl_cloud_pixels_included"] is True
+    assert stats["stats_source"].endswith("_smoke_cloud_review")
+
+
+def test_smoke_cloud_review_only_keeps_active_burn_scar_frames():
+    cloudy_quality = {
+        "accepted": False,
+        "valid_pixel_ratio": 0.0,
+        "cloud_pixel_ratio": 1.0,
+        "nodata_pixel_ratio": 0.0,
+        "reasons": ["insufficient_valid_pixels"],
+    }
+    nodata_quality = {
+        **cloudy_quality,
+        "nodata_pixel_ratio": 1.0,
+        "cloud_pixel_ratio": 0.0,
+    }
+
+    assert seed_sentinel_cache._should_keep_smoke_cloud_frame(
+        "active_2026_04_20",
+        "burn_scar",
+        cloudy_quality,
+        True,
+    )
+    assert not seed_sentinel_cache._should_keep_smoke_cloud_frame(
+        "baseline_2026_03_15",
+        "burn_scar",
+        cloudy_quality,
+        True,
+    )
+    assert not seed_sentinel_cache._should_keep_smoke_cloud_frame(
+        "active_2026_04_20",
+        "true_color",
+        cloudy_quality,
+        True,
+    )
+    assert not seed_sentinel_cache._should_keep_smoke_cloud_frame(
+        "active_2026_04_20",
+        "burn_scar",
+        nodata_quality,
+        True,
+    )
 
 
 def test_seed_single_cell_persists_frame_images_for_custom_windows(tmp_path, monkeypatch):
@@ -93,6 +172,9 @@ def test_seed_single_cell_persists_frame_images_for_custom_windows(tmp_path, mon
             "cloud_pixel_ratio": 0.0,
             "nodata_pixel_ratio": 0.0,
             "reasons": [],
+            "review_only": label == "active",
+            "acceptance_override": "wildfire_smoke_cloud_review" if label == "active" else None,
+            "flags": ["smoke_or_cloud_review"] if label == "active" else [],
             "band_stats": {
                 "bands": {"B04_red": {"mean": 0.05}, "B08_nir": {"mean": 0.3}, "B12_swir2": {"mean": 0.15}},
                 "derived_indices": {"ndvi": 0.7143, "nbr_swir2": 0.3333, "swir2_nir_ratio": 0.5},
@@ -139,5 +221,8 @@ def test_seed_single_cell_persists_frame_images_for_custom_windows(tmp_path, mon
     assert meta["spectral_bands"]["requested_bands"] == ["B12", "B08", "B04"]
     assert len(meta["spectral_bands"]["band_stats_by_frame"]) == 2
     assert meta["spectral_bands"]["band_stats_by_frame"][0]["derived_indices"]["ndvi"] == 0.7143
+    assert meta["frame_quality"][1]["review_only"] is True
+    assert meta["frame_quality"][1]["acceptance_override"] == "wildfire_smoke_cloud_review"
+    assert "smoke_or_cloud_review" in meta["frame_quality"][1]["flags"]
     assert (tmp_path / f"sh_{sig}_frames" / "01_pre.png").exists()
     assert (tmp_path / f"sh_{sig}_frames" / "02_active.png").exists()

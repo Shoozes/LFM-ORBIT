@@ -1628,6 +1628,40 @@ def test_ground_agent_chat_proposes_florida_wildfire_replay_when_requested():
     assert proposal["details"]["target_pack_id"] == "fireline"
 
 
+def test_ground_agent_chat_proposes_pineland_wildfire_replay_when_requested():
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "replay the pineland road wildfire mission"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "load_replay"
+    assert proposal["title"] == "Load replay: Pineland Road Wildfire Smoke/Fire Candidate Replay"
+    assert proposal["details"]["replay_id"] == "pineland_road_wildfire_replay"
+    assert proposal["details"]["use_case_id"] == "wildfire"
+    assert proposal["details"]["target_pack_id"] == "fireline"
+
+
+def test_ground_agent_chat_proposes_spain_wildfire_replay_when_requested():
+    response = client.post(
+        "/api/agent/chat",
+        json={"messages": [{"role": "user", "content": "load the Spain Larouco wildfire proof replay"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["actions"] == []
+    proposal = payload["proposals"][0]
+    assert proposal["kind"] == "load_replay"
+    assert proposal["title"] == "Load replay: Spain Larouco Wildfire Burn-Scar Replay"
+    assert proposal["details"]["replay_id"] == "spain_larouco_wildfire_replay"
+    assert proposal["details"]["use_case_id"] == "wildfire"
+    assert proposal["details"]["target_pack_id"] == "fireline"
+
+
 def test_ground_agent_chat_proposes_critical_minerals_replay_before_loading():
     response = client.post(
         "/api/agent/chat",
@@ -1753,7 +1787,7 @@ def test_ground_agent_chat_proposes_wildfire_mission_pack_without_replay_keyword
     assert (end - start).days == 30
 
 
-def test_ground_agent_chat_proposes_rescan_before_runtime_reset(tmp_path, monkeypatch):
+def test_ground_agent_chat_proposes_cached_replay_rescan_before_runtime_reset(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
     monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
     monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
@@ -1772,10 +1806,11 @@ def test_ground_agent_chat_proposes_rescan_before_runtime_reset(tmp_path, monkey
     assert payload["actions"] == []
     proposal = payload["proposals"][0]
     assert proposal["kind"] == "rescan_replay"
-    assert proposal["confirm_label"] == "Start Rescan"
+    assert proposal["confirm_label"] == "Rescan Cache"
     assert proposal["details"]["replay_id"] == "georgia_wildfire_replay"
-    assert proposal["details"]["runtime_truth_mode"] == "realtime"
-    assert proposal["details"]["imagery_origin"] == "provider_chain"
+    assert proposal["details"]["runtime_truth_mode"] == "replay"
+    assert proposal["details"]["imagery_origin"] == "cached_api"
+    assert proposal["details"]["scoring_basis"] == "cached_rescan_current_model"
 
     confirm = client.post("/api/agent/action/confirm", json={"proposal": proposal})
 
@@ -1784,7 +1819,9 @@ def test_ground_agent_chat_proposes_rescan_before_runtime_reset(tmp_path, monkey
     assert confirmed["actions"][0]["name"] == "rescan_replay"
     assert confirmed["actions"][0]["status"] == "ok"
     assert confirmed["actions"][0]["result"]["source_replay_id"] == "georgia_wildfire_replay"
-    assert confirmed["actions"][0]["result"]["mission"]["mission_mode"] == "live"
+    assert confirmed["actions"][0]["result"]["mission"]["mission_mode"] == "replay"
+    assert confirmed["actions"][0]["result"]["primary_cell_id"] == "wildfire_highway_82_candidate"
+    assert confirmed["actions"][0]["result"]["alerts_loaded"] == 1
 
 
 def test_ground_agent_action_confirm_rejects_unknown_action():
@@ -1873,9 +1910,11 @@ def test_ground_agent_chat_returns_operator_playbook():
     assert "mission object targets" in reply
     assert "proof mode" in reply
     assert "proposal-based" in reply
-    assert "Run Florida firewatch mission" in payload["suggestions"]
+    assert "Load Spain Larouco wildfire proof replay" in payload["suggestions"]
+    assert "Load Pineland Road wildfire proof replay" in payload["suggestions"]
+    assert "Load Florida SR-26 wildfire proof replay" in payload["suggestions"]
     assert "Load critical minerals proof replay" in payload["suggestions"]
-    assert "List replays" in payload["suggestions"]
+    assert "List real seeded proof replays" in payload["suggestions"]
 
 
 def test_ground_agent_chat_returns_agent_status(tmp_path, monkeypatch):
@@ -2140,6 +2179,38 @@ def test_ice_snow_score_endpoint_returns_multispectral_contract():
     assert data["scoring_basis"] == "multispectral_bands"
     assert data["use_case"] == "ice_snow_extent"
     assert "ndsi_increase" in data["reason_codes"]
+
+
+def test_wildfire_smoke_score_endpoint_returns_confidence_assist_contract():
+    response = client.post(
+        "/api/wildfire/smoke-score",
+        json={
+            "frames": [
+                {
+                    "label": "baseline",
+                    "bands": {"blue": 0.10, "green": 0.10, "red": 0.08, "nir": 0.50, "swir1": 0.18, "swir2": 0.18},
+                    "valid_pixel_ratio": 0.90,
+                    "scl_cloud_ratio": 0.02,
+                    "cloud_probability": 0.02,
+                },
+                {
+                    "label": "active",
+                    "bands": {"blue": 0.23, "green": 0.22, "red": 0.10, "nir": 0.43, "swir1": 0.19, "swir2": 0.20},
+                    "valid_pixel_ratio": 0.90,
+                    "scl_cloud_ratio": 0.02,
+                    "cloud_probability": 0.02,
+                },
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["use_case"] == "wildfire"
+    assert data["target_task"] == "wildfire_smoke_cloud_confidence"
+    assert data["target_action"] == "review"
+    assert data["provenance"]["source_guard"] == "no_proxy_fire_confirmation"
+    assert "smoke_plume_candidate" in data["reason_codes"]
 
 
 def test_maritime_monitor_endpoint_returns_offline_investigation_plan(tmp_path, monkeypatch):

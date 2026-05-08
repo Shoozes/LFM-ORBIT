@@ -2,7 +2,7 @@
 
 This is the recorded showcase path for the Liquid AI x DPhi Space Hackathon submission.
 
-The hackathon satellite-data API target is SimSat/Mapbox through DPhi Space SimSat. The default lane is SimSat Sentinel, with SimSat Mapbox available as the optional imagery/context lane when a Mapbox token is configured. The recorded showcase does not require Sentinel Hub credentials; bundled replay fixtures and SimSat/Mapbox runtime defaults keep the demo deterministic and quota-free.
+The hackathon satellite-data API target is SimSat/Mapbox through DPhi Space SimSat. The default lane is SimSat Sentinel, with SimSat Mapbox available as the optional imagery/context lane when a Mapbox token is configured. The recorded showcase does not require Sentinel Hub credentials; bundled replay fixtures and SimSat/Mapbox runtime defaults keep the demo deterministic and quota-free. Sentinel Hub is used only for development real-data seeding and cached replay refreshes, not as the default hackathon provider.
 
 Normal app startup is intentionally idle. It opens on the Atacama mining context so the strongest story is ready to inspect, but it does not auto-play the last replay, launch a mission, or begin scanning until the operator confirms a mission proposal.
 
@@ -154,7 +154,7 @@ Recorded demos preload their target mission or replay before the browser connect
 
 Live Florida Fire/Drought Readiness Watch is a smoke-testable readiness path, not a public proof claim. It defaults to a recent 30-day window and filters proxy-only vegetation changes before downlink; only source-backed smoke, active-fire, burn-scar, hotspot, or fireline-specific evidence should become retained fire candidates.
 
-Cloud policy: cloudy or no-data windows are not allowed to become positive detections. When SCL metadata is available, the backend quality gate records cloud/no-data ratios, replay-cache creation skips cloudy frames, and the scanner emits no-transmit quality-gate results when cloud cover blocks evidence.
+Cloud policy: cloudy or no-data windows are not allowed to become positive detections. For wildfire burn-scar seeds, active/ignition frames with valid dataMask can be retained as review-only smoke/cloud candidates when SCL flags a white plume as cloud; the confidence-assist layer then surfaces the cloud support and can defer the smoke claim instead of discarding the real frame.
 
 Refresh the tutorial video:
 
@@ -187,6 +187,9 @@ Current cached development replay assets:
 | Payload Reduction | `flood_extent` | `source/backend/assets/seeded_data/sh_24541539.webm` |
 | Provenance | `mining_expansion` | `source/backend/assets/seeded_data/sh_fbe644a9.webm` |
 | Florida Firewatch Replay | `wildfire` | `source/backend/assets/seeded_data/sh_83e3aea2.webm` with frame PNGs under `source/backend/assets/seeded_data/sh_83e3aea2_frames/` |
-| Greenland Abstain Safety | `ice_cap_growth` | Local static preview; static WebM is excluded from Fast Replay |
+| Highway 82 Wildfire Replay | `wildfire` | `source/backend/assets/seeded_data/sh_4015e8b8.webm` with review-only smoke/cloud frame PNGs under `source/backend/assets/seeded_data/sh_4015e8b8_frames/` |
+| Pineland Road Wildfire Replay | `wildfire` | `source/backend/assets/seeded_data/sh_af5954b2.webm` with review-only smoke/cloud frame PNGs under `source/backend/assets/seeded_data/sh_af5954b2_frames/` |
+| Spain Larouco Wildfire Replay | `wildfire` | `source/backend/assets/seeded_data/sh_09384ab0.webm` with burn-scar frame PNGs under `source/backend/assets/seeded_data/sh_09384ab0_frames/` |
+| Greenland Abstain Safety | `ice_cap_growth` | Local static preview; static WebM is excluded from Replay Cache |
 | Greenland Ice/Snow Extent | `ice_snow_extent` | Metadata-scored curated replay with `source/frontend/public/demo-assets/greenland-ice-timelapse.webm` used as secondary science context |
 | Suez Maritime Eclipse | `maritime_activity` | `source/backend/assets/seeded_data/sh_2d990c6b.webm` |

@@ -69,6 +69,7 @@ def test_documented_demo_media_exists_and_is_nonempty():
         "docs/media/videos/abstain-safety-demo.webm",
         "docs/media/videos/object-evidence-demo.webm",
         "docs/media/videos/orbital-eclipse-demo.webm",
+        "docs/media/videos/training-journey.webm",
         "docs/media/videos/tutorial_video.webm",
         "docs/media/timelapse/highlight-greenland-ice-timelapse.gif",
         "docs/media/timelapse/highlight-greenland-ice-timelapse.webm",
@@ -129,6 +130,7 @@ def test_public_demo_videos_are_temporal_and_nonblank():
         "docs/media/videos/abstain-safety-demo.webm",
         "docs/media/videos/object-evidence-demo.webm",
         "docs/media/videos/orbital-eclipse-demo.webm",
+        "docs/media/videos/training-journey.webm",
         "docs/media/videos/tutorial_video.webm",
         "docs/media/timelapse/highlight-greenland-ice-timelapse.webm",
     ]
@@ -227,7 +229,13 @@ def test_docs_user_and_dev_surfaces_are_separated():
     root_docs = sorted(path.name for path in docs_root.glob("*.md"))
 
     assert user_docs == ["DEMO_GUIDE.md", "OBJECT_EVIDENCE_MODE.md"]
-    assert dev_docs == ["ARCHITECTURE.md", "DATASET_CYCLE_TUTORIAL.md", "MODEL_HANDOFF.md", "TODO.md"]
+    assert dev_docs == [
+        "ARCHITECTURE.md",
+        "DATASET_CYCLE_TUTORIAL.md",
+        "MODEL_HANDOFF.md",
+        "SEEDED_DATA_REGISTRY.md",
+        "TODO.md",
+    ]
     assert legal_docs == ["THIRD_PARTY_NOTICES.md"]
     assert release_docs == ["v0.4.0-public-proof.md"]
     assert root_docs == ["README.md"]
@@ -301,16 +309,17 @@ def test_summary_bank_references_existing_files():
     assert missing == []
 
 
-def test_readme_keeps_showcase_first_product_shape():
+def test_readme_keeps_run_first_product_shape():
     markdown = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     required_sections = [
         "![What is LFM-ORBIT?](docs/media/infographics/what-is-lfm-orbit-info.png)",
-        "## Run The Showcase",
+        "## Run The App",
+        "## Record The Showcase",
         "## What It Proves",
         "## Proof Gallery",
         "## Validation Snapshot",
         "## Model + Training Loop",
-        "## Run Locally",
+        "## Requirements",
         "## Docs",
     ]
 
@@ -318,8 +327,10 @@ def test_readme_keeps_showcase_first_product_shape():
     assert all(position >= 0 for position in positions)
     assert positions == sorted(positions)
 
-    pre_showcase = markdown[: positions[1]]
-    assert "\n## " not in pre_showcase
+    pre_run = markdown[: positions[1]]
+    assert "\n## " not in pre_run
+    assert ".\\run.ps1" in markdown
+    assert "Choose **1. Install/Repair + Fetch trained Orbit GGUF -> Run**." in markdown
     assert "## Architecture In 60 Seconds" not in markdown
     assert "Public video playback is handled outside GitHub" not in markdown
     assert "## Verified Object Evidence" not in markdown
@@ -333,6 +344,38 @@ def test_readme_documents_minimal_cold_start_prerequisites():
     assert "Node.js `20.19.0`" in markdown
     assert "Node.js `22.12.0+`" in markdown
     assert "bootstrap repo-local `uv`" in markdown
+
+
+def test_validation_snapshots_match_current_release_gate():
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    todo = (REPO_ROOT / "docs/dev/TODO.md").read_text(encoding="utf-8")
+    bank = json.loads((REPO_ROOT / "summary_bank.json").read_text(encoding="utf-8"))
+    release_note = bank["groups"]["issue_group_hackathon_release_qa"]["note"]
+
+    for source in (readme, todo, release_note):
+        assert "499 passed" in source
+        assert "104 passed" in source or "104`" in source
+        assert "6 skipped" in source or "6` intentional skips" in source
+
+    assert "backend 495 tests" not in json.dumps(bank)
+    assert "backend `495 passed`" not in todo
+
+
+def test_replay_rescan_docs_describe_cached_data_contract():
+    docs = "\n".join(
+        [
+            (REPO_ROOT / "README.md").read_text(encoding="utf-8"),
+            (REPO_ROOT / "docs/dev/ARCHITECTURE.md").read_text(encoding="utf-8"),
+            (REPO_ROOT / "docs/dev/TODO.md").read_text(encoding="utf-8"),
+            (REPO_ROOT / "docs/dev/MODEL_HANDOFF.md").read_text(encoding="utf-8"),
+        ]
+    )
+
+    assert "Replay Cache" in docs
+    assert "cached_rescan_current_model" in docs
+    assert "Start Rescan" not in docs
+    assert "live rescan" not in docs.lower()
+    assert "current runtime/model stack" not in docs
 
 
 def test_summary_bank_file_references_are_repo_relative():

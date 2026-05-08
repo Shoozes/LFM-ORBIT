@@ -433,6 +433,7 @@ function Ensure-TrainedModel {
     $python = Ensure-Python
 
     $minSizeBytes = 1MB
+    $forceModelRefresh = $env:LFM_ORBIT_REFRESH_MODEL -match "^(1|true|yes|on)$"
 
     New-Item -ItemType Directory -Force -Path $ModelDir | Out-Null
 
@@ -441,10 +442,14 @@ function Ensure-TrainedModel {
         $needsDownload = $false
         if (Test-Path $ModelFile) {
             $fileSize = (Get-Item $ModelFile).Length
-            if ($fileSize -ge $minSizeBytes) {
+            if ($fileSize -ge $minSizeBytes -and -not $forceModelRefresh) {
                 Write-Host "    Trained Orbit GGUF already present ($([Math]::Round($fileSize / 1MB, 1)) MB)." -ForegroundColor Gray
             } else {
-                Write-Host "    Existing GGUF file is incomplete ($fileSize bytes). Re-downloading..." -ForegroundColor Yellow
+                if ($forceModelRefresh) {
+                    Write-Host "    LFM_ORBIT_REFRESH_MODEL requested. Re-downloading trained Orbit GGUF..." -ForegroundColor Yellow
+                } else {
+                    Write-Host "    Existing GGUF file is incomplete ($fileSize bytes). Re-downloading..." -ForegroundColor Yellow
+                }
                 $needsDownload = $true
             }
         } else {
@@ -489,11 +494,15 @@ function Ensure-TrainedModel {
         if (Test-Path $ModelFile) {
             $fileSize = (Get-Item $ModelFile).Length
             if ($fileSize -ge $minSizeBytes -and $installedRepoId -eq $modelRepoId -and $installedRevision -eq $modelRevision) {
-                if (-not $movingModelRevision) {
-                    Write-Host "    Trained Orbit GGUF already present from $modelRepoId@$modelRevision ($([Math]::Round($fileSize / 1MB, 1)) MB)." -ForegroundColor Gray
+                if (-not $forceModelRefresh) {
+                    $refreshHint = ""
+                    if ($movingModelRevision) {
+                        $refreshHint = " Set LFM_ORBIT_REFRESH_MODEL=true to refresh this moving revision."
+                    }
+                    Write-Host "    Trained Orbit GGUF already present from $modelRepoId@$modelRevision ($([Math]::Round($fileSize / 1MB, 1)) MB).$refreshHint" -ForegroundColor Gray
                     return
                 }
-                Write-Host "    Moving Hugging Face revision '$modelRevision' requested. Refreshing trained Orbit GGUF..." -ForegroundColor Yellow
+                Write-Host "    LFM_ORBIT_REFRESH_MODEL requested. Refreshing trained Orbit GGUF from $modelRepoId@$modelRevision..." -ForegroundColor Yellow
             } else {
                 Write-Host "    Existing GGUF is missing or does not match the trained Orbit handoff. Refreshing..." -ForegroundColor Yellow
             }
@@ -544,6 +553,8 @@ function Assert-TrainedModelRuntime {
 }
 
 function Install-Deps {
+    Ensure-OrbitPortAvailable -Port 8000 -Role "backend"
+    Ensure-OrbitPortAvailable -Port 5173 -Role "frontend"
     Install-BackendDeps
     Write-SimSatStatus
     Install-FrontendDeps

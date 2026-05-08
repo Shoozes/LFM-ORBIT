@@ -80,6 +80,27 @@ MISSION_PACKS: dict[str, dict[str, Any]] = {
         "bbox": [-81.916, 31.143, -81.756, 31.303],
         "date_window_days": 30,
     },
+    "wildfire_pineland_road": {
+        "label": "Pineland Road wildfire",
+        "aliases": ["pineland", "pineland road", "clinch wildfire", "fargo wildfire", "south georgia wildfire"],
+        "use_case_id": "wildfire",
+        "target_pack_id": "fireline",
+        "proof_replay_id": "pineland_road_wildfire_replay",
+        "task_text": "Review the Pineland Road wildfire in Clinch/Echols Counties, Georgia for active-fire, smoke, burn-scar, fireline, road corridor, and civilian lifeline context while preserving smoke/cloud ambiguity as review-only evidence.",
+        "bbox": [-82.84805919411279, 30.6763947250726, -82.6880591941128, 30.836394725072598],
+        "date_window_days": 30,
+    },
+    "wildfire_spain_larouco": {
+        "label": "Spain Larouco wildfire",
+        "aliases": ["spain", "spain wildfire", "wildfire spain", "larouco", "seadur", "ourense", "galicia wildfire"],
+        "use_case_id": "wildfire",
+        "target_pack_id": "fireline",
+        "proof_replay_id": "spain_larouco_wildfire_replay",
+        "task_text": "Review the August 2025 Larouco/Seadur wildfire in Ourense, Galicia for post-fire burn scar, active-window smoke/cloud ambiguity, vegetation loss, fireline context, and cross-border landscape impact while preserving candidate-only claim boundaries.",
+        "bbox": [-7.3027999999999995, 42.23681, -7.0228, 42.51681],
+        "start_date": "2025-07-20",
+        "end_date": "2025-09-10",
+    },
     "southeast_fireline_watch": {
         "label": "Southeast Fireline Watch",
         "aliases": ["southeast fireline", "fireline watch", "lifeline fire", "vehicle queue", "road obstruction"],
@@ -164,6 +185,17 @@ REPLAY_ALIASES: dict[str, str] = {
     "sr 26": "florida_sr26_wildfire_replay",
     "balu forest": "florida_sr26_wildfire_replay",
     "alachua fire": "florida_sr26_wildfire_replay",
+    "pineland": "pineland_road_wildfire_replay",
+    "pineland road": "pineland_road_wildfire_replay",
+    "clinch wildfire": "pineland_road_wildfire_replay",
+    "fargo wildfire": "pineland_road_wildfire_replay",
+    "south georgia wildfire": "pineland_road_wildfire_replay",
+    "spain wildfire": "spain_larouco_wildfire_replay",
+    "wildfire spain": "spain_larouco_wildfire_replay",
+    "larouco": "spain_larouco_wildfire_replay",
+    "seadur": "spain_larouco_wildfire_replay",
+    "ourense wildfire": "spain_larouco_wildfire_replay",
+    "galicia wildfire": "spain_larouco_wildfire_replay",
     "wildfire": "georgia_wildfire_replay",
     "fire": "georgia_wildfire_replay",
     "georgia": "georgia_wildfire_replay",
@@ -724,6 +756,13 @@ def _replay_scoring_basis(replay_id: str, use_case_id: str | None) -> str:
         return "multispectral_bands"
     if replay_id == "rondonia_frontier_showcase" or use_case_id == "deforestation":
         return "proxy_bands"
+    if replay_id in {
+        "georgia_wildfire_replay",
+        "florida_sr26_wildfire_replay",
+        "pineland_road_wildfire_replay",
+        "spain_larouco_wildfire_replay",
+    }:
+        return "sentinelhub_burn_scar_composite"
     return "visual_only"
 
 
@@ -738,17 +777,18 @@ def _replay_proposal(kind: str, replay_id: str) -> dict[str, Any]:
         "title": title,
         "use_case_id": use_case_id,
         "target_pack_id": item.get("target_pack_id") or "",
-        "runtime_truth_mode": "replay" if kind == "load_replay" else "realtime",
-        "imagery_origin": "cached_api" if kind == "load_replay" else "provider_chain",
-        "scoring_basis": scoring_basis if kind == "load_replay" else "current_runtime",
+        "runtime_truth_mode": "replay",
+        "imagery_origin": "cached_api",
+        "scoring_basis": scoring_basis if kind == "load_replay" else "cached_rescan_current_model",
         "start_date": item.get("start_date") or "",
         "end_date": item.get("end_date") or "",
         "alert_count": item.get("alert_count") or 0,
         "cells_scanned": item.get("cells_scanned") or 0,
-        "expected_reset": kind == "load_replay",
+        "expected_reset": True,
         "state_impact": [
-            "Runtime reset" if kind == "load_replay" else "Start active mission from replay bbox",
-            "Load replay evidence" if kind == "load_replay" else "Use current provider/model stack",
+            "Runtime reset",
+            "Load replay evidence" if kind == "load_replay" else "Rerun current prompt/model over cached frames",
+            "No provider fetch" if kind == "rescan_replay" else "Open frozen proof bundle",
             "Refresh Mission Control",
             "Refresh Logs, Inspect, Gallery, and Agent Dialogue",
         ],
@@ -759,10 +799,10 @@ def _replay_proposal(kind: str, replay_id: str) -> dict[str, Any]:
         summary=(
             "Load cached real API replay evidence into Mission, Logs, Inspect, Gallery, and Agent Dialogue."
             if kind == "load_replay"
-            else "Start a live rescan from this replay's bbox and dates using the current runtime/model stack."
+            else "Rerun the current prompt/model stack over the same cached replay frames and evidence."
         ),
         details=details,
-        confirm_label="Run Replay" if kind == "load_replay" else "Start Rescan",
+        confirm_label="Run Replay" if kind == "load_replay" else "Rescan Cache",
         risk_level="medium",
     )
 
@@ -1981,7 +2021,7 @@ def execute_ground_agent_proposal(proposal: dict[str, Any]) -> dict[str, Any]:
             }
         actions.append(_action("rescan_replay", "ok", result))
         return {
-            "reply": f"Started live rescan from replay `{replay_id}` using the current runtime and model stack.",
+            "reply": f"Rescanned cached replay `{replay_id}` with the current prompt/model stack.",
             "actions": actions,
             "state": _base_state(),
             "suggestions": _suggestions(),
@@ -2491,7 +2531,7 @@ def execute_ground_agent_chat(user_msg: str) -> dict[str, Any]:
         if not replay_id:
             actions.append(_action("rescan_replay", "error", {"error": "No matching replay found."}))
             return {
-                "reply": "I could not match that replay. Ask for 'list replays' or name Rondonia, Manchar, Atacama, Greenland, Georgia, Delhi, or Singapore.",
+                "reply": "I could not match that replay. Ask for 'list replays' or name Spain Larouco, Pineland Road, Florida SR-26, Atacama, Rondonia, Manchar, Greenland, Delhi, or Singapore.",
                 "actions": actions,
                 "state": _base_state(),
                 "suggestions": _suggestions(),
@@ -2512,7 +2552,7 @@ def execute_ground_agent_chat(user_msg: str) -> dict[str, Any]:
         if not replay_id:
             actions.append(_action("load_replay", "error", {"error": "No matching replay found."}))
             return {
-                "reply": "I could not match that replay. Ask for 'list replays' or name Rondonia, Manchar, Atacama, Greenland, Georgia, Delhi, or Singapore.",
+                "reply": "I could not match that replay. Ask for 'list replays' or name Spain Larouco, Pineland Road, Florida SR-26, Atacama, Rondonia, Manchar, Greenland, Delhi, or Singapore.",
                 "actions": actions,
                 "state": _base_state(),
                 "suggestions": _suggestions(),
@@ -2573,11 +2613,11 @@ def execute_ground_agent_chat(user_msg: str) -> dict[str, Any]:
 
 def _suggestions() -> list[str]:
     return [
-        "Run Florida firewatch mission",
+        "Load Spain Larouco wildfire proof replay",
+        "Load Pineland Road wildfire proof replay",
+        "Load Florida SR-26 wildfire proof replay",
         "Load critical minerals proof replay",
-        "Take me to the Bronx NY",
-        "Stop mission and fly to Bull Creek FL",
-        "List replays",
+        "List real seeded proof replays",
     ]
 
 

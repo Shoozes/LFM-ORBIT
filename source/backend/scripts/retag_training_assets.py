@@ -305,20 +305,23 @@ def _extract_video_frames(
     candidate: AssetCandidate,
     frames_dir: Path,
     *,
+    dataset_dir: Path,
+    output_dir: Path,
     frame_count: int,
     min_video_frames: int,
 ) -> tuple[list[AssetCandidate], TemporalSequenceCandidate | None, list[dict[str, Any]]]:
     frames_dir.mkdir(parents=True, exist_ok=True)
     skipped: list[dict[str, Any]] = []
+    video_source = _manifest_path_label(candidate.path, dataset_dir=dataset_dir, output_dir=output_dir)
     try:
         frames = _read_video_frames(candidate.path)
     except Exception as exc:
-        return [], None, [{"reason": "video_decode_failed", "path": str(candidate.path), "error": str(exc)}]
+        return [], None, [{"reason": "video_decode_failed", "path": video_source, "error": str(exc)}]
 
     if len(frames) < min_video_frames:
         return [], None, [{
             "reason": "invalid_timelapse_too_few_frames",
-            "path": str(candidate.path),
+            "path": video_source,
             "frames_count": len(frames),
             "minimum_frames": min_video_frames,
         }]
@@ -341,7 +344,7 @@ def _extract_video_frames(
                 observation_source=ref.observation_source,
                 reason_codes=list(ref.reason_codes),
                 source=ref.source,
-                video_source=str(candidate.path),
+                video_source=video_source,
                 frame_index=index,
             ))
         expanded.append(AssetCandidate(
@@ -861,6 +864,8 @@ def retag_dataset(
             frame_candidates, sequence, frame_skipped = _extract_video_frames(
                 candidate,
                 frames_dir,
+                dataset_dir=dataset_dir,
+                output_dir=output_dir,
                 frame_count=frame_count,
                 min_video_frames=min_video_frames,
             )

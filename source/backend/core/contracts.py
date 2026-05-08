@@ -27,9 +27,16 @@ class WindowObservation(TypedDict):
     """
     label: str
     quality: float
+    blue: NotRequired[float]
+    green: NotRequired[float]
     nir: float
     red: float
     swir: float
+    swir1: NotRequired[float]
+    swir2: NotRequired[float]
+    scl_cloud_ratio: NotRequired[float]
+    cloud_probability: NotRequired[float]
+    valid_pixel_ratio: NotRequired[float]
     ndvi: float
     nbr: float
     evi2: float
@@ -149,6 +156,18 @@ class VisualModelReview(TypedDict):
     reviewed_at: NotRequired[str]
 
 
+class WildfireSmokeAssessment(TypedDict):
+    smoke_likelihood: float
+    cloud_likelihood: float
+    burn_likelihood: float
+    hotspot_support: float
+    confidence_delta: float
+    final_confidence: float
+    target_action: Literal["prune", "defer", "review", "downlink_now"]
+    reason_codes: list[str]
+    provenance: dict[str, str | float | bool]
+
+
 class AlertRecord(TypedDict):
     event_id: str
     region_id: str
@@ -171,6 +190,7 @@ class AlertRecord(TypedDict):
     detection_summary: NotRequired[DetectionSummary]
     object_deltas: NotRequired[list[ObjectDelta]]
     visual_model_review: NotRequired[VisualModelReview]
+    wildfire_assessment: NotRequired[WildfireSmokeAssessment]
 
 
 class MetricsFlaggedExample(TypedDict):
@@ -245,6 +265,7 @@ class ScanResultMessage(TypedDict):
     boundary_context: NotRequired[list[BoundaryContext]]
     detection_summary: NotRequired[DetectionSummary]
     object_deltas: NotRequired[list[ObjectDelta]]
+    wildfire_assessment: NotRequired[WildfireSmokeAssessment]
 
 
 class HealthResponse(TypedDict):

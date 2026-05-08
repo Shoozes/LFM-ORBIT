@@ -52,7 +52,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `cd ../backend && uv run --no-sync uvicorn api.main:app --host 127.0.0.1 --port ${new URL(API_BASE).port}`,
+      command: `cd ../backend && uv run --locked uvicorn api.main:app --host 127.0.0.1 --port ${new URL(API_BASE).port}`,
       url: API_HEALTH_URL,
       timeout: 60_000,
       reuseExistingServer,
@@ -65,7 +65,7 @@ export default defineConfig({
       },
     },
     {
-      command: `cd ../backend && uv run --no-sync uvicorn satellite_debug:app --host 127.0.0.1 --port ${new URL(DEBUG_BASE).port}`,
+      command: `cd ../backend && uv run --locked uvicorn satellite_debug:app --host 127.0.0.1 --port ${new URL(DEBUG_BASE).port}`,
       url: DEBUG_BASE,
       timeout: 60_000,
       reuseExistingServer,

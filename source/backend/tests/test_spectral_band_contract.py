@@ -1,6 +1,18 @@
 import pytest
 
-from core.indices import compute_ndsi, compute_ndsi_from_bands, compute_ndvi, compute_ndvi_from_bands
+from core.indices import (
+    compute_blue_green_haze_score,
+    compute_dnbr,
+    compute_ndmi,
+    compute_ndmi_s2,
+    compute_nbr,
+    compute_nbr_s2,
+    compute_ndsi,
+    compute_ndsi_from_bands,
+    compute_ndvi,
+    compute_ndvi_from_bands,
+    compute_visible_whiteness,
+)
 
 
 def test_ndvi_requires_explicit_nir_and_red_bands():
@@ -57,3 +69,11 @@ def test_rgb_only_imagery_cannot_produce_real_ndsi():
     assert result["abstain"] is True
     assert result["ndsi"] is None
     assert "Green and SWIR1" in result["reason"]
+
+
+def test_sentinel2_burn_and_smoke_helpers_use_explicit_bands():
+    assert compute_nbr_s2(0.42, 0.18) == pytest.approx(compute_nbr(0.42, 0.18))
+    assert compute_ndmi_s2(0.42, 0.21) == pytest.approx(compute_ndmi(0.42, 0.21))
+    assert compute_dnbr(0.62, 0.22) == pytest.approx(0.4)
+    assert compute_visible_whiteness(0.5, 0.48, 0.46) == pytest.approx(0.92)
+    assert compute_blue_green_haze_score(0.21, 0.20, 0.12) == pytest.approx(0.51)

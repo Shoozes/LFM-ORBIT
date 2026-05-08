@@ -29,6 +29,7 @@ from PIL import Image, ImageDraw
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from core.config import DETECTION, resolve_sentinel_credentials
 from core.inference import generate
+from core.indices import compute_blue_green_haze_score, compute_visible_whiteness
 from core.observation_store import save_observation
 from core.scene_qc import INVALID_SCL_CLASSES, evaluate_scene_quality
 from sentinelhub import SHConfig, SentinelHubRequest, DataCollection, MimeType, BBox, CRS
@@ -92,12 +93,23 @@ function evaluatePixel(sample) {
 SH_BAND_STATS_EVALSCRIPT = """//VERSION=3
 function setup() {
     return {
-        input: ["B04", "B08", "B12", "SCL", "dataMask"],
-        output: { bands: 5, sampleType: "FLOAT32" }
+        input: ["B02", "B03", "B04", "B08", "B11", "B12", "SCL", "CLD", "CLP", "dataMask"],
+        output: { bands: 10, sampleType: "FLOAT32" }
     };
 }
 function evaluatePixel(sample) {
-    return [sample.B04, sample.B08, sample.B12, sample.SCL, sample.dataMask];
+    return [
+        sample.B02,
+        sample.B03,
+        sample.B04,
+        sample.B08,
+        sample.B11,
+        sample.B12,
+        sample.SCL,
+        sample.CLD,
+        sample.CLP,
+        sample.dataMask
+    ];
 }
 """
 
@@ -139,15 +151,33 @@ def _normalize_reflectance(values: np.ndarray) -> np.ndarray:
     return values
 
 
-def _band_stats_from_response(arr: np.ndarray) -> dict | None:
+def _band_stats_from_response(arr: np.ndarray, *, include_cloud_pixels: bool = False) -> dict | None:
     if arr.ndim != 3 or arr.shape[-1] < 5:
         return None
-    red = _normalize_reflectance(arr[:, :, 0].astype(np.float32))
-    nir = _normalize_reflectance(arr[:, :, 1].astype(np.float32))
-    swir2 = _normalize_reflectance(arr[:, :, 2].astype(np.float32))
-    scl = arr[:, :, 3].astype(np.uint8)
-    data_mask = arr[:, :, 4] > 0
-    valid_mask = data_mask & ~np.isin(scl.astype(int), INVALID_SCL_CLASSES)
+    if arr.shape[-1] >= 10:
+        blue = _normalize_reflectance(arr[:, :, 0].astype(np.float32))
+        green = _normalize_reflectance(arr[:, :, 1].astype(np.float32))
+        red = _normalize_reflectance(arr[:, :, 2].astype(np.float32))
+        nir = _normalize_reflectance(arr[:, :, 3].astype(np.float32))
+        swir1 = _normalize_reflectance(arr[:, :, 4].astype(np.float32))
+        swir2 = _normalize_reflectance(arr[:, :, 5].astype(np.float32))
+        scl = arr[:, :, 6].astype(np.uint8)
+        cld = arr[:, :, 7].astype(np.float32)
+        clp = arr[:, :, 8].astype(np.float32)
+        data_mask = arr[:, :, 9] > 0
+    else:
+        blue = None
+        green = None
+        red = _normalize_reflectance(arr[:, :, 0].astype(np.float32))
+        nir = _normalize_reflectance(arr[:, :, 1].astype(np.float32))
+        swir1 = None
+        swir2 = _normalize_reflectance(arr[:, :, 2].astype(np.float32))
+        scl = arr[:, :, 3].astype(np.uint8)
+        cld = None
+        clp = None
+        data_mask = arr[:, :, 4] > 0
+    invalid_classes = [0, 1] if include_cloud_pixels else INVALID_SCL_CLASSES
+    valid_mask = data_mask & ~np.isin(scl.astype(int), invalid_classes)
     if int(valid_mask.sum()) == 0:
         return None
 
@@ -162,19 +192,69 @@ def _band_stats_from_response(arr: np.ndarray) -> dict | None:
     red_mean = stats(red)["mean"]
     nir_mean = stats(nir)["mean"]
     swir2_mean = stats(swir2)["mean"]
+    band_stats = {
+        "B04_red": stats(red),
+        "B08_nir": stats(nir),
+        "B12_swir2": stats(swir2),
+    }
+    if blue is not None and green is not None and swir1 is not None:
+        blue_mean = stats(blue)["mean"]
+        green_mean = stats(green)["mean"]
+        swir1_mean = stats(swir1)["mean"]
+        band_stats = {
+            "B02_blue": stats(blue),
+            "B03_green": stats(green),
+            **band_stats,
+            "B11_swir1": stats(swir1),
+        }
+    else:
+        blue_mean = None
+        green_mean = None
+        swir1_mean = None
+
+    cloud_mask = np.isin(scl.astype(int), [3, 8, 9, 10]) & data_mask
+    cld_probability = None
+    clp_probability = None
+    if cld is not None:
+        cld_selected = cld[data_mask]
+        if cld_selected.size:
+            cld_mean = float(np.nanmean(cld_selected))
+            cld_probability = round(cld_mean / 100.0 if cld_mean > 1.0 else cld_mean, 4)
+    if clp is not None:
+        clp_selected = clp[data_mask]
+        if clp_selected.size:
+            clp_mean = float(np.nanmean(clp_selected))
+            clp_probability = round(clp_mean / 255.0 if clp_mean > 1.0 else clp_mean, 4)
+
+    derived_indices = {
+        "ndvi": _safe_index(nir_mean - red_mean, nir_mean + red_mean),
+        "nbr_swir2": _safe_index(nir_mean - swir2_mean, nir_mean + swir2_mean),
+        "swir2_nir_ratio": _safe_index(swir2_mean, nir_mean),
+    }
+    if blue_mean is not None and green_mean is not None and swir1_mean is not None:
+        derived_indices["ndmi_swir1"] = _safe_index(nir_mean - swir1_mean, nir_mean + swir1_mean)
+        derived_indices["visible_whiteness"] = round(compute_visible_whiteness(red_mean, green_mean, blue_mean), 4)
+        derived_indices["blue_green_haze_score"] = round(
+            compute_blue_green_haze_score(blue_mean, green_mean, red_mean),
+            4,
+        )
+
     return {
-        "bands": {
-            "B04_red": stats(red),
-            "B08_nir": stats(nir),
-            "B12_swir2": stats(swir2),
-        },
-        "derived_indices": {
-            "ndvi": _safe_index(nir_mean - red_mean, nir_mean + red_mean),
-            "nbr_swir2": _safe_index(nir_mean - swir2_mean, nir_mean + swir2_mean),
-            "swir2_nir_ratio": _safe_index(swir2_mean, nir_mean),
+        "bands": band_stats,
+        "derived_indices": derived_indices,
+        "cloud_metrics": {
+            "scl_cloud_ratio": round(float(cloud_mask.sum()) / max(1, int(data_mask.sum())), 4),
+            "cloud_probability_cld": cld_probability,
+            "cloud_probability_clp": clp_probability,
+            "data_mask_ratio": round(float(data_mask.mean()), 4),
         },
         "valid_pixel_ratio": round(float(valid_mask.mean()), 4),
-        "stats_source": "sentinelhub_process_b04_b08_b12_scl",
+        "stats_source": (
+            "sentinelhub_process_b02_b03_b04_b08_b11_b12_scl_cld_clp_smoke_cloud_review"
+            if include_cloud_pixels
+            else "sentinelhub_process_b02_b03_b04_b08_b11_b12_scl_cld_clp"
+        ),
+        "scl_cloud_pixels_included": include_cloud_pixels,
     }
 
 def get_chunk_signature(bbox: list[float]) -> str:
@@ -227,6 +307,7 @@ def fetch_sh_window(
     bbox_coords: list[float],
     config: SHConfig,
     visual_mode: str = "true_color",
+    allow_smoke_cloud_frames: bool = False,
 ) -> tuple[np.ndarray | None, str, dict | None]:
     w, s, e, n = bbox_coords
     bbox = BBox(bbox=[w, s, e, n], crs=CRS.WGS84)
@@ -266,7 +347,9 @@ def fetch_sh_window(
             "reasons": ["quality_unavailable"],
         }
 
-    if not quality["accepted"]:
+    smoke_cloud_review = _should_keep_smoke_cloud_frame(label, visual_mode, quality, allow_smoke_cloud_frames)
+
+    if not quality["accepted"] and not smoke_cloud_review:
         logger.warning(
             "  [SH] Skipping cloudy/low-quality frame %s %s->%s valid=%.1f%% cloud=%.1f%% reasons=%s",
             label,
@@ -277,6 +360,19 @@ def fetch_sh_window(
             ",".join(quality["reasons"]),
         )
         return None, "", quality
+    if smoke_cloud_review:
+        quality["accepted"] = True
+        quality["review_only"] = True
+        quality["acceptance_override"] = "wildfire_smoke_cloud_review"
+        quality["flags"] = sorted(set([*quality.get("flags", []), "smoke_or_cloud_review"]))
+        logger.warning(
+            "  [SH] Keeping smoky/cloud-flagged wildfire frame %s %s->%s for review valid=%.1f%% cloud=%.1f%%",
+            label,
+            start_date,
+            end_date,
+            quality["valid_pixel_ratio"] * 100,
+            quality["cloud_pixel_ratio"] * 100,
+        )
 
     band_stats_request = SentinelHubRequest(
         evalscript=SH_BAND_STATS_EVALSCRIPT,
@@ -295,7 +391,10 @@ def fetch_sh_window(
 
     try:
         band_stats_data = band_stats_request.get_data()
-        band_stats = _band_stats_from_response(band_stats_data[0]) if band_stats_data else None
+        band_stats = _band_stats_from_response(
+            band_stats_data[0],
+            include_cloud_pixels=smoke_cloud_review,
+        ) if band_stats_data else None
         if band_stats:
             quality["band_stats"] = band_stats
     except Exception as exc:
@@ -335,13 +434,40 @@ def fetch_sh_window(
             draw.rectangle([(0, _FRAME_H - bar_h), (_FRAME_W, _FRAME_H)], fill=(0, 0, 0))
             draw.text((8, _FRAME_H - bar_h + 6), label, fill=(255, 255, 255))
             draw.text((120, _FRAME_H - bar_h + 6), source_label, fill=(180, 220, 180))
-            draw.text((680, _FRAME_H - bar_h + 6), f"clear {quality['valid_pixel_ratio'] * 100:.0f}%", fill=(180, 220, 255))
+            quality_label = (
+                f"smoke/cloud review {quality['cloud_pixel_ratio'] * 100:.0f}%"
+                if smoke_cloud_review
+                else f"clear {quality['valid_pixel_ratio'] * 100:.0f}%"
+            )
+            draw.text((680, _FRAME_H - bar_h + 6), quality_label, fill=(180, 220, 255))
             
             return np.array(img, dtype=np.uint8), f"{source_label} {label}", quality
     except Exception as e:
         logger.warning(f"  [SH] Failed {label} {start_date}->{end_date}: {e}")
         
     return None, "", quality
+
+
+def _should_keep_smoke_cloud_frame(
+    label: str,
+    visual_mode: str,
+    quality: dict,
+    allow_smoke_cloud_frames: bool,
+) -> bool:
+    """Keep active wildfire frames that SCL may mark as cloud because of white smoke."""
+    if not allow_smoke_cloud_frames or visual_mode != "burn_scar":
+        return False
+    if quality.get("accepted"):
+        return False
+    label_text = label.lower()
+    if not any(token in label_text for token in ("active", "ignition", "smoke", "plume")):
+        return False
+    reasons = set(quality.get("reasons", []))
+    if not reasons.issubset({"insufficient_valid_pixels"}):
+        return False
+    nodata_ratio = float(quality.get("nodata_pixel_ratio") or 0.0)
+    cloud_ratio = float(quality.get("cloud_pixel_ratio") or 0.0)
+    return nodata_ratio <= 0.15 and cloud_ratio >= 0.20
 
 
 def fetch_sh_month(
@@ -394,6 +520,7 @@ def seed_single_cell(
     target_task: str | None = None,
     date_windows: list[tuple[str, str, str]] | None = None,
     visual_mode: str = "true_color",
+    allow_smoke_cloud_frames: bool = False,
 ) -> str | None:
     from datetime import date as _date
     bbox = [lon - cell_dim, lat - cell_dim, lon + cell_dim, lat + cell_dim]
@@ -424,7 +551,15 @@ def seed_single_cell(
     effective_end = frame_windows[-1][2] if frame_windows else end_ym
 
     for label, window_start, window_end in frame_windows:
-        frame, source_lbl, quality = fetch_sh_window(label, window_start, window_end, bbox, config, visual_mode)
+        frame, source_lbl, quality = fetch_sh_window(
+            label,
+            window_start,
+            window_end,
+            bbox,
+            config,
+            visual_mode,
+            allow_smoke_cloud_frames=allow_smoke_cloud_frames,
+        )
         if frame is not None:
             frames.append(frame)
             isos.append(label)
@@ -434,6 +569,9 @@ def seed_single_cell(
                 "cloud_pixel_ratio": quality.get("cloud_pixel_ratio") if quality else None,
                 "nodata_pixel_ratio": quality.get("nodata_pixel_ratio") if quality else None,
                 "reasons": quality.get("reasons", []) if quality else [],
+                "review_only": bool(quality.get("review_only")) if quality else False,
+                "acceptance_override": quality.get("acceptance_override") if quality else None,
+                "flags": quality.get("flags", []) if quality else [],
             })
             if quality and quality.get("band_stats"):
                 band_stats_by_frame.append({
@@ -511,14 +649,29 @@ def seed_single_cell(
         "spectral_bands": {
             "visual_mode": visual_mode,
             "requested_bands": requested_bands,
+            "stats_requested_bands": ["B02", "B03", "B04", "B08", "B11", "B12", "SCL", "CLD", "CLP", "dataMask"],
             "band_stats_by_frame": band_stats_by_frame,
-            "derived_indices": ["ndvi", "nbr_swir2", "swir2_nir_ratio"],
+            "derived_indices": [
+                "ndvi",
+                "nbr_swir2",
+                "ndmi_swir1",
+                "swir2_nir_ratio",
+                "visible_whiteness",
+                "blue_green_haze_score",
+            ],
             "note": "Band statistics are computed from accepted Sentinel-2 L2A pixels after SCL/dataMask quality filtering.",
         },
         "cloud_policy": {
             "min_valid_pixel_ratio": DETECTION.min_quality_threshold,
             "invalid_scl_classes": INVALID_SCL_CLASSES,
             "mosaicking_order": "leastCC",
+            "allow_smoke_cloud_frames": allow_smoke_cloud_frames,
+            "smoke_cloud_note": (
+                "Wildfire burn-scar seeding may keep active/ignition smoke frames for review when SCL flags likely smoke as cloud; "
+                "those frames are not standalone positive detections."
+                if allow_smoke_cloud_frames
+                else ""
+            ),
         },
         "frame_quality": frame_quality,
         "rejected_windows": rejected_windows,
@@ -571,6 +724,7 @@ def seed_grid(
     target_task: str | None = None,
     date_windows: list[tuple[str, str, str]] | None = None,
     visual_mode: str = "true_color",
+    allow_smoke_cloud_frames: bool = False,
 ) -> list[str]:
     cache_dir = Path(__file__).resolve().parents[1] / "assets" / "seeded_data"
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -608,6 +762,7 @@ def seed_grid(
                 target_task,
                 date_windows,
                 visual_mode,
+                allow_smoke_cloud_frames,
             )
             if sig:
                 sigs.append(sig)
@@ -654,6 +809,11 @@ def main():
         choices=sorted(SH_EVALSCRIPTS.keys()),
         default="true_color",
         help="Sentinel-2 visual composite to request.",
+    )
+    parser.add_argument(
+        "--allow-smoke-cloud-frames",
+        action="store_true",
+        help="For burn_scar wildfire seeds, keep active/ignition frames that SCL flags as cloud when dataMask is valid; marks them review-only.",
     )
     args = parser.parse_args()
     try:
@@ -713,6 +873,7 @@ def main():
             args.target_task,
             date_windows or None,
             args.visual_mode,
+            args.allow_smoke_cloud_frames,
         )
 
     logger.info("All done.")

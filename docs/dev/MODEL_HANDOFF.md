@@ -243,7 +243,7 @@ The export now includes:
 - SimSat/Mapbox through DPhi Space SimSat as the hackathon satellite-data API family: default SimSat Sentinel scanning, optional SimSat Mapbox imagery/context, direct Sentinel Hub, NASA, GEE, replay-cache, and offline provenance fields where available
 - temporal use-case metadata and examples for deforestation, wildfire, civilian lifeline disruption, maritime monitoring, ice/snow extent, legacy ice-cap visual review, floods, agriculture, urban expansion, mining, and generic temporal review
 - chat-style `training.jsonl`, `train_training.jsonl`, and `eval_training.jsonl` files for supervised data-refinement workflows
-- second-pass asset retagging through `scripts/retag_training_assets.py`, including deduplicated still images, sampled timelapse frames, ordered temporal sequence rows, Hugging Face ImageFolder-compatible `images/ + metadata.jsonl`, and provider adapters for heuristic/manual queue, Ollama vision models, or OpenAI-compatible vision models
+- second-pass asset retagging through `scripts/retag_training_assets.py`, including deduplicated still images, sampled timelapse frames, ordered temporal sequence rows, Hugging Face JSONL configs with `images/` assets, and provider adapters for heuristic/manual queue, Ollama vision models, or OpenAI-compatible vision models
 - optional Hugging Face dataset upload through `scripts/upload_orbit_dataset_hf.py`, using `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or a local developer token file
 - explicit metadata fields such as `target_action`, `target_category`, `target_task`, and `label_tier`
 - `orbit_training_contract_v1` metadata for review status, localization fields, evidence requirements, and LiquidAI Leap Tune-compatible import behavior
@@ -265,10 +265,10 @@ Orbit's observation cache is now stricter about handoff readiness:
 - a record is only marked `training_ready` after both satellite and ground observations exist for the same region
 - single-role cached notes are still useful context, but they should not be treated as paired supervision during downstream import
 
-Orbit also now supports curated replay manifests and dynamic Fast Replay entries from valid cached API WebMs. That is useful for model handoff work in two ways:
+Orbit also now supports curated replay manifests and dynamic Replay Cache entries from valid cached API WebMs. That is useful for model handoff work in two ways:
 
 - a trained-model review can be demonstrated against a fixed, inspectable mission instead of realtime scan timing
-- the same prior replay metadata can be rescanned after a model/runtime update to compare behavior
+- the same cached frames and evidence can be rescanned after a model/runtime update to compare behavior without provider fetches
 - future model eval packs can mirror the replay manifest structure so mission evidence and modeling artifacts stay aligned
 
 For deterministic local review, Orbit exposes a runtime reset path before replay load:
@@ -283,25 +283,29 @@ Completed runtime surfaces can also be packaged with:
 
 This snapshot path is for packaging completed realtime or replay missions. Bundled replay packs remain the preferred showcase walkthrough path.
 
-Current replay cache includes Rondonia replay coverage plus cached API missions for Pakistan Manchar Lake flooding, Atacama mining, Greenland ice/snow extent metadata scoring, Suez maritime queueing, Singapore maritime anchorage, Kansas crop phenology, Delhi urban expansion, Highway 82 Georgia wildfire candidate, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead. These are development and proof fixtures that avoid repeated API usage; they do not make Sentinel Hub part of the default hackathon runtime. The legacy Greenland ice-edge abstain WebM is excluded from Fast Replay because it fails the structural timelapse-integrity gate. These are intentionally small repo fixtures, not a full training corpus.
+Current replay cache includes Rondonia replay coverage plus cached API missions for Pakistan Manchar Lake flooding, Atacama mining, Greenland ice/snow extent metadata scoring, Suez maritime queueing, Singapore maritime anchorage, Kansas crop phenology, Delhi urban expansion, Highway 82 Georgia wildfire candidate, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead. These are development and proof fixtures that avoid repeated API usage; they do not make Sentinel Hub part of the default hackathon runtime. The legacy Greenland ice-edge abstain WebM is excluded from Replay Cache because it fails the structural timelapse-integrity gate. These are intentionally small repo fixtures, not a full training corpus.
 
 Recorded proof demos now export both the full proof screen and the isolated `evidence-frame.png` surface. That keeps model/dataset review aligned with the exact visible evidence frame used in Proof Mode, not just the longer Playwright recording.
 
 Orbit also stores timestamped watch manifests under `source/backend/assets/watchlists/`. These are source-backed risk watches, not labels. The SPC Day 2 Southern High Plains watch is now promoted only to `incident_report_verified_candidate` after NM Fire Info reported the Sparks Fire in Quay County inside the watch bbox; satellite burn-scar confirmation still requires a separate post-event imagery pass.
 
-Current raw replay/cache export after including the Florida firewatch seed:
+Current training-focused replay/cache export after the wildfire refresh:
 
-- `33` Orbit samples
+- `46` Orbit samples
 - `0` cached API observation rows
-- `25` replay-cache rows
+- `33` replay-cache rows
 - `7` visual story frame rows
-- `0` monitor-report rows
+- `5` monitor-report rows
 - `0` mission metadata rows
-- `26` rows with timelapse references
-- `wildfire` / `fireline` tags plus Sentinel-2 `B12/B08/B04` band stats on `seeded_83e3aea2__83e3aea2`
-- `0` local Windows paths in the published raw export JSONL/manifest
+- `34` rows with timelapse references
+- `265` image-level SFT rows and `33` temporal-sequence SFT rows after retagging
+- `145` image tags and `14` sequence tags reused by SHA-256
+- `0` skipped assets, `0` image tagger failures, and `0` sequence tagger failures
+- `wildfire` / `fireline` tags on Florida SR-26/Balu Forest, Georgia Highway 82, Pineland Road, Spain Larouco, Lahaina, and related fireline/burn-scar review candidates
+- `0` local Windows paths in the published retagged JSONL/manifest
 
-Hugging Face upload is wired and completed locally. The dataset is published at `Shoozes/LFM-Orbit-SatData`, with latest raw export commit `b6ef429d958a21dc7690d3f4b7cc4f3bd2088d25`: `records=33`, `seeded_cache_records=25`, `mission_metadata_records=0`, and the Florida firewatch sample tagged as `wildfire` / `fireline` with Sentinel-2 `B12/B08/B04` frame stats. The earlier retagged training export remains reusable for model work when raw replay/cache rows need SFT conversion.
+Hugging Face upload is wired and completed locally. The dataset is published at `Shoozes/LFM-Orbit-SatData`; the current refresh uses the retagged training folder as the Hub payload so the Dataset Viewer exposes separate single-image SFT, temporal SFT, asset metadata, full retag records, temporal metadata, review queue, and mission metadata configs.
+The May 7, 2026 dataset payload commit is `9ccff9ce7315e270ca1b280c82c39414ce591d01`; the Dataset Viewer verification commit is `2df07094f36037e71c7e14e28dfbd298343be359`; the final card documentation commit is `550c98f7c9b84eefbe3c0c6eb77b33a70028402a`. Dataset Viewer verified `1126` total rows with no pending or failed configs, including `70` wildfire image rows and `11` wildfire temporal rows.
 
 The trained model handoff bundle is published at `Shoozes/lfm2.5-450m-vl-orbit-satellite`. Local fetch with `--force` refreshed `runtime-data/models/lfm2.5-vlm-450m/`; `scripts/smoke_satellite_model.py --require-present --max-tokens 8` passed with `loaded=true` in the launcher-managed Windows backend environment. The manifest reports task `orbit-satellite-triage`, base model `LiquidAI/LFM2.5-VL-450M`, GGUF runtime, `training_modality=image_text`, `image_training_verified=true`, `7245` train rows, `7245` multimodal rows, `8335` image blocks, and `805` eval rows. The SAT/GND GGUF runtime remains `text_evidence_packet`; retained-frame image review is a separate opt-in `transformers_vlm` adapter path.
 

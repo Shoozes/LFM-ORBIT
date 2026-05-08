@@ -275,13 +275,14 @@ type MissionControlProps = {
   onOpenLogs?: () => void;
   onOpenProofMode?: () => void;
   onInspectFirstResult?: () => void;
+  proofAttentionActive?: boolean;
   resultAlertCount?: number;
   mission: Mission | null;
   onRefresh: () => void;
   isScanComplete?: boolean;
   scanCellCount?: number;
   onReplayLoaded?: (primaryCellId: string | null) => void | Promise<void>;
-  onReplayRescanStarted?: (mission: Mission) => void | Promise<void>;
+  onReplayRescanStarted?: (mission: Mission, primaryCellId: string | null) => void | Promise<void>;
   onPreviewBbox?: (bbox: number[]) => void;
   initialPresetId?: string | null;
 };
@@ -296,6 +297,7 @@ export default function MissionControl({
   onOpenLogs,
   onOpenProofMode,
   onInspectFirstResult,
+  proofAttentionActive = false,
   resultAlertCount = 0,
   mission,
   onRefresh,
@@ -447,7 +449,7 @@ export default function MissionControl({
       } else {
         await onRefresh();
       }
-      setReplayNotice("Cached API replay loaded into Mission, Logs, Inspect, and Agent Dialogue.");
+      setReplayNotice("Replay opened. Inspect the cached proof, or rescan cached data with the current model.");
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : "Replay failed to load.");
     } finally {
@@ -468,12 +470,13 @@ export default function MissionControl({
           review_model_filename?: string;
           review_model_revision?: string;
         };
+        primary_cell_id?: string | null;
       };
       if (!response.ok || !payload.mission) {
         throw new Error(payload.error || "Replay rescan failed");
       }
       if (onReplayRescanStarted) {
-        await onReplayRescanStarted(payload.mission);
+        await onReplayRescanStarted(payload.mission, payload.primary_cell_id ?? null);
       } else {
         await onRefresh();
       }
@@ -487,7 +490,7 @@ export default function MissionControl({
       const modelLabel = modelFilename
         ? ` Model: ${modelFilename}${modelRevision ? ` @ ${modelRevision}` : ""}.`
         : "";
-      setReplayNotice(`Live rescan started from replay metadata with the current model/runtime stack.${modelLabel}`);
+      setReplayNotice(`Cached-data rescan complete with the current prompt/model stack. No provider fetch was needed.${modelLabel}`);
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : "Replay rescan failed.");
     } finally {
@@ -576,6 +579,37 @@ export default function MissionControl({
               >
                 {mission.mission_mode === "replay" ? "Exit Replay" : "Stop Mission"}
               </button>
+              {mission.mission_mode === "replay" && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    data-testid="mission-replay-open-first-result"
+                    onClick={onInspectFirstResult}
+                    disabled={resultAlertCount === 0}
+                    className="rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Inspect Flag
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="mission-replay-open-logs"
+                    onClick={onOpenLogs}
+                    className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-700 hover:bg-zinc-100"
+                  >
+                    Logs
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="mission-replay-open-proof"
+                    data-proof-ready={proofAttentionActive ? "true" : "false"}
+                    onClick={onOpenProofMode}
+                    disabled={resultAlertCount === 0}
+                    className={`rounded border border-cyan-300 bg-cyan-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-800 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50 ${proofAttentionActive ? "proof-action-glow" : ""}`}
+                  >
+                    Proof Mode
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -607,8 +641,9 @@ export default function MissionControl({
                 <button
                   type="button"
                   data-testid="mission-complete-open-proof"
+                  data-proof-ready={proofAttentionActive ? "true" : "false"}
                   onClick={onOpenProofMode}
-                  className="rounded border border-cyan-300 bg-cyan-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-800 hover:bg-cyan-100"
+                  className={`rounded border border-cyan-300 bg-cyan-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-800 hover:bg-cyan-100 ${proofAttentionActive ? "proof-action-glow" : ""}`}
                 >
                   Proof Mode
                 </button>
@@ -701,14 +736,14 @@ export default function MissionControl({
             <div className="space-y-2" data-testid="fast-replay-panel">
               <div className="flex items-center justify-between gap-3">
                 <label className="block text-[10px] uppercase tracking-wider font-semibold text-zinc-500">
-                  Fast Replay
+                  Replay Cache
                 </label>
                 <span className="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold">
                   {replays.length} saved
                 </span>
               </div>
               <p className="text-xs text-zinc-600 leading-relaxed">
-                Load a completed mission instantly, or rescan the same bbox/date window with the current model after runtime updates.
+                Open a frozen proof bundle, or rerun the current prompt/model stack over the same cached frames and evidence.
               </p>
               <div className="space-y-3">
                 {replays.map((replay) => (
@@ -735,7 +770,7 @@ export default function MissionControl({
                           disabled={submitting || replayBusyId !== null || hasBlockingLiveMission}
                           className="rounded border border-cyan-200 bg-white px-3 py-1.5 text-[10px] uppercase tracking-wider text-cyan-700 hover:bg-cyan-50 disabled:opacity-40 disabled:cursor-not-allowed transition font-semibold"
                         >
-                          {replayBusyId === replay.replay_id ? "Loading..." : mission?.mission_mode === "replay" ? "Replace Replay" : "Load Replay"}
+                          {replayBusyId === replay.replay_id ? "Loading..." : mission?.mission_mode === "replay" ? "Replace Replay" : "Open Replay"}
                         </button>
                         <button
                           type="button"
@@ -744,7 +779,7 @@ export default function MissionControl({
                           disabled={submitting || replayBusyId !== null || hasBlockingLiveMission}
                           className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-[10px] uppercase tracking-wider text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed transition font-semibold"
                         >
-                          Rescan
+                          Rescan Cache
                         </button>
                       </div>
                     </div>

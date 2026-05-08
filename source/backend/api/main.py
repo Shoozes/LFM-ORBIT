@@ -100,6 +100,7 @@ from core.timelapse import generate_timelapse_frames
 from core.multimodal_inference import generate_with_image
 from core.vlm import explain_vlm_caption, explain_vlm_grounding, explain_vlm_vqa
 from core.watchlists import build_mission_from_watchlist_asset, get_watchlist, list_watchlists
+from core.wildfire_smoke import score_wildfire_smoke_assist
 
 logger = logging.getLogger(__name__)
 
@@ -713,6 +714,15 @@ class IceSnowScoreBody(BaseModel):
     min_accepted_frames: int = Field(default=3, ge=2, le=24)
 
 
+class WildfireSmokeScoreBody(BaseModel):
+    frames: list[dict[str, Any]] = Field(min_length=1, max_length=120)
+    hotspot_context: dict[str, Any] | None = None
+    runtime_truth_mode: str = Field(default="replay", max_length=40)
+    imagery_origin: str = Field(default="cached_api", max_length=80)
+    observation_source: str = Field(default="unknown", max_length=160)
+    min_accepted_frames: int = Field(default=2, ge=1, le=24)
+
+
 @app.get("/api/lifelines/assets")
 def lifeline_assets(category: str | None = None, region: str | None = None):
     """Return seeded civilian lifeline assets for before/after monitoring."""
@@ -749,6 +759,19 @@ def ice_snow_score(body: IceSnowScoreBody):
     """Score long-window ice/snow extent from Sentinel-2 L2A frame summaries."""
     return score_ice_snow_extent(
         body.frames,
+        runtime_truth_mode=body.runtime_truth_mode,
+        imagery_origin=body.imagery_origin,
+        observation_source=body.observation_source,
+        min_accepted_frames=body.min_accepted_frames,
+    )
+
+
+@app.post("/api/wildfire/smoke-score")
+def wildfire_smoke_score(body: WildfireSmokeScoreBody):
+    """Score wildfire smoke/cloud/burn confidence from Sentinel-2 L2A summaries."""
+    return score_wildfire_smoke_assist(
+        body.frames,
+        hotspot_context=body.hotspot_context,
         runtime_truth_mode=body.runtime_truth_mode,
         imagery_origin=body.imagery_origin,
         observation_source=body.observation_source,
@@ -1246,7 +1269,7 @@ def replay_load(replay_id: str = Path(...), request: Request = None):
 
 @app.post("/api/replay/rescan/{replay_id}")
 def replay_rescan(replay_id: str = Path(...), request: Request = None):
-    """Start a live rescan from a replay mission using the current runtime/model stack."""
+    """Rerun current prompt/model review over cached replay evidence."""
     _require_local_request(request)
     try:
         return rescan_seeded_replay(replay_id)

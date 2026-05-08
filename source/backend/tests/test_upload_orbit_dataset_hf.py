@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 
 from scripts import upload_orbit_dataset_hf
@@ -84,3 +85,69 @@ def test_run_hf_command_reports_cli_failure_without_token(monkeypatch, capsys):
     assert "exit code 403" in output
     assert "dataset write/create permission" in output
     assert "hf_secret_token" not in output
+
+
+def test_validate_dataset_dir_accepts_packaged_retag_output(tmp_path):
+    dataset = tmp_path / "retagged"
+    images = dataset / "images"
+    images.mkdir(parents=True)
+    (images / "asset.png").write_bytes(b"png")
+    (dataset / "training_assets.jsonl").write_text(
+        json.dumps({"asset_id": "a1", "image": "images/asset.png"}) + "\n",
+        encoding="utf-8",
+    )
+    (dataset / "metadata.jsonl").write_text(
+        json.dumps({"asset_id": "a1", "file_name": "images/asset.png"}) + "\n",
+        encoding="utf-8",
+    )
+    (dataset / "README.md").write_text(
+        "---\n"
+        "configs:\n"
+        "- config_name: default\n"
+        "  data_files:\n"
+        "  - split: train\n"
+        "    path: training_assets.jsonl\n"
+        "---\n",
+        encoding="utf-8",
+    )
+
+    assert upload_orbit_dataset_hf.validate_dataset_dir(dataset) == []
+
+
+def test_validate_dataset_dir_blocks_path_leaks_missing_assets_and_empty_configs(tmp_path):
+    dataset = tmp_path / "retagged"
+    dataset.mkdir()
+    (dataset / "training_assets.jsonl").write_text(
+        json.dumps({
+            "asset_id": "a1",
+            "image": "images/missing.png",
+            "metadata": {
+                "references": [
+                    {"video_source": r"C:\Users\dev\repo\runtime-data\modeling\orbit-export\samples\a\timelapse.webm"}
+                ]
+            },
+        })
+        + "\n",
+        encoding="utf-8",
+    )
+    (dataset / "mission_metadata.jsonl").write_text("", encoding="utf-8")
+    (dataset / "README.md").write_text(
+        "---\n"
+        "configs:\n"
+        "- config_name: default\n"
+        "  data_files:\n"
+        "  - split: train\n"
+        "    path: training_assets.jsonl\n"
+        "- config_name: mission_metadata\n"
+        "  data_files:\n"
+        "  - split: train\n"
+        "    path: mission_metadata.jsonl\n"
+        "---\n",
+        encoding="utf-8",
+    )
+
+    issues = upload_orbit_dataset_hf.validate_dataset_dir(dataset)
+
+    assert "training_assets.jsonl contains a local absolute path" in issues
+    assert "training_assets.jsonl references missing asset: images/missing.png" in issues
+    assert "README.md config references empty JSONL file: mission_metadata.jsonl" in issues

@@ -3,12 +3,24 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
 
 _DEFAULT_HF_TOKEN_PATH = Path(__file__).resolve().parents[3] / ".tools" / ".secrets" / "hf.txt"
+_LOCAL_PATH_PATTERNS = (
+    re.compile(r"[A-Za-z]:[\\/](?:Users|Windows|Program Files|ProgramData|workspaces|tmp)[\\/]", re.IGNORECASE),
+    re.compile(r"[\\/](?:Users|home)[\\/][^\"'\s]+[\\/](?:OneDrive|Desktop|workspaces|tmp)[\\/]", re.IGNORECASE),
+)
+_IMAGE_REF_FILES = {
+    "training_assets.jsonl": ("image",),
+    "metadata.jsonl": ("file_name",),
+    "retagged_assets.jsonl": ("file_name",),
+    "review_queue.jsonl": ("file_name",),
+}
 
 
 def resolve_hf_token(secrets_path: Path | None = None) -> tuple[str, str]:
@@ -67,6 +79,125 @@ def build_repo_create_command(*, repo_id: str, private: bool) -> list[str]:
     return command
 
 
+def _read_jsonl(path: Path) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    if not path.exists():
+        return rows
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        text = line.strip()
+        if not text:
+            continue
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{path.name}:{line_number} is not valid JSON: {exc}") from exc
+        if not isinstance(payload, dict):
+            raise ValueError(f"{path.name}:{line_number} must be a JSON object")
+        rows.append(payload)
+    return rows
+
+
+def _has_local_path(value: str) -> bool:
+    normalized = value.replace("\\\\", "\\").replace("\\/", "/")
+    return any(pattern.search(normalized) for pattern in _LOCAL_PATH_PATTERNS)
+
+
+def _collect_readme_config_paths(readme_path: Path) -> list[str]:
+    if not readme_path.exists():
+        return []
+    paths: list[str] = []
+    in_front_matter = False
+    seen_front_matter = False
+    for line in readme_path.read_text(encoding="utf-8").splitlines():
+        if line.strip() == "---":
+            if not seen_front_matter:
+                seen_front_matter = True
+                in_front_matter = True
+                continue
+            if in_front_matter:
+                break
+        if in_front_matter:
+            match = re.match(r"\s*path:\s*(.+?)\s*$", line)
+            if match:
+                paths.append(match.group(1).strip().strip("'\""))
+    return paths
+
+
+def validate_dataset_dir(dataset_dir: Path) -> list[str]:
+    """Return upload-blocking dataset packaging issues."""
+    dataset_dir = dataset_dir.resolve()
+    issues: list[str] = []
+    rows_by_name: dict[str, list[dict[str, object]]] = {}
+
+    for path in sorted(dataset_dir.glob("*.jsonl")):
+        try:
+            rows_by_name[path.name] = _read_jsonl(path)
+        except ValueError as exc:
+            issues.append(str(exc))
+
+    for path in sorted(dataset_dir.glob("*.json")) + sorted(dataset_dir.glob("*.jsonl")):
+        text = path.read_text(encoding="utf-8")
+        if _has_local_path(text):
+            issues.append(f"{path.name} contains a local absolute path")
+
+    referenced_images: set[str] = set()
+    for file_name, fields in _IMAGE_REF_FILES.items():
+        for row in rows_by_name.get(file_name, []):
+            for field in fields:
+                value = row.get(field)
+                if isinstance(value, str) and value:
+                    referenced_images.add(value)
+                    if not (dataset_dir / value).is_file():
+                        issues.append(f"{file_name} references missing asset: {value}")
+
+    for row in rows_by_name.get("training_temporal_sequences.jsonl", []):
+        images = row.get("images")
+        if isinstance(images, list):
+            for value in images:
+                if isinstance(value, str) and value:
+                    referenced_images.add(value)
+                    if not (dataset_dir / value).is_file():
+                        issues.append(f"training_temporal_sequences.jsonl references missing asset: {value}")
+
+    for row in rows_by_name.get("temporal_sequences.jsonl", []):
+        frames = row.get("ordered_frames")
+        if isinstance(frames, list):
+            for frame in frames:
+                if isinstance(frame, dict):
+                    value = frame.get("file_name")
+                    if isinstance(value, str) and value:
+                        referenced_images.add(value)
+                        if not (dataset_dir / value).is_file():
+                            issues.append(f"temporal_sequences.jsonl references missing asset: {value}")
+
+    metadata_images = {
+        str(row.get("file_name"))
+        for row in rows_by_name.get("metadata.jsonl", [])
+        if isinstance(row.get("file_name"), str) and row.get("file_name")
+    }
+    image_files = {
+        path.relative_to(dataset_dir).as_posix()
+        for path in (dataset_dir / "images").glob("*")
+        if path.is_file()
+    }
+    if metadata_images:
+        missing = sorted(metadata_images - image_files)
+        orphaned = sorted(image_files - metadata_images)
+        if missing:
+            issues.append(f"metadata.jsonl has {len(missing)} missing image file(s)")
+        if orphaned:
+            issues.append(f"images/ has {len(orphaned)} orphan file(s) not present in metadata.jsonl")
+
+    for config_path in _collect_readme_config_paths(dataset_dir / "README.md"):
+        target = dataset_dir / config_path
+        if not target.exists():
+            issues.append(f"README.md config references missing file: {config_path}")
+        elif target.suffix == ".jsonl" and not rows_by_name.get(target.name):
+            issues.append(f"README.md config references empty JSONL file: {config_path}")
+
+    return sorted(set(issues))
+
+
 def run_hf_command(command: list[str], *, env: dict[str, str]) -> int:
     """Run an hf command and keep expected CLI failures readable."""
     try:
@@ -98,6 +229,11 @@ def _parse_args() -> argparse.Namespace:
         help="Glob pattern to delete from the Hub repo in the same commit. Repeat for multiple patterns.",
     )
     parser.add_argument("--dry-run", action="store_true", help="Print the upload plan without running hf.")
+    parser.add_argument(
+        "--skip-validation",
+        action="store_true",
+        help="Skip local JSONL, asset-reference, path-leak, and README config validation before upload.",
+    )
     return parser.parse_args()
 
 
@@ -110,6 +246,15 @@ def main() -> int:
     token, source = resolve_hf_token()
     if not token and not args.dry_run:
         raise RuntimeError("HF token unavailable. Set HF_TOKEN or configure a local developer token file.")
+
+    if not args.skip_validation:
+        issues = validate_dataset_dir(dataset_dir)
+        if issues:
+            print("[Orbit] Dataset validation failed:")
+            for issue in issues:
+                print(f"[Orbit] - {issue}")
+            return 2
+        print("[Orbit] Dataset validation passed.")
 
     upload_command = build_upload_command(
         repo_id=args.repo_id,

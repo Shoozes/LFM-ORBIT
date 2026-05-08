@@ -29,9 +29,18 @@ export type ScanHeartbeat = {
 export type ScanWindow = {
   label: string;
   quality: number;
+  blue?: number;
+  green?: number;
   nir: number;
   red: number;
   swir: number;
+  swir1?: number;
+  swir2?: number;
+  scl_cloud_ratio?: number;
+  cloud_probability?: number;
+  valid_pixel_ratio?: number;
+  review_only?: boolean;
+  acceptance_override?: string | null;
   ndvi: number;
   nbr: number;
   evi2: number;
@@ -83,6 +92,18 @@ export type ObjectDelta = {
   action_hint: "discard" | "defer" | "downlink_now";
 };
 
+export type WildfireSmokeAssessment = {
+  smoke_likelihood: number;
+  cloud_likelihood: number;
+  burn_likelihood: number;
+  hotspot_support: number;
+  confidence_delta: number;
+  final_confidence: number;
+  target_action: "prune" | "defer" | "review" | "downlink_now";
+  reason_codes: string[];
+  provenance?: Record<string, string | number | boolean>;
+};
+
 export type ScanResultMessage = {
   type: "scan_result";
   event_id: string;
@@ -107,6 +128,7 @@ export type ScanResultMessage = {
   boundary_context?: BoundaryContext[];
   detection_summary?: DetectionSummary;
   object_deltas?: ObjectDelta[];
+  wildfire_assessment?: WildfireSmokeAssessment;
 };
 
 export type ScanCompleteMessage = {
@@ -138,6 +160,7 @@ export type AlertItem = {
   boundary_context?: BoundaryContext[];
   detection_summary?: DetectionSummary;
   object_deltas?: ObjectDelta[];
+  wildfire_assessment?: WildfireSmokeAssessment;
 };
 
 export type ApiHealth = {

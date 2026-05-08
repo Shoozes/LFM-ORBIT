@@ -19,7 +19,7 @@ except ImportError:  # pragma: no cover - optional runtime dependency guard
     ImageStat = None  # type: ignore[assignment]
 
     class UnidentifiedImageError(Exception):
-        pass
+        """Fallback image decode error used when Pillow is not installed."""
 
 
 _VALID_BACKENDS = {"none", "llama_cpp_mmproj", "transformers_vlm"}

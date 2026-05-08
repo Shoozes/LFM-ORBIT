@@ -34,6 +34,7 @@ Keep `docs/*.md` as the written docs layer. Put new visual artifacts under the a
 - `media/videos/abstain-safety-demo.webm`
 - `media/videos/object-evidence-demo.webm`
 - `media/videos/orbital-eclipse-demo.webm`
+- `media/videos/training-journey.webm`
 - `media/videos/tutorial_video.webm`
 
 ## Truth Rules

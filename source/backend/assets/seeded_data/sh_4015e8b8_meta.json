@@ -8,45 +8,304 @@
   ],
   "lat": 31.223,
   "lon": -81.836,
-  "location_name": "Highway 82 Fire candidate [+0,+0]",
-  "region_note": "Reported southeast Georgia Highway 82 wildfire near Atkinson and Waynesville, April 2026",
-  "start_date": "2026-01",
-  "end_date": "2026-04",
-  "frames_count": 4,
+  "location_name": "Highway 82 wildfire burn-scar close look [+0,+0]",
+  "region_note": "April 2026 Brantley County Highway 82 wildfire near Atkinson and Waynesville; large South Georgia fire selected because public reports and NASA imagery show burn scars large enough for orbital review. Active window may contain white smoke that Sentinel SCL flags as cloud.",
+  "start_date": "2026-03-15",
+  "end_date": "2026-05-07",
+  "frames_count": 3,
   "frame_dates": [
-    "pre-fire",
-    "ignition-window",
-    "active-fire",
-    "latest-clear"
+    "baseline_2026_03_15",
+    "ignition_2026_04_16",
+    "active_2026_04_20"
+  ],
+  "frame_images": [
+    "source/backend/assets/seeded_data/sh_4015e8b8_frames/01_baseline_2026_03_15.png",
+    "source/backend/assets/seeded_data/sh_4015e8b8_frames/02_ignition_2026_04_16.png",
+    "source/backend/assets/seeded_data/sh_4015e8b8_frames/03_active_2026_04_20.png"
   ],
   "date_windows": [
     {
-      "label": "pre-fire",
-      "start_date": "2026-04-01",
-      "end_date": "2026-04-10"
+      "label": "baseline_2026_03_15",
+      "start_date": "2026-03-15",
+      "end_date": "2026-04-15"
     },
     {
-      "label": "ignition-window",
+      "label": "ignition_2026_04_16",
+      "start_date": "2026-04-16",
+      "end_date": "2026-04-20"
+    },
+    {
+      "label": "active_2026_04_20",
       "start_date": "2026-04-20",
-      "end_date": "2026-04-23"
-    },
-    {
-      "label": "active-fire",
-      "start_date": "2026-04-24",
       "end_date": "2026-04-26"
     },
     {
-      "label": "latest-clear",
+      "label": "postfire_2026_04_27",
       "start_date": "2026-04-27",
-      "end_date": "2026-04-28"
+      "end_date": "2026-05-07"
     }
   ],
-  "vlm_explanation": "Sentinel-2 L2A timelapse seeded for Highway 82 Fire candidate [+0,+0] from 2026-01 to 2026-04. Metadata inference was skipped for this cache refresh.",
+  "vlm_explanation": "Sentinel-2 L2A timelapse seeded for Highway 82 wildfire burn-scar close look [+0,+0] from 2026-03-15 to 2026-05-07. Metadata inference was skipped for this cache refresh.",
   "source": "Sentinel Hub Sentinel-2 L2A SWIR/NIR/Red burn-scar composite",
   "visual_mode": "burn_scar",
-  "seeded_at": "2026-04-27",
+  "spectral_bands": {
+    "visual_mode": "burn_scar",
+    "requested_bands": [
+      "B12",
+      "B08",
+      "B04"
+    ],
+    "stats_requested_bands": [
+      "B02",
+      "B03",
+      "B04",
+      "B08",
+      "B11",
+      "B12",
+      "SCL",
+      "CLD",
+      "CLP",
+      "dataMask"
+    ],
+    "band_stats_by_frame": [
+      {
+        "label": "baseline_2026_03_15",
+        "bands": {
+          "B02_blue": {
+            "mean": 0.0419,
+            "p10": 0.0265,
+            "p90": 0.0676
+          },
+          "B03_green": {
+            "mean": 0.0616,
+            "p10": 0.0422,
+            "p90": 0.0894
+          },
+          "B04_red": {
+            "mean": 0.0554,
+            "p10": 0.0286,
+            "p90": 0.0988
+          },
+          "B08_nir": {
+            "mean": 0.2558,
+            "p10": 0.1848,
+            "p90": 0.3336
+          },
+          "B12_swir2": {
+            "mean": 0.1198,
+            "p10": 0.0665,
+            "p90": 0.2022
+          },
+          "B11_swir1": {
+            "mean": 0.2119,
+            "p10": 0.1442,
+            "p90": 0.3105
+          }
+        },
+        "derived_indices": {
+          "ndvi": 0.644,
+          "nbr_swir2": 0.3621,
+          "swir2_nir_ratio": 0.4683,
+          "ndmi_swir1": 0.0939,
+          "visible_whiteness": 0.6802,
+          "blue_green_haze_score": 0.0
+        },
+        "cloud_metrics": {
+          "scl_cloud_ratio": 0.0413,
+          "cloud_probability_cld": 0.8938,
+          "cloud_probability_clp": 0.0503,
+          "data_mask_ratio": 1.0
+        },
+        "valid_pixel_ratio": 0.9587,
+        "stats_source": "sentinelhub_process_b02_b03_b04_b08_b11_b12_scl_cld_clp",
+        "scl_cloud_pixels_included": false
+      },
+      {
+        "label": "ignition_2026_04_16",
+        "bands": {
+          "B02_blue": {
+            "mean": 0.05,
+            "p10": 0.0353,
+            "p90": 0.0746
+          },
+          "B03_green": {
+            "mean": 0.0686,
+            "p10": 0.0517,
+            "p90": 0.0937
+          },
+          "B04_red": {
+            "mean": 0.0595,
+            "p10": 0.0323,
+            "p90": 0.1019
+          },
+          "B08_nir": {
+            "mean": 0.2783,
+            "p10": 0.2232,
+            "p90": 0.3494
+          },
+          "B12_swir2": {
+            "mean": 0.1289,
+            "p10": 0.0716,
+            "p90": 0.2209
+          },
+          "B11_swir1": {
+            "mean": 0.2249,
+            "p10": 0.1573,
+            "p90": 0.3299
+          }
+        },
+        "derived_indices": {
+          "ndvi": 0.6477,
+          "nbr_swir2": 0.3669,
+          "swir2_nir_ratio": 0.4632,
+          "ndmi_swir1": 0.1061,
+          "visible_whiteness": 0.7289,
+          "blue_green_haze_score": 0.0
+        },
+        "cloud_metrics": {
+          "scl_cloud_ratio": 0.0425,
+          "cloud_probability_cld": 0.9808,
+          "cloud_probability_clp": 0.0678,
+          "data_mask_ratio": 1.0
+        },
+        "valid_pixel_ratio": 0.9575,
+        "stats_source": "sentinelhub_process_b02_b03_b04_b08_b11_b12_scl_cld_clp",
+        "scl_cloud_pixels_included": false
+      },
+      {
+        "label": "active_2026_04_20",
+        "bands": {
+          "B02_blue": {
+            "mean": 0.2022,
+            "p10": 0.0317,
+            "p90": 0.546
+          },
+          "B03_green": {
+            "mean": 0.2047,
+            "p10": 0.0545,
+            "p90": 0.5209
+          },
+          "B04_red": {
+            "mean": 0.1885,
+            "p10": 0.0343,
+            "p90": 0.5045
+          },
+          "B08_nir": {
+            "mean": 0.348,
+            "p10": 0.1401,
+            "p90": 0.5726
+          },
+          "B12_swir2": {
+            "mean": 0.1822,
+            "p10": 0.0682,
+            "p90": 0.4133
+          },
+          "B11_swir1": {
+            "mean": 0.2681,
+            "p10": 0.1242,
+            "p90": 0.4972
+          }
+        },
+        "derived_indices": {
+          "ndvi": 0.2973,
+          "nbr_swir2": 0.3127,
+          "swir2_nir_ratio": 0.5236,
+          "ndmi_swir1": 0.1297,
+          "visible_whiteness": 0.9209,
+          "blue_green_haze_score": 0.0897
+        },
+        "cloud_metrics": {
+          "scl_cloud_ratio": 0.3702,
+          "cloud_probability_cld": 0.1914,
+          "cloud_probability_clp": 0.4094,
+          "data_mask_ratio": 1.0
+        },
+        "valid_pixel_ratio": 1.0,
+        "stats_source": "sentinelhub_process_b02_b03_b04_b08_b11_b12_scl_cld_clp_smoke_cloud_review",
+        "scl_cloud_pixels_included": true
+      }
+    ],
+    "derived_indices": [
+      "ndvi",
+      "nbr_swir2",
+      "ndmi_swir1",
+      "swir2_nir_ratio",
+      "visible_whiteness",
+      "blue_green_haze_score"
+    ],
+    "note": "Band statistics are computed from accepted Sentinel-2 L2A pixels after SCL/dataMask quality filtering."
+  },
+  "cloud_policy": {
+    "min_valid_pixel_ratio": 0.65,
+    "invalid_scl_classes": [
+      0,
+      1,
+      3,
+      8,
+      9,
+      10
+    ],
+    "mosaicking_order": "leastCC",
+    "allow_smoke_cloud_frames": true,
+    "smoke_cloud_note": "Wildfire burn-scar seeding may keep active/ignition smoke frames for review when SCL flags likely smoke as cloud; those frames are not standalone positive detections."
+  },
+  "frame_quality": [
+    {
+      "label": "baseline_2026_03_15",
+      "valid_pixel_ratio": 0.9587,
+      "cloud_pixel_ratio": 0.0413,
+      "nodata_pixel_ratio": 0.0,
+      "reasons": [],
+      "review_only": false,
+      "acceptance_override": null,
+      "flags": []
+    },
+    {
+      "label": "ignition_2026_04_16",
+      "valid_pixel_ratio": 0.9575,
+      "cloud_pixel_ratio": 0.0425,
+      "nodata_pixel_ratio": 0.0,
+      "reasons": [],
+      "review_only": false,
+      "acceptance_override": null,
+      "flags": []
+    },
+    {
+      "label": "active_2026_04_20",
+      "valid_pixel_ratio": 0.6298,
+      "cloud_pixel_ratio": 0.3702,
+      "nodata_pixel_ratio": 0.0,
+      "reasons": [
+        "insufficient_valid_pixels"
+      ],
+      "review_only": true,
+      "acceptance_override": "wildfire_smoke_cloud_review",
+      "flags": [
+        "smoke_or_cloud_review"
+      ]
+    }
+  ],
+  "rejected_windows": [
+    {
+      "label": "postfire_2026_04_27",
+      "start_date": "2026-04-27",
+      "end_date": "2026-05-07",
+      "quality": {
+        "accepted": false,
+        "valid_pixel_ratio": 0.0656,
+        "cloud_pixel_ratio": 0.9344,
+        "nodata_pixel_ratio": 0.0,
+        "total_pixels": 49152,
+        "reasons": [
+          "insufficient_valid_pixels"
+        ]
+      }
+    }
+  ],
+  "seeded_at": "2026-05-07",
   "training_ready": true,
   "use_case_id": "wildfire",
   "target_category": "wildfire",
+  "target_pack_id": "fireline",
   "target_task": "wildfire_temporal_detection"
 }

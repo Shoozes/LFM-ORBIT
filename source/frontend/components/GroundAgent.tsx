@@ -33,14 +33,15 @@ type GroundAgentProps = {
   onActionComplete?: (response: ChatResponse) => void | Promise<void>;
   onNavigate?: (target: "mission" | "logs" | "settings" | "proof") => void | Promise<void>;
   mission?: Mission | null;
+  proofAttentionActive?: boolean;
 };
 
 const DEFAULT_COMMANDS = [
-  "Run Florida firewatch mission",
+  "Load Spain Larouco wildfire proof replay",
+  "Load Pineland Road wildfire proof replay",
+  "Load Florida SR-26 wildfire proof replay",
   "Load critical minerals proof replay",
-  "Take me to the Bronx NY",
-  "Stop mission and fly to Bull Creek FL",
-  "List replays",
+  "List real seeded proof replays",
 ];
 
 const AGENT_REQUEST_TIMEOUT_MS = 30_000;
@@ -93,7 +94,7 @@ function summarizeAction(action: AgentAction): string {
   return action.status;
 }
 
-export default function GroundAgent({ onActionComplete, onNavigate, mission }: GroundAgentProps) {
+export default function GroundAgent({ onActionComplete, onNavigate, mission, proofAttentionActive = false }: GroundAgentProps) {
   const [messages, setMessages] = useState<Message[]>([
     { role: "assistant", content: "Ground Agent initialized. Reading telemetry. Send an operations request." }
   ]);
@@ -182,9 +183,9 @@ export default function GroundAgent({ onActionComplete, onNavigate, mission }: G
   }, [input]);
 
   return (
-    <div className="flex h-full w-full flex-col bg-white">
+    <div className="ground-agent-shell flex h-full min-h-0 w-full flex-col bg-white">
       <div
-        className="border-b border-zinc-200 bg-zinc-50 px-3 py-1.5"
+        className="ground-agent-playbook border-b border-zinc-200 bg-zinc-50 px-3 py-1.5"
         data-testid="ground-agent-operator-playbook"
       >
         <div className="flex items-center justify-between gap-3">
@@ -202,24 +203,26 @@ export default function GroundAgent({ onActionComplete, onNavigate, mission }: G
             {mission?.status === "active" ? "Mission Active" : "No Mission"}
           </span>
         </div>
-        <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
+        <div className="ground-agent-shortcuts mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
           {NAV_SHORTCUTS.map((shortcut) => {
             const disabled = shortcut.requiresMission && !mission;
             const disabledReason = disabled ? "Start or load a mission first." : "";
+            const proofReady = shortcut.id === "proof" && proofAttentionActive && !disabled;
             return (
               <span
                 key={shortcut.id}
                 data-testid={`ground-agent-nav-${shortcut.id}-tip`}
-                data-ui-tip={disabled ? disabledReason : `Open ${shortcut.label}`}
+                data-ui-tip={disabled ? disabledReason : proofReady ? "Proof is ready. Open results." : `Open ${shortcut.label}`}
                 className="shrink-0"
               >
                 <button
                   type="button"
                   data-testid={`ground-agent-nav-${shortcut.id}`}
+                  data-proof-ready={proofReady ? "true" : "false"}
                   onClick={() => void onNavigate?.(shortcut.target)}
                   disabled={disabled || !onNavigate}
-                  aria-label={disabled ? `${shortcut.label}. ${disabledReason}` : shortcut.label}
-                  className="rounded border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-45"
+                  aria-label={disabled ? `${shortcut.label}. ${disabledReason}` : proofReady ? `${shortcut.label}. Proof is ready.` : shortcut.label}
+                  className={`rounded border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-45 ${proofReady ? "proof-action-glow border-cyan-300 text-cyan-800" : ""}`}
                 >
                   {shortcut.label}
                 </button>
@@ -229,7 +232,7 @@ export default function GroundAgent({ onActionComplete, onNavigate, mission }: G
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-3" data-testid="ground-agent-thread">
+      <div className="ground-agent-thread min-h-0 flex-1 overflow-y-auto p-2 sm:p-3 space-y-2 sm:space-y-3" data-testid="ground-agent-thread">
         {messages.map((m, i) => (
           <div key={i} className={`text-sm leading-relaxed ${m.role === "user" ? "text-right" : "text-left"}`}>
             <div
@@ -272,16 +275,16 @@ export default function GroundAgent({ onActionComplete, onNavigate, mission }: G
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="border-t border-zinc-200 p-3">
+      <div className="ground-agent-composer border-t border-zinc-200 p-2 sm:p-3">
         <div
           id="ground-agent-suggestions-label"
           data-testid="ground-agent-suggestions-label"
           className="mb-1.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500"
         >
           <span>Suggested Prompts</span>
-          <span className="normal-case tracking-normal text-zinc-400">Ask only. Confirm before app changes.</span>
+          <span className="ground-agent-suggestion-note normal-case tracking-normal text-zinc-400">Ask only. Confirm before app changes.</span>
         </div>
-        <div className="mb-2 flex gap-1.5 overflow-x-auto pb-0.5">
+        <div className="mb-1.5 flex gap-1.5 overflow-x-auto pb-0.5 sm:mb-2">
           {quickCommands.map((command) => (
             <span
               key={command}
@@ -316,7 +319,7 @@ export default function GroundAgent({ onActionComplete, onNavigate, mission }: G
             placeholder="Request replay, mission pack, link action..."
             disabled={isLoading}
             rows={2}
-            className="max-h-32 min-h-14 flex-1 resize-none rounded-lg border-2 border-zinc-300 bg-white px-3 py-2.5 text-sm leading-relaxed text-zinc-900 shadow-inner outline-none placeholder-zinc-400 focus:border-zinc-700 focus:ring-2 focus:ring-zinc-200 disabled:opacity-60"
+            className="max-h-32 min-h-12 flex-1 resize-none rounded-lg border-2 border-zinc-300 bg-white px-3 py-2 text-sm leading-relaxed text-zinc-900 shadow-inner outline-none placeholder-zinc-400 focus:border-zinc-700 focus:ring-2 focus:ring-zinc-200 disabled:opacity-60 sm:min-h-14 sm:py-2.5"
           />
           <button
             onClick={() => void sendMessage()}

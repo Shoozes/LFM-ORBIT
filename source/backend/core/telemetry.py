@@ -139,4 +139,8 @@ def build_scan_result_message(
         result["boundary_context"] = alert_payload["boundary_context"]
     if "demo_forced_anomaly" in alert_payload:
         result["demo_forced_anomaly"] = alert_payload["demo_forced_anomaly"]
+    if "wildfire_assessment" in alert_payload:
+        result["wildfire_assessment"] = alert_payload["wildfire_assessment"]
+    elif "wildfire_assessment" in score:
+        result["wildfire_assessment"] = score["wildfire_assessment"]
     return result

@@ -112,7 +112,7 @@ def _bbox_center(bbox: list[float]) -> tuple[float, float]:
 
 def _fallback_scene_family(bbox: list[float]) -> str:
     lon, lat = _bbox_center(bbox)
-    if -82.0 <= lon <= -80.0 and 24.0 <= lat <= 29.0:
+    if -83.5 <= lon <= -80.0 and 24.0 <= lat <= 31.0:
         return "florida_corridor"
     if -52.0 <= lon <= -45.0 and 64.0 <= lat <= 70.5:
         return "greenland_ice"
@@ -157,6 +157,8 @@ def _fallback_vqa(question: str, bbox: list[float]) -> str:
         if scene_family == "atacama_mining":
             return "Arid extraction-site terrain with pit, tailings, pond, road, and facility context."
         return "Mixed vegetation, exposed clearing, and road context."
+    if scene_family == "florida_corridor" and any(token in text for token in ("change", "changed", "evidence")):
+        return "Florida corridor evidence should stay candidate-only for smoke, burn-scar, fireline, road, water, and vegetation context."
     return "Unable to answer precisely from fallback vision mode."
 
 

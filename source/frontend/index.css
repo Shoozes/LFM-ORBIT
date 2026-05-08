@@ -177,3 +177,68 @@ body {
 .view-flip-button[data-active="true"] > span {
   transform: rotateY(360deg);
 }
+
+.proof-clamp-1 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  -webkit-line-clamp: 1;
+}
+
+.proof-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+}
+
+.proof-clamp-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  -webkit-line-clamp: 3;
+}
+
+.proof-action-glow {
+  box-shadow:
+    0 0 0 2px rgba(103, 232, 249, 0.72),
+    0 0 18px rgba(8, 145, 178, 0.36),
+    0 0 34px rgba(34, 211, 238, 0.28);
+  animation: proof-action-pulse 1.55s ease-in-out infinite;
+}
+
+@keyframes proof-action-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(103, 232, 249, 0.58),
+      0 0 14px rgba(8, 145, 178, 0.26),
+      0 0 28px rgba(34, 211, 238, 0.2);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(103, 232, 249, 0.92),
+      0 0 22px rgba(8, 145, 178, 0.48),
+      0 0 42px rgba(34, 211, 238, 0.34);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .proof-action-glow {
+    animation: none;
+  }
+}
+
+@media (max-width: 767px) and (max-height: 430px) {
+  .ground-agent-playbook,
+  .ground-agent-composer {
+    padding-bottom: 0.5rem;
+    padding-top: 0.5rem;
+  }
+
+  .ground-agent-shortcuts,
+  .ground-agent-suggestion-note {
+    display: none;
+  }
+}

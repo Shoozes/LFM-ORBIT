@@ -81,6 +81,39 @@ def _score_unavailable_fallback_score(reason: str) -> dict:
     )
 
 
+def _apply_wildfire_smoke_assist(score: dict, latest_mission: dict | None) -> dict:
+    if not latest_mission:
+        return score
+    use_case_id = str(latest_mission.get("use_case_id") or "").lower()
+    target_pack_id = str(latest_mission.get("target_pack_id") or "").lower()
+    if use_case_id != "wildfire" and target_pack_id != "fireline":
+        return score
+    try:
+        from core.wildfire_smoke import score_wildfire_smoke_assist
+
+        observation_source = str(score.get("observation_source", "unknown"))
+        assist = score_wildfire_smoke_assist(
+            [score.get("before_window", {}), score.get("after_window", {})],
+            observation_source=observation_source,
+            runtime_truth_mode=runtime_truth_mode_for_source(observation_source),
+            imagery_origin=imagery_origin_for_source(observation_source),
+        )
+    except Exception as exc:
+        logger.debug("wildfire smoke assist skipped: %s", exc, exc_info=True)
+        return score
+
+    score["wildfire_assessment"] = assist
+    score["confidence"] = assist["final_confidence"]
+    merged_codes = list(score.get("reason_codes", []))
+    proxy_capped = "proxy_or_fallback_source_capped" in assist.get("reason_codes", [])
+    for code in assist.get("reason_codes", []):
+        if proxy_capped and any(token in str(code).lower() for token in ("smoke", "burn", "hotspot", "fire")):
+            continue
+        merged_codes.append(code)
+    score["reason_codes"] = list(dict.fromkeys(merged_codes))
+    return score
+
+
 def _resume_progress_for_mission(mission: dict | None, total_cells: int) -> tuple[int, int]:
     if mission is None:
         return 0, 0
@@ -199,6 +232,7 @@ async def stream_region_scan(websocket: WebSocket):
                         else:
                             score = _score_unavailable_fallback_score(rejection_reason)
 
+                    score = _apply_wildfire_smoke_assist(score, latest_mission)
                     is_anomaly = score["change_score"] >= REGION.anomaly_threshold
                     if is_anomaly and is_proxy_only_firewatch_signal(
                         use_case_id=str(latest_mission.get("use_case_id") or "") if latest_mission else None,
@@ -276,6 +310,8 @@ async def stream_region_scan(websocket: WebSocket):
                         boundary_context=boundary_context,
                         demo_forced_anomaly=demo_forced_anomaly,
                     )
+                    if "wildfire_assessment" in score:
+                        alert_payload["wildfire_assessment"] = score["wildfire_assessment"]
                     payload_bytes = estimate_payload_bytes(alert_payload)
 
                     if is_confirmed_anomaly:
@@ -299,6 +335,7 @@ async def stream_region_scan(websocket: WebSocket):
                             scoring_basis=scoring_basis_for_source(score.get("observation_source", "unknown")),
                             before_window=score.get("before_window"),
                             after_window=score.get("after_window"),
+                            wildfire_assessment=score.get("wildfire_assessment"),
                             boundary_context=boundary_context,
                         )
 

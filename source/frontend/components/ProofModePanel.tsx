@@ -454,6 +454,10 @@ function formatRatio(ratio: number | null): string {
   return `${Math.floor(ratio).toLocaleString()}x`;
 }
 
+function formatLikelihood(value: number | undefined): string {
+  return value === undefined ? "n/a" : value.toFixed(2);
+}
+
 function buildPayloadAccounting(isAbstain: boolean): ProofJson["payload_accounting"] {
   if (isAbstain) {
     return {
@@ -651,6 +655,7 @@ function buildMissionProof(
       runtime_truth_mode: evidenceAlert?.runtime_truth_mode ?? "live",
       imagery_origin: evidenceAlert?.imagery_origin ?? "simsat",
       scoring_basis: evidenceAlert?.scoring_basis ?? "mission_metadata",
+      wildfire_assessment: evidenceAlert?.wildfire_assessment ?? null,
       object_targets: targets,
       visual_model_review: buildVisualModelReview(visualReview),
       grounding: [],
@@ -768,11 +773,15 @@ function ProofRow({
   testId?: string;
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 border-b border-zinc-800 py-2 last:border-b-0">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+    <div className="flex items-center justify-between gap-3 border-b border-zinc-800 py-1 last:border-b-0">
+      <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
         {label}
       </span>
-      <span data-testid={testId} className="max-w-[240px] text-right text-xs font-semibold text-zinc-100">
+      <span
+        data-testid={testId}
+        title={value}
+        className="proof-clamp-1 max-w-[220px] text-right text-[10px] font-semibold leading-snug text-zinc-100"
+      >
         {value}
       </span>
     </div>
@@ -1211,6 +1220,7 @@ export default function ProofModePanel({
           visual_summary: vqaAnswer,
           evidence_note: caption,
           visual_model_review: visualModelReview,
+          ...(evidenceAlert?.wildfire_assessment ? { wildfire_assessment: evidenceAlert.wildfire_assessment } : {}),
           ...(missionObjectTargets.length > 0 ? { object_targets: missionObjectTargets } : {}),
           ...(compactDetectionSummary ? { detections: compactDetectionSummary } : {}),
           ...(compactObjectDeltas.length > 0 ? { object_deltas: compactObjectDeltas } : {}),
@@ -1286,6 +1296,7 @@ export default function ProofModePanel({
   const proofJson = useMemo(() => JSON.stringify(proof, null, 2), [proof]);
   const sourceText = `${proof.provider} / ${proof.source_capture_time}`;
   const evidenceAlert = usesReplayEvidence || liveMissionScoped ? activeAlert : null;
+  const wildfireAssessment = evidenceAlert?.wildfire_assessment ?? null;
   const activeObjectTargets = mission?.object_targets?.filter((target) => target.enabled).map((target) => target.label) ?? [];
   const detectionSummary = evidenceAlert?.detection_summary ?? null;
   const objectDeltas = evidenceAlert?.object_deltas ?? [];
@@ -1371,21 +1382,21 @@ export default function ProofModePanel({
   const showFrameOverlays = Boolean((timelapseSource || imageSource) && (!liveMissionScoped || liveMissionHasFindings));
 
   return (
-    <div data-testid="proof-mode-panel" className="absolute inset-0 z-40 flex flex-col bg-zinc-950 text-zinc-100">
-      <header className="flex shrink-0 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-5 py-3">
+    <div data-testid="proof-mode-panel" className="absolute inset-0 z-40 flex flex-col overflow-hidden bg-zinc-950 text-zinc-100">
+      <header className="flex shrink-0 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 py-2">
         <div className="min-w-0 pr-4">
           <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-300">Proof Mode</p>
-          <h1 data-testid="demo-title" className="text-xl font-semibold text-white">
+          <h1 data-testid="demo-title" className="truncate text-lg font-semibold text-white">
             {proofTitle}
           </h1>
           <p
             data-testid="demo-context-caption"
-            className="mt-1 max-w-[980px] text-[11px] font-medium leading-snug text-zinc-300"
+            className="proof-clamp-2 mt-0.5 max-w-[980px] text-[11px] font-medium leading-snug text-zinc-300"
           >
             What: {context.what}. Where: {context.where}. When: {context.when}. Why: {context.why}.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2">
           <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-200">
             {proofStatusLabel}
           </span>
@@ -1399,17 +1410,17 @@ export default function ProofModePanel({
         </div>
       </header>
 
-      <main className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-auto p-4 xl:grid-cols-[280px_minmax(0,1fr)_420px]">
-        <section className="flex min-h-0 flex-col gap-3 rounded border border-zinc-800 bg-zinc-900/80 p-4">
+      <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 xl:grid-cols-[220px_minmax(0,1fr)_380px]">
+        <section className="flex min-h-0 flex-col gap-2 overflow-hidden rounded border border-zinc-800 bg-zinc-900/80 p-3">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
               {usesReplayEvidence ? "Replay Position" : "Mission Position"}
             </p>
-            <h2 className="mt-1 text-sm font-semibold text-white">
+            <h2 className="mt-1 truncate text-sm font-semibold text-white">
               {usesReplayEvidence ? mission?.replay_id ?? SHOWCASE_REPLAY_ID : mission?.use_case_id ?? DEMO_PROFILES[demoCase].replayId}
             </h2>
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid w-full max-w-[150px] grid-cols-3 gap-1.5 self-center">
             {Array.from({ length: 9 }).map((_, index) => {
               const active = index === 4;
               return (
@@ -1427,18 +1438,18 @@ export default function ProofModePanel({
             })}
           </div>
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded border border-zinc-800 bg-zinc-950 p-3">
+            <div className="rounded border border-zinc-800 bg-zinc-950 p-2">
               <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">Cells</p>
-              <p className="mt-1 text-lg font-semibold text-white">{cellsScanned}</p>
+              <p className="mt-0.5 text-lg font-semibold text-white">{cellsScanned}</p>
             </div>
-            <div className="rounded border border-zinc-800 bg-zinc-950 p-3">
+            <div className="rounded border border-zinc-800 bg-zinc-950 p-2">
               <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">{alertMetricLabel}</p>
-              <p className="mt-1 text-lg font-semibold text-white">{alertsEmitted}</p>
+              <p className="mt-0.5 text-lg font-semibold text-white">{alertsEmitted}</p>
             </div>
           </div>
-          <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300">
+          <div className="space-y-1 rounded border border-zinc-800 bg-zinc-950 p-2 text-[11px] leading-snug text-zinc-300">
             {storyLines.map((line) => (
-              <p key={line}>{line}</p>
+              <p key={line} className="proof-clamp-2">{line}</p>
             ))}
           </div>
           {demoCase === "eclipse" && (
@@ -1473,8 +1484,8 @@ export default function ProofModePanel({
           )}
         </section>
 
-        <section className="flex min-h-0 flex-col rounded border border-zinc-800 bg-zinc-900/80 p-4">
-          <div className="mb-3 flex items-center justify-between">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded border border-zinc-800 bg-zinc-900/80 p-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Satellite Frame</p>
               <h2 className="text-sm font-semibold text-white">
@@ -1487,7 +1498,7 @@ export default function ProofModePanel({
           </div>
           <div
             data-testid="satellite-frame"
-            className="relative min-h-[360px] flex-1 overflow-hidden rounded border border-zinc-800 bg-zinc-950 xl:min-h-0"
+            className="relative min-h-[260px] flex-1 overflow-hidden rounded border border-zinc-800 bg-zinc-950 xl:min-h-0"
           >
             {timelapseSource ? (
               <video
@@ -1593,11 +1604,11 @@ export default function ProofModePanel({
                 </span>
               </div>
             ))}
-            <div className="absolute bottom-4 left-4 right-4 grid grid-cols-3 gap-2">
+            <div className="absolute bottom-3 left-3 right-3 grid grid-cols-3 gap-1.5">
               {reasonCodes.slice(0, 3).map((code) => (
                 <span
                   key={code}
-                  className="rounded border border-zinc-900/40 bg-zinc-950/85 px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-100"
+                  className="rounded border border-zinc-900/40 bg-zinc-950/85 px-2 py-1 text-center text-[9px] font-semibold uppercase tracking-[0.1em] text-zinc-100"
                 >
                   {formatReasonCode(code)}
                 </span>
@@ -1605,7 +1616,7 @@ export default function ProofModePanel({
             </div>
             <div
               data-testid="timelapse-integrity"
-              className="absolute right-4 top-4 rounded border border-zinc-900/40 bg-zinc-950/85 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-100"
+              className="absolute right-3 top-3 max-w-[260px] rounded border border-zinc-900/40 bg-zinc-950/85 px-2 py-1 text-right text-[9px] font-semibold uppercase tracking-[0.1em] text-zinc-100"
             >
               {timelapseSource
                 ? liveMissionScoped
@@ -1622,23 +1633,23 @@ export default function ProofModePanel({
                     : "Static satellite frame: raw image stays local"}
             </div>
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-3">
-            <div className="rounded border border-zinc-800 bg-zinc-950 p-3">
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            <div className="rounded border border-zinc-800 bg-zinc-950 p-2">
               <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">Evidence result</p>
-              <p className="mt-1 text-xs font-semibold text-white">{proof.result}</p>
+              <p className="proof-clamp-2 mt-1 text-[11px] font-semibold leading-snug text-white">{proof.result}</p>
             </div>
-            <div className="rounded border border-zinc-800 bg-zinc-950 p-3">
+            <div className="rounded border border-zinc-800 bg-zinc-950 p-2">
               <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">Visual summary</p>
-              <p className="mt-1 text-xs font-semibold text-white">{proof.abstained ? "Unavailable" : vqaAnswer}</p>
+              <p className="proof-clamp-2 mt-1 text-[11px] font-semibold leading-snug text-white">{proof.abstained ? "Unavailable" : vqaAnswer}</p>
             </div>
-            <div className="rounded border border-zinc-800 bg-zinc-950 p-3">
+            <div className="rounded border border-zinc-800 bg-zinc-950 p-2">
               <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">Evidence note</p>
-              <p className="mt-1 text-xs font-semibold text-white">{proof.abstained ? "No note transmitted" : caption}</p>
+              <p className="proof-clamp-2 mt-1 text-[11px] font-semibold leading-snug text-white">{proof.abstained ? "No note transmitted" : caption}</p>
             </div>
           </div>
           <div
             data-testid="proof-image-conditioned-review"
-            className={`mt-3 rounded border p-3 ${
+            className={`mt-2 rounded border p-2 ${
               visualReview?.image_conditioned
                 ? "border-emerald-500/30 bg-emerald-500/10"
                 : visualReview?.abstained
@@ -1653,35 +1664,35 @@ export default function ProofModePanel({
                   ? "Image-conditioned review abstained"
                   : "Image-conditioned review unavailable"}
             </p>
-            <p className="mt-1 text-xs font-semibold text-white">
+            <p className="proof-clamp-2 mt-1 text-[11px] font-semibold leading-snug text-white">
               {visualReview?.image_conditioned
                 ? visualReview.response || "Visual review returned no text."
                 : visualReview?.abstained
                   ? visualReview.response || visualReview.reason || "The retained frame was too low-information for visual review."
                   : visualReview?.reason || "Retained evidence image was not reviewed by an image-conditioned runtime."}
             </p>
-            <dl className="mt-3 grid grid-cols-2 gap-2 text-[10px] uppercase tracking-[0.12em] text-zinc-500">
+            <dl className="mt-2 grid grid-cols-2 gap-2 text-[10px] uppercase tracking-[0.12em] text-zinc-500 xl:grid-cols-4">
               <div>
                 <dt>Model</dt>
-                <dd className="mt-0.5 normal-case tracking-normal text-zinc-200">
+                <dd className="proof-clamp-2 mt-0.5 normal-case tracking-normal text-zinc-200">
                   {visualReview?.visual_model ?? String(visualReview?.provenance?.visual_model ?? "not loaded")}
                 </dd>
               </div>
               <div>
                 <dt>Runtime</dt>
-                <dd className="mt-0.5 normal-case tracking-normal text-zinc-200">
+                <dd className="proof-clamp-2 mt-0.5 normal-case tracking-normal text-zinc-200">
                   {visualReview?.runtime_inference_mode ?? "text_evidence_packet"}
                 </dd>
               </div>
               <div>
                 <dt>Frame</dt>
-                <dd className="mt-0.5 normal-case tracking-normal text-zinc-200">
+                <dd className="proof-clamp-2 mt-0.5 normal-case tracking-normal text-zinc-200">
                   {String(visualReview?.provenance?.frame_id ?? "unavailable")}
                 </dd>
               </div>
               <div>
                 <dt>Source</dt>
-                <dd className="mt-0.5 normal-case tracking-normal text-zinc-200">
+                <dd className="proof-clamp-2 mt-0.5 normal-case tracking-normal text-zinc-200">
                   {formatSourceLabel(String(visualReview?.provenance?.imagery_origin ?? visualReview?.provenance?.image_source ?? "unknown"))}
                 </dd>
               </div>
@@ -1689,20 +1700,20 @@ export default function ProofModePanel({
           </div>
         </section>
 
-        <aside className="flex min-h-0 flex-col rounded border border-zinc-800 bg-zinc-900/90 p-4">
-          <div className="mb-3 flex items-start justify-between gap-3">
+        <aside className="flex min-h-0 flex-col overflow-hidden rounded border border-zinc-800 bg-zinc-900/90 p-3">
+          <div className="mb-2 flex items-start justify-between gap-3">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Proof Card</p>
-              <h2 className="text-sm font-semibold text-white">{proof.demo}</h2>
+              <h2 className="truncate text-sm font-semibold text-white">{proof.demo}</h2>
             </div>
             {observedLatencyMs !== null && (
-              <span className="rounded border border-zinc-700 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-300">
+              <span className="shrink-0 rounded border border-zinc-700 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-zinc-300">
                 observed {observedLatencyMs} ms
               </span>
             )}
           </div>
 
-          <div className="rounded border border-zinc-800 bg-zinc-950 px-3">
+          <div className="rounded border border-zinc-800 bg-zinc-950 px-2">
             <ProofRow label="Mission" value={proof.mission} />
             <ProofRow label="Replay/source" value={sourceText} testId="proof-source" />
             <ProofRow label="Model" value={proof.model} testId="proof-model" />
@@ -1717,37 +1728,80 @@ export default function ProofModePanel({
 
           <div
             data-testid="proof-confidence-stack"
-            className="mt-3 rounded border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-50"
+            className="mt-2 rounded border border-emerald-500/25 bg-emerald-500/10 p-2 text-xs text-emerald-50"
           >
-            <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="mb-1.5 flex items-center justify-between gap-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-200">
                 Confidence Stack
               </p>
-              <span className="rounded border border-emerald-300/30 bg-zinc-950/60 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-100">
+              <span className="rounded border border-emerald-300/30 bg-zinc-950/60 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-100">
                 total {proof.abstained ? "low" : proof.confidence.toFixed(2)}
               </span>
             </div>
-            <div className="space-y-1.5">
+            <div className="grid grid-cols-2 gap-1">
               {confidenceStack.map((item) => (
                 <div key={item.signal} className="rounded border border-emerald-300/20 bg-zinc-950/45 px-2 py-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-100">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span className="truncate text-[8px] font-semibold uppercase tracking-[0.08em] text-emerald-100">
                       {item.signal}
                     </span>
-                    <span className="shrink-0 text-[10px] font-semibold text-white">
+                    <span className="shrink-0 text-[8px] font-semibold text-white">
                       {(item.weight * 100).toFixed(0)}% x {item.score.toFixed(2)} = {item.weighted.toFixed(2)}
                     </span>
                   </div>
-                  <p className="mt-0.5 truncate text-[10px] text-emerald-200/70">{item.evidence}</p>
+                  <p className="mt-0.5 truncate text-[8px] text-emerald-200/70">{item.evidence}</p>
                 </div>
               ))}
             </div>
           </div>
 
+          {wildfireAssessment && (
+            <div
+              data-testid="proof-wildfire-assessment"
+              className="mt-2 rounded border border-orange-500/30 bg-orange-500/10 p-2 text-xs text-orange-50"
+            >
+              <div className="mb-1.5 flex items-center justify-between gap-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-orange-200">
+                  Wildfire Assist
+                </p>
+                <span className="rounded border border-orange-300/30 bg-zinc-950/60 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-orange-100">
+                  {wildfireAssessment.target_action.replace(/_/g, " ")}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-1">
+                <div className="rounded border border-orange-300/20 bg-zinc-950/45 px-2 py-1">
+                  <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-orange-200/75">Smoke</p>
+                  <p className="text-xs font-bold text-white">{formatLikelihood(wildfireAssessment.smoke_likelihood)}</p>
+                </div>
+                <div className="rounded border border-orange-300/20 bg-zinc-950/45 px-2 py-1">
+                  <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-orange-200/75">Cloud</p>
+                  <p className="text-xs font-bold text-white">{formatLikelihood(wildfireAssessment.cloud_likelihood)}</p>
+                </div>
+                <div className="rounded border border-orange-300/20 bg-zinc-950/45 px-2 py-1">
+                  <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-orange-200/75">Burn</p>
+                  <p className="text-xs font-bold text-white">{formatLikelihood(wildfireAssessment.burn_likelihood)}</p>
+                </div>
+                <div className="rounded border border-orange-300/20 bg-zinc-950/45 px-2 py-1">
+                  <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-orange-200/75">Delta</p>
+                  <p className="text-xs font-bold text-white">{wildfireAssessment.confidence_delta.toFixed(2)}</p>
+                </div>
+              </div>
+              {wildfireAssessment.reason_codes.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {wildfireAssessment.reason_codes.slice(0, 4).map((code) => (
+                    <span key={code} className="rounded border border-orange-300/20 bg-zinc-950/45 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-orange-100">
+                      {formatReasonCode(code)}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {(activeObjectTargets.length > 0 || detectionSummary || objectDeltas.length > 0) && (
             <div
               data-testid="proof-object-evidence"
-              className="mt-3 space-y-3 rounded border border-cyan-500/30 bg-cyan-500/10 p-3 text-xs text-cyan-50"
+              className="mt-2 space-y-1.5 rounded border border-cyan-500/30 bg-cyan-500/10 p-2 text-xs text-cyan-50"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -1761,7 +1815,7 @@ export default function ProofModePanel({
                   )}
                 </div>
                 {detectionSummary && (
-                  <span className="rounded border border-cyan-300/30 bg-zinc-950/60 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-cyan-100">
+                  <span className="rounded border border-cyan-300/30 bg-zinc-950/60 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-cyan-100">
                     {detectionSummary.total_boxes} boxes
                   </span>
                 )}
@@ -1772,9 +1826,9 @@ export default function ProofModePanel({
                   <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-300/80">
                     Searched
                   </p>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-1">
                     {activeObjectTargets.map((target) => (
-                      <span key={target} className="rounded border border-cyan-300/25 bg-zinc-950/50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.1em]">
+                      <span key={target} className="rounded border border-cyan-300/25 bg-zinc-950/50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em]">
                         {target}
                       </span>
                     ))}
@@ -1808,7 +1862,7 @@ export default function ProofModePanel({
                   <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-300/80">
                     Top Boxes
                   </p>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     {detectionSummary.top_boxes.slice(0, 4).map((box, index) => (
                       <div key={box.id ?? `${box.label}-${index}`} className="rounded border border-cyan-300/20 bg-zinc-950/45 px-2 py-1">
                         <p className="truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-cyan-100">
@@ -1886,7 +1940,7 @@ export default function ProofModePanel({
 
           <pre
             data-testid="proof-json"
-            className="mt-3 min-h-0 flex-1 overflow-auto rounded border border-zinc-800 bg-black p-3 text-[10px] leading-relaxed text-emerald-100"
+            className="mt-2 min-h-[74px] flex-1 overflow-auto rounded border border-zinc-800 bg-black p-2 text-[9px] leading-relaxed text-emerald-100"
           >
             {proofJson}
           </pre>

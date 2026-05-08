@@ -151,6 +151,65 @@ function renderWindowCard(title: string, window: ScanWindow) {
   );
 }
 
+function formatLikelihood(value: number | undefined): string {
+  return value === undefined ? "n/a" : value.toFixed(2);
+}
+
+function WildfireAssessmentCard({ alert }: { alert: AlertItem }) {
+  const assessment = alert.wildfire_assessment;
+  if (!assessment) return null;
+
+  const actionColor =
+    assessment.target_action === "downlink_now"
+      ? "border-red-200 bg-red-50 text-red-800"
+      : assessment.target_action === "review"
+        ? "border-orange-200 bg-orange-50 text-orange-800"
+        : "border-amber-200 bg-amber-50 text-amber-800";
+
+  return (
+    <div data-testid="wildfire-assessment" className={`mb-3 rounded border p-3 text-xs font-medium ${actionColor}`}>
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider">Wildfire Confidence Assist</p>
+          <p className="mt-1 text-[10px] opacity-80">
+            Source-backed smoke, cloud, burn, and hotspot confidence from cached Sentinel-2 bands.
+          </p>
+        </div>
+        <span className="rounded border border-current/20 bg-white/60 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider">
+          {assessment.target_action.replace(/_/g, " ")}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded border border-current/15 bg-white/70 px-2 py-1">
+          <p className="text-[10px] uppercase tracking-wider opacity-70">Smoke</p>
+          <p className="text-sm font-bold text-zinc-900">{formatLikelihood(assessment.smoke_likelihood)}</p>
+        </div>
+        <div className="rounded border border-current/15 bg-white/70 px-2 py-1">
+          <p className="text-[10px] uppercase tracking-wider opacity-70">Cloud</p>
+          <p className="text-sm font-bold text-zinc-900">{formatLikelihood(assessment.cloud_likelihood)}</p>
+        </div>
+        <div className="rounded border border-current/15 bg-white/70 px-2 py-1">
+          <p className="text-[10px] uppercase tracking-wider opacity-70">Burn</p>
+          <p className="text-sm font-bold text-zinc-900">{formatLikelihood(assessment.burn_likelihood)}</p>
+        </div>
+        <div className="rounded border border-current/15 bg-white/70 px-2 py-1">
+          <p className="text-[10px] uppercase tracking-wider opacity-70">Delta</p>
+          <p className="text-sm font-bold text-zinc-900">{assessment.confidence_delta.toFixed(2)}</p>
+        </div>
+      </div>
+      {assessment.reason_codes.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {assessment.reason_codes.slice(0, 6).map((code) => (
+            <span key={code} className="rounded border border-current/15 bg-white/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider">
+              {formatReasonCode(code)}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function getDataUrlExtension(dataUrl: string): string {
   if (dataUrl.startsWith("data:image/jpeg")) return "jpg";
   if (dataUrl.startsWith("data:image/png")) return "png";
@@ -165,6 +224,14 @@ function downloadDataUrl(dataUrl: string, filenameStem: string) {
   a.href = dataUrl;
   a.download = `${filenameStem}.${getDataUrlExtension(dataUrl)}`;
   a.click();
+}
+
+function isSquareGridCellId(cellId: string): boolean {
+  const parts = cellId.split("_");
+  if (parts.length !== 3 || parts[0] !== "sq") return false;
+  const lat = Number(parts[1]);
+  const lng = Number(parts[2]);
+  return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
 }
 
 function ImageryChip({
@@ -381,8 +448,9 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenTimelapse
 
   // Fetch cell imagery whenever the selected cell changes
   useEffect(() => {
-    if (!selectedCellId) {
+    if (!selectedCellId || !isSquareGridCellId(selectedCellId)) {
       setImagery(null);
+      setImageryLoading(false);
       return;
     }
 
@@ -596,6 +664,8 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenTimelapse
             )}
           </div>
         )}
+
+        <WildfireAssessmentCard alert={alert} />
 
         <div className="mb-3 rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 font-medium">
           This panel shows mission evidence only. It identifies candidate satellite signals and does not claim final ground truth.

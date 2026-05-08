@@ -30,6 +30,8 @@ const AlertsLogs = lazy(loadAlertsLogs);
 const ProofModePanel = lazy(loadProofModePanel);
 
 type DemoCase = "showcase" | "payload" | "provenance" | "abstain" | "eclipse" | "ice" | "forest";
+type ActiveTab = "agents" | "mission" | "logs" | "inspect" | "settings";
+type MobileView = "map" | "chat";
 type ScanCellState = Record<string, { isAnomaly: boolean; isDiscarded: boolean }>;
 
 const SHOWCASE_REPLAY_ID = "atacama_mining_replay";
@@ -232,6 +234,13 @@ function buildScanCellStateFromProgress(
   return state;
 }
 
+function getGridCellIds(grid: GeoJSON.FeatureCollection | null): string[] {
+  if (!grid) return [];
+  return grid.features
+    .map((feature) => getCellIdFromProperties(feature.properties))
+    .filter((cellId): cellId is string => Boolean(cellId));
+}
+
 function normalizeNumberArray(value: unknown, length: number): number[] | null {
   if (!Array.isArray(value) || value.length !== length) return null;
   const numbers = value.map((entry) => Number(entry));
@@ -270,6 +279,7 @@ export default function App() {
   ));
   const [vlmBoxes, setVlmBoxes] = useState<VlmBox[]>([]);
   const [scanCellState, setScanCellState] = useState<ScanCellState>({});
+  const [cachedReplayScanActive, setCachedReplayScanActive] = useState(false);
   const [showMissionTimelapse, setShowMissionTimelapse] = useState(false);
   const [mission, setMission] = useState<Mission | null>(null);
   const [missionLoaded, setMissionLoaded] = useState(false);
@@ -281,6 +291,7 @@ export default function App() {
   const [demoStepIndex, setDemoStepIndex] = useState(0);
   const previousActiveMissionRef = useRef<Mission | null>(null);
   const previewedMissionIdRef = useRef<number | null>(null);
+  const replayScanTimeoutsRef = useRef<number[]>([]);
   const apiBaseUrl = getApiBaseUrl();
   const demoUiEnabled = Boolean(demoQuery.enabled && missionLoaded && (!mission || mission.mission_mode === "replay"));
 
@@ -368,6 +379,8 @@ export default function App() {
     setDrawnBbox(loadedMission?.bbox ? [...loadedMission.bbox] : null);
     setVlmBoxes([]);
     setShowMissionTimelapse(false);
+    setProofMission(loadedMission ?? null);
+    setProofModeActive(false);
     if (primaryCellId) {
       setSelectedCellId(primaryCellId);
       setActiveTab("inspect");
@@ -376,16 +389,24 @@ export default function App() {
     }
   }, [fetchMission, refreshTelemetry, setSelectedCellId]);
 
-  const handleReplayRescanStarted = useCallback(async (rescanMission: Mission) => {
+  const handleReplayRescanStarted = useCallback(async (rescanMission: Mission, primaryCellId: string | null) => {
     await Promise.all([
       refreshTelemetry({ replaceAlerts: true }),
       fetchMission(),
     ]);
-    setSelectedCellId(null);
     setDrawnBbox(rescanMission.bbox ? [...rescanMission.bbox] : null);
     setVlmBoxes([]);
     setShowMissionTimelapse(false);
-    setActiveTab("mission");
+    setProofMission(rescanMission);
+    setProofModeActive(false);
+    setDismissedCompleteMissionId(null);
+    if (primaryCellId) {
+      setSelectedCellId(primaryCellId);
+      setActiveTab("inspect");
+    } else {
+      setSelectedCellId(null);
+      setActiveTab("logs");
+    }
   }, [fetchMission, refreshTelemetry, setSelectedCellId]);
 
   const handleOpenTimelapseForCell = (cellId: string) => {
@@ -428,9 +449,10 @@ export default function App() {
   );
   const defaultMissionDateRange = useMemo(() => getDefaultMissionDateRange(), []);
 
-  const [activeTab, setActiveTab] = useState<"agents" | "mission" | "logs" | "inspect" | "settings">(
+  const [activeTab, setActiveTab] = useState<ActiveTab>(
     demoQuery.enabled ? "mission" : "agents",
   );
+  const [mobileView, setMobileView] = useState<MobileView>("chat");
 
   const handleProofModeStart = useCallback(async () => {
     setDemoStepIndex(0);
@@ -578,13 +600,15 @@ export default function App() {
         findOkAction(response, "start_custom_mission") || findOkAction(response, "start_mission_pack"),
       );
       const loadedReplay = findOkAction(response, "load_replay");
+      const rescannedReplay = findOkAction(response, "rescan_replay");
       if (launchedMission) {
         previewedMissionIdRef.current = refreshedMission.id;
       }
       setDrawnBbox([...refreshedMission.bbox]);
-      if (loadedReplay) {
-        const primaryCellId = typeof loadedReplay.primary_cell_id === "string"
-          ? loadedReplay.primary_cell_id
+      if (loadedReplay || rescannedReplay) {
+        const replayAction = loadedReplay || rescannedReplay;
+        const primaryCellId = typeof replayAction?.primary_cell_id === "string"
+          ? replayAction.primary_cell_id
           : null;
         setVlmBoxes([]);
         setShowMissionTimelapse(false);
@@ -620,17 +644,22 @@ export default function App() {
     }
   }, [fetchMission, refreshTelemetry, setSelectedCellId]);
 
-  const scanAnimationActive = Boolean(
+  const liveScanAnimationActive = Boolean(
     mission?.status === "active"
-      && mission.mission_mode !== "replay"
-      && !missionPassComplete,
+    && mission.mission_mode !== "replay"
+    && !missionPassComplete,
   );
+  const scanAnimationActive = liveScanAnimationActive || cachedReplayScanActive;
 
   useEffect(() => {
     if (selectedCellId && activeTab !== "inspect") {
       setActiveTab("inspect");
     }
   }, [selectedCellId]);
+
+  useEffect(() => {
+    setMobileView("chat");
+  }, [activeTab]);
 
   useEffect(() => {
     if (missionPassComplete) {
@@ -642,6 +671,50 @@ export default function App() {
   useEffect(() => {
     setScanCellState({});
   }, [mission?.id]);
+
+  useEffect(() => {
+    for (const timeoutId of replayScanTimeoutsRef.current) {
+      window.clearTimeout(timeoutId);
+    }
+    replayScanTimeoutsRef.current = [];
+    setCachedReplayScanActive(false);
+
+    if (!mission || mission.status !== "active" || mission.mission_mode !== "replay") {
+      return;
+    }
+    const cellIds = getGridCellIds(displayGrid);
+    if (cellIds.length === 0) {
+      return;
+    }
+
+    setScanCellState({});
+    setCachedReplayScanActive(true);
+    const stepDelayMs = cellIds.length <= 8 ? 140 : 70;
+    cellIds.forEach((cellId, index) => {
+      const timeoutId = window.setTimeout(() => {
+        setScanCellState((current) => {
+          if (current[cellId]?.isDiscarded) return current;
+          return {
+            ...current,
+            [cellId]: { isAnomaly: false, isDiscarded: true },
+          };
+        });
+      }, 180 + index * stepDelayMs);
+      replayScanTimeoutsRef.current.push(timeoutId);
+    });
+
+    const completionTimeoutId = window.setTimeout(() => {
+      setCachedReplayScanActive(false);
+    }, 300 + cellIds.length * stepDelayMs);
+    replayScanTimeoutsRef.current.push(completionTimeoutId);
+
+    return () => {
+      for (const timeoutId of replayScanTimeoutsRef.current) {
+        window.clearTimeout(timeoutId);
+      }
+      replayScanTimeoutsRef.current = [];
+    };
+  }, [displayGrid, mission?.id, mission?.mission_mode, mission?.status]);
 
   useEffect(() => {
     if (!mission || mission.mission_mode === "replay" || !displayGrid) {
@@ -746,7 +819,9 @@ export default function App() {
   const areaToolStatus = drawBboxActive
     ? "Drawing"
     : drawnBbox
-      ? scanAnimationActive
+      ? cachedReplayScanActive
+        ? "Replaying"
+        : liveScanAnimationActive
         ? "Scanning"
         : "Selected"
       : "No Area";
@@ -763,9 +838,10 @@ export default function App() {
     setVlmBoxes([]);
     setShowMissionTimelapse(false);
   }, []);
+  const missionBboxKey = mission?.bbox?.join(",") ?? "";
   const missionScopedAlerts = useMemo(() => (
     mission?.mission_mode === "replay" ? alerts : filterAlertsForBbox(alerts, mission?.bbox)
-  ), [alerts, mission]);
+  ), [alerts, mission?.mission_mode, missionBboxKey]);
   const firstAlertCellId = missionScopedAlerts[0]?.cell_id ?? null;
   const completionNoticeVisible = Boolean(
     mission
@@ -773,6 +849,16 @@ export default function App() {
       && missionPassComplete
       && dismissedCompleteMissionId !== mission.id,
   );
+  const proofAttentionActive = Boolean(
+    !proofModeActive
+      && mission?.status === "active"
+      && (
+        mission.mission_mode === "replay"
+          ? missionScopedAlerts.length > 0
+          : missionPassComplete
+      ),
+  );
+  const proofAttentionClass = proofAttentionActive ? "proof-action-glow" : "";
   const openMissionLogs = useCallback(() => {
     setActiveTab("logs");
   }, []);
@@ -786,15 +872,19 @@ export default function App() {
   }, [firstAlertCellId, setSelectedCellId]);
 
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-zinc-50 text-zinc-900 font-sans text-sm">
+    <div className="relative flex h-[100dvh] w-screen overflow-hidden bg-zinc-50 text-zinc-900 font-sans text-sm lg:h-screen">
       {/* LEFT PANE: MAP */}
-      <div className="flex-1 relative h-full">
+      <div
+        data-testid="app-map-pane"
+        className={`${mobileView === "map" ? "block" : "hidden"} relative h-full min-w-0 flex-1 lg:block`}
+      >
         <Suspense fallback={<LoadingPanel label="Map" className="bg-[#05070b] text-zinc-500" />}>
           <MapVisualizer
             geoJsonGrid={displayGrid}
             selectedCellId={selectedCellId}
             onCellClick={(id) => {
                setSelectedCellId(id);
+               setActiveTab("inspect");
             }}
             drawBboxActive={drawBboxActive}
             drawnBbox={drawnBbox}
@@ -849,6 +939,12 @@ export default function App() {
             vlmBoxes={vlmBoxes}
             scanCellState={scanCellState}
             scanAnimationActive={scanAnimationActive}
+            scanStatusLabel={cachedReplayScanActive ? "Cached replay scan - restoring selected cells" : undefined}
+            scanPausedLabel={
+              mission?.mission_mode === "replay"
+                ? "Cached replay restored - inspect results or Proof Mode"
+                : undefined
+            }
             scanStateKey={mission?.id ?? null}
             cameraRequest={mapCameraRequest}
             onCameraRequestHandled={(requestId) => {
@@ -858,10 +954,10 @@ export default function App() {
         </Suspense>
 
         {/* Simple Connection Status overlay top-left on map */}
-        <div className="absolute left-4 top-4 z-10 flex flex-col gap-2">
+        <div className="absolute left-3 right-3 top-3 z-10 flex max-w-[min(380px,calc(100vw-1.5rem))] flex-col gap-2 lg:left-4 lg:right-auto lg:top-4">
           <div className="flex items-center gap-2 rounded border border-zinc-200 bg-white/90 px-3 py-1.5 shadow-sm backdrop-blur cursor-default" title="Telemetry Link Status (View Only)">
              <span className={`h-2 w-2 rounded-full ${linkStatusDot}`}></span>
-             <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-700">
+             <span className="truncate text-[10px] uppercase font-bold tracking-widest text-zinc-700">
                {linkStatusLabel}
              </span>
           </div>
@@ -879,7 +975,7 @@ export default function App() {
                } ${
                  mission.mission_mode === "replay" ? "bg-cyan-500" : "bg-emerald-500"
                }`}></span>
-               <span className={`text-[10px] uppercase font-bold tracking-widest ${
+               <span className={`min-w-0 truncate text-[10px] uppercase font-bold tracking-widest ${
                  mission.mission_mode === "replay" ? "text-cyan-700" : "text-emerald-700"
                }`}>
                  {mission.mission_mode === "replay"
@@ -926,8 +1022,9 @@ export default function App() {
                 <button
                   type="button"
                   data-testid="scan-complete-open-proof"
+                  data-proof-ready={proofAttentionActive ? "true" : "false"}
                   onClick={() => void handleProofModeStart()}
-                  className="rounded border border-cyan-300 bg-cyan-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-800 hover:bg-cyan-100"
+                  className={`rounded border border-cyan-300 bg-cyan-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-800 hover:bg-cyan-100 ${proofAttentionClass}`}
                 >
                   Proof Mode
                 </button>
@@ -1022,17 +1119,20 @@ export default function App() {
       </div>
 
       {/* RIGHT PANE: SIDEBAR */}
-      <div className="w-[clamp(500px,38vw,620px)] min-w-[500px] flex flex-col h-full bg-white border-l border-zinc-200 shadow-xl relative z-20 overflow-hidden">
+      <div
+        data-testid="app-chat-pane"
+        className={`${mobileView === "chat" ? "flex" : "hidden"} relative z-20 h-full w-full flex-col overflow-hidden border-l border-zinc-200 bg-white pb-16 shadow-xl lg:flex lg:w-[clamp(500px,38vw,620px)] lg:min-w-[500px] lg:pb-0`}
+      >
 
         {/* Tabs Header */}
-        <div className="flex items-center border-b border-zinc-200 bg-zinc-50 px-2 pt-2 shrink-0">
-           <button data-testid="tab-agents" data-ui-tip="Chat and actions" onClick={() => setActiveTab("agents")} className={`px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === "agents" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Agent</button>
-           <button data-testid="tab-mission" data-ui-tip="Mission setup" onClick={() => setActiveTab("mission")} className={`px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === "mission" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Mission</button>
-           <button data-testid="tab-logs" data-ui-tip="Events and alerts" onClick={() => setActiveTab("logs")} className={`px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === "logs" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Logs</button>
+        <div className="flex shrink-0 items-center overflow-x-auto border-b border-zinc-200 bg-zinc-50 px-2 pt-2">
+           <button data-testid="tab-agents" data-ui-tip="Chat and actions" onClick={() => setActiveTab("agents")} className={`shrink-0 px-3 py-2 text-xs font-medium border-b-2 transition sm:px-4 sm:text-sm ${activeTab === "agents" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Agent</button>
+           <button data-testid="tab-mission" data-ui-tip="Mission setup" onClick={() => setActiveTab("mission")} className={`shrink-0 px-3 py-2 text-xs font-medium border-b-2 transition sm:px-4 sm:text-sm ${activeTab === "mission" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Mission</button>
+           <button data-testid="tab-logs" data-ui-tip="Events and alerts" onClick={() => setActiveTab("logs")} className={`shrink-0 px-3 py-2 text-xs font-medium border-b-2 transition sm:px-4 sm:text-sm ${activeTab === "logs" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Logs</button>
            {selectedCellId && (
-              <button data-testid="tab-inspect" data-ui-tip="Selected cell" onClick={() => setActiveTab("inspect")} className={`px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === "inspect" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Inspect</button>
+              <button data-testid="tab-inspect" data-ui-tip="Selected cell" onClick={() => setActiveTab("inspect")} className={`shrink-0 px-3 py-2 text-xs font-medium border-b-2 transition sm:px-4 sm:text-sm ${activeTab === "inspect" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Inspect</button>
            )}
-           <button data-testid="tab-settings" data-ui-tip="Providers and model" onClick={() => setActiveTab("settings")} className={`px-4 py-2 text-sm font-medium border-b-2 transition ml-auto ${activeTab === "settings" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Settings</button>
+           <button data-testid="tab-settings" data-ui-tip="Providers and model" onClick={() => setActiveTab("settings")} className={`ml-auto shrink-0 px-3 py-2 text-xs font-medium border-b-2 transition sm:px-4 sm:text-sm ${activeTab === "settings" ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}>Settings</button>
         </div>
 
         {/* Tab Content */}
@@ -1057,6 +1157,7 @@ export default function App() {
                       onOpenLogs={openMissionLogs}
                       onOpenProofMode={() => void handleProofModeStart()}
                       onInspectFirstResult={openFirstResult}
+                      proofAttentionActive={proofAttentionActive}
                       resultAlertCount={missionScopedAlerts.length}
                       scanCellCount={selectedGridCellCount}
                       onPreviewBbox={(bbox) => {
@@ -1100,7 +1201,7 @@ export default function App() {
 
           {activeTab === "agents" && (
             <div className="flex flex-col h-full">
-               <div className="flex basis-[78%] flex-col min-h-0 border-b border-zinc-200">
+               <div className="flex min-h-0 flex-1 flex-col border-b border-zinc-200 lg:basis-[78%] lg:flex-none">
                   <h2 className="sr-only">Ground Agent</h2>
                   <div className="flex-1 overflow-hidden">
                     <Suspense fallback={<LoadingPanel label="Ground Agent" />}>
@@ -1108,11 +1209,12 @@ export default function App() {
                         onActionComplete={handleGroundAgentActionComplete}
                         onNavigate={handleGroundAgentNavigate}
                         mission={mission}
+                        proofAttentionActive={proofAttentionActive}
                       />
                     </Suspense>
                   </div>
                </div>
-               <div className="flex basis-[22%] flex-col min-h-0">
+               <div className="hidden basis-[22%] flex-col min-h-0 lg:flex">
                   <h2 data-testid="header-agent-bus" className="border-b border-zinc-100 bg-zinc-50 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500 shrink-0">SAT/GND Dialogue Bus</h2>
                   <div className="flex-1 overflow-hidden">
                     <Suspense fallback={<LoadingPanel label="Agent Bus" />}>
@@ -1143,6 +1245,40 @@ export default function App() {
 
           {activeTab === "inspect" && selectedCellId && (
             <div className="flex flex-col h-full p-4">
+              {mission && missionScopedAlerts.length > 0 && (
+                <div
+                  data-testid="inspect-result-next-actions"
+                  className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-cyan-200 bg-cyan-50 px-3 py-2 text-cyan-950"
+                >
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-700">Results Ready</p>
+                    <p className="mt-1 text-[11px] font-medium leading-relaxed">
+                      {mission.mission_mode === "replay"
+                        ? "Cached replay evidence is restored for this selected cell."
+                        : "Scan evidence is available for this selected cell."}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      data-testid="inspect-open-logs"
+                      onClick={openMissionLogs}
+                      className="rounded border border-cyan-300 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-800 hover:bg-cyan-100"
+                    >
+                      Logs
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="inspect-open-proof"
+                      data-proof-ready={proofAttentionActive ? "true" : "false"}
+                      onClick={() => void handleProofModeStart()}
+                      className={`rounded border border-cyan-300 bg-cyan-700 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white hover:bg-cyan-800 ${proofAttentionActive ? proofAttentionClass : "shadow-[0_0_18px_rgba(8,145,178,0.35)] ring-2 ring-cyan-200"}`}
+                    >
+                      Proof Mode
+                    </button>
+                  </div>
+                </div>
+              )}
               <Suspense fallback={<LoadingPanel label="Inspect" className="rounded border border-zinc-200 bg-white" />}>
                 <ValidationPanel
                   selectedCellId={selectedCellId}
@@ -1169,10 +1305,41 @@ export default function App() {
         </div>
       </div>
 
+      <nav
+        data-testid="mobile-main-nav"
+        className="fixed inset-x-3 bottom-3 z-40 flex rounded border border-zinc-200 bg-white/95 p-1 shadow-xl backdrop-blur lg:hidden"
+        aria-label="Main mobile navigation"
+      >
+        <button
+          type="button"
+          data-testid="mobile-nav-chat"
+          onClick={() => setMobileView("chat")}
+          className={`min-h-11 flex-1 rounded px-3 text-xs font-bold uppercase tracking-[0.14em] transition ${
+            mobileView === "chat"
+              ? "bg-zinc-900 text-white"
+              : "text-zinc-600 hover:bg-zinc-100"
+          }`}
+        >
+          Chat
+        </button>
+        <button
+          type="button"
+          data-testid="mobile-nav-map"
+          onClick={() => setMobileView("map")}
+          className={`min-h-11 flex-1 rounded px-3 text-xs font-bold uppercase tracking-[0.14em] transition ${
+            mobileView === "map"
+              ? "bg-zinc-900 text-white"
+              : "text-zinc-600 hover:bg-zinc-100"
+          }`}
+        >
+          Map
+        </button>
+      </nav>
+
       {demoUiEnabled && (
         <div
           data-testid="demo-caption"
-          className="pointer-events-none absolute bottom-4 left-4 z-50 w-[340px] rounded border border-zinc-800 bg-zinc-950/92 p-3 text-zinc-100 shadow-xl backdrop-blur"
+          className="pointer-events-none absolute bottom-20 left-4 z-50 w-[min(340px,calc(100vw-2rem))] rounded border border-zinc-800 bg-zinc-950/92 p-3 text-zinc-100 shadow-xl backdrop-blur lg:bottom-4"
         >
           <div className="mb-3 flex items-center justify-between gap-3">
             <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-200">
@@ -1183,8 +1350,9 @@ export default function App() {
             <button
               type="button"
               data-testid="proof-mode-button"
+              data-proof-ready={proofAttentionActive ? "true" : "false"}
               onClick={() => void handleProofModeStart()}
-              className="pointer-events-auto shrink-0 rounded border border-cyan-300/50 bg-cyan-500/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100 hover:border-cyan-200"
+              className={`pointer-events-auto shrink-0 rounded border border-cyan-300/50 bg-cyan-500/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100 hover:border-cyan-200 ${proofAttentionClass}`}
             >
               Proof Mode
             </button>

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from core.agent_bus import mark_messages_read, post_message, upsert_pin
+from core.analyzer import analyze_alert
 from core.gallery import add_gallery_item, resolve_seeded_thumbnail
 from core.metrics import seed_metrics_summary
 from core.mission import get_mission, start_mission, update_mission_progress
@@ -281,6 +282,19 @@ def _severity_to_action(alert: dict[str, Any]) -> str:
     return "ARCHIVE — replay below escalation threshold."
 
 
+def _severity_to_priority(severity: str, fallback: str) -> str:
+    normalized = severity.strip().lower()
+    if normalized == "critical":
+        return "critical"
+    if normalized == "high":
+        return "high"
+    if normalized == "moderate":
+        return "medium"
+    if normalized == "low":
+        return "low"
+    return fallback
+
+
 def _alert_payload_bytes(alert: dict[str, Any]) -> int:
     if isinstance(alert.get("detection_summary"), dict):
         return estimate_object_proof_payload_bytes(
@@ -425,6 +439,7 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
             detection_summary=alert.get("detection_summary") if isinstance(alert.get("detection_summary"), dict) else None,
             object_deltas=alert.get("object_deltas") if isinstance(alert.get("object_deltas"), list) else None,
             visual_model_review=alert.get("visual_model_review") if isinstance(alert.get("visual_model_review"), dict) else None,
+            wildfire_assessment=alert.get("wildfire_assessment") if isinstance(alert.get("wildfire_assessment"), dict) else None,
             downlinked=True,
         )
 
@@ -484,6 +499,7 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
                 "detection_summary": alert.get("detection_summary") if isinstance(alert.get("detection_summary"), dict) else None,
                 "object_deltas": alert.get("object_deltas") if isinstance(alert.get("object_deltas"), list) else None,
                 "visual_model_review": alert.get("visual_model_review") if isinstance(alert.get("visual_model_review"), dict) else None,
+                "wildfire_assessment": alert.get("wildfire_assessment") if isinstance(alert.get("wildfire_assessment"), dict) else None,
             },
         )
         post_message(
@@ -526,8 +542,12 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
 
 
 def rescan_seeded_replay(replay_id: str) -> dict[str, Any]:
-    """Start a live mission from replay metadata so new model/runtime behavior can rescan it."""
+    """Rerun current model review over cached replay evidence without provider fetches."""
     spec = _load_replay_spec(replay_id)
+    alerts = list(spec.get("alerts") or [])
+    if not alerts:
+        raise ValueError(f"Replay '{replay_id}' has no alerts to rescan")
+
     reset_runtime_state()
     review_metadata = _current_model_review_metadata()
     mission = start_mission(
@@ -535,30 +555,220 @@ def rescan_seeded_replay(replay_id: str) -> dict[str, Any]:
         bbox=spec.get("bbox"),
         start_date=spec.get("start_date"),
         end_date=spec.get("end_date"),
-        mission_mode="live",
-        replay_id=None,
-        summary=f"Rescan from replay {replay_id}. Uses the current runtime/model stack.",
+        mission_mode="replay",
+        replay_id=replay_id,
+        summary=(
+            f"Cached-data rescan from replay {replay_id}. Same retained frames and evidence, "
+            "reviewed with the current prompt/model stack."
+        ),
         use_case_id=str(spec.get("use_case_id") or "") or None,
         target_pack_id=str(spec.get("target_pack_id") or "") or None,
         object_targets=spec.get("object_targets") if isinstance(spec.get("object_targets"), list) else None,
     )
+    mission_id = int(mission["id"])
     post_message(
         sender="operator",
         recipient="broadcast",
         msg_type="mission",
         payload={
-            "mission_id": mission["id"],
+            "mission_id": mission_id,
             "task": mission["task_text"],
             "bbox": mission.get("bbox"),
             "source_replay_id": replay_id,
             "review_metadata": review_metadata,
-            "note": f"[RESCAN #{mission['id']}] Started live rescan from replay: {spec.get('title', replay_id)}",
+            "note": f"[RESCAN #{mission_id}] Reviewing cached replay data with the current model stack: {spec.get('title', replay_id)}",
         },
     )
+    post_message(
+        sender="ground",
+        recipient="broadcast",
+        msg_type="status",
+        payload={
+            "source_replay_id": replay_id,
+            "review_metadata": review_metadata,
+            "note": "Cached-data rescan complete. Provider fetches stayed idle; inspect the refreshed alert summaries.",
+        },
+    )
+
+    analysis_results: list[dict[str, Any]] = []
+    metrics_alerts: list[dict[str, Any]] = []
+    rescan_scoring_basis = "cached_rescan_current_model"
+
+    for alert in alerts:
+        runtime_metadata = {
+            **_alert_runtime_metadata(spec, alert),
+            "runtime_truth_mode": "replay",
+            "imagery_origin": "cached_api",
+            "scoring_basis": rescan_scoring_basis,
+        }
+        reason_codes = list(dict.fromkeys([
+            *[str(code) for code in alert.get("reason_codes") or []],
+            "cached_rescan_current_model",
+        ]))
+        analysis = analyze_alert(
+            change_score=float(alert["change_score"]),
+            confidence=float(alert["confidence"]),
+            reason_codes=reason_codes,
+            before_window=dict(alert.get("before_window") or {}),
+            after_window=dict(alert.get("after_window") or {}),
+            observation_source=str(alert.get("observation_source") or "replay"),
+            demo_forced_anomaly=False,
+            use_case_id=str(spec.get("use_case_id") or "") or None,
+            target_pack_id=str(spec.get("target_pack_id") or "") or None,
+        )
+        priority = _severity_to_priority(str(analysis.get("severity") or ""), str(alert.get("priority") or "review"))
+        event_id = f"{str(alert['event_id'])}_cached_rescan"
+        alert_for_payload = {
+            **alert,
+            "event_id": event_id,
+            "priority": priority,
+            "reason_codes": reason_codes,
+            "scoring_basis": rescan_scoring_basis,
+        }
+        alert_payload_bytes = _alert_payload_bytes(alert_for_payload)
+
+        push_alert(
+            event_id=event_id,
+            region_id="replay",
+            cell_id=str(alert["cell_id"]),
+            change_score=float(alert["change_score"]),
+            confidence=float(alert["confidence"]),
+            priority=priority,
+            reason_codes=reason_codes,
+            payload_bytes=alert_payload_bytes,
+            observation_source=str(alert.get("observation_source") or "replay"),
+            runtime_truth_mode=runtime_metadata["runtime_truth_mode"],
+            imagery_origin=runtime_metadata["imagery_origin"],
+            scoring_basis=runtime_metadata["scoring_basis"],
+            before_window=dict(alert.get("before_window") or {}),
+            after_window=dict(alert.get("after_window") or {}),
+            detection_summary=alert.get("detection_summary") if isinstance(alert.get("detection_summary"), dict) else None,
+            object_deltas=alert.get("object_deltas") if isinstance(alert.get("object_deltas"), list) else None,
+            visual_model_review=alert.get("visual_model_review") if isinstance(alert.get("visual_model_review"), dict) else None,
+            wildfire_assessment=alert.get("wildfire_assessment") if isinstance(alert.get("wildfire_assessment"), dict) else None,
+            downlinked=True,
+        )
+
+        seeded_video = str(alert.get("seeded_video") or "").strip()
+        video_b64 = _seeded_video_data_url(seeded_video) if seeded_video else None
+        thumb = resolve_seeded_thumbnail(_seeded_signature(seeded_video)) if seeded_video else None
+        timelapse_analysis = str(alert.get("timelapse_analysis") or "")
+        if analysis.get("summary"):
+            timelapse_analysis = (
+                f"{timelapse_analysis}\n\nCached rescan review:\n{analysis['summary']}"
+                if timelapse_analysis
+                else str(analysis["summary"])
+            )
+        add_gallery_item(
+            cell_id=str(alert["cell_id"]),
+            lat=float(alert["lat"]),
+            lng=float(alert["lng"]),
+            severity=priority,
+            change_score=float(alert["change_score"]),
+            mission_id=mission_id,
+            fetch_thumb=False,
+            timelapse_b64=video_b64,
+            timelapse_analysis=timelapse_analysis,
+            context_thumb=thumb,
+            context_thumb_source="seeded_cache" if thumb else None,
+            timelapse_source="replay" if video_b64 else None,
+        )
+
+        upsert_pin(
+            pin_type="satellite",
+            cell_id=str(alert["cell_id"]),
+            lat=float(alert["lat"]),
+            lng=float(alert["lng"]),
+            label=f"SAT ◆ {str(alert['cell_id'])[:8]}",
+            note=f"Cached replay packet rescanned with current model review. Source replay: {replay_id}.",
+        )
+        upsert_pin(
+            pin_type="ground",
+            cell_id=str(alert["cell_id"]),
+            lat=float(alert["lat"]),
+            lng=float(alert["lng"]),
+            label=f"GND ● {str(alert['cell_id'])[:8]}",
+            note=str(analysis.get("summary") or "Cached replay packet reviewed with current model."),
+            severity=priority,
+        )
+
+        post_message(
+            sender="satellite",
+            recipient="ground",
+            msg_type="flag",
+            cell_id=str(alert["cell_id"]),
+            payload={
+                "event_id": event_id,
+                "note": "Cached replay evidence re-emitted for current model review.",
+                "change_score": float(alert["change_score"]),
+                "confidence": float(alert["confidence"]),
+                "reason_codes": reason_codes,
+                "observation_source": str(alert.get("observation_source") or "replay"),
+                "runtime_truth_mode": runtime_metadata["runtime_truth_mode"],
+                "imagery_origin": runtime_metadata["imagery_origin"],
+                "scoring_basis": runtime_metadata["scoring_basis"],
+                "before_window": dict(alert.get("before_window") or {}),
+                "after_window": dict(alert.get("after_window") or {}),
+                "detection_summary": alert.get("detection_summary") if isinstance(alert.get("detection_summary"), dict) else None,
+                "object_deltas": alert.get("object_deltas") if isinstance(alert.get("object_deltas"), list) else None,
+                "visual_model_review": alert.get("visual_model_review") if isinstance(alert.get("visual_model_review"), dict) else None,
+                "wildfire_assessment": alert.get("wildfire_assessment") if isinstance(alert.get("wildfire_assessment"), dict) else None,
+                "source_replay_id": replay_id,
+                "review_metadata": review_metadata,
+            },
+        )
+        post_message(
+            sender="ground",
+            recipient="satellite",
+            msg_type="confirmation",
+            cell_id=str(alert["cell_id"]),
+            payload={
+                "severity": priority,
+                "action": f"REVIEW - cached replay rescanned with {analysis.get('model', 'current model')}.",
+                "analysis_summary": str(analysis.get("summary") or ""),
+                "timelapse_analysis": timelapse_analysis,
+                "findings": list(analysis.get("findings") or []),
+                "note": "Current model review over cached replay evidence.",
+                "model": str(analysis.get("model") or ""),
+                "model_runtime": str(analysis.get("model_runtime") or ""),
+                "source_replay_id": replay_id,
+                "review_metadata": review_metadata,
+            },
+        )
+        analysis_results.append(
+            {
+                "cell_id": str(alert["cell_id"]),
+                "event_id": event_id,
+                "priority": priority,
+                "model": str(analysis.get("model") or ""),
+                "model_runtime": str(analysis.get("model_runtime") or ""),
+                "summary": str(analysis.get("summary") or ""),
+            }
+        )
+        metrics_alerts.append(alert_for_payload)
+
+    update_mission_progress(
+        mission_id,
+        cells_scanned=int(spec.get("cells_scanned") or len(alerts)),
+        flags_found=len(alerts),
+    )
+    mark_messages_read(recipient="ground", msg_type="flag")
+    mark_messages_read(recipient="satellite", msg_type="confirmation")
+    refreshed_mission = get_mission(mission_id)
+    if refreshed_mission is None:
+        raise ValueError(f"Replay rescan mission '{replay_id}' failed to persist")
+
+    metrics_spec = {**spec, "runtime_truth_mode": "replay", "imagery_origin": "cached_api", "scoring_basis": rescan_scoring_basis}
+    metrics = _seed_metrics(metrics_spec, metrics_alerts)
+
     return {
         "source_replay_id": replay_id,
-        "mission": mission,
+        "mission": refreshed_mission,
+        "primary_cell_id": str(spec.get("primary_cell_id") or alerts[0]["cell_id"]),
+        "alerts_loaded": len(alerts),
+        "metrics": metrics,
         "review_metadata": review_metadata,
+        "analysis_results": analysis_results,
         "title": str(spec.get("title") or replay_id),
         "summary": str(spec.get("summary") or ""),
     }

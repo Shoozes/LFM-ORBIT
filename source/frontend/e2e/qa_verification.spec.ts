@@ -184,9 +184,165 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await expect(page.getByTestId("ground-agent-operator-playbook")).toContainText("Task, replay, inspect.");
     await expect(page.getByTestId("ground-agent-suggestions-label")).toContainText("Suggested Prompts");
     await expect(page.getByTestId("ground-agent-suggestions-label")).toContainText("Ask only. Confirm before app changes.");
-    await expect(page.getByRole("button", { name: "Run Florida firewatch mission" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Load Spain Larouco wildfire proof replay" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Load Florida SR-26 wildfire proof replay" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Load critical minerals proof replay" })).toBeVisible();
     await expect(page.getByTestId("header-agent-bus")).toContainText("SAT/GND Dialogue Bus");
+  });
+
+  test("verify first suggested replay exposes scan, markers, and proof next steps", async ({ page }) => {
+    await page.getByRole("button", { name: "Load Spain Larouco wildfire proof replay" }).click();
+
+    const proposal = page.getByTestId("ground-agent-proposal-card");
+    await expect(proposal).toBeVisible({ timeout: 15_000 });
+    await expect(proposal).toContainText("spain_larouco_wildfire_replay");
+    await proposal.getByRole("button", { name: "Run Replay" }).click();
+
+    await expect(page.getByText("REPLAY ACTIVE: spain_larouco_wildfire_replay")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("tab-inspect")).toHaveClass(/border-zinc-900/, { timeout: 15_000 });
+    await expect(page.getByTestId("inspect-result-next-actions")).toBeVisible();
+    await expect(page.getByTestId("inspect-open-proof")).toBeEnabled();
+    await expect(page.getByTestId("inspect-open-proof")).toHaveAttribute("data-proof-ready", "true");
+    await expect(page.getByTestId("inspect-open-proof")).toHaveClass(/proof-action-glow/);
+    await expect(page.getByTestId("map-scan-paused-hint")).toContainText("Cached replay restored", { timeout: 15_000 });
+
+    await page.getByTestId("inspect-open-proof").click();
+    await expect(page.getByTestId("proof-mode-panel")).toBeVisible({ timeout: 15_000 });
+    const proofLayout = await page.evaluate(() => {
+      const panel = document.querySelector("[data-testid='proof-mode-panel']");
+      const main = panel?.querySelector("main");
+      const sections = panel ? Array.from(panel.querySelectorAll("main > *")) : [];
+      return {
+        panelClientHeight: panel?.clientHeight ?? 0,
+        panelScrollHeight: panel?.scrollHeight ?? 0,
+        mainClientHeight: main?.clientHeight ?? 0,
+        mainScrollHeight: main?.scrollHeight ?? 0,
+        overflowingSections: sections.filter((section) => section.scrollHeight > section.clientHeight + 2).length,
+      };
+    });
+    expect(proofLayout.panelScrollHeight).toBeLessThanOrEqual(proofLayout.panelClientHeight + 2);
+    expect(proofLayout.mainScrollHeight).toBeLessThanOrEqual(proofLayout.mainClientHeight + 2);
+    expect(proofLayout.overflowingSections).toBe(0);
+    await page.getByRole("button", { name: "Close" }).click();
+
+    await expect(page.getByTestId("map-pin-satellite")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("map-pin-ground")).toBeVisible({ timeout: 15_000 });
+    await expect(async () => {
+      const separation = await page.evaluate(() => {
+        const sat = document.querySelector("[data-testid='map-pin-satellite']")?.getBoundingClientRect();
+        const ground = document.querySelector("[data-testid='map-pin-ground']")?.getBoundingClientRect();
+        if (!sat || !ground) return 0;
+        return Math.hypot(
+          (sat.left + sat.width / 2) - (ground.left + ground.width / 2),
+          (sat.top + sat.height / 2) - (ground.top + ground.height / 2),
+        );
+      });
+      expect(separation).toBeGreaterThan(20);
+    }).toPass({ timeout: 10_000 });
+
+    await page.getByTestId("tab-agents").click();
+    await page.getByTestId("map-pin-ground").click();
+    await expect(page.getByTestId("tab-inspect")).toHaveClass(/border-zinc-900/, { timeout: 10_000 });
+    await expect(page.getByTestId("map-pin-tooltip")).toContainText("Ground marker", { timeout: 10_000 });
+  });
+
+  test("verify wide screens keep map and operator panels side by side", async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await gotoApp(page);
+
+    await expect(page.getByTestId("app-map-pane")).toBeVisible();
+    await expect(page.getByTestId("app-chat-pane")).toBeVisible();
+    await expect(page.getByTestId("mobile-main-nav")).toBeHidden();
+    await expect(page.getByTestId("header-agent-bus")).toContainText("SAT/GND Dialogue Bus");
+
+    const layout = await page.evaluate(() => {
+      const map = document.querySelector("[data-testid='app-map-pane']")?.getBoundingClientRect();
+      const panel = document.querySelector("[data-testid='app-chat-pane']")?.getBoundingClientRect();
+      return {
+        bodyWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        mapWidth: map?.width ?? 0,
+        panelWidth: panel?.width ?? 0,
+      };
+    });
+    expect(layout.scrollWidth).toBeLessThanOrEqual(layout.bodyWidth + 1);
+    expect(layout.mapWidth).toBeGreaterThan(900);
+    expect(layout.panelWidth).toBeGreaterThanOrEqual(500);
+    expect(layout.panelWidth).toBeLessThanOrEqual(700);
+  });
+
+  test("verify 16:9 mobile shell uses Chat and Map as primary views", async ({ page }) => {
+    await page.setViewportSize({ width: 640, height: 360 });
+    await gotoApp(page);
+
+    await expect(page.getByTestId("mobile-main-nav")).toBeVisible();
+    await expect(page.getByTestId("mobile-nav-chat")).toBeVisible();
+    await expect(page.getByTestId("mobile-nav-map")).toBeVisible();
+    await expect(page.getByTestId("app-chat-pane")).toBeVisible();
+    await expect(page.getByTestId("app-map-pane")).toBeHidden();
+    await expect(page.getByTestId("ground-agent-operator-playbook")).toBeVisible();
+    await expect(page.getByTestId("ground-agent-message-assistant").first()).toBeVisible();
+    await expect(page.getByTestId("header-agent-bus")).toBeHidden();
+
+    await page.getByTestId("mobile-nav-map").click();
+    await expect(page.getByTestId("app-map-pane")).toBeVisible();
+    await expect(page.getByTestId("app-chat-pane")).toBeHidden();
+    await expect(page.getByTestId("map-area-tools")).toBeVisible();
+
+    const mapLayout = await page.evaluate(() => ({
+      bodyWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      navBottom: document.querySelector("[data-testid='mobile-main-nav']")?.getBoundingClientRect().bottom ?? 0,
+      viewportHeight: window.innerHeight,
+    }));
+    expect(mapLayout.scrollWidth).toBeLessThanOrEqual(mapLayout.bodyWidth + 1);
+    expect(mapLayout.navBottom).toBeLessThanOrEqual(mapLayout.viewportHeight);
+
+    await page.getByTestId("mobile-nav-chat").click();
+    await expect(page.getByTestId("app-chat-pane")).toBeVisible();
+    await expect(page.getByTestId("app-map-pane")).toBeHidden();
+    await expect(page.getByRole("button", { name: "Load Spain Larouco wildfire proof replay" })).toBeVisible();
+  });
+
+  test("verify 9:16 mobile shell keeps Chat and Map usable", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await gotoApp(page);
+
+    await expect(page.getByTestId("mobile-main-nav")).toBeVisible();
+    await expect(page.getByTestId("app-chat-pane")).toBeVisible();
+    await expect(page.getByTestId("app-map-pane")).toBeHidden();
+    await expect(page.getByTestId("ground-agent-operator-playbook")).toBeVisible();
+    await expect(page.getByTestId("ground-agent-message-assistant").first()).toBeVisible();
+    await expect(page.getByTestId("ground-agent-chat-input")).toBeVisible();
+
+    const chatLayout = await page.evaluate(() => ({
+      bodyWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      navBottom: document.querySelector("[data-testid='mobile-main-nav']")?.getBoundingClientRect().bottom ?? 0,
+      inputBottom: document.querySelector("[data-testid='ground-agent-chat-input']")?.getBoundingClientRect().bottom ?? 0,
+      viewportHeight: window.innerHeight,
+    }));
+    expect(chatLayout.scrollWidth).toBeLessThanOrEqual(chatLayout.bodyWidth + 1);
+    expect(chatLayout.navBottom).toBeLessThanOrEqual(chatLayout.viewportHeight);
+    expect(chatLayout.inputBottom).toBeLessThan(chatLayout.navBottom);
+
+    await page.getByTestId("mobile-nav-map").click();
+    await expect(page.getByTestId("app-map-pane")).toBeVisible();
+    await expect(page.getByTestId("app-chat-pane")).toBeHidden();
+    await expect(page.getByTestId("map-area-tools")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Open spatial options at map center" })).toBeVisible();
+
+    const mapLayout = await page.evaluate(() => ({
+      bodyWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      navTop: document.querySelector("[data-testid='mobile-main-nav']")?.getBoundingClientRect().top ?? 0,
+      actionsBottom: document.querySelector("button[title='Open spatial options at map center']")?.getBoundingClientRect().bottom ?? 0,
+      actionsTop: document.querySelector("button[title='Open spatial options at map center']")?.getBoundingClientRect().top ?? 0,
+      creditTop: document.querySelector("[data-testid='map-basemap-credit']")?.getBoundingClientRect().top ?? 0,
+    }));
+    expect(mapLayout.scrollWidth).toBeLessThanOrEqual(mapLayout.bodyWidth + 1);
+    expect(mapLayout.actionsBottom).toBeLessThan(mapLayout.navTop);
+    expect(mapLayout.actionsTop).toBeLessThan(mapLayout.creditTop);
   });
 
   test("verify clean startup stays idle until an operator mission", async ({ page, request }) => {
@@ -251,10 +407,22 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await page.getByTestId("tab-mission").click();
     await expect(page.getByText("Replay Mission · georgia_wildfire_replay")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("REPLAY ACTIVE: georgia_wildfire_replay")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("mission-replay-open-first-result")).toBeEnabled();
+    await expect(page.getByTestId("mission-replay-open-logs")).toBeVisible();
+    await expect(page.getByTestId("mission-replay-open-proof")).toBeEnabled();
+    await expect(page.getByTestId("mission-replay-open-proof")).toHaveAttribute("data-proof-ready", "true");
+    await expect(page.getByTestId("mission-replay-open-proof")).toHaveClass(/proof-action-glow/);
+    await page.getByTestId("mission-panel-tab-replay").click();
+    await expect(page.getByTestId("rescan-replay-georgia_wildfire_replay")).toHaveText("Rescan Cache");
+    await page.getByTestId("rescan-replay-georgia_wildfire_replay").click();
+    await expect(page.getByTestId("tab-inspect")).toHaveClass(/border-zinc-900/, { timeout: 15_000 });
+    await expect(page.getByText("REPLAY ACTIVE: georgia_wildfire_replay")).toBeVisible({ timeout: 15_000 });
 
     await page.getByTestId("tab-agents").click();
     await expect(page.getByTestId("ground-agent-nav-object_evidence")).toHaveCount(0);
     await expect(page.getByTestId("ground-agent-nav-proof")).toBeEnabled();
+    await expect(page.getByTestId("ground-agent-nav-proof")).toHaveAttribute("data-proof-ready", "true");
+    await expect(page.getByTestId("ground-agent-nav-proof-tip")).toHaveAttribute("data-ui-tip", "Proof is ready. Open results.");
     await page.getByTestId("ground-agent-nav-proof").click();
     await expect(page.getByTestId("proof-mode-panel")).toBeVisible({ timeout: 30_000 });
   });

@@ -17,6 +17,8 @@ EXPECTED_REPLAY_IDS = {
     "atacama_mining_replay",
     "singapore_maritime_replay",
     "georgia_wildfire_replay",
+    "pineland_road_wildfire_replay",
+    "spain_larouco_wildfire_replay",
     "florida_sr26_wildfire_replay",
     "delhi_urban_replay",
     "greenland_ice_snow_extent_replay",
@@ -28,7 +30,12 @@ EXPECTED_REPLAY_IDS = {
 
 MULTISPECTRAL_REPLAY_IDS = {"greenland_ice_snow_extent_replay"}
 PROXY_REPLAY_IDS = {"rondonia_frontier_showcase"}
-BURN_SCAR_REPLAY_IDS = {"florida_sr26_wildfire_replay"}
+BURN_SCAR_REPLAY_IDS = {
+    "florida_sr26_wildfire_replay",
+    "georgia_wildfire_replay",
+    "pineland_road_wildfire_replay",
+    "spain_larouco_wildfire_replay",
+}
 METADATA_ONLY_REPLAY_IDS = {"greenland_ice_snow_extent_replay"}
 OBJECT_FIXTURE_REPLAY_IDS = {
     "southeast_fireline_object_replay",
@@ -158,6 +165,59 @@ def test_florida_wildfire_replay_loads_real_seeded_timelapse(tmp_path, monkeypat
     assert recent_alerts[0]["cell_id"] == "wildfire_florida_sr26_candidate"
     assert recent_alerts[0]["observation_source"] == "seeded_sentinelhub_replay"
     assert recent_alerts[0]["scoring_basis"] == "sentinelhub_burn_scar_composite"
+
+    gallery = list_gallery(limit=5)
+    assert len(gallery) == 1
+    assert gallery[0]["has_timelapse"] == 1
+    assert gallery[0]["timelapse_source"] == "replay"
+
+
+def test_pineland_wildfire_replay_loads_smoke_cloud_review_seeded_timelapse(tmp_path, monkeypatch):
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+    _reset_runtime_state()
+
+    payload = replay_load("pineland_road_wildfire_replay")
+
+    assert payload["mission"]["use_case_id"] == "wildfire"
+    assert payload["mission"]["target_pack_id"] == "fireline"
+    assert payload["primary_cell_id"] == "wildfire_pineland_road_candidate"
+    assert payload["alerts_loaded"] == 1
+
+    alert = get_recent_alerts(limit=5)["alerts"][0]
+    assert alert["cell_id"] == "wildfire_pineland_road_candidate"
+    assert alert["observation_source"] == "seeded_sentinelhub_replay"
+    assert alert["scoring_basis"] == "sentinelhub_burn_scar_composite"
+    assert alert["wildfire_assessment"]["target_action"] == "defer"
+    assert "smoke_or_cloud_review" in alert["after_window"]["flags"]
+
+    gallery = list_gallery(limit=5)
+    assert len(gallery) == 1
+    assert gallery[0]["has_timelapse"] == 1
+    assert gallery[0]["timelapse_source"] == "replay"
+
+
+def test_spain_larouco_wildfire_replay_loads_real_burn_scar_proof(tmp_path, monkeypatch):
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+    _reset_runtime_state()
+
+    payload = replay_load("spain_larouco_wildfire_replay")
+
+    assert payload["mission"]["use_case_id"] == "wildfire"
+    assert payload["mission"]["target_pack_id"] == "fireline"
+    assert payload["primary_cell_id"] == "wildfire_spain_larouco_candidate"
+    assert payload["alerts_loaded"] == 1
+
+    alert = get_recent_alerts(limit=5)["alerts"][0]
+    assert alert["cell_id"] == "wildfire_spain_larouco_candidate"
+    assert alert["observation_source"] == "seeded_sentinelhub_replay"
+    assert alert["scoring_basis"] == "sentinelhub_burn_scar_composite"
+    assert alert["wildfire_assessment"]["target_action"] == "review"
+    assert "dnbr_burn_support" in alert["wildfire_assessment"]["reason_codes"]
+    assert "burn_scar_candidate" in alert["after_window"]["flags"]
 
     gallery = list_gallery(limit=5)
     assert len(gallery) == 1
@@ -363,14 +423,27 @@ def test_seeded_cache_replay_loads_and_rescans(tmp_path, monkeypatch):
 
     assert isinstance(rescan_payload, dict)
     assert rescan_payload["source_replay_id"] == seeded["replay_id"]
-    assert rescan_payload["mission"]["mission_mode"] == "live"
+    assert rescan_payload["mission"]["mission_mode"] == "replay"
+    assert rescan_payload["mission"]["replay_id"] == seeded["replay_id"]
     assert rescan_payload["mission"]["bbox"] == seeded["bbox"]
-    assert "current runtime/model stack" in rescan_payload["mission"]["summary"]
+    assert "Same retained frames and evidence" in rescan_payload["mission"]["summary"]
+    assert rescan_payload["primary_cell_id"] == seeded["primary_cell_id"]
+    assert rescan_payload["alerts_loaded"] == 1
     assert rescan_payload["review_metadata"]["review_model_filename"].endswith(".gguf")
     assert rescan_payload["review_metadata"]["review_model_revision"]
     assert rescan_payload["review_metadata"]["reviewed_at"].endswith("Z")
     assert "model_path" not in rescan_payload["review_metadata"]
-    assert get_recent_alerts(limit=5)["alerts"] == []
+    rescanned_alerts = get_recent_alerts(limit=5)["alerts"]
+    assert len(rescanned_alerts) == 1
+    assert rescanned_alerts[0]["runtime_truth_mode"] == "replay"
+    assert rescanned_alerts[0]["imagery_origin"] == "cached_api"
+    assert rescanned_alerts[0]["scoring_basis"] == "cached_rescan_current_model"
+    assert "cached_rescan_current_model" in rescanned_alerts[0]["reason_codes"]
+    assert list_gallery(limit=5)[0]["timelapse_source"] == "replay"
+    assert read_metrics_summary()["scoring_basis"] == "cached_rescan_current_model"
+    assert read_metrics_summary()["flagged_examples"][0]["scoring_basis"] == "cached_rescan_current_model"
+    assert "cached_rescan_current_model" in read_metrics_summary()["flagged_examples"][0]["reason_codes"]
+    assert rescan_payload["analysis_results"][0]["model"]
 
 
 def test_replay_snapshot_export_import_round_trips_runtime_surfaces(tmp_path, monkeypatch):

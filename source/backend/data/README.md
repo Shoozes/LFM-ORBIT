@@ -10,7 +10,7 @@ Orbit's data cycle is:
 2. The backend stores alert metadata, gallery evidence, thumbnails, videos, observations, agent decisions, and monitor reports.
 3. `scripts/export_orbit_dataset.py` packages those records into an Orbit dataset export with JSONL manifests and local assets.
 4. `scripts/retag_training_assets.py` walks the export, deduplicates images and frames by SHA-256, extracts timelapse frames, preserves temporal sequence context, and retags assets with a chosen provider.
-5. The retagged folder can be reviewed locally, loaded as a Hugging Face ImageFolder dataset, uploaded to Hugging Face, or used by external fine-tuning jobs.
+5. The retagged folder can be reviewed locally, loaded as Hugging Face JSONL configs with `images/` assets, uploaded to Hugging Face, or used by external fine-tuning jobs.
 6. Trained artifacts can come back through the model handoff/fetch path documented in `../../../docs/dev/MODEL_HANDOFF.md`.
 
 The goal is a closed loop: collect evidence in Orbit, package it cleanly, retag it with a stronger vision model when useful, train or evaluate externally, then bring model artifacts back into Orbit.
@@ -111,11 +111,14 @@ Current high-quality replay assets:
 |---|---|---|
 | `flood_extent` | Pakistan Manchar Lake flood | `assets/seeded_data/sh_24541539.webm` |
 | `mining_expansion` | Atacama open-pit mining | `assets/seeded_data/sh_fbe644a9.webm` |
-| `ice_cap_growth` | Greenland Ilulissat ice edge abstain preview | Legacy static cache excluded from Fast Replay |
+| `ice_cap_growth` | Greenland Ilulissat ice edge abstain preview | Legacy static cache excluded from Replay Cache |
 | `ice_snow_extent` | Greenland ice/snow extent replay with NDSI/SCL metadata | Metadata-only curated replay until a refreshed contextual WebM is seeded |
 | `maritime_activity` | Suez maritime channel | `assets/seeded_data/sh_2d990c6b.webm` |
 | `maritime_activity` | Singapore Strait maritime anchorage | `assets/seeded_data/sh_99548137.webm` |
+| `wildfire` | Florida SR-26/Balu Forest wildfire candidate | `assets/seeded_data/sh_83e3aea2.webm` |
 | `wildfire` | Highway 82 Georgia wildfire candidate | `assets/seeded_data/sh_4015e8b8.webm` |
+| `wildfire` | Pineland Road wildfire smoke/cloud review candidate | `assets/seeded_data/sh_af5954b2.webm` |
+| `wildfire` | Spain Larouco wildfire burn-scar review | `assets/seeded_data/sh_09384ab0.webm` |
 | `crop_phenology` | Kansas seasonal crop-control sequence | `assets/seeded_data/sh_8342a218.webm` |
 | `urban_expansion` | Delhi NCR urban expansion review | `assets/seeded_data/sh_f03170dc.webm` |
 | `volcanic_surface_change` | Mauna Loa lava-flow surface-change review | `assets/seeded_data/sh_53c969f1.webm` |
@@ -218,7 +221,7 @@ The retagger writes:
 - `retagged_training/images/`
   Deduplicated image assets and extracted video frames.
 - `retagged_training/metadata.jsonl`
-  Hugging Face ImageFolder-compatible metadata.
+  Image asset metadata with labels, reason codes, quality, confidence, and duplicate-reference counts.
 - `retagged_training/retagged_assets.jsonl`
   Full Orbit asset records with provider/model output and source references.
 - `retagged_training/training_assets.jsonl`
@@ -268,18 +271,17 @@ uv run --no-sync python scripts\retag_training_assets.py `
 
 ## Hugging Face Handoff
 
-The retagged folder is shaped so it can be loaded as an ImageFolder-style dataset:
+The Hub dataset is shaped as explicit JSONL configs so single-image SFT rows, ordered temporal SFT rows, metadata, review queues, and optional mission metadata do not get inferred as one mixed schema. Do not include an empty `mission_metadata` config in the Hub card; Dataset Viewer treats empty JSONL configs as split-parse failures.
 
 ```python
 from datasets import load_dataset
 
-ds = load_dataset(
-    "imagefolder",
-    data_dir="runtime-data/modeling/orbit-export/retagged_training",
-)
+assets = load_dataset("Shoozes/LFM-Orbit-SatData", "default", split="train")
+temporal = load_dataset("Shoozes/LFM-Orbit-SatData", "temporal_sft", split="train")
+metadata = load_dataset("Shoozes/LFM-Orbit-SatData", "asset_metadata", split="train")
 ```
 
-For sequence-aware training, use `training_temporal_sequences.jsonl` alongside the referenced frame paths in `images/`.
+For local validation before upload, point `load_dataset()` at `runtime-data/modeling/orbit-export/retagged_training` with the same config names. For sequence-aware training, use `training_temporal_sequences.jsonl` alongside the referenced frame paths in `images/`.
 
 Upload helper:
 
@@ -292,22 +294,24 @@ uv run --no-sync python scripts\upload_orbit_dataset_hf.py `
   --private
 ```
 
-The helper reads `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or a local developer token file, then calls the `hf` CLI with the token in process environment only. Use `--dry-run` to inspect the upload command without network calls. Use repeated `--delete` patterns when a cleaned export should replace generated Hub files such as `samples/**`, `samples.jsonl`, and `manifest.json`.
+The helper reads `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or a local developer token file, then calls the `hf` CLI with the token in process environment only. Before upload it validates root JSONL files, referenced image assets, local path leaks, orphaned image files, and README config paths. Use `--dry-run` to inspect the upload command without network calls. Use repeated `--delete` patterns when a cleaned export should replace generated Hub files such as `samples/**`, `samples.jsonl`, and `manifest.json`.
 
-Current raw replay/cache export result after the Florida firewatch seed refresh:
+Current training-focused replay/cache export result after the wildfire refresh:
 
-- Dataset export: `33` samples, `25` replay-cache rows, `7` visual story frames, `0` mission metadata rows, and `26` rows with timelapse references.
-- Firewatch seed: `seeded_83e3aea2__83e3aea2`, tagged `wildfire`, target pack `fireline`, with Sentinel-2 `B12/B08/B04` band tags, derived `ndvi`, `nbr_swir2`, `swir2_nir_ratio`, one WebM timelapse, and three accepted frame PNGs.
-- Retag output from the prior training refresh remains reusable for model work; run retag only when the raw export needs to be transformed into single-image or temporal SFT rows.
+- Dataset export: `46` samples, `33` replay-cache rows, `7` visual story frames, `5` monitor-report rows, `0` mission metadata rows, and `34` rows with timelapse references.
+- Retag output: `265` image-level SFT rows, `33` temporal-sequence SFT rows, `145` reused image tags, `14` reused sequence tags, `0` skipped assets, `0` image tagger failures, and `0` sequence tagger failures.
+- Wildfire seeds include Florida SR-26/Balu Forest, Georgia Highway 82, Pineland Road, Spain Larouco, Lahaina, and related fireline/burn-scar review candidates. Applicable rows are tagged `wildfire` / `fireline`, include Sentinel-2 burn-scar composite provenance, and carry frame-level labels for model training.
+- The Hub upload uses the retagged folder, not raw `samples/`, so training rows point to `images/` assets and export-relative provenance.
 
 ## Dataset Refresh Cadence
 
 - Use semantic refresh labels such as `orbit-satdata-YYYY-MM-DD` for local export/retag folders.
 - Publish only changed assets and metadata configs; avoid re-uploading already-present hashes unless a schema changes.
 - Keep `mission_metadata` for metadata-only missions such as the Greenland ice/snow extent replay instead of forcing invalid timelapse assets into image configs.
+- For public training refreshes, use `--no-missions --no-archived-missions` when local operator mission archives would flood image training with repeated intent-only rows. Include `mission_metadata` deliberately when the refresh goal is tool/intent tuning.
 - Record each Hub refresh in this README, `docs/dev/DATASET_CYCLE_TUTORIAL.md`, and `summary_bank.json` with counts, commit hash, tagger source, and skipped/failed asset counts.
 - For hackathon demos, prefer seeded replay data and SimSat runtime evidence before spending direct-provider quota on refreshes.
-- Hugging Face dataset: `Shoozes/LFM-Orbit-SatData`, latest raw export commit `b6ef429d958a21dc7690d3f4b7cc4f3bd2088d25`, with `records=33`, `seeded_cache_records=25`, `mission_metadata_records=0`, and the tagged Florida firewatch Sentinel-2 sample included.
+- Hugging Face dataset: `Shoozes/LFM-Orbit-SatData`, data payload commit `9ccff9ce7315e270ca1b280c82c39414ce591d01`, Dataset Viewer verification commit `2df07094f36037e71c7e14e28dfbd298343be359`, final card documentation commit `550c98f7c9b84eefbe3c0c6eb77b33a70028402a`, with `records=46`, `seeded_cache_records=33`, `monitor_report_records=5`, `mission_metadata_records=0`, `unique_training_assets=265`, `unique_temporal_sequences=33`, remote `num_rows=1126`, `70` wildfire image rows, and `11` wildfire temporal rows.
 - Dataset Viewer schema note: upload `source/backend/data/HF_DATASET_CARD.md` as the Hub `README.md` so single-image SFT rows, temporal SFT rows, metadata, mission metadata, and review records load as separate configs instead of one mixed inferred JSON split.
 
 ## Optional Tkinter UI

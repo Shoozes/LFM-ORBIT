@@ -200,12 +200,17 @@ def test_retag_dataset_extracts_timelapse_frames_and_sequence_rows(tmp_path, mon
         encoding="utf-8",
     )
 
-    def fake_extract(candidate, frames_dir, *, frame_count, min_video_frames):
+    def fake_extract(candidate, frames_dir, *, dataset_dir, output_dir, frame_count, min_video_frames):
         frames_dir.mkdir(parents=True, exist_ok=True)
         first = frames_dir / "timelapse__frame_0000.jpg"
         second = frames_dir / "timelapse__frame_0002.jpg"
         _write_png(first, (0, 40, 0))
         _write_png(second, (120, 80, 30))
+        video_source = retag_training_assets._manifest_path_label(
+            candidate.path,
+            dataset_dir=dataset_dir,
+            output_dir=output_dir,
+        )
         frame_candidates = [
             retag_training_assets.AssetCandidate(
                 path=first,
@@ -220,7 +225,7 @@ def test_retag_dataset_extracts_timelapse_frames_and_sequence_rows(tmp_path, mon
                         target_action="alert",
                         observation_source="seeded_replay",
                         reason_codes=["multi_index_consensus"],
-                        video_source=str(candidate.path),
+                        video_source=video_source,
                         frame_index=0,
                     )
                 ],
@@ -238,7 +243,7 @@ def test_retag_dataset_extracts_timelapse_frames_and_sequence_rows(tmp_path, mon
                         target_action="alert",
                         observation_source="seeded_replay",
                         reason_codes=["multi_index_consensus"],
-                        video_source=str(candidate.path),
+                        video_source=video_source,
                         frame_index=2,
                     )
                 ],
@@ -276,6 +281,7 @@ def test_retag_dataset_extracts_timelapse_frames_and_sequence_rows(tmp_path, mon
     assert sequence_rows[0]["retag"]["temporal_validity"] == "multi_frame_context"
     assert len(sequence_training_rows[0]["images"]) == 2
     assert all("timelapse_" in row["source_asset_path"] for row in asset_rows)
+    assert asset_rows[0]["references"][0]["video_source"] == "samples/sample_video/timelapse.webm"
 
 
 def test_retag_dataset_names_extracted_frames_by_video_hash(tmp_path, monkeypatch):

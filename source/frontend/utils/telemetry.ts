@@ -6,6 +6,7 @@ import type {
   ScanResultMessage,
   ScanWindow,
   TelemetryMessage,
+  WildfireSmokeAssessment,
 } from "../types/telemetry";
 
 export function formatSourceLabel(source: string | undefined): string {
@@ -142,18 +143,57 @@ function normalizeWindow(value: unknown): ScanWindow | null {
     return null;
   }
 
-  return {
+  const normalized: ScanWindow = {
     label: value.label,
     quality: value.quality,
+    blue: isNumber(value.blue) ? value.blue : undefined,
+    green: isNumber(value.green) ? value.green : undefined,
     nir: value.nir,
     red: value.red,
     swir: value.swir,
+    swir1: isNumber(value.swir1) ? value.swir1 : undefined,
+    swir2: isNumber(value.swir2) ? value.swir2 : undefined,
+    scl_cloud_ratio: isNumber(value.scl_cloud_ratio) ? value.scl_cloud_ratio : undefined,
+    cloud_probability: isNumber(value.cloud_probability) ? value.cloud_probability : undefined,
+    valid_pixel_ratio: isNumber(value.valid_pixel_ratio) ? value.valid_pixel_ratio : undefined,
+    review_only: value.review_only === true ? true : undefined,
+    acceptance_override: isString(value.acceptance_override) ? value.acceptance_override : null,
     ndvi: value.ndvi,
     nbr: value.nbr,
     evi2: value.evi2,
     ndmi: value.ndmi,
     soil_ratio: value.soil_ratio,
     flags: value.flags,
+  };
+  return normalized;
+}
+
+function normalizeWildfireAssessment(value: unknown): WildfireSmokeAssessment | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  if (
+    !isNumber(value.smoke_likelihood) ||
+    !isNumber(value.cloud_likelihood) ||
+    !isNumber(value.burn_likelihood) ||
+    !isNumber(value.hotspot_support) ||
+    !isNumber(value.confidence_delta) ||
+    !isNumber(value.final_confidence) ||
+    !isString(value.target_action) ||
+    !isStringArray(value.reason_codes)
+  ) {
+    return undefined;
+  }
+  return {
+    smoke_likelihood: value.smoke_likelihood,
+    cloud_likelihood: value.cloud_likelihood,
+    burn_likelihood: value.burn_likelihood,
+    hotspot_support: value.hotspot_support,
+    confidence_delta: value.confidence_delta,
+    final_confidence: value.final_confidence,
+    target_action: value.target_action as WildfireSmokeAssessment["target_action"],
+    reason_codes: value.reason_codes,
+    provenance: isRecord(value.provenance) ? value.provenance as WildfireSmokeAssessment["provenance"] : undefined,
   };
 }
 
@@ -249,6 +289,7 @@ export function parseTelemetryMessage(raw: string): TelemetryMessage | null {
       cycle_index: parsed.cycle_index,
       demo_forced_anomaly: parsed.demo_forced_anomaly === true,
       boundary_context: boundaryContext,
+      wildfire_assessment: normalizeWildfireAssessment(parsed.wildfire_assessment),
     };
   } catch {
     return null;
@@ -275,6 +316,7 @@ export function toAlertItem(message: ScanResultMessage): AlertItem {
     downlinked: true,
     demo_forced_anomaly: message.demo_forced_anomaly,
     boundary_context: message.boundary_context,
+    wildfire_assessment: message.wildfire_assessment,
   };
 }
 

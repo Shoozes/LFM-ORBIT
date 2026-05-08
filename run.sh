@@ -466,17 +466,27 @@ ensure_trained_model() {
     mkdir -p "$MODEL_DIR"
 
     local min_size_bytes=1048576
+    local force_model_refresh=false
+    case "${LFM_ORBIT_REFRESH_MODEL:-}" in
+        1|true|TRUE|yes|YES|on|ON)
+            force_model_refresh=true
+            ;;
+    esac
 
     if [[ -n "${LFM_MODEL_URL:-}" ]]; then
         local needs_download=false
         if [[ -f "$MODEL_FILE" ]]; then
             local file_size
             file_size=$(stat -c%s "$MODEL_FILE" 2>/dev/null || stat -f%z "$MODEL_FILE")
-            if [[ "$file_size" -ge "$min_size_bytes" ]]; then
+            if [[ "$file_size" -ge "$min_size_bytes" && "$force_model_refresh" != true ]]; then
                 echo "[i] Trained Orbit GGUF already present."
                 return
             fi
-            echo "[i] Existing GGUF file is incomplete ($file_size bytes). Re-downloading..."
+            if [[ "$force_model_refresh" == true ]]; then
+                echo "[i] LFM_ORBIT_REFRESH_MODEL requested. Re-downloading trained Orbit GGUF..."
+            else
+                echo "[i] Existing GGUF file is incomplete ($file_size bytes). Re-downloading..."
+            fi
             needs_download=true
         else
             needs_download=true
@@ -498,7 +508,8 @@ ensure_trained_model() {
                 ;;
         esac
 
-        if [[ "$moving_model_revision" != true ]] && "$PYTHON_CMD" - "$MODEL_MANIFEST" "$MODEL_FILE" "$model_repo_id" "$model_revision" "$min_size_bytes" <<'PY'
+        local model_matches=false
+        if "$PYTHON_CMD" - "$MODEL_MANIFEST" "$MODEL_FILE" "$model_repo_id" "$model_revision" "$min_size_bytes" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -518,11 +529,20 @@ revision = str(source.get("revision") or payload.get("revision") or "")
 raise SystemExit(0 if repo_id == expected_repo and revision == expected_revision else 1)
 PY
         then
-            echo "[i] Trained Orbit GGUF already present from $model_repo_id@$model_revision."
+            model_matches=true
+        fi
+        if [[ "$model_matches" == true && "$force_model_refresh" != true ]]; then
+            if [[ "$moving_model_revision" == true ]]; then
+                echo "[i] Trained Orbit GGUF already present from $model_repo_id@$model_revision. Set LFM_ORBIT_REFRESH_MODEL=true to refresh this moving revision."
+            else
+                echo "[i] Trained Orbit GGUF already present from $model_repo_id@$model_revision."
+            fi
             return
         fi
-        if [[ "$moving_model_revision" == true && -f "$MODEL_FILE" ]]; then
-            echo "[i] Moving Hugging Face revision '$model_revision' requested. Refreshing trained Orbit GGUF..."
+        if [[ "$model_matches" == true && "$force_model_refresh" == true ]]; then
+            echo "[i] LFM_ORBIT_REFRESH_MODEL requested. Refreshing trained Orbit GGUF from $model_repo_id@$model_revision..."
+        elif [[ -f "$MODEL_FILE" ]]; then
+            echo "[i] Existing GGUF is missing or does not match the trained Orbit handoff. Refreshing..."
         fi
 
         echo "[*] Fetching trained Orbit GGUF bundle..."
@@ -561,6 +581,8 @@ assert_trained_model_runtime() {
 }
 
 install_deps() {
+    ensure_orbit_port_available 8000 "backend"
+    ensure_orbit_port_available 5173 "frontend"
     install_backend_deps
     write_simsat_status
     install_frontend_deps

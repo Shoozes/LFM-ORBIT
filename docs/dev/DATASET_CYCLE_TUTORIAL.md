@@ -137,8 +137,11 @@ Dataset: [Shoozes/LFM-Orbit-SatData](https://huggingface.co/datasets/Shoozes/LFM
 
 Current refresh:
 
-- Data/card commit: `2d5c5c400b61e869a1154881743ac6f1c1f77e3b`
-- Remote config verification: `default=179`, `temporal_sft=26`, `asset_metadata=179`, `retagged_assets=179`, `temporal_metadata=26`, `review_queue=179`, `mission_metadata=185`
+- Data payload commit: `9ccff9ce7315e270ca1b280c82c39414ce591d01`
+- Dataset Viewer verification commit: `2df07094f36037e71c7e14e28dfbd298343be359`
+- Final card documentation commit: `550c98f7c9b84eefbe3c0c6eb77b33a70028402a`
+- Remote config verification before the May 7 refresh: `default=179`, `temporal_sft=26`, `asset_metadata=179`, `retagged_assets=179`, `temporal_metadata=26`, `review_queue=179`, `mission_metadata=185`
+- Current remote refresh: `default=265`, `temporal_sft=33`, `asset_metadata=265`, `retagged_assets=265`, `temporal_metadata=33`, `review_queue=265`, total rows `1126`; `mission_metadata=0` is omitted from the Hub card until non-empty so Dataset Viewer does not fail the empty split. Remote label check found `70` wildfire image rows and `11` wildfire temporal rows.
 
 The Hub card keeps schemas separate:
 
@@ -157,5 +160,6 @@ The Hub card keeps schemas separate:
 - Use a dated local refresh label such as `orbit-satdata-YYYY-MM-DD`.
 - Reuse existing image hashes and upload only changed configs/assets unless a schema changes.
 - Keep metadata-only missions in `mission_metadata`; do not force invalid WebMs into image configs.
+- For training-data refreshes, exclude local mission archives with `--no-missions --no-archived-missions` unless the explicit goal is intent/tool tuning. Otherwise repeated operator mission rows can crowd out seeded replay evidence under the export limit.
 - Record counts, tagger source, skipped assets, failures, and Hub commit hash in this tutorial, `source/backend/data/README.md`, and `summary_bank.json`.
 - Keep direct Sentinel/NASA/GEE refreshes optional. The hackathon path remains SimSat/Mapbox through DPhi Space SimSat plus seeded replay data.

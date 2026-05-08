@@ -103,6 +103,9 @@ def _migrate_alerts_schema(connection: sqlite3.Connection):
     if "visual_model_review" not in columns:
         connection.execute("ALTER TABLE alerts ADD COLUMN visual_model_review TEXT")
 
+    if "wildfire_assessment" not in columns:
+        connection.execute("ALTER TABLE alerts ADD COLUMN wildfire_assessment TEXT")
+
     connection.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_alerts_event_id
@@ -161,6 +164,7 @@ def push_alert(
     detection_summary: dict | None = None,
     object_deltas: list[dict] | None = None,
     visual_model_review: dict | None = None,
+    wildfire_assessment: dict | None = None,
     downlinked: bool = False,
 ):
     with _connect() as connection:
@@ -187,8 +191,9 @@ def push_alert(
                 boundary_context,
                 detection_summary,
                 object_deltas,
-                visual_model_review
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                visual_model_review,
+                wildfire_assessment
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event_id,
@@ -215,6 +220,7 @@ def push_alert(
                 json.dumps(_compact_detection_summary(detection_summary)) if detection_summary else None,
                 json.dumps(object_deltas) if object_deltas else None,
                 json.dumps(_compact_visual_model_review(visual_model_review)) if visual_model_review else None,
+                json.dumps(wildfire_assessment) if wildfire_assessment else None,
             ),
         )
         connection.commit()
@@ -360,7 +366,8 @@ def get_recent_alerts(limit: int = 50) -> RecentAlertsResponse:
                 boundary_context,
                 detection_summary,
                 object_deltas,
-                visual_model_review
+                visual_model_review,
+                wildfire_assessment
             FROM alerts
             ORDER BY id DESC
             LIMIT ?
@@ -417,6 +424,7 @@ def get_recent_alerts(limit: int = 50) -> RecentAlertsResponse:
                 "detection_summary": json.loads(row["detection_summary"]) if "detection_summary" in row.keys() and row["detection_summary"] else None,
                 "object_deltas": json.loads(row["object_deltas"]) if "object_deltas" in row.keys() and row["object_deltas"] else None,
                 "visual_model_review": json.loads(row["visual_model_review"]) if "visual_model_review" in row.keys() and row["visual_model_review"] else None,
+                "wildfire_assessment": json.loads(row["wildfire_assessment"]) if "wildfire_assessment" in row.keys() and row["wildfire_assessment"] else None,
             }
         )
 

@@ -93,6 +93,14 @@ def compute_nbr(nir: float, swir2: float) -> float:
         return 0.0
     return (nir - swir2) / denominator
 
+def compute_dnbr(pre_nbr: float, post_nbr: float) -> float:
+    """Delta Normalized Burn Ratio."""
+    return pre_nbr - post_nbr
+
+def compute_nbr_s2(nir: float, swir2: float) -> float:
+    """Sentinel-2 NBR using B08 NIR and B12 SWIR2."""
+    return compute_nbr(nir, swir2)
+
 def compute_ndmi(nir: float, swir1: float) -> float:
     """Normalized Difference Moisture Index.
     Typically uses SWIR1 (Band 11 on Sentinel-2).
@@ -102,6 +110,10 @@ def compute_ndmi(nir: float, swir1: float) -> float:
         return 0.0
     return (nir - swir1) / denominator
 
+def compute_ndmi_s2(nir: float, swir1: float) -> float:
+    """Sentinel-2 NDMI using B08 NIR and B11 SWIR1."""
+    return compute_ndmi(nir, swir1)
+
 def compute_swir_nir_ratio(nir: float, swir: float) -> float:
     """Bare soil / structural dryness proxy.
     Soil exposure causes high SWIR and low NIR. Spike indicates clearance.
@@ -109,3 +121,16 @@ def compute_swir_nir_ratio(nir: float, swir: float) -> float:
     if nir <= 0:
         return 0.0
     return swir / nir
+
+def compute_visible_whiteness(red: float, green: float, blue: float) -> float:
+    """RGB channel balance cue for bright white smoke/cloud ambiguity."""
+    high = max(red, green, blue)
+    low = min(red, green, blue)
+    if high <= 0:
+        return 0.0
+    return max(0.0, min(1.0, 1.0 - ((high - low) / high)))
+
+def compute_blue_green_haze_score(blue: float, green: float, red: float) -> float:
+    """Blue/green lift cue used as smoke assist, not standalone confirmation."""
+    haze = ((blue + green) * 0.5) - red
+    return max(0.0, min(1.0, haze * 6.0))
