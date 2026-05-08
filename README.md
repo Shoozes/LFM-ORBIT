@@ -34,15 +34,31 @@ The default hackathon path uses SimSat/Mapbox plus bundled cached replay proof. 
 
 Option 1 reuses an existing valid trained GGUF after the first download. Set `LFM_ORBIT_REFRESH_MODEL=true` only when you intentionally want to refresh the moving Hugging Face `main` handoff.
 
+## Mission Stories
+
+Orbit is not a single canned demo. The app ships with several reviewable mission stories so an operator can pick the signal that best explains the product loop:
+
+| Story | What To Look For | Best Use |
+|---|---|---|
+| Critical Minerals Expansion Watch | evaporation pond regions, tailings regions, open-pit expansion, roads, facility clusters | clearest main showcase and provenance proof |
+| Deforestation / Rondonia Frontier | canopy-loss boundary, road-edge expansion, exposed soil, retained timelapse frames | end-to-end tutorial from chat-launched mission to proof JSON |
+| Fire Watch / Wildfire | burn-scar, smoke/cloud ambiguity, fireline or readiness indicators | emergency-relevance story with cautious evidence wording |
+| Flood / Waterline | new surface water, overflow regions, shoreline movement | payload-reduction and visible boundary-change story |
+| Maritime Activity | vessel-queue or port activity regions, link outage queueing | orbital-eclipse and compact-packet queue proof |
+| Glacier / Ice-Snow | snow/ice extent, spectral-confidence guardrails, sequential timelapse context | slower science-context and abstain-safety story |
+| Urban / Lifeline / Transport | road corridors, facility regions, infrastructure context | secondary operator-planning and map-context stories |
+
+The recommended public showcase is still **Critical Minerals Expansion Watch** because it is visually clear and source-bound. The other stories use the same app mechanics: select an area, scan or rescan cached evidence, let SAT/GND agents review retained packets, then open Proof Mode.
+
 ## Reviewer Path
 
 1. Open **Mission**.
 2. Choose **Replay**.
-3. Load **Critical Minerals Expansion Watch** or **Spain Larouco Wildfire Burn-Scar Replay**.
+3. Load **Critical Minerals Expansion Watch** for the shortest proof path, or choose another mission story such as **Deforestation**, **Fire Watch**, **Flood**, **Maritime**, **Glacier**, or **Urban**.
 4. Review **Logs** and **Inspect** for the downlinked alert, retained timelapse, source metadata, and agent notes.
 5. Open **Agent -> Proof Mode** for the compact proof JSON and visual evidence.
 
-This is the intended judging path: one mission, one scan/proof story, and clear source/runtime boundaries. The supporting tabs and demos exist to prove the same product loop, not to broaden the claim.
+For judging, one complete mission is enough. The extra stories are there to show the product is a reusable mission-control prototype, not a rigid one-off recording.
 
 ## Record The Showcase
 
