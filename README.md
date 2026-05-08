@@ -54,6 +54,14 @@ npm run demo:showcase
 
 The showcase loads deterministic Critical Minerals Expansion Watch replay evidence and writes video, screenshot, trace, and `proof.json` artifacts. No Sentinel Hub credentials are needed for the showcase path.
 
+## Watch The Main Videos
+
+The primary videos are linked instead of embedded because they are larger tutorial artifacts:
+
+- [Tutorial walkthrough](docs/media/videos/tutorial_video.webm): plain-English product run-through from mission selection to scan, SAT/GND handoff, retained evidence, Proof Mode, compact JSON, and tagged data.
+- [Training journey](docs/media/videos/training-journey.webm): shows how reviewed Orbit evidence becomes reusable training data.
+- [Media index](docs/media/README.md): all promoted videos, screenshots, story plates, and timelapse highlights.
+
 Full repo verification:
 
 ```powershell

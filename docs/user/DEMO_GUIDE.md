@@ -82,13 +82,14 @@ Docs video exports:
 
 | Demo | Video |
 |---|---|
+| Tutorial Walkthrough | `docs/media/videos/tutorial_video.webm` |
+| Training Journey | `docs/media/videos/training-journey.webm` |
 | Main Showcase | `docs/media/videos/showcase-demo.webm` |
 | Payload Reduction | `docs/media/videos/payload-reduction-demo.webm` |
 | Provenance | `docs/media/videos/provenance-demo.webm` |
 | Greenland Abstain Safety | `docs/media/videos/abstain-safety-demo.webm` |
 | Legacy Target-Pack Port Audit | `docs/media/videos/object-evidence-demo.webm` |
 | Suez Maritime Eclipse | `docs/media/videos/orbital-eclipse-demo.webm` |
-| Tutorial Walkthrough | `docs/media/videos/tutorial_video.webm` |
 | README Timelapse Highlight | `docs/media/timelapse/highlight-greenland-ice-timelapse.gif`, `docs/media/timelapse/highlight-greenland-ice-timelapse.webm` |
 
 Current mission split:

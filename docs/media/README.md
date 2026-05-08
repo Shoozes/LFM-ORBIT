@@ -12,6 +12,16 @@ This folder keeps generated and hand-polished media out of the main docs root.
 
 Keep `docs/*.md` as the written docs layer. Put new visual artifacts under the appropriate media subfolder, link them from a doc when they are public proof, and update `source/backend/tests/test_docs_artifacts.py` when the artifact is part of the public proof surface. Unreferenced public media is treated as stale. Raw Playwright screenshots should stay under `source/frontend/e2e/screenshots/` or `source/frontend/test-results/` until promoted and visually audited.
 
+## Primary Video Highlights
+
+Start with the tutorial videos. They are linked here instead of embedded on the front README so the product page stays fast and focused.
+
+| Video | File | What It Shows |
+|---|---|---|
+| Tutorial walkthrough | [`videos/tutorial_video.webm`](videos/tutorial_video.webm) | End-to-end operator path: mission selection, scan grid, SAT/GND handoff, retained evidence, Proof Mode, compact JSON, and tagged data. |
+| Training journey | [`videos/training-journey.webm`](videos/training-journey.webm) | How reviewed Orbit evidence becomes reusable training data for model improvement. |
+| Critical Minerals proof cut | [`videos/showcase-demo.webm`](videos/showcase-demo.webm) | Short deterministic proof cut centered on Critical Minerals Expansion Watch. |
+
 ## Promoted Media Inventory
 
 - `media/infographics/what-is-lfm-orbit-info.png`
