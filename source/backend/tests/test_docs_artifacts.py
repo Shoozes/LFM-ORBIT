@@ -354,8 +354,9 @@ def test_validation_snapshots_match_current_release_gate():
 
     for source in (readme, todo, release_note):
         assert "499 passed" in source
-        assert "104 passed" in source or "104`" in source
-        assert "6 skipped" in source or "6` intentional skips" in source
+        assert "Playwright" in source
+        assert "intentional skips" in source
+        assert "104 passed" not in source
 
     assert "backend 495 tests" not in json.dumps(bank)
     assert "backend `495 passed`" not in todo

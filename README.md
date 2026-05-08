@@ -140,11 +140,11 @@ Known map targets carry mission context and safe evidence guidance with the came
 | Root verify | `.\run.ps1 -Verify` passing |
 | Backend tests | `499 passed` |
 | Frontend | typecheck + build passing |
-| Playwright E2E | `104 passed`, `6 skipped` |
+| Playwright E2E | passing with intentional skips |
 | Docs/import guards | passing |
 | Option 1 launch | backend `8000` and app `5173` ready |
 | Clean-start smoke | idle on Atacama context, no auto replay, no default scan |
-| Recorded demos | showcase, payload, provenance, abstain, eclipse, tutorial |
+| Recorded demos | showcase, tutorial, training journey, payload, provenance, abstain, eclipse |
 | Dataset export | `46` raw replay/cache samples, `34` timelapse rows |
 | Retagged training set | `265` assets, `33` temporal sequences |
 | Dataset | [Shoozes/LFM-Orbit-SatData](https://huggingface.co/datasets/Shoozes/LFM-Orbit-SatData) |

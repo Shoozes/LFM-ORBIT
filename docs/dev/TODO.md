@@ -163,7 +163,7 @@ Model/runtime:
 
 ## Latest Validation Snapshot
 
-- Current local verification: `.\run.ps1 -Verify` passed end-to-end. Backend `499 passed`; GGUF runtime smoke passed; frontend typecheck/build passed; full Playwright passed `104 passed` with `6 skipped`. The latest May 8 integrity spot-check passed import contracts, docs artifacts, frontend typecheck/build, full replay backend tests, and the focused Ground Agent replay/rescan browser flow.
+- Current local verification: `.\run.ps1 -Verify` passed end-to-end. Backend `499 passed`; GGUF runtime smoke passed; frontend typecheck/build passed; full Playwright E2E passed with intentional skips. The latest May 8 integrity spot-check passed import contracts, docs artifacts, frontend typecheck/build, full replay backend tests, and the focused Ground Agent replay/rescan browser flow.
 - Current launcher verification: `.\run.ps1 -Install` launched option-1 flow successfully; backend `8000` and frontend `5173` became ready, then the launched process tree was stopped cleanly.
 - Cold staged-content verification: fresh Windows and WSL/Linux clones passed before the final wildfire/docs guard additions; the current release gate is the full local `499 passed` backend suite plus option-1 launcher smoke. Windows covered `uv sync --extra dev`, `npm ci`, frontend build, and responsive/replay smoke. WSL/Linux covered native Linux Node/uv setup, `npm ci`, frontend build, Playwright Chromium/deps install, and the same responsive/replay smoke.
 - Current runtime boundary: SAT/GND GGUF calls remain text evidence-packet reasoning; `/api/inference/image` is optional LiquidAI/LFM2.5-VL-450M image-conditioned retained-frame review and only reports enabled after a real adapter passes image pixels.
