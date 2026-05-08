@@ -842,6 +842,13 @@ export default function App() {
   const missionScopedAlerts = useMemo(() => (
     mission?.mission_mode === "replay" ? alerts : filterAlertsForBbox(alerts, mission?.bbox)
   ), [alerts, mission?.mission_mode, missionBboxKey]);
+  const cachedRescanActive = Boolean(
+    mission?.mission_mode === "replay"
+      && missionScopedAlerts.some((alert) => (
+        alert.scoring_basis === "cached_rescan_current_model"
+          || alert.reason_codes?.includes("cached_rescan_current_model")
+      )),
+  );
   const firstAlertCellId = missionScopedAlerts[0]?.cell_id ?? null;
   const completionNoticeVisible = Boolean(
     mission
@@ -939,10 +946,12 @@ export default function App() {
             vlmBoxes={vlmBoxes}
             scanCellState={scanCellState}
             scanAnimationActive={scanAnimationActive}
-            scanStatusLabel={cachedReplayScanActive ? "Cached replay scan - restoring selected cells" : undefined}
+            scanStatusLabel={cachedReplayScanActive ? (cachedRescanActive ? "Cached rescan - restoring selected cells" : "Cached replay scan - restoring selected cells") : undefined}
             scanPausedLabel={
               mission?.mission_mode === "replay"
-                ? "Cached replay restored - inspect results or Proof Mode"
+                ? cachedRescanActive
+                  ? "Cached rescan restored - inspect results or Proof Mode"
+                  : "Cached replay restored - inspect results or Proof Mode"
                 : undefined
             }
             scanStateKey={mission?.id ?? null}
@@ -979,7 +988,7 @@ export default function App() {
                  mission.mission_mode === "replay" ? "text-cyan-700" : "text-emerald-700"
                }`}>
                  {mission.mission_mode === "replay"
-                   ? `REPLAY ACTIVE: ${mission.replay_id || `#${mission.id}`}`
+                   ? `${cachedRescanActive ? "CACHED RESCAN ACTIVE" : "REPLAY ACTIVE"}: ${mission.replay_id || `#${mission.id}`}`
                    : missionPassComplete
                      ? `SCAN COMPLETE: #${mission.id}`
                      : `MISSION ACTIVE: #${mission.id}`}
@@ -1157,6 +1166,7 @@ export default function App() {
                       onOpenLogs={openMissionLogs}
                       onOpenProofMode={() => void handleProofModeStart()}
                       onInspectFirstResult={openFirstResult}
+                      cachedRescanActive={cachedRescanActive}
                       proofAttentionActive={proofAttentionActive}
                       resultAlertCount={missionScopedAlerts.length}
                       scanCellCount={selectedGridCellCount}

@@ -275,6 +275,7 @@ type MissionControlProps = {
   onOpenLogs?: () => void;
   onOpenProofMode?: () => void;
   onInspectFirstResult?: () => void;
+  cachedRescanActive?: boolean;
   proofAttentionActive?: boolean;
   resultAlertCount?: number;
   mission: Mission | null;
@@ -297,6 +298,7 @@ export default function MissionControl({
   onOpenLogs,
   onOpenProofMode,
   onInspectFirstResult,
+  cachedRescanActive = false,
   proofAttentionActive = false,
   resultAlertCount = 0,
   mission,
@@ -537,7 +539,9 @@ export default function MissionControl({
             </span>
             {mission && (
               <span className={`rounded-full border px-2.5 py-0.5 text-[10px] uppercase tracking-wider ${severityColor(mission.status)}`}>
-                {mission.mission_mode === "replay" ? `replay ${mission.status}` : mission.status}
+                {mission.mission_mode === "replay"
+                  ? `${cachedRescanActive ? "rescan" : "replay"} ${mission.status}`
+                  : mission.status}
               </span>
             )}
           </div>
@@ -556,7 +560,7 @@ export default function MissionControl({
                 mission.mission_mode === "replay" ? "text-cyan-700" : "text-emerald-700"
               }`}>
                 {mission.mission_mode === "replay"
-                  ? `Replay Mission · ${mission.replay_id || `#${mission.id}`}`
+                  ? `${cachedRescanActive ? "Cached Rescan" : "Replay Mission"} · ${mission.replay_id || `#${mission.id}`}`
                   : isScanComplete ? `Mission Pass Complete #${mission.id}` : `Active Mission #${mission.id}`}
               </p>
               <p className="text-sm text-zinc-900 font-medium leading-snug">{mission.task_text}</p>
@@ -577,7 +581,7 @@ export default function MissionControl({
                 onClick={handleStop}
                 className="mt-3 rounded border border-red-200 bg-white px-3 py-1.5 text-[10px] uppercase tracking-wider text-red-600 hover:bg-red-50 transition font-medium"
               >
-                {mission.mission_mode === "replay" ? "Exit Replay" : "Stop Mission"}
+                {mission.mission_mode === "replay" ? (cachedRescanActive ? "Exit Rescan" : "Exit Replay") : "Stop Mission"}
               </button>
               {mission.mission_mode === "replay" && (
                 <div className="mt-3 flex flex-wrap gap-2">

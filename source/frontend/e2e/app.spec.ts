@@ -413,7 +413,7 @@ test.describe("Phase 4.75 - Cached replay flow", () => {
 
     await page.getByTestId("mission-panel-tab-replay").click();
     await page.getByTestId("rescan-replay-rondonia_frontier_showcase").click();
-    await expect(page.getByText("REPLAY ACTIVE: rondonia_frontier_showcase")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("CACHED RESCAN ACTIVE: rondonia_frontier_showcase")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("replay_rondonia_center_cached_rescan")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("Cached Rescan Current Model")).toBeVisible({ timeout: 10_000 });
   });

@@ -416,7 +416,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await expect(page.getByTestId("rescan-replay-georgia_wildfire_replay")).toHaveText("Rescan Cache");
     await page.getByTestId("rescan-replay-georgia_wildfire_replay").click();
     await expect(page.getByTestId("tab-inspect")).toHaveClass(/border-zinc-900/, { timeout: 15_000 });
-    await expect(page.getByText("REPLAY ACTIVE: georgia_wildfire_replay")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("CACHED RESCAN ACTIVE: georgia_wildfire_replay")).toBeVisible({ timeout: 15_000 });
 
     await page.getByTestId("tab-agents").click();
     await expect(page.getByTestId("ground-agent-nav-object_evidence")).toHaveCount(0);
