@@ -1,8 +1,8 @@
 # LFM-ORBIT
 
-LFM-ORBIT scans selected Earth areas tile-by-tile across a chosen time frame, looking for configured concerns such as wildfire evidence, mineral expansion, biomass loss, flooding, maritime activity, and other Earth-observation targets.
+LFM-ORBIT is a professional-product-style MVP for satellite evidence triage. It is not a production surveillance system; it is a reproducible mission-control prototype showing how local Liquid AI reasoning can reduce satellite downlink load, retain only useful evidence, and produce compact proof packets with provenance.
 
-It uses real satellite/timelapse evidence when configured, prunes low-value cells before downlink, reviews retained evidence with dual agents, and packages findings into compact proof JSON.
+The product journey is simple: an operator selects a mission area, Orbit scans satellite tiles, low-value cells are pruned before downlink, retained evidence is reviewed by SAT/GND agents, and the final output is compact proof JSON with imagery provenance.
 
 [Demo guide](docs/user/DEMO_GUIDE.md) | [Validation](#validation-snapshot) | [Release](https://github.com/Shoozes/LFM-ORBIT/releases/latest)
 
@@ -42,6 +42,8 @@ Option 1 reuses an existing valid trained GGUF after the first download. Set `LF
 4. Review **Logs** and **Inspect** for the downlinked alert, retained timelapse, source metadata, and agent notes.
 5. Open **Agent -> Proof Mode** for the compact proof JSON and visual evidence.
 
+This is the intended judging path: one mission, one scan/proof story, and clear source/runtime boundaries. The supporting tabs and demos exist to prove the same product loop, not to broaden the claim.
+
 ## Record The Showcase
 
 ```bash
@@ -70,6 +72,8 @@ Full repo verification:
 - Optional LiquidAI/LFM2.5-VL-450M retained-frame review when the image runtime is enabled.
 - Compact proof JSON instead of raw-image downlink.
 - Saved and tagged evidence for export, retagging, tuning, replay, and cached-data rescan with newer prompts or models.
+
+The hackathon artifact is treated like a product contract: install path, deterministic demo, source-backed evidence, proof output, and honest runtime boundaries.
 
 ## Proof Gallery
 

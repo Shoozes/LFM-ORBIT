@@ -2,6 +2,8 @@
 
 This is the recorded showcase path for the Liquid AI x DPhi Space Hackathon submission.
 
+Frame the product as one clear operator journey: select a mission area, scan satellite tiles, prune low-value cells before downlink, review retained evidence with SAT/GND agents, and produce compact proof JSON with imagery provenance. Avoid showing the whole app in the main cut; every visible screen should support that path.
+
 The hackathon satellite-data API target is SimSat/Mapbox through DPhi Space SimSat. The default lane is SimSat Sentinel, with SimSat Mapbox available as the optional imagery/context lane when a Mapbox token is configured. The recorded showcase does not require Sentinel Hub credentials; bundled replay fixtures and SimSat/Mapbox runtime defaults keep the demo deterministic and quota-free. Sentinel Hub is used only for development real-data seeding and cached replay refreshes, not as the default hackathon provider.
 
 Normal app startup is intentionally idle. It opens on the Atacama mining context so the strongest story is ready to inspect, but it does not auto-play the last replay, launch a mission, or begin scanning until the operator confirms a mission proposal.
@@ -41,6 +43,16 @@ What it proves:
 9. Abstain and backend-derived link-outage queue behavior in the full demo set
 10. Target-pack proof metadata attached to alerts, replays, datasets, and Proof Mode without a separate Mission-tab evidence workspace
 11. Optional retained-frame image-conditioned review when the LiquidAI/LFM2.5-VL-450M Transformers runtime is installed and enabled
+
+Main media checklist:
+
+1. Product name and one-line value proposition
+2. Mission selection
+3. Scan/progress moment
+4. Retained evidence or timelapse moment
+5. Payload-reduction and proof JSON moment
+6. Replay/live/source-mode boundary
+7. Closing frame: local-first, reproducible, compact satellite proof
 
 Artifacts:
 
