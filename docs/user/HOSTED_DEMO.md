@@ -8,6 +8,8 @@ The hosted route renders at `/hosted` locally and at the configured project path
 
 Current deployment: [https://shoozes.github.io/LFM-ORBIT/](https://shoozes.github.io/LFM-ORBIT/). The Pages deployment and deployed static-origin smoke passed for the current `main` commit; HTTPS is enforced by the repository Pages configuration.
 
+The hosted presentation uses normal document-flow scrolling and constrains horizontal overflow for narrow viewports. The full operator app keeps its separate viewport-locked shell; the hosted-only stylesheet overrides that global body lock so the public evidence page can reach every section on desktop and mobile.
+
 The default Pages build is deliberately model-free. It emits no browser model manifest, Wllama runtime, or model weights while redistribution and attribution terms are unresolved. Browser text reasoning is an explicit opt-in local capability, not image-conditioned VLM inference.
 
 ## Start locally

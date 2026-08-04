@@ -1,3 +1,8 @@
+body {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 .hosted-shell {
   --hosted-ink: #ecf8ff;
   --hosted-muted: #9eb8c6;
@@ -11,7 +16,6 @@
   color: var(--hosted-ink);
   min-height: 100vh;
   overflow-x: hidden;
-  overflow-y: auto;
   font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
 }
 

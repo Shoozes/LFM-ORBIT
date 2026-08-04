@@ -126,7 +126,7 @@
       ]
     },
     "feature_group_hosted_browser_portfolio": {
-      "description": "Browser-only hosted route with a fail-closed Pages entry, optional HTTPS model/package manifests, auditable replay provenance, safe base-aware assets, separated cancellation state, production-preview MIME/model proof, and no-backend smoke coverage.",
+      "description": "Browser-only hosted route with a fail-closed Pages entry, responsive document-flow scrolling, optional HTTPS model/package manifests, auditable replay provenance, safe base-aware assets, separated cancellation state, production-preview MIME/model proof, and no-backend smoke coverage.",
       "files": [
         "docs/user/HOSTED_DEMO.md",
         "source/frontend/e2e/hosted.build.spec.ts",
@@ -152,6 +152,7 @@
         "source/frontend/hosted/modelStateCore.d.ts",
         "source/frontend/hosted/modelStateCore.js",
         "source/frontend/hosted/useBrowserModel.ts",
+        "source/frontend/index.css",
         "source/frontend/package.json",
         "source/frontend/playwright.hosted.build.config.ts",
         "source/frontend/playwright.hosted.capture.config.ts",
@@ -320,7 +321,7 @@
       ]
     },
     "issue_group_hosted_pages_path_and_deployment": {
-      "description": "Pages project-path base resolution, fail-closed model-free artifact delivery, safe hosted asset routing, complete saved-package visuals, subpath production smoke, post-deploy static-origin verification, and deployment readiness gates.",
+      "description": "Pages project-path base resolution, fail-closed model-free artifact delivery, safe hosted asset routing, responsive document-flow scrolling, complete saved-package visuals, subpath production smoke, post-deploy static-origin verification, and deployment readiness gates.",
       "files": [
         ".github/workflows/pages.yml",
         "docs/dev/TODO.md",
@@ -340,6 +341,7 @@
         "source/frontend/hosted/hostedModel.ts",
         "source/frontend/hosted/model-manifest.json",
         "source/frontend/index.html",
+        "source/frontend/index.css",
         "source/frontend/package.json",
         "source/frontend/playwright.config.ts",
         "source/frontend/playwright.hosted.pages.config.ts",

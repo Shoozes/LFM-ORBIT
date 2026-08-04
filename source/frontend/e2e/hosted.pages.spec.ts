@@ -92,3 +92,26 @@ test("hosted Pages build stays under the project path", async ({ page }) => {
   expect(cssMimes.length).toBeGreaterThan(0);
   expect(cssMimes.every((mime) => /text\/css/i.test(mime))).toBe(true);
 });
+
+test("hosted Pages presentation remains scrollable and horizontally contained on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(PAGES_BASE, { waitUntil: "networkidle" });
+  await expect(page.getByRole("heading", { name: /small model turns satellite change/i })).toBeVisible();
+
+  const layout = await page.evaluate(() => {
+    window.scrollTo(0, document.documentElement.scrollHeight);
+    return {
+      bodyOverflowY: getComputedStyle(document.body).overflowY,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      documentScrollHeight: document.documentElement.scrollHeight,
+      viewportHeight: window.innerHeight,
+      scrollY: window.scrollY,
+    };
+  });
+
+  expect(layout.bodyOverflowY).toBe("auto");
+  expect(layout.documentScrollHeight).toBeGreaterThan(layout.viewportHeight + 100);
+  expect(layout.scrollY).toBeGreaterThan(0);
+  expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth + 1);
+});

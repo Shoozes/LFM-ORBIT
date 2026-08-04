@@ -102,6 +102,23 @@ test("deployed Pages origin serves the project-path static contract", async ({ p
   await expect(page.getByRole("heading", { name: /small model turns satellite change/i })).toBeVisible();
   await expect(page.getByRole("link", { name: /Full app \(local\)/i })).toHaveCount(0);
 
+  await page.setViewportSize({ width: 390, height: 844 });
+  const layout = await page.evaluate(() => {
+    window.scrollTo(0, document.documentElement.scrollHeight);
+    return {
+      bodyOverflowY: getComputedStyle(document.body).overflowY,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      documentScrollHeight: document.documentElement.scrollHeight,
+      viewportHeight: window.innerHeight,
+      scrollY: window.scrollY,
+    };
+  });
+  expect(layout.bodyOverflowY).toBe("auto");
+  expect(layout.documentScrollHeight).toBeGreaterThan(layout.viewportHeight + 100);
+  expect(layout.scrollY).toBeGreaterThan(0);
+  expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth + 1);
+
   const packageResponse = await page.request.get(assetUrl("demo-packages/index.json", hostedPagesUrl));
   const modelResponse = await page.request.get(assetUrl("model-manifest.json", hostedPagesUrl));
   expect(packageResponse.ok()).toBe(true);
