@@ -113,88 +113,41 @@ The portfolio artifact is treated like a product contract: install path, determi
 
 ## Proof Gallery
 
-### 01. Critical Minerals Expansion Watch
+The four strongest surfaces are below. The [media index](docs/media/README.md) owns the full screenshot, story-plate, timelapse, and video inventory so this README stays focused on the product contract.
+
+### Critical minerals and payload reduction
 
 ![Critical minerals expansion evidence](docs/media/story-plates/story-critical-minerals-expansion.png)
 
-Region-level mining expansion evidence with provenance, target-pack context, and compact proof output.
-
-### 02. Payload Reduction
+Region-level evidence keeps provenance and target-pack context attached while raw imagery is reduced to compact proof JSON.
 
 ![Payload reduction proof](docs/media/readme/readme-payload-reduction.png)
 
-Raw frame evidence is reduced to compact alert JSON before downlink.
-
-### 03. Orbital Eclipse Queue
+### Replay and target-pack proof
 
 ![Orbital eclipse proof](docs/media/readme/readme-orbital-eclipse.png)
 
-Alerts queue during link loss and flush after contact returns.
-
-### 04. Target-Pack Proof
+Link loss queues compact alerts until contact returns. Target-pack metadata travels with replay snapshots, dataset rows, and Proof Mode.
 
 ![Port activity CV object evidence](docs/media/story-plates/story-object-evidence-port.png)
 
-Target-pack metadata travels with alerts, replay snapshots, dataset rows, and Proof Mode.
+### Hosted boundary
 
-### 05. Provenance And Audit
-
-![Provenance proof](docs/media/readme/readme-provenance.png)
-
-Each alert keeps provider, capture time, bbox, confidence, model metadata, and payload accounting attached.
-
-### 06. Timelapse Context
-
-![Greenland ice/snow Sentinel-2 timelapse](docs/media/timelapse/highlight-greenland-ice-timelapse.gif)
-
-Timelapse review uses sequential imagery slices, not static color-shift videos.
-
-### 07. Ground Operations
-
-![Ground Agent operator playbook](docs/media/readme/readme-ground-agent-playbook.png)
-
-Ground Agent handles replay loads, mission packs, link simulation, and operator review cards before state changes.
-
-### 08. Semantic Location Context
-
-![Ground Agent semantic location camera context](docs/media/readme/readme-location-camera-context.png)
-
-Known map targets carry mission context and safe evidence guidance with the camera move.
-
-### 09. Hosted Browser Presentation
-
-![Hosted browser demo](docs/media/readme/readme-hosted-demo.png)
-
-The separate hosted route presents saved evidence packages and optional local browser inference without backend controls. The GitHub Pages artifact is intentionally saved-packages-only until the browser-model redistribution decision is complete.
-
-[Hosted browser demo video](docs/media/videos/hosted-demo.webm) shows the static route, saved-package provenance, and local-model boundary without starting the backend.
-
-### 10. Hosted Evidence Package
-
-![Hosted saved evidence package](docs/media/readme/readme-hosted-evidence.png)
-
-The hosted package view keeps the data boundary visible: saved demo evidence is not live imagery.
+The hosted route presents saved evidence packages without backend controls. Pages is intentionally saved-packages-only until the browser-model redistribution decision is complete; use the [hosted handoff](docs/user/HOSTED_DEMO.md) for deployment details.
 
 ## Validation Snapshot
 
-The table below separates the historical May 8 release snapshot from the recorded August 4 integrity pass and this hosted-build follow-up. Frontend build checks were rerun locally; backend and live-browser gates remain qualified below. The production GGUF launcher path remains a separate heavyweight verification lane.
+The current local baseline has a locked backend suite (`560 passed`), `17` frontend unit tests, TypeScript/build checks, and a fail-closed Pages artifact. The required Playwright suite now excludes media production and release-only hosted/model specs; run it from `source/frontend` when browser dependencies are available. This managed desktop environment currently blocks Chromium launch with `spawn EPERM`, so no browser pass is claimed here.
 
-| Check | Current State |
-|---|---|
-| Root verify | Recorded August 4 `.\run.ps1 -Verify` pass; the optional trained-GGUF runtime smoke remains a separate lane |
-| Backend tests | Fresh locked Windows environment: focused import/docs/CI gate `33 passed`; full backend suite `557 passed` with no application failures or `httpx2` warning |
-| Frontend | Fresh typecheck, 17 unit tests, production build, hosted build, default Pages build, and explicit model-enabled Pages build passed; local Chromium launch returned `spawn EPERM`, so no new browser pass is claimed |
-| Pages project path | Fresh fail-closed saved-packages-only build and no-model-runtime artifact audit pass under `/LFM-ORBIT/`; browser smoke and live deployment proof remain separate |
-| Hosted real-model proof | Prior opt-in `npm run test:hosted:model:build` proof fetched the pinned 219 MB GGUF and generated locally with no backend/API/WebSocket requests; it was not rerun in this pass |
-| Playwright E2E | August 4 default suite rerun: `108 passed, 6 skipped` with intentional skips; Pages-only release specs are excluded from this default port-owning suite |
-| Docs/import guards | Fresh focused backend/import/docs/CI gate `33 passed`; full locked backend suite `557 passed` |
-| Option 1 launch | Recorded August 4: backend `8000` and app `5173` ready |
-| Clean-start smoke | Recorded August 4: idle on Atacama context, no auto replay, no default scan |
-| Recorded demos | showcase, tutorial, training journey, payload, provenance, abstain, eclipse |
-| Dataset export | `46` raw replay/cache samples, `34` timelapse rows |
-| Retagged training set | `265` assets, `33` temporal sequences |
-| Dataset | [Shoozes/LFM-Orbit-SatData](https://huggingface.co/datasets/Shoozes/LFM-Orbit-SatData) |
-| Trained model | [Shoozes/lfm2.5-450m-vl-orbit-satellite](https://huggingface.co/Shoozes/lfm2.5-450m-vl-orbit-satellite) |
+```powershell
+cd source/frontend
+npm run lint
+npm run test:unit
+npm run build:pages
+npm run test:e2e
+```
+
+The Pages workflow separately runs hosted smoke, deploys the model-free project-path artifact, and performs a live static-origin check. The public URL, model licensing decision, and iOS Safari model proof remain external release gates in [TODO.md](docs/dev/TODO.md).
 
 ## Model + Training Loop
 
@@ -217,4 +170,3 @@ Python `3.10+` and Node.js `20.19.0` from `.nvmrc` or Node.js `22.12.0+`. The la
 - [Model handoff](docs/dev/MODEL_HANDOFF.md)
 - [Dataset cycle](docs/dev/DATASET_CYCLE_TUTORIAL.md)
 - [Current backlog](docs/dev/TODO.md)
-- [Current integrity review](docs/dev/review.md)

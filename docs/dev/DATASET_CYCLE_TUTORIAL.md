@@ -161,5 +161,5 @@ The Hub card keeps schemas separate:
 - Reuse existing image hashes and upload only changed configs/assets unless a schema changes.
 - Keep metadata-only missions in `mission_metadata`; do not force invalid WebMs into image configs.
 - For training-data refreshes, exclude local mission archives with `--no-missions --no-archived-missions` unless the explicit goal is intent/tool tuning. Otherwise repeated operator mission rows can crowd out seeded replay evidence under the export limit.
-- Record counts, tagger source, skipped assets, failures, and Hub commit hash in this tutorial, `source/backend/data/README.md`, and `summary_bank.json`.
+- Keep changing counts, tagger source, skipped assets, failures, and Hub commit hashes in the generated dataset manifests and release evidence; this tutorial owns the stable refresh workflow.
 - Keep direct Sentinel/NASA/GEE refreshes optional. The default path remains SimSat/Mapbox through DPhi Space SimSat plus seeded replay data.

@@ -1,6 +1,6 @@
 # LFM Orbit Docs
 
-Start with the product [README](../README.md). Use the docs below only when you need commands, contracts, or maintenance detail.
+Start with the product [README](../README.md). Each active document owns one surface; current unfinished work lives only in [TODO.md](dev/TODO.md), while generated manifests and historical archives are references.
 
 ## User
 
@@ -13,7 +13,6 @@ Start with the product [README](../README.md). Use the docs below only when you 
 - [Architecture](dev/ARCHITECTURE.md)
 - [Pitfall ledger](dev/PITFALL_LEDGER.md)
 - [Repository boundary](dev/REPOSITORY_BOUNDARY.md)
-- [Current integrity review](dev/review.md)
 - [Model handoff](dev/MODEL_HANDOFF.md)
 - [Dataset cycle](dev/DATASET_CYCLE_TUTORIAL.md)
 - [Seeded data registry](dev/SEEDED_DATA_REGISTRY.md)

@@ -29,6 +29,8 @@ SCRIPT_MODULES = (
     "scripts.smoke_image_review",
     "scripts.smoke_satellite_model",
     "scripts.upload_orbit_dataset_hf",
+    "scripts.verify_docs",
+    "scripts.verify_workflow_contracts",
 )
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -105,6 +107,6 @@ def test_launchers_keep_minimal_runtime_guards_documented():
     assert "Ensure-OrbitPortAvailable -Port 5173" in ps_launcher
     assert "stop_process_tree" in bash_launcher
     assert "Stop-OrbitProcessTree" in ps_launcher
-    assert "uv run --locked uvicorn api.main:app" in playwright_config
-    assert "uv run --locked uvicorn satellite_debug:app" in playwright_config
+    assert "run --locked uvicorn api.main:app" in playwright_config
+    assert "run --locked uvicorn satellite_debug:app" in playwright_config
     assert "uv run --no-sync uvicorn" not in playwright_config

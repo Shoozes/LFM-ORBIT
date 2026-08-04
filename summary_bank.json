@@ -76,7 +76,6 @@
         "docs/dev/ARCHITECTURE.md",
         "docs/dev/PITFALL_LEDGER.md",
         "docs/dev/REPOSITORY_BOUNDARY.md",
-        "docs/dev/review.md",
         "docs/dev/TODO.md",
         "source/backend/pyproject.toml",
         "source/frontend/package.json"
@@ -92,6 +91,7 @@
         "run.ps1",
         "run.sh",
         "source/backend/pyproject.toml",
+        "source/backend/scripts/verify_workflow_contracts.py",
         "source/backend/tests/test_ci_workflow.py",
         "source/backend/tests/test_import_contracts.py",
         "source/backend/tests/test_request_limits.py",
@@ -101,6 +101,7 @@
         "source/frontend/e2e/hosted.pages.live.static.spec.ts",
         "source/frontend/package.json",
         "source/frontend/playwright.config.ts",
+        "source/frontend/playwright.media.config.ts",
         "source/frontend/playwright.hosted.build.config.ts",
         "source/frontend/playwright.hosted.config.ts",
         "source/frontend/playwright.hosted.pages.config.ts",
@@ -244,6 +245,8 @@
       "files": [
         "README.md",
         "docs/README.md",
+        "docs/dev/DATASET_CYCLE_TUTORIAL.md",
+        "docs/dev/SEEDED_DATA_REGISTRY.md",
         "docs/dev/TODO.md",
         "docs/dev/MODEL_HANDOFF.md",
         "docs/dev/archive/QA_PITFALLS.md",
@@ -256,10 +259,28 @@
         "source/backend/tests/test_seeded_timelapse_integrity.py"
       ]
     },
+    "issue_group_ci_and_docs_contracts": {
+      "description": "Separated hosted/application/media CI lanes, dependency audit artifacts, workflow syntax checks, docs budgets, and summary-bank integrity.",
+      "files": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/docs.yml",
+        "source/backend/scripts/verify_docs.py",
+        "source/backend/scripts/verify_workflow_contracts.py",
+        "source/backend/tests/test_ci_workflow.py",
+        "source/backend/tests/test_docs_artifacts.py",
+        "source/frontend/package.json",
+        "source/frontend/playwright.config.ts",
+        "source/frontend/playwright.media.config.ts",
+        "docs/dev/ARCHITECTURE.md",
+        "docs/dev/TODO.md",
+        "docs/user/DEMO_GUIDE.md",
+        "docs/user/HOSTED_DEMO.md",
+        "summary_bank.json"
+      ]
+    },
     "issue_group_integrity_scalability_review": {
       "description": "Current frontend integrity findings and cross-surface mission/replay wiring, including async refresh cancellation and QA contracts.",
       "files": [
-        "docs/dev/review.md",
         "source/backend/core/mission.py",
         "source/backend/tests/test_mission.py",
         "source/frontend/App.tsx",
@@ -291,7 +312,6 @@
       "files": [
         ".github/workflows/pages.yml",
         "docs/dev/TODO.md",
-        "docs/dev/review.md",
         "docs/user/HOSTED_DEMO.md",
         "source/backend/tests/test_ci_workflow.py",
         "source/backend/tests/test_docs_artifacts.py",
@@ -326,7 +346,6 @@
         "source/backend/scripts/export_orbit_dataset.py",
         "source/backend/tests/test_export_orbit_dataset.py",
         "docs/dev/TODO.md",
-        "docs/dev/review.md",
         "summary_bank.json"
       ]
     },

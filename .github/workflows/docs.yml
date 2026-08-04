@@ -1,0 +1,50 @@
+name: Documentation Contracts
+
+on:
+  push:
+    branches:
+      - main
+      - hackathon
+    paths:
+      - README.md
+      - docs/**
+      - summary_bank.json
+      - .tools/_gen_bank.py
+      - source/backend/scripts/verify_docs.py
+      - source/backend/tests/test_docs_artifacts.py
+      - .github/workflows/docs.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - README.md
+      - docs/**
+      - summary_bank.json
+      - .tools/_gen_bank.py
+      - source/backend/scripts/verify_docs.py
+      - source/backend/tests/test_docs_artifacts.py
+      - .github/workflows/docs.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    name: Docs and Context Contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate active docs and local references
+        run: python source/backend/scripts/verify_docs.py
+
+      - name: Audit summary-bank routing
+        run: python .tools/_gen_bank.py --audit --fail-on-audit --max-bank-kb 384

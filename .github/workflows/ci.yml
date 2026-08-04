@@ -18,10 +18,71 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  scope:
+    name: Change Scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.scope.outputs.docs_only }}
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed paths
+        id: scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BEFORE: ${{ github.event.before }}
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            docs_only=false
+            changed_paths="manual dispatch"
+          elif [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base_sha="$EVENT_BASE_SHA"
+            if [[ -z "$base_sha" || "$base_sha" =~ ^0+$ ]]; then
+              changed_paths="$(git diff-tree --no-commit-id --name-only -r "$HEAD_SHA")"
+            else
+              changed_paths="$(git diff --name-only "$base_sha" "$HEAD_SHA")"
+            fi
+          else
+            base_sha="$EVENT_BEFORE"
+            if [[ -z "$base_sha" || "$base_sha" =~ ^0+$ ]]; then
+              changed_paths="$(git diff-tree --no-commit-id --name-only -r "$HEAD_SHA")"
+            else
+              changed_paths="$(git diff --name-only "$base_sha" "$HEAD_SHA")"
+            fi
+          fi
+
+          if [[ "$EVENT_NAME" != "workflow_dispatch" ]]; then
+            docs_only=true
+            if [[ -z "$changed_paths" ]]; then
+              docs_only=false
+            fi
+            while IFS= read -r changed_path; do
+              [[ -z "$changed_path" ]] && continue
+              case "$changed_path" in
+                README.md|docs/*|summary_bank.json) ;;
+                *) docs_only=false; break ;;
+              esac
+            done <<< "$changed_paths"
+          fi
+
+          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
+          echo "docs_only=$docs_only"
+          printf '%s\n' "$changed_paths"
+
   security-static:
     name: Security and Static Checks
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    needs: scope
+    if: needs.scope.outputs.docs_only != 'true'
     permissions:
       contents: read
       security-events: write
@@ -49,10 +110,19 @@ jobs:
       - name: Ruff syntax/static sanity
         run: uvx ruff check source/backend --select E9
 
-      - name: Python dependency audit
+      - name: Prepare Python dependency audit
         working-directory: source/backend
         run: |
           uv export --extra dev --extra model --format requirements-txt --no-hashes --no-emit-project --output-file requirements-audit.txt
+          set +e
+          uvx pip-audit -r requirements-audit.txt --format json > pip-audit.json 2> pip-audit.stderr
+          status=$?
+          echo "PIP_AUDIT_STATUS=$status" >> "$GITHUB_ENV"
+          exit 0
+
+      - name: Python dependency audit
+        working-directory: source/backend
+        run: |
           # diskcache is pulled transitively by optional llama-cpp-python. Its latest
           # release has no fix for PYSEC-2026-2447 (alias CVE-2025-69872), so keep
           # the exception explicit and revisit it when diskcache ships a fix.
@@ -69,14 +139,37 @@ jobs:
         working-directory: source/frontend
         run: npm ci
 
+      - name: Prepare frontend dependency audit
+        working-directory: source/frontend
+        run: |
+          set +e
+          npm audit --json > npm-audit.json 2> npm-audit.stderr
+          status=$?
+          echo "NPM_AUDIT_STATUS=$status" >> "$GITHUB_ENV"
+          exit 0
+
       - name: Frontend dependency audit
         working-directory: source/frontend
         run: npm audit --audit-level=high
+
+      - name: Upload dependency audit reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dependency-audit-reports
+          path: |
+            source/backend/pip-audit.json
+            source/backend/pip-audit.stderr
+            source/frontend/npm-audit.json
+            source/frontend/npm-audit.stderr
+          if-no-files-found: ignore
 
   backend:
     name: Backend Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: scope
+    if: needs.scope.outputs.docs_only != 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -107,6 +200,8 @@ jobs:
     name: Frontend Typecheck and Build
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: scope
+    if: needs.scope.outputs.docs_only != 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -134,15 +229,79 @@ jobs:
         working-directory: source/frontend
         run: npm run build:hosted
 
-  e2e:
-    name: Frontend E2E
+  workflow-contracts:
+    name: Workflow Contracts
     runs-on: ubuntu-latest
-    # Clean runners may spend ~11 minutes installing Playwright OS/browser dependencies
-    # before the serialized ~17-minute suite begins.
-    timeout-minutes: 35
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install pinned actionlint
+        env:
+          ACTIONLINT_VERSION: v1.7.7
+        run: |
+          go install "github.com/rhysd/actionlint/cmd/actionlint@${ACTIONLINT_VERSION}"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Validate workflow syntax
+        run: actionlint
+
+      - name: Validate repository workflow contracts
+        run: python source/backend/scripts/verify_workflow_contracts.py
+
+  hosted-smoke:
+    name: Hosted Production Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs:
+      - scope
+      - frontend
+    if: needs.scope.outputs.docs_only != 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: source/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: source/frontend
+        run: npm ci
+
+      - name: Install Playwright browser
+        working-directory: source/frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run hosted production smoke
+        working-directory: source/frontend
+        env:
+          CI: "true"
+        run: npm run verify:hosted
+
+      - name: Upload hosted smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hosted-smoke-artifacts
+          path: |
+            source/frontend/playwright-report
+            source/frontend/test-results
+          if-no-files-found: ignore
+
+  app-e2e:
+    name: Application E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs:
+      - scope
       - backend
       - frontend
+    if: needs.scope.outputs.docs_only != 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -178,12 +337,6 @@ jobs:
         working-directory: source/frontend
         run: npx playwright install --with-deps chromium
 
-      - name: Run hosted production smoke
-        working-directory: source/frontend
-        env:
-          CI: "true"
-        run: npm run verify:hosted
-
       - name: Run Playwright suite
         working-directory: source/frontend
         env:
@@ -195,7 +348,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-artifacts
+          name: app-e2e-artifacts
           path: |
             source/frontend/playwright-report
             source/frontend/test-results
@@ -205,24 +358,42 @@ jobs:
     name: ci-summary
     if: always()
     needs:
+      - scope
       - security-static
       - backend
       - frontend
-      - e2e
+      - workflow-contracts
+      - hosted-smoke
+      - app-e2e
     runs-on: ubuntu-latest
     steps:
       - name: Require all CI jobs to pass
         env:
           SECURITY_STATIC: ${{ needs.security-static.result }}
+          SCOPE: ${{ needs.scope.result }}
+          DOCS_ONLY: ${{ needs.scope.outputs.docs_only }}
           BACKEND: ${{ needs.backend.result }}
           FRONTEND: ${{ needs.frontend.result }}
-          E2E: ${{ needs.e2e.result }}
+          WORKFLOW_CONTRACTS: ${{ needs.workflow-contracts.result }}
+          HOSTED_SMOKE: ${{ needs.hosted-smoke.result }}
+          APP_E2E: ${{ needs.app-e2e.result }}
         run: |
           echo "security-static=$SECURITY_STATIC"
+          echo "scope=$SCOPE"
+          echo "docs-only=$DOCS_ONLY"
           echo "backend=$BACKEND"
           echo "frontend=$FRONTEND"
-          echo "e2e=$E2E"
-          test "$SECURITY_STATIC" = success
-          test "$BACKEND" = success
-          test "$FRONTEND" = success
-          test "$E2E" = success
+          echo "workflow-contracts=$WORKFLOW_CONTRACTS"
+          echo "hosted-smoke=$HOSTED_SMOKE"
+          echo "app-e2e=$APP_E2E"
+          test "$SCOPE" = success
+          test "$WORKFLOW_CONTRACTS" = success
+          if [ "$DOCS_ONLY" = true ]; then
+            echo "Docs-only change: heavyweight application jobs were intentionally skipped."
+          else
+            test "$SECURITY_STATIC" = success
+            test "$BACKEND" = success
+            test "$FRONTEND" = success
+            test "$HOSTED_SMOKE" = success
+            test "$APP_E2E" = success
+          fi

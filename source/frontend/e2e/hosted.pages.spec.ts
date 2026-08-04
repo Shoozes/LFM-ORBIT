@@ -60,7 +60,7 @@ test("hosted Pages build stays under the project path", async ({ page }) => {
   await expect(page.getByRole("img", { name: /Southeast US fireline review/i })).toBeVisible();
   await page.getByRole("link", { name: "What it teaches" }).click();
   await expect(page).toHaveURL(/#lesson$/);
-  await page.getByRole("link", { name: "Saved evidence" }).click();
+  await page.getByRole("link", { name: "Saved evidence", exact: true }).click();
   await expect(page).toHaveURL(/#evidence$/);
   await page.getByRole("link", { name: MODEL_ENABLED ? "Fetch model" : "Review evidence" }).click();
   await expect(page).toHaveURL(MODEL_ENABLED ? /#model$/ : /#evidence$/);

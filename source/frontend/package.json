@@ -24,12 +24,14 @@
     "test:hosted:pages:live:static": "npx playwright test -c playwright.hosted.pages.live.static.config.ts",
     "test:hosted:model": "npx playwright test -c playwright.hosted.model.config.ts",
     "test:hosted:model:build": "npm run build:hosted && npx playwright test -c playwright.hosted.model.build.config.ts",
+    "test:media": "npx playwright test -c playwright.media.config.ts",
     "verify:hosted": "npm run test:unit && npm run build:hosted && npm run test:hosted:build",
     "demo:hosted": "npx playwright test -c playwright.hosted.capture.config.ts",
     "demo:record": "npx playwright test -c playwright.demo.config.ts e2e/demos",
     "demo:showcase": "npx playwright test -c playwright.demo.config.ts e2e/demos/showcase.demo.spec.ts",
     "demo:payload": "npx playwright test -c playwright.demo.config.ts e2e/demos/payload-reduction.demo.spec.ts",
-    "demo:tutorial": "npx playwright test e2e/tutorial_video.spec.ts",
+    "demo:screenshots": "npm run test:media -- e2e/capture_screenshots.spec.ts",
+    "demo:tutorial": "npm run test:media -- e2e/tutorial_video.spec.ts",
     "demo:report": "npx playwright show-report"
   },
   "dependencies": {

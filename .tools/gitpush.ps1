@@ -152,11 +152,14 @@ function Assert-NoGitOperationInProgress {
         }
     }
 
-    $unmerged = Invoke-Git { git @('diff', '--name-only', '--diff-filter=U') }
+    # Git may emit benign environment warnings (for example, an unreadable
+    # global excludes file) on stderr. They are not unresolved paths.
+    $unmerged = Invoke-Git { git @('diff', '--name-only', '--diff-filter=U') 2>$null }
     if ($unmerged.ExitCode -ne 0) {
         throw "Could not inspect the index for unresolved conflicts: $($unmerged.Output -join [Environment]::NewLine)"
     }
-    if ($unmerged.Output.Count -gt 0) { $states += 'unresolved index conflicts' }
+    $unmergedPaths = @($unmerged.Output | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+    if ($unmergedPaths.Count -gt 0) { $states += 'unresolved index conflicts' }
 
     $states = @($states | Sort-Object -Unique)
     if ($states.Count -gt 0) {

@@ -42,7 +42,11 @@ def test_readme_local_links_and_images_exist():
 def test_markdown_local_links_and_images_exist():
     markdown_roots = [
         REPO_ROOT / "README.md",
-        *sorted((REPO_ROOT / "docs").rglob("*.md")),
+        *sorted(
+            path
+            for path in (REPO_ROOT / "docs").rglob("*.md")
+            if "archive" not in path.relative_to(REPO_ROOT / "docs").parts
+        ),
         *sorted((REPO_ROOT / "source/backend/data").glob("*.md")),
     ]
     missing: list[tuple[str, str]] = []
@@ -239,7 +243,6 @@ def test_docs_user_and_dev_surfaces_are_separated():
         "REPOSITORY_BOUNDARY.md",
         "SEEDED_DATA_REGISTRY.md",
         "TODO.md",
-        "review.md",
     ]
     assert legal_docs == ["THIRD_PARTY_NOTICES.md"]
     assert release_docs == ["v0.4.0-public-proof.md"]
@@ -256,7 +259,11 @@ def test_docs_user_and_dev_surfaces_are_separated():
 def test_docs_media_files_are_referenced_by_markdown():
     markdown_roots = [
         REPO_ROOT / "README.md",
-        *sorted((REPO_ROOT / "docs").rglob("*.md")),
+        *sorted(
+            path
+            for path in (REPO_ROOT / "docs").rglob("*.md")
+            if "archive" not in path.relative_to(REPO_ROOT / "docs").parts
+        ),
         *sorted((REPO_ROOT / "source/backend/data").glob("*.md")),
     ]
     markdown = "\n".join(path.read_text(encoding="utf-8", errors="ignore") for path in markdown_roots if path.exists())
@@ -276,7 +283,11 @@ def test_docs_media_files_are_referenced_by_markdown():
 def test_docs_do_not_reintroduce_retired_mission_evidence_ui():
     docs_paths = [
         REPO_ROOT / "README.md",
-        *sorted((REPO_ROOT / "docs").rglob("*.md")),
+        *sorted(
+            path
+            for path in (REPO_ROOT / "docs").rglob("*.md")
+            if "archive" not in path.relative_to(REPO_ROOT / "docs").parts
+        ),
     ]
     combined = "\n".join(path.read_text(encoding="utf-8", errors="ignore") for path in docs_paths if path.exists())
     retired_active_claims = [
@@ -379,13 +390,14 @@ def test_validation_snapshots_match_current_release_gate():
     todo = (REPO_ROOT / "docs/dev/TODO.md").read_text(encoding="utf-8")
     release = (REPO_ROOT / "docs/release/v0.4.0-public-proof.md").read_text(encoding="utf-8")
 
-    for source in (readme, todo, release):
-        assert "557 passed" in source
+    assert "560 passed" in readme
+    assert "557 passed" in release
+    for source in (readme, release):
         assert "Playwright" in source
-        assert "intentional skips" in source
         assert "104 passed" not in source
 
-    assert "backend `495 passed`" not in todo
+    assert "Latest Validation Snapshot" not in todo
+    assert "Current State" not in todo
 
 
 def test_replay_rescan_docs_describe_cached_data_contract():
@@ -437,6 +449,34 @@ def test_summary_bank_file_groups_are_deduplicated():
             seen.add(rel_path)
 
     assert duplicates == []
+
+
+def test_active_docs_fit_maintenance_budgets():
+    budgets = {
+        "README.md": 25 * 1024,
+        "docs/dev/ARCHITECTURE.md": 12 * 1024,
+        "docs/dev/TODO.md": 8 * 1024,
+        "docs/user/HOSTED_DEMO.md": 6 * 1024,
+        "docs/user/DEMO_GUIDE.md": 6 * 1024,
+    }
+    active_docs = [
+        REPO_ROOT / "README.md",
+        *sorted(
+            path
+            for path in (REPO_ROOT / "docs").rglob("*.md")
+            if "archive" not in path.relative_to(REPO_ROOT / "docs").parts
+        ),
+    ]
+    oversized = []
+    for path in active_docs:
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        if relative.startswith("docs/legal/"):
+            continue
+        limit = budgets.get(relative, 10 * 1024)
+        if path.stat().st_size > limit:
+            oversized.append((relative, path.stat().st_size, limit))
+
+    assert oversized == []
 
 
 def test_summary_bank_defaults_and_archived_routes_are_recoverable():

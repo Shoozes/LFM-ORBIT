@@ -86,3 +86,49 @@ def test_default_playwright_suite_excludes_pages_only_specs():
 
     assert '"**/hosted.pages.spec.ts"' in config
     assert '"**/hosted.pages.live.spec.ts"' in config
+    assert '"**/hosted.pages.live.static.spec.ts"' in config
+
+
+def test_default_playwright_suite_excludes_media_production_specs():
+    config = (REPO_ROOT / "source/frontend/playwright.config.ts").read_text(encoding="utf-8")
+    media_config = (REPO_ROOT / "source/frontend/playwright.media.config.ts").read_text(encoding="utf-8")
+    package_json = (REPO_ROOT / "source/frontend/package.json").read_text(encoding="utf-8")
+
+    for spec in (
+        '"**/capture_screenshots.spec.ts"',
+        '"**/dual_agent_demo.spec.ts"',
+        '"**/tutorial_video.spec.ts"',
+    ):
+        assert spec in config
+        assert spec in media_config
+    assert '"test:media":' in package_json
+    assert '"demo:tutorial": "npm run test:media' in package_json
+    assert '"demo:screenshots": "npm run test:media' in package_json
+
+
+def test_ci_separates_hosted_smoke_application_e2e_and_fast_contracts():
+    workflow = (REPO_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+
+    for marker in (
+        "scope:",
+        "docs_only:",
+        "Classify changed paths",
+        "workflow-contracts:",
+        "hosted-smoke:",
+        "app-e2e:",
+        "name: hosted-smoke-artifacts",
+        "name: app-e2e-artifacts",
+        "ACTIONLINT_VERSION: v1.7.7",
+        "name: dependency-audit-reports",
+    ):
+        assert marker in workflow
+    assert "paths-ignore:" not in workflow
+    assert "needs:\n      - scope\n      - frontend\n    if: needs.scope.outputs.docs_only != 'true'" in workflow
+    assert "npm run verify:hosted" in workflow
+    assert "npm run test:e2e" in workflow
+
+
+def test_pages_smoke_uses_exact_navigation_locators():
+    pages_spec = (REPO_ROOT / "source/frontend/e2e/hosted.pages.spec.ts").read_text(encoding="utf-8")
+
+    assert 'getByRole("link", { name: "Saved evidence", exact: true })' in pages_spec

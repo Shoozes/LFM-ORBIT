@@ -18,10 +18,11 @@ The initial public synchronization commit was `d9206163` on top of the verified 
 
 ## Current remote observation
 
-The last authenticated LFM-ORBIT publication check on August 4, 2026 moved `origin/main` to `f4c69a0b856c5f366a13e734765ded0218c02ce6`; tag `v0.4.0-public-proof` remained at `07d0042aa7f1cd6f6c2878fd087e55c61e98a428`, and no `origin/hackathon` ref was returned. The configured GenUni remote was not authenticated in that environment, so its remote archive refs remain unverified. This review created no branch or tag.
+The local checkout currently has `main` and `origin/main` at `a4d14dff95969055a5343d382692d15482e9faf1`. This implementation pass has not changed refs, tags, or branches; the working tree contains only uncommitted review changes. Before publication, re-run the authenticated remote-head and tag checks below rather than treating this snapshot as permanent evidence.
 
 ## Review rules
 
 - App code, app tests, hosted-demo assets, and app docs are reviewed and published from LFM-ORBIT.
 - Training artifacts and producer metadata remain attributable to GenUni in the model handoff; this relationship does not change the app's Git remote.
 - A future sync must verify both remote heads before pushing and must not force-rewrite LFM-ORBIT history.
+- The current release handoff and unfinished external gates are owned by [TODO.md](TODO.md); this boundary document does not become a second status ledger.
