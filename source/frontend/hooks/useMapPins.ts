@@ -6,6 +6,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getApiBaseUrl } from "../utils/telemetry";
+import { createRequestGate } from "../utils/requestGateCore.js";
+import type { RequestGate } from "../utils/requestGateCore.js";
 
 export type MapPin = {
   id: number;
@@ -25,10 +27,14 @@ const FETCH_TIMEOUT_MS = 5000;
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const abortRequest = () => controller.abort();
+  init.signal?.addEventListener("abort", abortRequest, { once: true });
   try {
+    if (init.signal?.aborted) controller.abort();
     return await fetch(input, { ...init, signal: controller.signal });
   } finally {
     window.clearTimeout(timeoutId);
+    init.signal?.removeEventListener("abort", abortRequest);
   }
 }
 
@@ -47,23 +53,34 @@ export function useMapPins() {
   const [error, setError] = useState<string | null>(null);
   const apiBase = getApiBaseUrl();
   const mountedRef = useRef(true);
-  const requestSeqRef = useRef(0);
+  const refreshGateRef = useRef<RequestGate | null>(null);
 
-  const fetchPins = useCallback(async () => {
-    const requestSeq = ++requestSeqRef.current;
+  const fetchPins = useCallback(async (): Promise<boolean> => {
+    const gate = refreshGateRef.current ?? createRequestGate();
+    refreshGateRef.current = gate;
+    const request = gate.begin();
     try {
-      const r = await fetchWithTimeout(`${apiBase}/api/map/pins`);
+      const r = await fetchWithTimeout(`${apiBase}/api/map/pins`, {
+        signal: request.controller.signal,
+      });
       if (!r.ok) {
         throw new Error(`HTTP ${r.status}`);
       }
       const data = (await r.json()) as { pins: MapPin[] };
-      if (mountedRef.current && requestSeq === requestSeqRef.current) {
+      if (mountedRef.current && gate.isCurrent(request)) {
         setPins(Array.isArray(data.pins) ? data.pins : []);
         setError(null);
+        return true;
       }
+      return false;
     } catch (exc) {
-      if (mountedRef.current && requestSeq === requestSeqRef.current) {
+      if (mountedRef.current && gate.isLatest(request)) {
         setError(errorMessage(exc, "Map pins unavailable"));
+      }
+      return false;
+    } finally {
+      if (gate.isLatest(request)) {
+        gate.finish(request);
       }
     }
   }, [apiBase]);
@@ -75,12 +92,15 @@ export function useMapPins() {
     return () => {
       mountedRef.current = false;
       window.clearInterval(id);
+      refreshGateRef.current?.abort();
+      refreshGateRef.current = null;
     };
   }, [fetchPins]);
 
   const dropPin = useCallback(
     async (lat: number, lng: number, note?: string) => {
       try {
+        refreshGateRef.current?.abort();
         const response = await fetchWithTimeout(`${apiBase}/api/map/pins`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -89,8 +109,8 @@ export function useMapPins() {
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
-        await fetchPins();
-        if (mountedRef.current) setError(null);
+        const refreshed = await fetchPins();
+        if (mountedRef.current && refreshed) setError(null);
         return true;
       } catch (exc) {
         if (mountedRef.current) setError(errorMessage(exc, "Operator pin was not saved"));
@@ -103,6 +123,7 @@ export function useMapPins() {
   const removePin = useCallback(
     async (pinId: number) => {
       try {
+        refreshGateRef.current?.abort();
         const response = await fetchWithTimeout(`${apiBase}/api/map/pins/${pinId}`, { method: "DELETE" });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
@@ -111,13 +132,14 @@ export function useMapPins() {
           setPins((prev) => prev.filter((p) => p.id !== pinId));
           setError(null);
         }
+        await fetchPins();
         return true;
       } catch (exc) {
         if (mountedRef.current) setError(errorMessage(exc, "Operator pin was not removed"));
         return false;
       }
     },
-    [apiBase]
+    [apiBase, fetchPins]
   );
 
   return { pins, dropPin, removePin, refetch: fetchPins, error };

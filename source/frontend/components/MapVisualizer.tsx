@@ -420,6 +420,7 @@ export default function MapVisualizer({
   const scanAnimationActiveRef = useRef(scanAnimationActive);
   const handledCameraRequestRef = useRef<string | null>(null);
   const cameraHudTimeoutRef = useRef<number | null>(null);
+  const cameraMoveTimeoutRef = useRef<number | null>(null);
   const dragPanWasEnabledRef = useRef<boolean | null>(null);
 
   // Bbox draw state
@@ -832,6 +833,10 @@ export default function MapVisualizer({
         window.clearTimeout(cameraHudTimeoutRef.current);
         cameraHudTimeoutRef.current = null;
       }
+      if (cameraMoveTimeoutRef.current) {
+        window.clearTimeout(cameraMoveTimeoutRef.current);
+        cameraMoveTimeoutRef.current = null;
+      }
       vlmPopupRef.current?.remove();
       vlmPopupRef.current = null;
       for (const timeoutId of scanStateTimeoutsRef.current) {
@@ -1043,6 +1048,7 @@ export default function MapVisualizer({
     }
 
     const moveCamera = () => {
+      cameraMoveTimeoutRef.current = null;
       if (mapRef.current !== map) return;
       map.once("moveend", () => {
         if (mapRef.current === map) setCameraMoveState("arrived");
@@ -1056,7 +1062,10 @@ export default function MapVisualizer({
       });
     };
 
-    window.setTimeout(moveCamera, bbox ? 170 : 0);
+    if (cameraMoveTimeoutRef.current) {
+      window.clearTimeout(cameraMoveTimeoutRef.current);
+    }
+    cameraMoveTimeoutRef.current = window.setTimeout(moveCamera, bbox ? 170 : 0);
 
     onCameraRequestHandled?.(cameraRequest.id);
   }, [cameraRequest, mapReady, onCameraRequestHandled]);

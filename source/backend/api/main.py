@@ -398,7 +398,7 @@ async def request_shape_guard(request: Request, call_next):
             validate_json_shape(json.loads(raw_body))
         except json.JSONDecodeError:
             # Let FastAPI's normal validation response describe malformed JSON.
-            pass
+            logger.debug("Malformed JSON body deferred to FastAPI validation.")
         except ValueError as exc:
             return JSONResponse(status_code=413, content={"error": str(exc)})
     return await call_next(request)

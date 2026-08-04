@@ -137,7 +137,7 @@ The hosted route presents saved evidence packages without backend controls. Page
 
 ## Validation Snapshot
 
-The current local baseline has a locked backend suite (`561 passed`), `17` frontend unit tests, TypeScript/build checks, and a fail-closed Pages artifact. The required Playwright suite now excludes media production and release-only hosted/model specs; run it from `source/frontend` when browser dependencies are available. This managed desktop environment currently blocks Chromium launch with `spawn EPERM`, so no browser pass is claimed here.
+The current `main` baseline (`5f920cc`) has a locked backend suite (`561 passed`), `18` frontend unit tests, TypeScript/build checks, and a fail-closed Pages artifact. The required Playwright suite now excludes media production and release-only hosted/model specs; run it from `source/frontend` when browser dependencies are available. This managed desktop environment currently blocks Chromium launch with `spawn EPERM`, so no browser pass is claimed here; the hosted and application browser lanes are covered by [CI run 30930624125](https://github.com/Shoozes/LFM-ORBIT/actions/runs/30930624125) and [Pages run 30930624410](https://github.com/Shoozes/LFM-ORBIT/actions/runs/30930624410).
 
 ```powershell
 cd source/frontend

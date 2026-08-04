@@ -4,6 +4,7 @@ export type RequestGateHandle = {
 
 export type RequestGate = {
   begin(): RequestGateHandle;
+  isLatest(request: RequestGateHandle): boolean;
   isCurrent(request: RequestGateHandle): boolean;
   finish(request: RequestGateHandle): void;
   abort(): void;

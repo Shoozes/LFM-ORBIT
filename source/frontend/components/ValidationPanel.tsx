@@ -8,6 +8,8 @@ import {
 } from "../utils/objectEvidence";
 import { useAgentBus } from "../hooks/useAgentBus";
 import type { Mission } from "../types/mission";
+import { createRequestGate } from "../utils/requestGateCore.js";
+import type { RequestGate } from "../utils/requestGateCore.js";
 type GalleryFull = {
   timelapse_b64: string | null;
   timelapse_source: string | null;
@@ -340,6 +342,9 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenTimelapse
   const [visualReviewLoading, setVisualReviewLoading] = useState(false);
   const apiBaseUrl = getApiBaseUrl();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const galleryRequestGateRef = useRef<RequestGate | null>(null);
+  const visualReviewRequestGateRef = useRef<RequestGate | null>(null);
+  const imageryRequestGateRef = useRef<RequestGate | null>(null);
 
   // Reset analysis, imagery, and gallery data when the selected alert changes
   const alertKey = alert?.event_id ?? null;
@@ -358,24 +363,37 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenTimelapse
     }
     setGalleryLoading(true);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const gate = galleryRequestGateRef.current ?? createRequestGate();
+    galleryRequestGateRef.current = gate;
+    const request = gate.begin();
+    const timeoutId = setTimeout(() => request.controller.abort(), 10000);
 
-    void fetch(`${apiBaseUrl}/api/gallery/${selectedCellId}`, { signal: controller.signal })
+    void fetch(`${apiBaseUrl}/api/gallery/${selectedCellId}`, { signal: request.controller.signal })
       .then((r) => {
         clearTimeout(timeoutId);
         return r.ok ? r.json() : null;
       })
-      .then((data) => setGalleryItem(data as GalleryFull | null))
+      .then((data) => {
+        if (gate.isCurrent(request)) {
+          setGalleryItem(data as GalleryFull | null);
+        }
+      })
       .catch(() => {
         clearTimeout(timeoutId);
-        setGalleryItem(null);
+        if (gate.isLatest(request)) {
+          setGalleryItem(null);
+        }
       })
-      .finally(() => setGalleryLoading(false));
+      .finally(() => {
+        if (gate.isLatest(request)) {
+          gate.finish(request);
+          setGalleryLoading(false);
+        }
+      });
 
     return () => {
       clearTimeout(timeoutId);
-      controller.abort();
+      gate.abort();
     };
   }, [selectedCellId, alert, apiBaseUrl]);
 
@@ -388,14 +406,17 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenTimelapse
     const currentAlert = alert;
     setVisualReview(null);
     setVisualReviewLoading(true);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const gate = visualReviewRequestGateRef.current ?? createRequestGate();
+    visualReviewRequestGateRef.current = gate;
+    const request = gate.begin();
+    const timeoutId = setTimeout(() => request.controller.abort(), 30000);
 
     async function runVisualReview() {
       const imageResponse = await fetch(`${apiBaseUrl}/api/gallery/${selectedCellId}/visual-review-image`, {
-        signal: controller.signal,
+        signal: request.controller.signal,
       });
       const imagePayload = imageResponse.ok ? ((await imageResponse.json()) as VisualReviewImage) : null;
+      if (!gate.isCurrent(request)) return;
       if (!imagePayload?.available || !imagePayload.image_b64) {
         setVisualReview({
           available: false,
@@ -410,7 +431,7 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenTimelapse
       const reviewResponse = await fetch(`${apiBaseUrl}/api/inference/image`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
+        signal: request.controller.signal,
         body: JSON.stringify({
           prompt: mission?.task_text ?? "Review this retained satellite evidence frame for the configured concern.",
           image_b64: imagePayload.image_b64,
@@ -424,25 +445,36 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenTimelapse
           },
         }),
       });
-      setVisualReview(reviewResponse.ok ? ((await reviewResponse.json()) as ImageReviewResponse) : null);
+      if (!gate.isCurrent(request)) return;
+      const reviewPayload = reviewResponse.ok
+        ? ((await reviewResponse.json()) as ImageReviewResponse)
+        : null;
+      if (!gate.isCurrent(request)) return;
+      setVisualReview(reviewPayload);
     }
 
     void runVisualReview()
-      .catch(() => setVisualReview({
-        available: false,
-        image_conditioned: false,
-        runtime_inference_mode: "text_evidence_packet",
-        reason: "image-conditioned review unavailable",
-        response: "",
-      }))
+      .catch(() => {
+        if (!gate.isLatest(request)) return;
+        setVisualReview({
+          available: false,
+          image_conditioned: false,
+          runtime_inference_mode: "text_evidence_packet",
+          reason: "image-conditioned review unavailable",
+          response: "",
+        });
+      })
       .finally(() => {
         clearTimeout(timeoutId);
-        setVisualReviewLoading(false);
+        if (gate.isLatest(request)) {
+          gate.finish(request);
+          setVisualReviewLoading(false);
+        }
       });
 
     return () => {
       clearTimeout(timeoutId);
-      controller.abort();
+      gate.abort();
     };
   }, [selectedCellId, alert, mission, apiBaseUrl]);
 
@@ -457,26 +489,37 @@ export default function ValidationPanel({ selectedCellId, alert, onOpenTimelapse
     setImagery(null);
     setImageryLoading(true);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const gate = imageryRequestGateRef.current ?? createRequestGate();
+    imageryRequestGateRef.current = gate;
+    const request = gate.begin();
+    const timeoutId = setTimeout(() => request.controller.abort(), 10000);
 
-    void fetch(`${apiBaseUrl}/api/imagery/cell/${selectedCellId}`, { signal: controller.signal })
+    void fetch(`${apiBaseUrl}/api/imagery/cell/${selectedCellId}`, { signal: request.controller.signal })
       .then((r) => {
         clearTimeout(timeoutId);
         return r.ok ? r.json() : null;
       })
       .then((data) => {
-        setImagery(data as CellImageryResponse | null);
+        if (gate.isCurrent(request)) {
+          setImagery(data as CellImageryResponse | null);
+        }
       })
       .catch(() => {
         clearTimeout(timeoutId);
-        setImagery(null);
+        if (gate.isLatest(request)) {
+          setImagery(null);
+        }
       })
-      .finally(() => setImageryLoading(false));
+      .finally(() => {
+        if (gate.isLatest(request)) {
+          gate.finish(request);
+          setImageryLoading(false);
+        }
+      });
 
     return () => {
       clearTimeout(timeoutId);
-      controller.abort();
+      gate.abort();
     };
   }, [selectedCellId, apiBaseUrl]);
 

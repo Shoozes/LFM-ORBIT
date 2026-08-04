@@ -308,6 +308,17 @@
         "source/frontend/utils/requestGateCore.js"
       ]
     },
+    "issue_group_frontend_async_request_integrity": {
+      "description": "Selection-bound validation requests, map-pin refresh cancellation, and map camera/timer cleanup that prevent stale UI state during rapid operator changes or teardown.",
+      "files": [
+        "source/frontend/components/MapVisualizer.tsx",
+        "source/frontend/components/ValidationPanel.tsx",
+        "source/frontend/hooks/useMapPins.ts",
+        "source/frontend/tests/requestGateCore.test.mjs",
+        "source/frontend/utils/requestGateCore.d.ts",
+        "source/frontend/utils/requestGateCore.js"
+      ]
+    },
     "issue_group_frontend_transport_integrity": {
       "description": "Validated agent-dialogue WebSocket envelopes, bounded client history, capped reconnect backoff, and timeout-bounded telemetry refreshes.",
       "files": [

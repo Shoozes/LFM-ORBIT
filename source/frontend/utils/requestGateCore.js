@@ -9,6 +9,10 @@ export function createRequestGate() {
       return request;
     },
 
+    isLatest(request) {
+      return activeRequest === request;
+    },
+
     isCurrent(request) {
       return activeRequest === request && !request.controller.signal.aborted;
     },

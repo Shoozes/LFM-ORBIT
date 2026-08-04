@@ -27,3 +27,16 @@ test("request gate invalidates in-flight work during cleanup", () => {
   assert.equal(request.controller.signal.aborted, true);
   assert.equal(gate.isCurrent(request), false);
 });
+
+test("request gate keeps the latest aborted request identifiable for cleanup", () => {
+  const gate = createRequestGate();
+  const request = gate.begin();
+
+  request.controller.abort();
+
+  assert.equal(gate.isLatest(request), true);
+  assert.equal(gate.isCurrent(request), false);
+
+  gate.finish(request);
+  assert.equal(gate.isLatest(request), false);
+});
