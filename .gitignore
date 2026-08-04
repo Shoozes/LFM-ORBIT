@@ -30,6 +30,7 @@ htmlcov/
 source/frontend/.vite/
 source/frontend/dist/
 source/frontend/dist-hosted/
+source/frontend/dist-pages/
 source/frontend/playwright-report/
 source/frontend/test-results/
 source/backend/dist/

@@ -76,8 +76,10 @@
         "docs/dev/ARCHITECTURE.md",
         "docs/dev/PITFALL_LEDGER.md",
         "docs/dev/REPOSITORY_BOUNDARY.md",
+        "docs/dev/review.md",
         "docs/dev/TODO.md",
         "source/backend/pyproject.toml",
+        "source/backend/uv.lock",
         "source/frontend/package.json"
       ]
     },
@@ -86,6 +88,7 @@
       "files": [
         ".github/workflows/ci.yml",
         ".github/workflows/codeql.yml",
+        ".github/workflows/pages.yml",
         "run.bat",
         "run.ps1",
         "run.sh",
@@ -94,10 +97,15 @@
         "source/backend/tests/test_import_contracts.py",
         "source/backend/tests/test_request_limits.py",
         "source/frontend/e2e/hosted.contracts.spec.ts",
+        "source/frontend/e2e/hosted.pages.spec.ts",
+        "source/frontend/e2e/hosted.pages.live.spec.ts",
         "source/frontend/package.json",
         "source/frontend/playwright.config.ts",
         "source/frontend/playwright.hosted.build.config.ts",
-        "source/frontend/playwright.hosted.config.ts"
+        "source/frontend/playwright.hosted.config.ts",
+        "source/frontend/playwright.hosted.pages.config.ts",
+        "source/frontend/playwright.hosted.pages.live.config.ts",
+        "source/frontend/vite.config.ts"
       ]
     },
     "workflow__context_routing": {
@@ -116,8 +124,10 @@
       ]
     },
     "feature_group_hosted_browser_portfolio": {
-      "description": "Browser-only hosted route, capability-gated local model/package manifests, auditable replay provenance, separated cancellation state, production-preview MIME/model proof, hosted video, and no-backend smoke coverage.",
+      "description": "Browser-only hosted route, capability-gated local model/package manifests, auditable replay provenance, safe base-aware assets, Pages-subpath proof, separated cancellation state, production-preview MIME/model proof, hosted video, and no-backend smoke coverage.",
       "files": [
+        ".github/workflows/pages.yml",
+        "docs/dev/review.md",
         "docs/media/videos/hosted-demo.webm",
         "docs/user/HOSTED_DEMO.md",
         "source/frontend/e2e/hosted.build.spec.ts",
@@ -125,6 +135,8 @@
         "source/frontend/e2e/hosted.contracts.spec.ts",
         "source/frontend/e2e/hosted.model-build.spec.ts",
         "source/frontend/e2e/hosted.model-fetch.spec.ts",
+        "source/frontend/e2e/hosted.pages.spec.ts",
+        "source/frontend/e2e/hosted.pages.live.spec.ts",
         "source/frontend/e2e/hosted.spec.ts",
         "source/frontend/e2e/hostedModelTest.ts",
         "source/frontend/hosted-main.tsx",
@@ -143,10 +155,17 @@
         "source/frontend/playwright.hosted.build.config.ts",
         "source/frontend/playwright.hosted.capture.config.ts",
         "source/frontend/playwright.hosted.config.ts",
+        "source/frontend/playwright.hosted.pages.config.ts",
+        "source/frontend/playwright.hosted.pages.live.config.ts",
         "source/frontend/playwright.hosted.model.build.config.ts",
         "source/frontend/playwright.hosted.model.config.ts",
         "source/frontend/public/demo-packages/index.json",
         "source/frontend/public/model-manifest.json",
+        "source/frontend/public/demo-assets/fireline-sentinel.png",
+        "source/frontend/index.html",
+        "source/frontend/tsconfig.json",
+        "source/frontend/vite.config.ts",
+        "source/backend/tests/test_ci_workflow.py",
         "source/frontend/tests/hosted-model.test.mjs"
       ]
     },
@@ -261,6 +280,45 @@
         "source/frontend/e2e/qa_verification.spec.ts",
         "source/frontend/types/mission.ts",
         "source/frontend/types/replay.ts",
+        "summary_bank.json"
+      ]
+    },
+    "issue_group_hosted_pages_path_and_deployment": {
+      "description": "Pages project-path base resolution, safe hosted asset routing, complete saved-package visuals, subpath production smoke, and deployment readiness gates.",
+      "files": [
+        ".github/workflows/pages.yml",
+        "docs/dev/TODO.md",
+        "docs/dev/review.md",
+        "docs/user/HOSTED_DEMO.md",
+        "source/backend/tests/test_ci_workflow.py",
+        "source/backend/tests/test_docs_artifacts.py",
+        "source/frontend/e2e/hosted.pages.spec.ts",
+        "source/frontend/e2e/hosted.pages.live.spec.ts",
+        "source/frontend/hosted/HostedDemo.tsx",
+        "source/frontend/hosted/demoPackages.ts",
+        "source/frontend/hosted/hostedConfig.ts",
+        "source/frontend/hosted/hostedModel.ts",
+        "source/frontend/index.html",
+        "source/frontend/package.json",
+        "source/frontend/playwright.config.ts",
+        "source/frontend/playwright.hosted.pages.config.ts",
+        "source/frontend/playwright.hosted.pages.live.config.ts",
+        "source/frontend/public/demo-assets/fireline-sentinel.png",
+        "source/frontend/public/demo-packages/index.json",
+        "source/frontend/tsconfig.json",
+        "source/frontend/vite.config.ts",
+        "summary_bank.json"
+      ]
+    },
+    "issue_group_backend_test_client_compatibility": {
+      "description": "Locked Starlette TestClient compatibility through httpx2, dependency resolution, warning-free backend verification, and offline export fallback naming.",
+      "files": [
+        "source/backend/pyproject.toml",
+        "source/backend/uv.lock",
+        "source/backend/scripts/export_orbit_dataset.py",
+        "source/backend/tests/test_export_orbit_dataset.py",
+        "docs/dev/TODO.md",
+        "docs/dev/review.md",
         "summary_bank.json"
       ]
     },

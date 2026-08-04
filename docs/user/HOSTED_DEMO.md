@@ -22,7 +22,7 @@ Open `http://127.0.0.1:5173/hosted`. This path installs only the frontend; it do
 - Each package uses schema v2 and carries a local replay id, source manifest path, bbox, observation window, scoring basis, runtime truth, imagery origin, and candidate/review/abstain decision.
 - A local Orbit Classroom chat grounded in the selected package.
 - Short teaching cards covering browser constraints, evidence boundaries, and edge-AI tradeoffs.
-- Reviewed Atacama and Greenland evidence stills; the fireline packet remains a text-first review story until a matching public still is promoted.
+- Reviewed Atacama, Greenland, and Southeast US fireline evidence stills; every promoted package now has a matching visual asset and accessible alt text.
 
 The browser model is pinned by `source/frontend/public/model-manifest.json` to Hugging Face revision `0fc90b8caaa6b8e07d1dc0a9125969c2730e4353`, with a 219,310,432-byte inventory and SHA-256 `9e488f38f64dc4b897c768bec4b37ba01a671309910fd08c470220fa244e14f6`. The route reads this local manifest on entry without fetching the GGUF. After the visitor chooses fetch, it verifies the remote pointer and byte count before Wllama loads the public artifact; later visits may use browser cache.
 
@@ -34,7 +34,18 @@ The hosted manifest currently labels the Shoozes handoff repository `mit`. The u
 
 ## Deploy
 
-Build the hosted presentation with `npm run build:hosted` from `source/frontend`, then serve `source/frontend/dist-hosted` as a static site with SPA fallback. The hosted build renders at `/`; `/hosted` remains the local full-app build alias. The hosted route must not be configured as a backend/API proxy.
+Build the hosted presentation with `npm run build:hosted` from `source/frontend`, then serve `source/frontend/dist-hosted` at a domain root. For the standard repository Pages site, use `npm run build:pages`; it emits `dist-pages` with the project base supplied by `VITE_PUBLIC_BASE` (the committed workflow supplies `/<repository>/`). The hosted build renders at `/`; `/hosted` remains the local full-app build alias. The hosted route must not be configured as a backend/API proxy.
+
+The committed `.github/workflows/pages.yml` runs the hosted unit checks, Pages-subpath production smoke, and Pages-only artifact build on `main`, then deploys `dist-pages` through the `github-pages` environment. A live-origin model proof and owner-approved model licensing decision are still required before calling the public site release-ready.
+
+After deployment, run the release-only live proof from `source/frontend` with the exact trailing-slash Pages URL:
+
+```powershell
+$env:HOSTED_PAGES_URL = "https://<owner>.github.io/<repository>/"
+npm run test:hosted:pages:live
+```
+
+The live proof runs the browser model/chat path twice and attaches timing evidence. It fails closed when `HOSTED_PAGES_URL` is missing and is intentionally not part of normal CI because each pass can download the 219 MB model artifact.
 
 The browser demo is device-dependent: model memory, download time, WebAssembly support, and browser storage vary. If local inference cannot start, the page should show the error and keep the saved evidence and teaching content usable.
 
@@ -46,6 +57,8 @@ npm run test:unit
 npm run lint
 npm run test:hosted
 npm run verify:hosted
+npm run build:pages
+npm run test:hosted:pages
 ```
 
 The focused unit command covers capability, cancellation, response parsing, and actionable error branches without a model download. The opt-in `npm run test:hosted:model` command performs the slower real 219 MB browser fetch and proves Wllama load plus local generation without starting FastAPI. `npm run test:hosted:model:build` repeats that fetch-and-generate proof against the production `dist-hosted` preview and also runs the static MIME check through `npm run verify:hosted`. These commands are intentionally excluded from both the normal hosted smoke and the full-app E2E suite because they depend on network, device memory, and browser cache state.

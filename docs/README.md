@@ -13,6 +13,7 @@ Start with the product [README](../README.md). Use the docs below only when you 
 - [Architecture](dev/ARCHITECTURE.md)
 - [Pitfall ledger](dev/PITFALL_LEDGER.md)
 - [Repository boundary](dev/REPOSITORY_BOUNDARY.md)
+- [Current integrity review](dev/review.md)
 - [Model handoff](dev/MODEL_HANDOFF.md)
 - [Dataset cycle](dev/DATASET_CYCLE_TUTORIAL.md)
 - [Seeded data registry](dev/SEEDED_DATA_REGISTRY.md)

@@ -29,7 +29,8 @@ This is the compact backlog and integrity checklist. Keep current context routin
 - Frontend reloads must not restart an active mission from the first scan cell or let stale demo query params override a live mission.
 - Public README proof currently centers on Critical Minerals, target-pack proof, payload reduction, orbital eclipse queueing, provenance, abstain safety, Greenland timelapse context, Ground Agent flow, and semantic map context.
 - The current trained LiquidAI Leap Tune-compatible bundle is fetched from `Shoozes/lfm2.5-450m-vl-orbit-satellite`; SAT/GND GGUF calls remain evidence-packet reasoning. `/api/inference/image` provides a separate opt-in retained-frame LiquidAI/LFM2.5-VL-450M image-text-to-text review path when `image_conditioned_runtime_enabled=true`.
-- The hosted portfolio route is separate from the full app: the normal build keeps the full app at `/` and the browser-only alias at `/hosted`; `npm run build:hosted` emits an isolated static bundle at `/` with Wllama/WebAssembly, a pinned small GGUF manifest, validated saved packages, and no backend/provider controls. The browser runtime is text reasoning over saved evidence, not image-conditioned VLM inference.
+- The hosted portfolio route is separate from the full app: the normal build keeps the full app at `/` and the browser-only alias at `/hosted`; `npm run build:hosted` emits an isolated static bundle at `/`, while `npm run build:pages` emits the same browser-only route under a configurable project base such as `/LFM-ORBIT/`. The browser runtime is text reasoning over saved evidence, not image-conditioned VLM inference.
+- Every promoted hosted package has a repo-local visual asset and accessible alt text; the fireline card uses the reviewed `fireline_sentinel.png` source frame and remains candidate/review-only.
 - The hosted route reads the static model manifest before any GGUF request, displays the pinned model identity/size/license/capability, and exposes separate download and generation cancellation states so a stopped response can reuse the loaded browser instance.
 - Mission confirmation overrides are now persisted through `core/mission.py` and `/api/mission/start`; omitted policy still falls back to the conservative `distinct_acquisition` region setting, while explicitly requested `single_acquisition` is available for one-shot callers.
 - The repository boundary is explicit: LFM-ORBIT `main` carries the public application, GenUni remains the separate training-cycle/producer repository, and `.tools/project.json` points publish/pull helpers at public LFM-ORBIT while recording GenUni as `trainingRemote`.
@@ -71,6 +72,9 @@ This is the compact backlog and integrity checklist. Keep current context routin
 - Telemetry refreshes now abort superseded work and ignore stale/unmounted responses; metrics polling and WebSocket callbacks stop updating state after cleanup. Done when: frontend typecheck/build passes and the browser guard remains green.
 - The hosted hero action now starts the browser-local Wllama fetch directly after manifest identity is visible, with separate generation cancellation and an opt-in real-model smoke proving the static route needs no FastAPI/model server. Done when: the real hosted fetch reaches local-ready state, generation returns a response, and no `/api`, `/ws`, or port-8000 requests occur.
 - The production hosted proof now covers the built preview, browser-local generation, executable JavaScript MIME, and `application/wasm` MIME. Done when: `npm run test:hosted:model:build` passes after `npm run build:hosted`.
+- Pages project-path support is implemented with a configurable Vite base, shared safe asset resolution, a Pages-subpath production smoke, and a least-privilege deployment workflow. Done when: `npm run build:pages` and `npm run test:hosted:pages` pass, all first-party requests remain below `/LFM-ORBIT/`, and `.github/workflows/pages.yml` uploads only `dist-pages`.
+- Backend tests now use Starlette's supported `httpx2` TestClient integration through the locked development extra. Done when: `uv run --locked pytest -q` completes without the previous TestClient deprecation warning.
+- Hosted visual coverage is complete for all three saved packages. Done when: the manifest requires `imageSrc` and `imageAlt`, the source asset exists and passes the nonblank guard, and the Pages smoke loads each package still.
 - Current-state docs now distinguish the August 4 root-launcher rerun from the historical May release gate and the optional trained-GGUF smoke lane; target-pack contracts carry the current review date. Done when: docs/media guards pass and no current doc conflates `run.ps1 -Verify` with the optional trained-GGUF smoke.
 - GitHub Actions and CodeQL workflow pins now target Node-24-native action majors, while heavyweight real hosted model fetches remain outside normal E2E. Done when: the CI summary passes without a Node-20 runtime annotation and the normal test list excludes the opt-in model-fetch specs.
 - Hosted browser capability probing now gates WebAssembly, browser storage, and device-memory risk before fetch; unsupported or incomplete signals keep the saved-package route usable and preserve `imageInput=false`. Done when: `npm run test:unit`, hosted contract smoke, and actionable fallback copy all pass without a backend request.
@@ -81,21 +85,50 @@ This is the compact backlog and integrity checklist. Keep current context routin
 - The current vetted location registry and explicitly unavailable future Sentinel lanes are covered by contract tests and archive guards. Done when: target/location tests pass and no provider or marine/HAB action is half-wired.
 - The public/private repository boundary is documented and synchronized. Done when: LFM-ORBIT `main` is the app remote, GenUni `main` retains its pre-migration training app state, links and controller policy point to the correct repositories, and the handoff note records both histories.
 
+## Active Backlog
+
+- Task: Prove the deployed Pages origin. **Owner/runtime evidence required.**
+  - What/Why: Local project-path proof cannot establish public-origin CORS, MIME, caching, browser-storage, or model-download behavior.
+  - Where: the successful `github-pages` deployment, the deployed project URL, `source/frontend/playwright.hosted.pages.live.config.ts`, and `source/frontend/e2e/hosted.pages.live.spec.ts`.
+  - How: Set `HOSTED_PAGES_URL` to the exact trailing-slash project URL and run the opt-in live smoke; verify the sealed manifest, pinned revision, 219 MB initial load, local response, no backend/API/WebSocket/provider requests, and cached reload timing.
+  - When: After the Pages workflow is deployed and GitHub reports the environment URL.
+  - Subtasks: `[x]` Build the fail-closed live harness and timing attachment. `[ ]` Deploy the workflow. `[ ]` Run the first/cached model proof and retain its artifact.
+  - Done when: the public Pages origin completes an initial and cached local model load with recorded browser/runtime timing and the proof is retained with the release record.
+  - Verification: release-only or scheduled Playwright run using the deployed URL; do not add the model download to every commit.
+
+- Task: Link the verified Pages URL from public entry points. **Owner/runtime evidence required.**
+  - What/Why: The repository intentionally does not invent a live URL before deployment, but a verified public demo should be discoverable from the README and hosted-demo guide.
+  - Where: `README.md`, `docs/user/HOSTED_DEMO.md`, and the repository About/Homepage field.
+  - How: After the Pages workflow completes, copy the exact environment URL into the public links and keep the local `/LFM-ORBIT/` path contract documented separately.
+  - When: Immediately after the deployed-origin proof succeeds.
+  - Done when: every public entry point uses the same verified URL and the link checker/browser smoke can open it without redirect or base-path errors.
+  - Verification: open the final URL from each linked document and rerun the deployed-origin smoke.
+
+- Task: Resolve model redistribution and attribution metadata. **Owner/legal evidence required.**
+  - What/Why: The derivative handoff currently advertises `mit`, while the upstream LiquidAI model card advertises `lfm1.0`; the repository must not infer inherited terms from one label.
+  - Where: `source/frontend/public/model-manifest.json`, `docs/legal/THIRD_PARTY_NOTICES.md`, `docs/user/HOSTED_DEMO.md`, `docs/dev/MODEL_HANDOFF.md`, and the Shoozes Hugging Face model card.
+  - How: Confirm derivative artifact, base-model, quantization, redistribution, attribution, and naming terms; publish a corrected immutable model revision if required, then update manifest identity and tests together.
+  - When: Before public model promotion or any live-origin proof is treated as release-ready.
+  - Done when: owner/legal sign-off, model-card metadata, browser manifest, displayed copy, and third-party notices agree for the exact pinned revision.
+  - Verification: pinned pointer/byte/hash proof plus a manifest/license consistency test and recorded owner decision.
+
+- Task: Verify preserved hackathon archive references. **Owner/repository evidence required.**
+  - What/Why: Modern `main` is the public app, but the original submission must remain independently recoverable.
+  - Where: remote `hackathon` branch, immutable release tag, `docs/dev/REPOSITORY_BOUNDARY.md`, and CI branch triggers.
+  - How: Resolve the branch and tag to the intended pre-modernization submission commit in a clean clone; create missing references only with explicit owner authorization.
+  - When: Before the next public release or repository-boundary migration.
+  - Done when: a clean clone can check out modern `main` and the preserved submission state, and active CI does not run the modern gate for the immutable archive unless requested.
+  - Verification: `git ls-remote`, annotated-tag/object verification, clean-clone checkout, and boundary-doc update.
+
 ## External Gates (not local stubs)
 
 - Task: Revalidate wildfire source evidence before promotion. **Owner/provider evidence required.**
   - What/Why: The current Fire/Drought Watch correctly defers smoke/cloud ambiguity, but the Lochloosa seed has not earned stronger-than-candidate wording.
   - Where: Sentinel seed manifests, `source/backend/assets/replays/`, `source/backend/core/wildfire_smoke.py`, and wildfire confidence tests.
   - How: An owner must rerun the next accepted post-event pass, record source/frame provenance, and tune thresholds against exported labels while preserving candidate-only behavior.
+  - When: At the next accepted post-event source window, before stronger-than-candidate wording is published.
   - Done when: A reviewed replay has accepted source-backed frames, stable confidence metrics, updated provenance docs, and tests prove ambiguous smoke remains review-only.
   - Verification: `uv run --no-sync pytest tests/test_wildfire_smoke.py tests/test_seed_sentinel_cache.py tests/test_replay.py -q` plus a reviewed manifest/frame audit and owner acceptance.
-
-- Task: Audit model licensing and publishable handoff metadata. **Owner/legal evidence required.**
-  - What/Why: The hosted manifest reports `mit` for the Shoozes handoff repository while the upstream Liquid AI base model is labeled `lfm1.0`; repository metadata must not settle inherited model or artifact redistribution terms.
-  - Where: `source/frontend/public/model-manifest.json`, `docs/user/HOSTED_DEMO.md`, `docs/dev/MODEL_HANDOFF.md`, the Shoozes Hugging Face handoff repo, and `docs/legal/THIRD_PARTY_NOTICES.md`.
-  - How: The repository owner/legal reviewer must confirm the handoff model card, base-model license, quantization/artifact terms, and required attribution, then encode approved license-source fields without runtime inference.
-  - Done when: one owner-approved decision covers the published GGUF, base model, quantization, hosted redistribution, and displayed attribution, with matching model-card/docs/tests.
-  - Verification: manifest/license consistency test, third-party-notices review, pinned handoff revision audit, and explicit owner sign-off.
 
 ## Scope Lock
 
@@ -192,6 +225,8 @@ Model/runtime:
 - Optional live provider probe: `uv run --no-sync python scripts/probe_live_observation.py --provider simsat_sentinel --bbox="-63.1,-10.1,-62.9,-9.9" --start "2025-01-01" --end "2025-02-01"` from `source/backend`
 - Frontend type/build guard: `npm run lint` and `npm run build` from `source/frontend`
 - Hosted static guard: `npm run verify:hosted` from `source/frontend` (`build:hosted` followed by the static preview smoke)
+- Hosted Pages guard: `npm run build:pages` followed by `npm run test:hosted:pages` from `source/frontend`
+- Deployed Pages guard: set `HOSTED_PAGES_URL` to the exact trailing-slash Pages URL, then run `npm run test:hosted:pages:live` from `source/frontend`; this is release-only because it downloads the model twice.
 - Full browser guard: `npm run test:e2e` from `source/frontend`
 - Demo refresh: `npm run demo:record` and `npm run demo:tutorial` from `source/frontend`
 - README timelapse refresh: `uv run --no-sync python scripts/build_docs_timelapse_highlight.py` from `source/backend`
@@ -200,9 +235,12 @@ Model/runtime:
 ## Latest Validation Snapshot
 
 - Prior recorded release verification: `.\run.ps1 -Verify` passed end-to-end on May 8 with backend `499 passed`, GGUF runtime smoke, frontend typecheck/build, and full Playwright E2E with intentional skips. Treat that as historical until the current environment reruns the launcher gate.
-- August 4 backend verification: `python -m pytest -q` recorded `552 passed`; coverage includes queue, prompt, cache, image-safety, local-boundary, path, replay-validation, additive cached-rescan comparison, project-config, CI workflow, clean-checkout assets, scenario-registry, model-handoff identity, hosted package wiring, telemetry-coordinator contracts, mission-owned scanning, persisted/replay-safe confirmation-policy API wiring, resource-limit behavior, SQLite lifecycle closure, and concurrent runtime-artifact writes.
+- August 4 backend verification: `uv run --locked pytest -q` recorded `554 passed` with zero warnings; coverage includes queue, prompt, cache, image-safety, local-boundary, path, replay-validation, additive cached-rescan comparison, project-config, CI workflow, clean-checkout assets, scenario-registry, model-handoff identity, hosted package wiring, telemetry-coordinator contracts, mission-owned scanning, persisted/replay-safe confirmation-policy API wiring, resource-limit behavior, SQLite lifecycle closure, concurrent runtime-artifact writes, and default Playwright Pages-spec exclusion.
 - August 4 hosted verification: `npm run lint`, `npm run build:hosted`, `npm run test:hosted`, and `npm run test:hosted:build` passed from `source/frontend`; the hosted smoke does not start FastAPI or require the backend model runtime, the static preview proves JSON/JavaScript/WebAssembly MIME types, and the manifest identity is visible before a model request.
 - August 4 hosted production browser-model verification: `npm run test:hosted:model:build` passed after the real 219 MB GGUF fetch; the built preview reached local-ready state and generated a local response with no backend/API/WebSocket requests. This remains opt-in and excluded from the normal/full E2E configs because it depends on network, device memory, and browser cache state.
+- August 4 Pages-path verification: `npm run build:pages` passed and the Pages-subpath smoke passed through the approved external browser runtime; managed Chromium remains environment-unverified because its launch returns `spawn EPERM` inside this sandbox.
+- August 4 live-origin harness: implemented but not run because the Pages workflow is not yet deployed from the current local changes; it now fails closed without `HOSTED_PAGES_URL` and records two model/chat timing passes when supplied.
+- August 4 default browser verification: `npm run test:e2e` reran with `108 passed, 6 skipped` and no failures; the two release-only Pages specs are excluded from the port-owning default config, while the long tutorial case completed in `6.4m`.
 - August 4 full-app launcher verification: `.\run.ps1 -Verify` passed with `108 passed, 6 skipped` and intentional skips; the replay-replacement case passed after the Windows-safe atomic runtime-writer fix, the 7-minute tutorial capture passed, and the tracked README/tutorial media was regenerated by the verification suite.
 - The GitHub E2E job allows 35 minutes so clean runners can install Playwright OS/browser dependencies before the serialized full suite; this is a CI budget, not a hosted-demo requirement.
 - August 3 hosted media verification: `npm run demo:hosted` passed and regenerated the nonblank README stills for the hero and saved-evidence sections; the capture path does not fetch the GGUF.

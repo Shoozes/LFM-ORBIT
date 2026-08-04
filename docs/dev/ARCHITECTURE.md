@@ -4,7 +4,7 @@ Current as of **August 4, 2026**.
 
 ## System Shape
 
-LFM Orbit has two presentations: the full operator app at `/`, backed by FastAPI, and a separate browser-only portfolio route. The normal build exposes the hosted route at `/hosted`; `npm run build:hosted` emits the hosted presentation at `/` without the full app. The full frontend is organized around five operator surfaces plus one replay proof surface:
+LFM Orbit has two presentations: the full operator app at `/`, backed by FastAPI, and a separate browser-only portfolio route. The normal build exposes the hosted route at `/hosted`; `npm run build:hosted` emits the hosted presentation at `/` without the full app, while `npm run build:pages` emits the same bundle under a configurable Pages project base. The full frontend is organized around five operator surfaces plus one replay proof surface:
 
 - `Mission`: define bbox, task text, and temporal window.
 - `Agents`: inspect the SAT/GND dialogue bus and interact with the ground assistant.
@@ -62,7 +62,7 @@ flowchart LR
 24. `SettingsPanel.tsx` queries provider, SimSat, analysis, and depth status endpoints independently, with short retries so one transient miss does not force a false offline settings surface.
 25. `GroundAgent.tsx`, `/api/agent/chat`, and `/api/agent/action/confirm` provide a local action chat that proposes and confirms replay loads/rescans, mission packs, SAT/GND link changes, and map-navigation actions before mutating app state.
 26. `ProofModePanel.tsx` turns replay state into visible Proof Mode output: satellite frame, bbox/evidence overlay, evidence result, image-conditioned retained-frame review status when enabled, latency, provenance, raw-vs-alert bytes, reduction ratio, abstain state, backend-derived link outage queue, and proof JSON. Its async hydration is keyed to mission identity and snapshots high-churn telemetry inputs so live mission refreshes do not cancel an in-flight related-timelapse request.
-27. `source/frontend/hosted/HostedDemo.tsx` is a static presentation surface with a validated `source/frontend/public/demo-packages/index.json` manifest and local browser tutoring; reviewed stills live under `source/frontend/public/demo-assets/`. `hostedModel.ts` validates the sealed browser model manifest and `useBrowserModel.ts` reads its identity on route entry, verifies the pinned Hugging Face pointer/byte inventory only after an explicit fetch, and keeps download cancellation separate from reusable-instance generation cancellation before Wllama/WebAssembly loads it. `TerrainShaderCanvas.tsx` supplies the HAIO-inspired landing visual and pauses when motion/visibility conditions require it.
+27. `source/frontend/hosted/HostedDemo.tsx` is a static presentation surface with a validated `source/frontend/public/demo-packages/index.json` manifest and local browser tutoring; reviewed stills live under `source/frontend/public/demo-assets/`. `hostedConfig.ts` owns the project-base-aware asset resolver, `hostedModel.ts` validates the sealed browser model manifest, and `useBrowserModel.ts` reads its identity on route entry, verifies the pinned Hugging Face pointer/byte inventory only after an explicit fetch, and keeps download cancellation separate from reusable-instance generation cancellation before Wllama/WebAssembly loads it. `TerrainShaderCanvas.tsx` supplies the HAIO-inspired landing visual and pauses when motion/visibility conditions require it.
 
 ## Module Map
 

@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import TerrainShaderCanvas from "./TerrainShaderCanvas";
 import { loadDemoPackages, packageContext, SYSTEM_PROMPT } from "./demoPackages";
 import type { DemoPackage } from "./demoPackages";
-import { HOSTED_ROUTE, IS_HOSTED_BUILD } from "./hostedConfig";
+import { HOSTED_ROUTE, IS_HOSTED_BUILD, resolveHostedAsset } from "./hostedConfig";
 import { isBrowserModelAbortError } from "./modelState";
 import { useBrowserModel } from "./useBrowserModel";
 import "./hosted.css";
@@ -219,10 +219,10 @@ export default function HostedDemo() {
             </div>
             <article className="hosted-evidence-card">
               <div
-                className={`hosted-evidence-visual ${selectedPackage.imageSrc ? "has-image" : ""}`}
-                aria-label={selectedPackage.imageAlt ?? "Illustrated saved evidence panel"}
+                className="hosted-evidence-visual has-image"
+                aria-label={selectedPackage.imageAlt}
                 role="img"
-                style={selectedPackage.imageSrc ? { backgroundImage: `url("${selectedPackage.imageSrc}")` } : undefined}
+                style={{ backgroundImage: `url("${resolveHostedAsset(selectedPackage.imageSrc)}")` }}
               >
                 <span className="hosted-evidence-crosshair" />
                 <span className="hosted-evidence-label">{selectedPackage.signal}</span>

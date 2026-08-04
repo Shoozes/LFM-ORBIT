@@ -20,6 +20,8 @@ export default defineConfig({
     "**/hosted.build.spec.ts",
     "**/hosted.model-build.spec.ts",
     "**/hosted.model-fetch.spec.ts",
+    "**/hosted.pages.spec.ts",
+    "**/hosted.pages.live.spec.ts",
   ],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,

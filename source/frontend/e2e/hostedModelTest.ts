@@ -1,8 +1,16 @@
 import { expect, type Page } from "@playwright/test";
 
-export async function exerciseHostedModel(page: Page, route: string): Promise<void> {
+export type HostedModelRunTiming = {
+  modelRequests: number;
+  modelReadyMs: number;
+  responseMs: number;
+  totalMs: number;
+};
+
+export async function exerciseHostedModel(page: Page, route: string): Promise<HostedModelRunTiming> {
   const forbiddenRequests: string[] = [];
   const modelRequests: string[] = [];
+  const startedAt = Date.now();
 
   page.on("request", (request) => {
     const url = request.url();
@@ -13,13 +21,21 @@ export async function exerciseHostedModel(page: Page, route: string): Promise<vo
   await page.goto(route);
   await page.getByRole("button", { name: /Fetch the small model/i }).click();
   await expect(page.locator(".hosted-model-status")).toHaveText("Model loaded locally in this browser", { timeout: 9 * 60_000 });
+  const modelReadyMs = Date.now() - startedAt;
   await expect(page.getByRole("textbox", { name: "Ask Orbit Classroom" })).toBeEnabled();
 
   const question = page.getByRole("textbox", { name: "Ask Orbit Classroom" });
   await question.fill("In one short sentence, what is this saved evidence packet for?");
   await page.getByRole("button", { name: "Ask", exact: true }).click();
   await expect(page.locator(".hosted-chat-line.hosted-chat-assistant").last()).toContainText(/\S/, { timeout: 90_000 });
+  const responseMs = Date.now() - startedAt;
 
   expect(forbiddenRequests).toEqual([]);
   expect(modelRequests.length).toBeGreaterThan(0);
+  return {
+    modelRequests: modelRequests.length,
+    modelReadyMs,
+    responseMs,
+    totalMs: Date.now() - startedAt,
+  };
 }

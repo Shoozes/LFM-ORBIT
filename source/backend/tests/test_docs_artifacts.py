@@ -239,6 +239,7 @@ def test_docs_user_and_dev_surfaces_are_separated():
         "REPOSITORY_BOUNDARY.md",
         "SEEDED_DATA_REGISTRY.md",
         "TODO.md",
+        "review.md",
     ]
     assert legal_docs == ["THIRD_PARTY_NOTICES.md"]
     assert release_docs == ["v0.4.0-public-proof.md"]
@@ -379,7 +380,7 @@ def test_validation_snapshots_match_current_release_gate():
     release = (REPO_ROOT / "docs/release/v0.4.0-public-proof.md").read_text(encoding="utf-8")
 
     for source in (readme, todo, release):
-        assert "552 passed" in source
+        assert "554 passed" in source
         assert "Playwright" in source
         assert "intentional skips" in source
         assert "104 passed" not in source
@@ -490,7 +491,10 @@ def test_summary_bank_tracks_current_hosted_integrity_surfaces():
     assert "source/frontend/hosted/demoPackages.ts" in hosted["files"]
     assert "source/frontend/public/demo-packages/index.json" in hosted["files"]
     assert "source/frontend/public/model-manifest.json" in hosted["files"]
-    assert "source/frontend/public/demo-assets/atacama-mining.png" not in hosted["files"]
+    assert "source/frontend/e2e/hosted.pages.spec.ts" in hosted["files"]
+    assert "source/frontend/playwright.hosted.pages.config.ts" in hosted["files"]
+    assert "source/frontend/public/demo-assets/fireline-sentinel.png" in hosted["files"]
+    assert "source/frontend/vite.config.ts" in hosted["files"]
     assert "source/backend/core/scan_coordinator.py" in coordinator["files"]
 
 
@@ -505,6 +509,16 @@ def test_hosted_demo_packages_are_versioned_and_trace_to_saved_replays():
     assert len(package_ids) == len(packages)
 
     for package in packages:
+        image_src = package.get("imageSrc")
+        image_alt = package.get("imageAlt")
+        assert isinstance(image_src, str)
+        assert re.fullmatch(r"demo-assets/[a-z0-9._/-]+", image_src)
+        assert isinstance(image_alt, str) and image_alt.strip()
+        image_path = REPO_ROOT / "source/frontend/public" / image_src
+        assert image_path.exists(), package["id"]
+        with Image.open(image_path) as image:
+            assert image.width >= 480 and image.height >= 270, package["id"]
+
         evidence = package["evidence"]
         assert evidence["runtimeTruthMode"] == "replay"
         assert evidence["imageryOrigin"] == "cached_api"

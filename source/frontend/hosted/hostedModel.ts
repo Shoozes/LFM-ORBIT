@@ -1,3 +1,5 @@
+import { resolveHostedAsset } from "./hostedConfig";
+
 export type HostedModelManifest = {
   schemaVersion: 1;
   kind: "browser-gguf";
@@ -18,7 +20,7 @@ export type HostedModelManifest = {
   };
 };
 
-export const MODEL_MANIFEST_PATH = `${import.meta.env.BASE_URL}model-manifest.json`;
+export const MODEL_MANIFEST_PATH = resolveHostedAsset("model-manifest.json");
 const MAX_BROWSER_MODEL_BYTES = 512_000_000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -16,6 +16,10 @@ The repair keeps the public LFM-ORBIT history and adds the reviewed application 
 
 The initial public synchronization commit was `d9206163` on top of the verified LFM-ORBIT base `bb3196ad74ee8138cebb4b87cd10c5043611e164`; the recovery-note follow-up reached `8fe6ae2c258f25c98b8a6caf1b66ededd326fb95`, and the published pitfall-ledger update is now `e20af69e847422f88f365257da7e509e24cdc950`.
 
+## Current remote observation
+
+On August 4, 2026, a read-only `git ls-remote origin` check reported LFM-ORBIT `main` at `a78e70d367f1077676c592be8ba83605c082e488` and tag `v0.4.0-public-proof` at `07d0042aa7f1cd6f6c2878fd087e55c61e98a428`; no `origin/hackathon` ref was returned. The configured GenUni remote was not authenticated in this environment, so its remote archive refs remain unverified. No branch or tag was created or altered during the audit.
+
 ## Review rules
 
 - App code, app tests, hosted-demo assets, and app docs are reviewed and published from LFM-ORBIT.

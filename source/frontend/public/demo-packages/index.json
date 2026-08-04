@@ -9,7 +9,7 @@
       "signal": "surface-change candidate",
       "teachingPoint": "Compare a small evidence packet with raw imagery and ask the model what should be retained.",
       "facts": ["2 temporal windows", "NDVI + SWIR summaries", "provenance included", "not live provider data"],
-      "imageSrc": "/demo-assets/atacama-mining.png",
+      "imageSrc": "demo-assets/atacama-mining.png",
       "imageAlt": "Saved Sentinel-2 frame of the Atacama mining region",
       "evidence": {
         "sourceReplayId": "atacama_mining_replay",
@@ -31,7 +31,7 @@
       "signal": "quality gate / abstain",
       "teachingPoint": "Ask why a model should abstain when the evidence window is not trustworthy.",
       "facts": ["NDSI trend", "cloud rejection", "confidence capped", "no alert emitted"],
-      "imageSrc": "/demo-assets/greenland-ice.png",
+      "imageSrc": "demo-assets/greenland-ice.png",
       "imageAlt": "Saved Sentinel-2 frame of Greenland ice and snow extent",
       "evidence": {
         "sourceReplayId": "greenland_ice_snow_extent_replay",
@@ -53,6 +53,8 @@
       "signal": "review-only candidate",
       "teachingPoint": "Use the model to practice separating evidence, uncertainty, and action.",
       "facts": ["smoke/cloud ambiguity", "hotspot context", "candidate status", "human review retained"],
+      "imageSrc": "demo-assets/fireline-sentinel.png",
+      "imageAlt": "Saved false-color Sentinel-2 frame for Southeast US fireline review",
       "evidence": {
         "sourceReplayId": "southeast_fireline_object_replay",
         "sourceAsset": "source/backend/assets/replays/southeast_fireline_object_replay.json",

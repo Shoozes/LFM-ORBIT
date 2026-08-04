@@ -236,7 +236,7 @@ def test_write_dataset_export_backfills_context_and_includes_ground_reject_contr
     assert reject["training_contract"]["target_action"] == "prune"
 
 
-def test_write_dataset_export_rasterizes_svg_context_placeholders(tmp_path, monkeypatch):
+def test_write_dataset_export_rasterizes_svg_context_fallbacks(tmp_path, monkeypatch):
     db_path = tmp_path / "alerts.sqlite"
     bus_path = tmp_path / "agent_bus.sqlite"
     monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(db_path))

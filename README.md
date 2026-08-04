@@ -182,10 +182,11 @@ The table below separates the historical May 8 release snapshot from the current
 | Check | Current State |
 |---|---|
 | Root verify | August 4 `.\run.ps1 -Verify` passed; the optional trained-GGUF runtime smoke remains a separate lane |
-| Backend tests | August 4 full backend suite `552 passed` |
+| Backend tests | August 4 full backend suite `554 passed` |
 | Frontend | typecheck + production build passing; hosted smoke, static preview, and production-preview model proof passing |
+| Pages project path | Pages-mode production build and `/LFM-ORBIT/` static smoke passing locally; live deployment proof remains separate |
 | Hosted real-model proof | `npm run test:hosted:model:build` fetched the pinned 219 MB GGUF and generated a local response with no backend/API/WebSocket requests |
-| Playwright E2E | hosted smoke plus full app suite locally: `108 passed, 6 skipped` with intentional skips; the full suite remains the heavyweight gate |
+| Playwright E2E | August 4 default suite rerun: `108 passed, 6 skipped` with intentional skips; Pages-only release specs are excluded from this default port-owning suite |
 | Docs/import guards | passing |
 | Option 1 launch | backend `8000` and app `5173` ready |
 | Clean-start smoke | idle on Atacama context, no auto replay, no default scan |
@@ -216,3 +217,4 @@ Python `3.10+` and Node.js `20.19.0` from `.nvmrc` or Node.js `22.12.0+`. The la
 - [Model handoff](docs/dev/MODEL_HANDOFF.md)
 - [Dataset cycle](docs/dev/DATASET_CYCLE_TUTORIAL.md)
 - [Current backlog](docs/dev/TODO.md)
+- [Current integrity review](docs/dev/review.md)

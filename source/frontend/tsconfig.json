@@ -17,6 +17,6 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["*.tsx", "**/*.tsx", "**/*.ts"],
-    "exclude": ["vite.config.ts", "playwright.config.ts", "playwright.demo.config.ts", "playwright.hosted.config.ts", "playwright.hosted.build.config.ts", "playwright.hosted.capture.config.ts", "playwright.hosted.model.config.ts", "playwright.hosted.model.build.config.ts", "e2e/**"],
+    "exclude": ["vite.config.ts", "playwright.config.ts", "playwright.demo.config.ts", "playwright.hosted.config.ts", "playwright.hosted.build.config.ts", "playwright.hosted.capture.config.ts", "playwright.hosted.pages.config.ts", "playwright.hosted.pages.live.config.ts", "playwright.hosted.model.config.ts", "playwright.hosted.model.build.config.ts", "e2e/**"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

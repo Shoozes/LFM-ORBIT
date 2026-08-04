@@ -1,3 +1,5 @@
+import { resolveHostedAsset } from "./hostedConfig";
+
 export type DemoPackage = {
   id: string;
   title: string;
@@ -7,8 +9,8 @@ export type DemoPackage = {
   teachingPoint: string;
   facts: string[];
   evidence: DemoPackageEvidence;
-  imageSrc?: string;
-  imageAlt?: string;
+  imageSrc: string;
+  imageAlt: string;
 };
 
 export type DemoPackageEvidence = {
@@ -28,7 +30,7 @@ export type DemoPackageIndex = {
   packages: DemoPackage[];
 };
 
-export const DEMO_PACKAGE_MANIFEST_PATH = `${import.meta.env.BASE_URL}demo-packages/index.json`;
+export const DEMO_PACKAGE_MANIFEST_PATH = resolveHostedAsset("demo-packages/index.json");
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object";
@@ -43,9 +45,9 @@ function requiredText(value: unknown, field: string, maxLength = 600): string {
 
 function validatePackage(value: unknown, index: number): DemoPackage {
   if (!isRecord(value)) throw new Error(`Hosted package ${index + 1} must be an object.`);
-  const imageSrc = value.imageSrc === undefined ? undefined : requiredText(value.imageSrc, `packages[${index}].imageSrc`, 180);
-  const imageAlt = value.imageAlt === undefined ? undefined : requiredText(value.imageAlt, `packages[${index}].imageAlt`, 240);
-  if (imageSrc && (!/^\/demo-assets\/[a-z0-9._/-]+$/i.test(imageSrc) || imageSrc.includes("..") || !imageAlt)) {
+  const imageSrc = requiredText(value.imageSrc, `packages[${index}].imageSrc`, 180);
+  const imageAlt = requiredText(value.imageAlt, `packages[${index}].imageAlt`, 240);
+  if (!/^demo-assets\/[a-z0-9._/-]+$/i.test(imageSrc) || imageSrc.includes("..")) {
     throw new Error(`Hosted package ${index + 1} must use a repo-local image and accessible alt text.`);
   }
   if (!Array.isArray(value.facts) || value.facts.length === 0 || value.facts.length > 8 || value.facts.some((fact) => typeof fact !== "string" || !fact.trim() || fact.trim().length > 300)) {
@@ -95,7 +97,8 @@ function validatePackage(value: unknown, index: number): DemoPackage {
       sourceAsset,
       sourceReplayId,
     },
-    ...(imageSrc ? { imageSrc, imageAlt } : {}),
+    imageSrc,
+    imageAlt,
   };
 }
 

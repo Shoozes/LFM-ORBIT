@@ -68,7 +68,7 @@ def _decode_data_url(data_url: str) -> tuple[bytes, str]:
     return base64.b64decode(payload), suffix
 
 
-def _svg_to_png_placeholder(raw: bytes, size: int = 192) -> bytes:
+def _svg_to_png_fallback(raw: bytes, size: int = 192) -> bytes:
     from PIL import Image, ImageDraw
 
     text = raw.decode("utf-8", errors="ignore")
@@ -106,7 +106,7 @@ def _write_asset(sample_dir: Path, stem: str, data_url: str | None) -> str | Non
         return None
     raw, suffix = _decode_data_url(data_url)
     if suffix == ".svg":
-        raw = _svg_to_png_placeholder(raw)
+        raw = _svg_to_png_fallback(raw)
         suffix = ".png"
     asset_path = sample_dir / f"{stem}{suffix}"
     asset_path.write_bytes(raw)
