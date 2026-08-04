@@ -183,6 +183,18 @@
         "source/frontend/e2e/vlm.spec.ts"
       ]
     },
+    "feature_group_proof_mode_and_validation": {
+      "description": "Proof Mode presentation, selected-cell validation, visual-review fallback states, and mission-scoped evidence checks.",
+      "files": [
+        "docs/user/OBJECT_EVIDENCE_MODE.md",
+        "source/frontend/components/ProofModePanel.tsx",
+        "source/frontend/components/ValidationPanel.tsx",
+        "source/frontend/e2e/proof-mode-image-review.spec.ts",
+        "source/frontend/e2e/vlm.spec.ts",
+        "source/frontend/types/mission.ts",
+        "source/frontend/types/visualEvidence.ts"
+      ]
+    },
     "issue_group_scan_producer_and_agent_deduplication": {
       "description": "Mission-owned telemetry producer, acquisition-aware confirmation, scan lease, browser refresh lifecycle, and fan-out tests.",
       "max_kb": 384,

@@ -18,7 +18,7 @@ The initial public synchronization commit was `d9206163` on top of the verified 
 
 ## Current remote observation
 
-As of August 4, 2026, local `main` and `origin/main` match `cc5edcc85487a92ac1a306a872643aff4cdd1717`, and the working tree is clean. CI run [30921740198](https://github.com/Shoozes/LFM-ORBIT/actions/runs/30921740198), Documentation Contracts run [30921741330](https://github.com/Shoozes/LFM-ORBIT/actions/runs/30921741330), and Pages run [30921739777](https://github.com/Shoozes/LFM-ORBIT/actions/runs/30921739777) all passed for that commit. GitHub Pages is enabled for workflow publishing with HTTPS enforced at `https://shoozes.github.io/LFM-ORBIT/`. Re-run the authenticated remote-head and tag checks below before documenting a later release.
+As of the August 4, 2026 audit, local `main` and `origin/main` were clean and synchronized at the reviewed baseline `985b1f6b68b7613997dff64aa9d60f84c4f6f637`. CI run [30923884354](https://github.com/Shoozes/LFM-ORBIT/actions/runs/30923884354) and Pages run [30923882870](https://github.com/Shoozes/LFM-ORBIT/actions/runs/30923882870) passed for that baseline; the CI run included workflow-contract validation and the docs verifier remains covered by the separate Documentation Contracts workflow. This paragraph is dated evidence, not a live status ledger: after any subsequent push, compare local `main` with `origin/main` and rerun the required checks before replacing it. GitHub Pages is enabled for workflow publishing with HTTPS enforced at `https://shoozes.github.io/LFM-ORBIT/`.
 
 ## Review rules
 

@@ -16,6 +16,8 @@ import {
   parseTelemetryMessage,
   toAlertItem,
 } from "../utils/telemetry";
+import { createRequestGate } from "../utils/requestGateCore.js";
+import type { RequestGate } from "../utils/requestGateCore.js";
 
 export type UseTelemetryState = {
   geoJsonGrid: GeoJSON.FeatureCollection | null;
@@ -81,6 +83,7 @@ export function useTelemetry(): UseTelemetryState {
   const mountedRef = useRef(true);
   const refreshAbortRef = useRef<AbortController | null>(null);
   const refreshSequenceRef = useRef(0);
+  const metricsGateRef = useRef<RequestGate | null>(null);
   const metricsInFlightRef = useRef(false);
   const MAX_RECONNECT_ATTEMPTS = 10;
   const BASE_RECONNECT_DELAY_MS = 1000;
@@ -91,6 +94,8 @@ export function useTelemetry(): UseTelemetryState {
       mountedRef.current = false;
       refreshAbortRef.current?.abort();
       refreshAbortRef.current = null;
+      metricsGateRef.current?.abort();
+      metricsGateRef.current = null;
     };
   }, []);
 
@@ -100,12 +105,15 @@ export function useTelemetry(): UseTelemetryState {
     refreshAbortRef.current?.abort();
     const controller = new AbortController();
     refreshAbortRef.current = controller;
+    const metricsGate = metricsGateRef.current ?? createRequestGate();
+    metricsGateRef.current = metricsGate;
+    const metricsRequest = metricsGate.begin();
 
     try {
       const [health, recent, metrics] = await Promise.all([
         fetchJson<ApiHealth>(`${apiBaseUrl}/api/health`, controller.signal),
         fetchJson<RecentAlertsResponse>(`${apiBaseUrl}/api/alerts/recent?limit=50`, controller.signal),
-        fetchJson<ApiMetricsSummary>(`${apiBaseUrl}/api/metrics/summary`, controller.signal),
+        fetchJson<ApiMetricsSummary>(`${apiBaseUrl}/api/metrics/summary`, metricsRequest.controller.signal),
       ]);
 
       if (
@@ -129,11 +137,14 @@ export function useTelemetry(): UseTelemetryState {
         }
       }
 
-      if (metrics) {
+      if (metrics && metricsGate.isCurrent(metricsRequest)) {
         setMetricsSummary(metrics);
         setBandwidthSaved(metrics.total_bandwidth_saved_mb);
       }
     } finally {
+      if (metricsGate.isCurrent(metricsRequest)) {
+        metricsGate.finish(metricsRequest);
+      }
       if (refreshAbortRef.current === controller) {
         refreshAbortRef.current = null;
       }
@@ -152,17 +163,28 @@ export function useTelemetry(): UseTelemetryState {
         return;
       }
       metricsInFlightRef.current = true;
+      const metricsGate = metricsGateRef.current ?? createRequestGate();
+      metricsGateRef.current = metricsGate;
+      const metricsRequest = metricsGate.begin();
       try {
         const metrics = await fetchJson<ApiMetricsSummary>(
           `${apiBaseUrl}/api/metrics/summary`,
-          controller.signal,
+          metricsRequest.controller.signal,
         );
-        if (controller.signal.aborted || !mountedRef.current || !metrics) {
+        if (
+          controller.signal.aborted
+          || !mountedRef.current
+          || !metrics
+          || !metricsGate.isCurrent(metricsRequest)
+        ) {
           return;
         }
         setMetricsSummary(metrics);
         setBandwidthSaved(metrics.total_bandwidth_saved_mb);
       } finally {
+        if (metricsGate.isCurrent(metricsRequest)) {
+          metricsGate.finish(metricsRequest);
+        }
         metricsInFlightRef.current = false;
       }
     };
@@ -173,6 +195,7 @@ export function useTelemetry(): UseTelemetryState {
 
     return () => {
       controller.abort();
+      metricsGateRef.current?.abort();
       window.clearInterval(intervalId);
     };
   }, [apiBaseUrl]);

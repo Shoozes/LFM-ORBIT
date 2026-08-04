@@ -390,8 +390,8 @@ def test_validation_snapshots_match_current_release_gate():
     todo = (REPO_ROOT / "docs/dev/TODO.md").read_text(encoding="utf-8")
     release = (REPO_ROOT / "docs/release/v0.4.0-public-proof.md").read_text(encoding="utf-8")
 
-    assert "560 passed" in readme
-    assert "557 passed" in release
+    assert "561 passed" in readme
+    assert "561 passed" in release
     for source in (readme, release):
         assert "Playwright" in source
         assert "104 passed" not in source
