@@ -11,6 +11,7 @@ Start with the product [README](../README.md). Use the docs below only when you 
 ## Dev
 
 - [Architecture](dev/ARCHITECTURE.md)
+- [Pitfall ledger](dev/PITFALL_LEDGER.md)
 - [Repository boundary](dev/REPOSITORY_BOUNDARY.md)
 - [Model handoff](dev/MODEL_HANDOFF.md)
 - [Dataset cycle](dev/DATASET_CYCLE_TUTORIAL.md)

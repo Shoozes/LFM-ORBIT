@@ -14,7 +14,7 @@ Before this synchronization, public LFM-ORBIT `main` was verified at `bb3196ad74
 
 The repair keeps the public LFM-ORBIT history and adds the reviewed application tree on top of it. GenUni `main` now points to rollback commit `4068dbae0d2b3317770c45a8532536a49e077d18`, whose tree is exactly `a413da770d588ff5b5b100447bfa13e9635e78e4`. Because GenUni protects `main` from force-pushes, this is a normal fast-forward content rollback: the mistaken commits remain in GenUni history, but the branch no longer presents the Orbit application tree. Neither repository is treated as a mirror of the other.
 
-The public synchronization commit is `d9206163` on top of the verified LFM-ORBIT base `bb3196ad74ee8138cebb4b87cd10c5043611e164`.
+The initial public synchronization commit was `d9206163` on top of the verified LFM-ORBIT base `bb3196ad74ee8138cebb4b87cd10c5043611e164`; the recovery-note follow-up made the current published head `8fe6ae2c258f25c98b8a6caf1b66ededd326fb95`.
 
 ## Review rules
 

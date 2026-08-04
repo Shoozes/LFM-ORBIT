@@ -74,6 +74,7 @@
         "README.md",
         "docs/README.md",
         "docs/dev/ARCHITECTURE.md",
+        "docs/dev/PITFALL_LEDGER.md",
         "docs/dev/REPOSITORY_BOUNDARY.md",
         "docs/dev/TODO.md",
         "source/backend/pyproject.toml",
@@ -260,6 +261,20 @@
         "source/frontend/e2e/qa_verification.spec.ts",
         "source/frontend/types/mission.ts",
         "source/frontend/types/replay.ts",
+        "summary_bank.json"
+      ]
+    },
+    "issue_group_repository_boundary_and_pitfalls": {
+      "description": "Public LFM-ORBIT versus GenUni training ownership, remote-target checks, unrelated-history recovery, protected-main rollback, and the regression-prevention ledger.",
+      "files": [
+        ".tools/project.json",
+        "README.md",
+        "docs/README.md",
+        "docs/dev/PITFALL_LEDGER.md",
+        "docs/dev/REPOSITORY_BOUNDARY.md",
+        "docs/dev/TODO.md",
+        "source/backend/tests/test_docs_artifacts.py",
+        "source/backend/tests/test_project_config.py",
         "summary_bank.json"
       ]
     },

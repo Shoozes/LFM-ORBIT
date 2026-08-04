@@ -235,6 +235,7 @@ def test_docs_user_and_dev_surfaces_are_separated():
         "ARCHITECTURE.md",
         "DATASET_CYCLE_TUTORIAL.md",
         "MODEL_HANDOFF.md",
+        "PITFALL_LEDGER.md",
         "REPOSITORY_BOUNDARY.md",
         "SEEDED_DATA_REGISTRY.md",
         "TODO.md",
