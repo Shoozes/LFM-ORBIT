@@ -147,7 +147,7 @@ npm run build:pages
 npm run test:e2e
 ```
 
-The Pages workflow separately runs hosted smoke, deploys the model-free project-path artifact, and performs a live static-origin check. The public URL, model licensing decision, and iOS Safari model proof remain external release gates in [TODO.md](docs/dev/TODO.md).
+The Pages workflow separately runs hosted smoke, deploys the model-free project-path artifact, and performs a live static-origin check. The current deployed HTTPS project path is [shoozes.github.io/LFM-ORBIT](https://shoozes.github.io/LFM-ORBIT/); model licensing and iOS Safari model proof remain external release gates in [TODO.md](docs/dev/TODO.md).
 
 ## Model + Training Loop
 

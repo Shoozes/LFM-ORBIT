@@ -2,36 +2,6 @@
 
 Owner: maintainers of unfinished release and operational work. Keep this file limited to active tasks; current architecture is [ARCHITECTURE.md](ARCHITECTURE.md), product proof is the root [README](../../README.md), and historical work is in Git, the [summary-bank archive](archive/summary_bank_history.json), and the [documentation compaction archive](archive/2026-08-04-integrity-review/README.md).
 
-## P0
-
-### Task: Rerun the proven CI and Pages fixes on main
-
-What: publish the reviewed fixes and rerun the two failures proven on commit `a4d14dff95969055a5343d382692d15482e9faf1`: the default CI list loaded the release-only static Pages spec without `HOSTED_PAGES_URL`, and the Pages smoke used a non-exact `Saved evidence` locator.
-
-Why: the exact root causes are now known; a green remote run is still required because local Windows Chromium cannot reproduce the hosted browser lane.
-
-Where: `.github/workflows/ci.yml`, `source/frontend/playwright.config.ts`, `source/frontend/e2e/hosted.pages.spec.ts`, and GitHub Actions for `Shoozes/LFM-ORBIT`.
-
-How/When: after publication, run the next `main` workflows and inspect the hosted smoke plus default E2E jobs. Pages configuration was not the failure on the reviewed run; build, deploy, and static-origin checks remain separate gates.
-
-Done when: CI and Pages both complete successfully for the new commit, with no `HOSTED_PAGES_URL` import failure and no hosted-pages locator strict-mode failure.
-
-Verification: run `npm run test:e2e -- --list`, `npm run test:hosted:pages`, and retain the new run URLs/logs; the original evidence is run `30913026728` / `30913027001`.
-
-### Task: Prove the deployed Pages static origin
-
-What: verify the exact HTTPS project-path URL after a successful deployment.
-
-Why: local `dist-pages` proof does not prove DNS, Pages configuration, asset MIME, or post-deploy routing.
-
-Where: `HOSTED_PAGES_URL`, `.github/workflows/pages.yml`, and `source/frontend/e2e/hosted.pages.live.static.spec.ts`.
-
-How/When: run `npm run test:hosted:pages:live:static` with the trailing-slash public URL after the Pages setting is confirmed.
-
-Done when: the same deployment run passes package/image loading, model-runtime absence, base-path navigation, and no-backend static-origin checks.
-
-Verification: retain the workflow artifact and public URL; do not claim live proof from a local preview.
-
 ## P1
 
 ### Task: Approve the public browser-model handoff
