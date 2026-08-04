@@ -66,8 +66,8 @@ def test_pages_workflow_builds_and_deploys_only_the_hosted_project_path():
     assert "npm run build:pages" in workflow
     assert "npm run test:hosted:pages" in workflow
     assert workflow.index("npx playwright install --with-deps chromium") < workflow.index("npm run test:hosted:pages")
-    assert "actions/configure-pages@v5" in workflow
-    assert "actions/upload-pages-artifact@v4" in workflow
+    assert "actions/configure-pages@v6" in workflow
+    assert "actions/upload-pages-artifact@v5" in workflow
     assert "actions/deploy-pages@v4" in workflow
     assert "path: source/frontend/dist-pages" in workflow
     assert "needs: build" in workflow
