@@ -32,8 +32,8 @@ def fetch_nasa_observations(cell_id: str) -> Optional[ObservationPair]:
     centroid_lat, centroid_lng = cell_to_latlng(cell_id)
 
     # Note: date here must align with the general bounds, we'll try a recent one or default
-    req_date = "2024-01-01" 
-    
+    req_date = "2024-01-01"
+
     url = "https://api.nasa.gov/planetary/earth/imagery"
     params = {
         "lon": centroid_lng,
@@ -48,11 +48,11 @@ def fetch_nasa_observations(cell_id: str) -> Optional[ObservationPair]:
         # We just want to ensure we hit the API and it's valid
         with httpx.Client(timeout=10.0) as client:
             resp = client.head(url, params=params)
-            
+
             # NASA API often redirects or returns an image
             if resp.status_code not in (200, 302):
                 logger.warning(
-                    "NASA API imagery fetch failed for %s (Status: %s)", 
+                    "NASA API imagery fetch failed for %s (Status: %s)",
                     cell_id, resp.status_code
                 )
                 return None
@@ -62,24 +62,24 @@ def fetch_nasa_observations(cell_id: str) -> Optional[ObservationPair]:
 
     # Verification successful; construct proxy bands representing this pull.
     h = int(hashlib.md5(cell_id.encode()).hexdigest(), 16)
-    
+
     before_bands = {
         "nir": 0.65 + (h % 10) * 0.01,
         "red": 0.08 + ((h >> 4) % 10) * 0.005,
         "swir": 0.15 + ((h >> 8) % 10) * 0.01,
     }
-    
+
     after_bands = dict(before_bands)
-    
+
     before_flags = []
     after_flags = []
-    
+
     if (h % 100) < 20:
         after_bands["nir"] *= 0.4
         after_bands["red"] *= 1.8
         after_bands["swir"] *= 1.5
         after_flags.append("disturbance_pattern")
-        
+
     return {
         "source": SOURCE_NASA_API,
         "cell_id": cell_id,

@@ -65,13 +65,13 @@ def test_build_flag_message_scores_rounded_to_4dp():
 def test_build_flag_message_with_llm_result():
     from core.satellite_agent import _build_flag_message
     score = {"change_score": 0.700, "confidence": 0.900, "reason_codes": []}
-    
+
     llm_res = {
         "thinking": "Clear tree canopy removal observed mathematically.",
         "response": "Mathematical deforestation identified.",
         "tool_calls": []
     }
-    
+
     payload = _build_flag_message("cellZ", score, llm_result=llm_res)
     assert payload["thinking"] == "Clear tree canopy removal observed mathematically."
     assert payload["response"] == "Mathematical deforestation identified."

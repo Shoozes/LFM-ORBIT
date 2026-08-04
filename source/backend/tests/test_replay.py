@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from fastapi.responses import JSONResponse
 
 from api.main import mission_current, mission_stop, replay_catalog, replay_load, replay_rescan
@@ -8,7 +10,49 @@ from core.gallery import list_gallery
 from core.metrics import read_metrics_summary
 from core.object_targets import get_target_pack
 from core.queue import get_recent_alerts
-from core.replay_snapshot import SNAPSHOT_FORMAT, export_replay_snapshot, import_replay_snapshot
+from core.replay_snapshot import SNAPSHOT_FORMAT, _coerce_bool, export_replay_snapshot, import_replay_snapshot
+
+
+def test_replay_snapshot_bool_coercion_handles_text_values():
+    assert _coerce_bool("true") is True
+    assert _coerce_bool("false") is False
+    assert _coerce_bool("0") is False
+    assert _coerce_bool("unexpected") is False
+
+
+def test_replay_snapshot_rejects_malformed_rows_before_reset(tmp_path, monkeypatch):
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+    _reset_runtime_state()
+    replay_load("rondonia_frontier_showcase")
+    before = get_recent_alerts(limit=20)["alerts"]
+
+    malformed = export_replay_snapshot(limit=50)
+    malformed["alerts"][0]["payload_bytes"] = "not-an-integer"
+
+    with pytest.raises(ValueError, match="payload_bytes"):
+        import_replay_snapshot(malformed)
+
+    assert len(get_recent_alerts(limit=20)["alerts"]) == len(before)
+
+
+def test_replay_snapshot_preserves_confirmation_policy(tmp_path, monkeypatch):
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+    _reset_runtime_state()
+
+    from core.mission import get_active_mission, start_mission
+
+    start_mission("Single acquisition snapshot", confirmation_policy="single_acquisition")
+    snapshot = export_replay_snapshot(limit=20)
+
+    import_replay_snapshot(snapshot)
+
+    restored = get_active_mission()
+    assert restored is not None
+    assert restored["confirmation_policy"] == "single_acquisition"
 from core.runtime_state import reset_runtime_state
 
 EXPECTED_REPLAY_IDS = {
@@ -72,6 +116,25 @@ def test_replay_catalog_lists_seeded_showcase_pack(tmp_path, monkeypatch):
     assert any(item["source_kind"] == "seeded_cache" for item in payload["replays"])
     assert next(item for item in payload["replays"] if item["replay_id"] == "greenland_ice_snow_extent_replay")["use_case_id"] == "ice_snow_extent"
     assert "seeded_cache_sh_cc0e95b7" not in replay_ids
+
+
+def test_replay_rescan_returns_additive_prior_current_comparison(tmp_path, monkeypatch):
+    monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(tmp_path / "alerts.sqlite"))
+    monkeypatch.setenv("AGENT_BUS_PATH", str(tmp_path / "agent_bus.sqlite"))
+    monkeypatch.setenv("CANOPY_SENTINEL_METRICS_PATH", str(tmp_path / "metrics.json"))
+    _reset_runtime_state()
+
+    payload = replay_rescan("atacama_mining_replay")
+    comparison = payload["comparison"]
+
+    assert comparison["mode"] == "additive"
+    assert comparison["source_replay_id"] == "atacama_mining_replay"
+    assert comparison["current_scoring_basis"] == "cached_rescan_current_model"
+    assert comparison["prior_alert_count"] == comparison["current_alert_count"] == 1
+    assert comparison["changed_count"] + comparison["unchanged_count"] == 1
+    assert {row["status"] for row in comparison["rows"]} <= {"changed", "unchanged"}
+    assert all(row["cell_id"] for row in comparison["rows"])
+    assert "Original replay proof remains unchanged" in comparison["note"]
 
 
 def test_curated_replays_expose_use_case_metadata():

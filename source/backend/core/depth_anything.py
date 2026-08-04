@@ -6,7 +6,6 @@ Depth Anything package unless the feature is explicitly enabled.
 
 from __future__ import annotations
 
-import base64
 import importlib.util
 import logging
 import os
@@ -16,6 +15,7 @@ from io import BytesIO
 from typing import Any
 
 import numpy as np
+from core.image_payload import decode_base64_payload
 
 logger = logging.getLogger(__name__)
 
@@ -190,18 +190,21 @@ def _decode_image_data_url(image_b64: str, max_pixels: int):
     except ImportError as exc:  # pragma: no cover - transitive dependency guard
         raise DepthAnythingUnavailable("Pillow is required for depth image decoding.") from exc
 
-    payload = image_b64.strip()
-    if not payload:
-        raise ValueError("image_b64 is required.")
-    if "," in payload and payload.lower().startswith("data:"):
-        payload = payload.split(",", 1)[1]
     try:
-        raw = base64.b64decode(payload, validate=True)
-    except Exception as exc:
-        raise ValueError("image_b64 must be valid base64 image data.") from exc
+        raw = decode_base64_payload(image_b64)
+    except ValueError as exc:
+        raise ValueError(str(exc) + ".") from exc
 
-    image = Image.open(BytesIO(raw)).convert("RGB")
-    pixels = image.width * image.height
+    try:
+        with Image.open(BytesIO(raw)) as opened:
+            pixels = opened.width * opened.height
+            if pixels <= 0:
+                raise ValueError("image payload has invalid dimensions.")
+            image = opened.convert("RGB")
+    except Exception as exc:
+        if isinstance(exc, ValueError):
+            raise
+        raise ValueError("image_b64 is not a readable image.") from exc
     if pixels > max_pixels:
         scale = (max_pixels / pixels) ** 0.5
         next_size = (max(1, int(image.width * scale)), max(1, int(image.height * scale)))

@@ -11,6 +11,18 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+.app-route-loading {
+  align-items: center;
+  background: #07111e;
+  color: #9bdff5;
+  display: flex;
+  font: 700 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  height: 100vh;
+  justify-content: center;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: rgba(52, 211, 153, 0.28) rgba(3, 8, 18, 0.9);

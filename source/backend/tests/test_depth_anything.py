@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from PIL import Image
+from io import BytesIO
+import base64
 
 from core import depth_anything
 from core.depth_anything import _extract_depth_array, clear_depth_anything_runtime_override, estimate_depth_summary
+from core.image_payload import decode_base64_payload
 
 
 class PredictionLike:
@@ -40,3 +44,13 @@ def test_estimate_depth_summary_rejects_bad_image_before_model_load(monkeypatch)
         estimate_depth_summary("not-image")
 
     clear_depth_anything_runtime_override()
+
+
+def test_shared_image_decoder_rejects_oversized_decoded_payload():
+    image = Image.new("RGB", (1, 1), (1, 2, 3))
+    output = BytesIO()
+    image.save(output, format="PNG")
+    encoded = base64.b64encode(output.getvalue()).decode("ascii")
+
+    with pytest.raises(ValueError, match="byte limit"):
+        decode_base64_payload(encoded, max_bytes=1)

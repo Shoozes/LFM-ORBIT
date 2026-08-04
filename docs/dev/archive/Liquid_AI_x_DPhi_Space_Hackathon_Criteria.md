@@ -1,6 +1,6 @@
 # Hackathon Criteria
 
-**Liquid Track:** 
+**Liquid Track:**
 
 **Use of Satellite Imagery \-\> 10%**
 
@@ -12,18 +12,18 @@ The problem is specific and real. Satellite imagery \+ LFM2-VL together unlock s
 
 **Technical Implementation \-\> 35%**
 
-The app runs. **It must be runnable without debugging to qualify**. Users have the freedom to choose their deployment and inference tooling (llama.cpp, MLX, ONNX...).  
+The app runs. **It must be runnable without debugging to qualify**. Users have the freedom to choose their deployment and inference tooling (llama.cpp, MLX, ONNX...).
 Fine-tuning LFM2-VL on domain-specific satellite data is strongly encouraged and will be rewarded, with documented methodology, measurable improvement over the base model, and publicly shared weights and training code.
 
 **Demo and Communication \-\> 20%**
 
 End-to-end demo of you (the participant) explaining the whole thing. Writing code is easy in 2026\. Clearly articulating the problem you are solving and the architecture of your solution is not. Make the effort and you will be rewarded. (edited) 
 
-**General AI Track:** 
+**General AI Track:**
 
 **Use of Satellite Imagery \-\> 20%**
 
-Satellite images from the DPhi API are the core data source, applied to a real-world domain.  
+Satellite images from the DPhi API are the core data source, applied to a real-world domain.
 Preference is given to approaches that reflect the constraints and opportunities of space-based data acquisition (e.g. temporal continuity, large volumes and limited downlink).
 
 Usage of multiple spectral bands is rewarded.
@@ -34,12 +34,12 @@ The solution addresses a real problem that benefits specifically from running AI
 
 Strong submissions will clearly justify:
 
-* Why the application must run in orbit (e.g. latency sensitivity, continuous data streams, or bandwidth limitations)  
+* Why the application must run in orbit (e.g. latency sensitivity, continuous data streams, or bandwidth limitations)
 * How on-board compute enables capabilities that would otherwise be impractical or impossible on existing satellites.
 
 **Technical Implementation \-\> 35%**
 
-The app runs. **It must be runnable without debugging to qualify**. Users have the freedom to choose their deployment and inference tooling (MLX, ONNX...).  
+The app runs. **It must be runnable without debugging to qualify**. Users have the freedom to choose their deployment and inference tooling (MLX, ONNX...).
 Submissions should go beyond simply adapting an existing model.
 
 Conceptual innovation, system design, and (optional) fine-tuning for the space-based use case are strongly rewarded.
@@ -50,7 +50,7 @@ End-to-end demo of you (the participant) explaining the whole thing. Writing cod
 
 # Hackathon Prizes
 
-DPhi Space will be offering the same credits for the winner 
+DPhi Space will be offering the same credits for the winner
 
 | Liquid AI Track | General AI Track |
 | :---- | :---- |

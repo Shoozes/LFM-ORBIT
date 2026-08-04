@@ -1,0 +1,175 @@
+{
+  "name": "LFM-ORBIT",
+  "git": {
+    "remote": "https://github.com/Shoozes/LFM-ORBIT.git",
+    "trainingRemote": "https://github.com/Shoozes/GenUni.git",
+    "defaultBranch": "main"
+  },
+  "paths": {
+    "secretsDir": ".tools/.secrets",
+    "tokenFile": "gt.txt"
+  },
+  "_note": "Dev controller button layout. Groups become tabs.",
+  "window": {
+    "title": "LFM-ORBIT  //  Unified Controller",
+    "width": 780,
+    "height": 600
+  },
+  "groups": [
+    {
+      "label": "AI Context Tools",
+      "buttons": [
+        {
+          "label": "Dump Default Structure",
+          "description": "Generates _struct_summary.txt based on the default groups in your summary bank.",
+          "type": "python",
+          "script": ".tools/_gen_struct.py",
+          "args": [],
+          "capture": true,
+          "show_output": true
+        },
+        {
+          "label": "Sync Summary Bank",
+          "description": "Scans the repo for new/moved files and updates summary_bank.json without breaking custom groups.",
+          "type": "python",
+          "script": ".tools/_gen_bank.py",
+          "args": [
+            "--auto-add"
+          ],
+          "capture": true,
+          "show_output": true
+        },
+        {
+          "label": "Edit Summary Bank",
+          "description": "Opens summary_bank.json in your default text editor.",
+          "type": "open_file",
+          "path": "summary_bank.json"
+        },
+        {
+          "label": "Print Context Group",
+          "description": "Prints a group's context directly to stdout for LLM consumption.",
+          "type": "powershell",
+          "script": ".tools/get-context.ps1",
+          "args": [],
+          "capture": true,
+          "show_output": true,
+          "prompt_arg": {
+            "label": "Group name from summary_bank.json:",
+            "flag": "",
+            "initial_value": "workflow__repo_orientation"
+          }
+        }
+      ]
+    },
+    {
+      "label": "Run & Test",
+      "buttons": [
+        {
+          "label": "Install Full Runtime",
+          "description": "Installs locked dependencies, fetches the trained Orbit GGUF, and starts the full local demo.",
+          "type": "powershell",
+          "script": "run.ps1",
+          "args": [
+            "-Install"
+          ],
+          "capture": true,
+          "show_output": true,
+          "spinner": true
+        },
+        {
+          "label": "Start Web Dev",
+          "description": "Starts the full local demo from already-installed dependencies.",
+          "type": "powershell",
+          "script": "run.ps1",
+          "args": [
+            "-Run"
+          ],
+          "capture": false,
+          "show_output": false
+        },
+        {
+          "label": "Start Hosted Demo",
+          "description": "Starts the browser-only hosted portfolio demo without the Orbit backend.",
+          "type": "powershell",
+          "script": "run.ps1",
+          "args": [
+            "-Hosted"
+          ],
+          "capture": false,
+          "show_output": false
+        },
+        {
+          "label": "Clean Runtime State",
+          "description": "Clears mutable runtime stores for a cold start without touching source-backed demo assets.",
+          "type": "powershell",
+          "script": "run.ps1",
+          "args": [
+            "-Clean"
+          ],
+          "capture": true,
+          "show_output": true,
+          "spinner": true
+        },
+        {
+          "label": "Verify Repo",
+          "description": "Runs locked backend, frontend, hosted static-preview, and Playwright verification.",
+          "type": "powershell",
+          "script": "run.ps1",
+          "args": [
+            "-Verify"
+          ],
+          "capture": true,
+          "show_output": true,
+          "spinner": true
+        },
+        {
+          "label": "Install Dependencies Only",
+          "description": "Installs locked dependencies and the trained model without starting a server.",
+          "type": "powershell",
+          "script": "run.ps1",
+          "args": [
+            "-InstallOnly",
+            "-FetchModel"
+          ],
+          "capture": true,
+          "show_output": true,
+          "spinner": true
+        }
+      ]
+    },
+    {
+      "label": "Git",
+      "buttons": [
+        {
+          "label": "Push Reviewed Changes",
+          "description": "Commits only reviewed, pre-staged changes and pushes the current branch to the public LFM-ORBIT GitHub remote with upstream tracking. Stops on divergence or conflicts.",
+          "type": "powershell",
+          "script": ".tools/gitpush.ps1",
+          "args": [
+            "-Yes"
+          ],
+          "capture": true,
+          "show_output": true,
+          "spinner": true,
+          "prompt_arg": {
+            "label": "Commit message",
+            "flag": "-Message",
+            "initial_value": "manual"
+          }
+        },
+        {
+          "label": "Pull / Sync",
+          "description": "Fetches, prunes, and safely rebases the current branch from origin. Stops without choosing conflict sides or dropping a conflicted safety stash.",
+          "type": "powershell",
+          "script": ".tools/gitpull.ps1",
+          "args": [
+            "-Yes"
+          ],
+          "capture": true,
+          "show_output": true,
+          "spinner": true
+        }
+      ]
+    }
+  ]
+}

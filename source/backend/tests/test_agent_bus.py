@@ -23,11 +23,10 @@ def isolated_bus(tmp_path, monkeypatch):
 
 def test_init_bus_creates_tables(isolated_bus):
     import sqlite3
-    conn = sqlite3.connect(isolated_bus)
-    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    with sqlite3.connect(isolated_bus) as conn:
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
     assert "agent_messages" in tables
     assert "map_pins" in tables
-    conn.close()
 
 
 def test_init_bus_reset_clears_data(isolated_bus):
@@ -79,6 +78,20 @@ def test_pull_messages_broadcast_received_by_all():
     for recipient in ("ground", "satellite"):
         msgs = pull_messages(recipient, mark_read=False)
         assert any(m["msg_type"] == "status" for m in msgs), f"{recipient} should see broadcast"
+
+
+def test_pull_messages_broadcast_has_independent_receipts():
+    from core.agent_bus import get_bus_stats, post_message, pull_messages
+
+    post_message("operator", "broadcast", "status", {"note": "deliver twice"})
+
+    assert len(pull_messages("ground", mark_read=True)) == 1
+    assert len(pull_messages("ground", mark_read=True)) == 0
+    assert get_bus_stats()["unread_messages"] == 1
+
+    assert len(pull_messages("satellite", mark_read=True)) == 1
+    assert len(pull_messages("satellite", mark_read=True)) == 0
+    assert get_bus_stats()["unread_messages"] == 0
 
 
 def test_pull_messages_respects_limit():

@@ -1,6 +1,6 @@
 # Orbit Model Handoff
 
-Updated May 6, 2026.
+Updated August 4, 2026.
 
 ## Purpose
 
@@ -27,6 +27,12 @@ That means:
 - `/api/inference/image` can run a bounded retained-frame image-conditioned review through LiquidAI/LFM2.5-VL-450M when the opt-in Transformers image runtime is configured and loaded
 - a published `mmproj` can still be carried in a future handoff manifest so the artifact chain is ready for a GGUF projector path
 - the current LiquidAI Leap Tune-compatible Orbit bundle is a trained GGUF handoff without an `mmproj` file
+
+## Hosted browser handoff
+
+The portfolio route is a separate frontend-only contract. The hosted build renders at `/`; the full local build exposes the same surface at `/hosted`. It loads and validates `source/frontend/public/model-manifest.json`, then uses Wllama/WebAssembly to fetch the pinned `LFM2.5-VL-450M-Q4_0.gguf` revision from [Shoozes/lfm2.5-450m-vl-orbit-satellite](https://huggingface.co/Shoozes/lfm2.5-450m-vl-orbit-satellite) before running short local text chat against saved demo-package context. It does not use the backend GGUF path, FastAPI, provider credentials, live imagery, or browser-side image inputs. Do not merge this sealed browser artifact contract with the moving full-app model handoff.
+
+The hosted package index is schema v2. Each card is validated against a local replay manifest and carries its source replay id, repo-relative source asset, ordered bbox, observation window, `runtimeTruthMode=replay`, `imageryOrigin=cached_api`, scoring basis, review summary, and candidate/review/abstain retention decision. The package is a compact offline presentation of replay evidence; it is not a second live-provider or model-server path.
 
 ## Orbit Runtime Contract
 
@@ -89,7 +95,7 @@ cd <repo-root>
 ./run.sh --install
 ```
 
-The production launcher path downloads the trained handoff, installs the `model` extra (`llama-cpp-python`), and runs `scripts/smoke_satellite_model.py --require-present --max-tokens 8`. If the GGUF runtime cannot load, option 1 fails before the app starts; fallback analysis is development-only, not the hackathon path.
+The full-runtime launcher path downloads the trained handoff, installs the `model` extra (`llama-cpp-python`), and runs `scripts/smoke_satellite_model.py --require-present --max-tokens 8`. If the GGUF runtime cannot load, option 1 fails before the app starts; fallback analysis is development-only, not the full-runtime path.
 
 Direct script usage:
 
@@ -226,7 +232,7 @@ Current published bundle:
 
 Treat this as the trained runtime artifact for evidence-packet and bbox JSON reasoning. Its training manifest now includes image-text rows, but Orbit still must not describe the GGUF SAT/GND path as image-conditioned. Image-conditioned retained-frame review is only claimed through the separate runtime-gated `/api/inference/image` adapter.
 
-Do not move training UI or provider management into Orbit. Keep Orbit's hackathon path centered on DPhi SimSat (`simsat_sentinel`), bundled replay fixtures, and manifest-driven model consumption.
+Do not move training UI or provider management into Orbit. Keep Orbit's full-app path centered on DPhi SimSat (`simsat_sentinel`), bundled replay fixtures, and manifest-driven model consumption.
 
 ## Orbit Dataset Bridge
 
@@ -240,7 +246,7 @@ The export now includes:
 - cached API observation-store rows when the CLI is run without `--no-api-observations`
 - direct replay-cache rows when the CLI is run with `--include-seeded-cache`
 - persisted maritime/lifeline monitor-report JSON rows when passed through `--monitor-reports-dir`
-- SimSat/Mapbox through DPhi Space SimSat as the hackathon satellite-data API family: default SimSat Sentinel scanning, optional SimSat Mapbox imagery/context, direct Sentinel Hub, NASA, GEE, replay-cache, and offline provenance fields where available
+- SimSat/Mapbox through DPhi Space SimSat as the default satellite-data API family: default SimSat Sentinel scanning, optional SimSat Mapbox imagery/context, direct Sentinel Hub, NASA, GEE, replay-cache, and offline provenance fields where available
 - temporal use-case metadata and examples for deforestation, wildfire, civilian lifeline disruption, maritime monitoring, ice/snow extent, legacy ice-cap visual review, floods, agriculture, urban expansion, mining, and generic temporal review
 - chat-style `training.jsonl`, `train_training.jsonl`, and `eval_training.jsonl` files for supervised data-refinement workflows
 - second-pass asset retagging through `scripts/retag_training_assets.py`, including deduplicated still images, sampled timelapse frames, ordered temporal sequence rows, Hugging Face JSONL configs with `images/` assets, and provider adapters for heuristic/manual queue, Ollama vision models, or OpenAI-compatible vision models
@@ -283,7 +289,7 @@ Completed runtime surfaces can also be packaged with:
 
 This snapshot path is for packaging completed realtime or replay missions. Bundled replay packs remain the preferred showcase walkthrough path.
 
-Current replay cache includes Rondonia replay coverage plus cached API missions for Pakistan Manchar Lake flooding, Atacama mining, Greenland ice/snow extent metadata scoring, Suez maritime queueing, Singapore maritime anchorage, Kansas crop phenology, Delhi urban expansion, Highway 82 Georgia wildfire candidate, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead. These are development and proof fixtures that avoid repeated API usage; they do not make Sentinel Hub part of the default hackathon runtime. The legacy Greenland ice-edge abstain WebM is excluded from Replay Cache because it fails the structural timelapse-integrity gate. These are intentionally small repo fixtures, not a full training corpus.
+Current replay cache includes Rondonia replay coverage plus cached API missions for Pakistan Manchar Lake flooding, Atacama mining, Greenland ice/snow extent metadata scoring, Suez maritime queueing, Singapore maritime anchorage, Kansas crop phenology, Delhi urban expansion, Highway 82 Georgia wildfire candidate, Mauna Loa, Lake Urmia, Black Rock City, Lahaina, Kakhovka, Kilauea, and Lake Mead. These are development and proof fixtures that avoid repeated API usage; they do not make Sentinel Hub part of the default runtime. The legacy Greenland ice-edge abstain WebM is excluded from Replay Cache because it fails the structural timelapse-integrity gate. These are intentionally small repo fixtures, not a full training corpus.
 
 Recorded proof demos now export both the full proof screen and the isolated `evidence-frame.png` surface. That keeps model/dataset review aligned with the exact visible evidence frame used in Proof Mode, not just the longer Playwright recording.
 
@@ -323,8 +329,8 @@ The trained model handoff bundle is published at `Shoozes/lfm2.5-450m-vl-orbit-s
 
 ## Tracked Runtime Gaps
 
-This handoff closes artifact resolution, publication flow, and dataset export passthrough for image-review metadata. The runtime gaps below are tracked in `TODO.md`:
+This handoff closes artifact resolution, publication flow, dataset export passthrough for image-review metadata, and the replay-rescan comparison contract. The remaining capability gaps are intentionally gated rather than presented as working behavior:
 
 - automatic `mmproj` use in the current `llama_cpp` path when a compatible projector exists
 - a GGUF-native `mmproj` image path if a compatible projector exists
-- completed replay-rescan diff output that compares current-model results with prior replay proof without overwriting the original audit record
+- replay-rescan diff output is now implemented additively; the original replay proof is not overwritten

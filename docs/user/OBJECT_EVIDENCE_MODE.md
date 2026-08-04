@@ -1,6 +1,6 @@
 # LFM-ORBIT Target-Pack Proof Contracts
 
-Current as of **May 5, 2026**.
+Current as of **August 3, 2026**.
 
 Target packs are the backend contract for what a mission should retain, not a separate operator workspace. The submission UI keeps the Mission tab focused on plan, replay, scan progress, and timelapse. Target-pack details remain attached to missions, alerts, replay snapshots, dataset exports, and Proof Mode so evidence can be audited without adding a second tuning panel.
 

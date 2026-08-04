@@ -413,7 +413,7 @@ def analyze_alert(
 ) -> AlertAnalysisResponse:
     """
     Analyze a mission alert using available offline infrastructure.
-    
+
     Args:
         change_score:       Composite change score from the scorer.
         confidence:         Confidence value from the scorer.
@@ -450,7 +450,7 @@ def analyze_timelapse(
             vlm_text = obs["observations"][-1].get("vlm_text")
             if vlm_text:
                 return f"[Visual Confirmation]: {vlm_text}"
-        
+
         # Fallback if no observation is stored, just acknowledge it.
         return (
             "[Visual Confirmation]: Canopy decay signal detected across temporal sequence. "

@@ -29,6 +29,7 @@ htmlcov/
 .eslintcache
 source/frontend/.vite/
 source/frontend/dist/
+source/frontend/dist-hosted/
 source/frontend/playwright-report/
 source/frontend/test-results/
 source/backend/dist/
@@ -79,6 +80,8 @@ code_references/
 _struct_summary.txt
 _structure_with_content.txt
 .tools/
+!.tools/
+!.tools/project.json
 .agents/
 docs/dev-notes/
 docs/unnamed.jpg
@@ -99,23 +102,12 @@ source/backend/assets/seeded_data/nasa_*_meta.json
 source/backend/assets/seeded_data/sh_*.webm
 source/backend/assets/seeded_data/sh_*_meta.json
 source/backend/assets/seeded_data/sh_*_frames/
-# Promoted source-backed wildfire proof fixtures.
-!source/backend/assets/seeded_data/sh_4015e8b8.webm
-!source/backend/assets/seeded_data/sh_4015e8b8_meta.json
-!source/backend/assets/seeded_data/sh_4015e8b8_frames/
-!source/backend/assets/seeded_data/sh_4015e8b8_frames/*.png
-!source/backend/assets/seeded_data/sh_09384ab0.webm
-!source/backend/assets/seeded_data/sh_09384ab0_meta.json
-!source/backend/assets/seeded_data/sh_09384ab0_frames/
-!source/backend/assets/seeded_data/sh_09384ab0_frames/*.png
-!source/backend/assets/seeded_data/sh_83e3aea2.webm
-!source/backend/assets/seeded_data/sh_83e3aea2_meta.json
-!source/backend/assets/seeded_data/sh_83e3aea2_frames/
-!source/backend/assets/seeded_data/sh_83e3aea2_frames/*.png
-!source/backend/assets/seeded_data/sh_af5954b2.webm
-!source/backend/assets/seeded_data/sh_af5954b2_meta.json
-!source/backend/assets/seeded_data/sh_af5954b2_frames/
-!source/backend/assets/seeded_data/sh_af5954b2_frames/*.png
+# Source-backed replay fixtures referenced by replay catalogs and summary-bank groups.
+!source/backend/assets/seeded_data/sh_*.webm
+!source/backend/assets/seeded_data/sh_*_meta.json
+!source/backend/assets/seeded_data/sh_*_frames/
+!source/backend/assets/seeded_data/sh_*_frames/*.png
+!source/backend/assets/seeded_data/nasa_aa01bc81.webm
 models/
 unsloth_compiled_cache/
 _unsloth_sentencepiece_temp/

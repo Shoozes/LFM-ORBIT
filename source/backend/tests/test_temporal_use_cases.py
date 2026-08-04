@@ -1,4 +1,8 @@
-from core.temporal_use_cases import classify_temporal_use_case, list_temporal_use_cases
+from core.temporal_use_cases import (
+    classify_temporal_use_case,
+    get_replay_cache_promotion_contract,
+    list_temporal_use_cases,
+)
 
 
 def test_temporal_use_case_catalog_includes_required_examples():
@@ -16,6 +20,12 @@ def test_temporal_use_case_catalog_includes_required_examples():
         assert use_case_id in cases
         assert cases[use_case_id]["temporal_methods"]
         assert cases[use_case_id]["examples"]
+
+
+def test_replay_cache_promotion_requires_an_explicit_use_case_contract():
+    assert get_replay_cache_promotion_contract(use_case_id="deforestation") is not None
+    assert get_replay_cache_promotion_contract(use_case_id="wildfire") is None
+    assert get_replay_cache_promotion_contract(target_pack_id="deforestation") is not None
 
 
 def test_temporal_use_case_classifier_handles_mission_text():

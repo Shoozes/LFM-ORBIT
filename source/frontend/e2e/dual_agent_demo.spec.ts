@@ -8,8 +8,8 @@ import {
   showSubtitle,
 } from "./tutorialHelpers";
 
-test.use({ 
-  video: "on", 
+test.use({
+  video: "on",
   viewport: { width: 1440, height: 900 }
 });
 

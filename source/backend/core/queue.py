@@ -1,6 +1,7 @@
 import json
 import os
 import sqlite3
+from contextlib import AbstractContextManager
 from typing import Any
 
 from core.config import (
@@ -11,20 +12,26 @@ from core.config import (
     scoring_basis_for_source,
 )
 from core.contracts import RecentAlertsResponse
+from core.paths import get_runtime_data_dir
+from core.sqlite import managed_connection
 
-DEFAULT_DB_PATH = os.path.join(os.path.dirname(__file__), "../../../runtime-data/dtn_queue.sqlite")
+DEFAULT_DB_PATH = str(get_runtime_data_dir() / "dtn_queue.sqlite")
 
 
 def get_db_path() -> str:
-    return os.getenv("CANOPY_SENTINEL_DB_PATH", DEFAULT_DB_PATH)
+    return os.getenv("CANOPY_SENTINEL_DB_PATH", str(get_runtime_data_dir() / "dtn_queue.sqlite"))
 
 
-def _connect() -> sqlite3.Connection:
+def _connect() -> AbstractContextManager[sqlite3.Connection]:
     db_path = get_db_path()
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    connection = sqlite3.connect(db_path)
+    parent = os.path.dirname(db_path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    connection = sqlite3.connect(db_path, timeout=5.0)
+    connection.execute("PRAGMA busy_timeout = 5000")
+    connection.execute("PRAGMA journal_mode = WAL")
     connection.row_factory = sqlite3.Row
-    return connection
+    return managed_connection(connection)
 
 
 def _column_names(connection: sqlite3.Connection, table_name: str) -> set[str]:
@@ -46,19 +53,33 @@ def _migrate_alerts_schema(connection: sqlite3.Connection):
             reason_codes TEXT NOT NULL,
             payload_bytes INTEGER NOT NULL,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            downlinked BOOLEAN DEFAULT 0
+            downlinked BOOLEAN DEFAULT 0,
+            mission_id INTEGER,
+            use_case_id TEXT,
+            target_pack_id TEXT
         )
         """
     )
 
+    candidate_columns = _column_names(connection, "candidates")
+    if candidate_columns and "mission_id" not in candidate_columns:
+        # Candidate counts are transient and cannot be safely assigned to a
+        # mission after the schema upgrade, so discard only this derived state.
+        connection.execute("DROP TABLE candidates")
+
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS candidates (
-            cell_id TEXT PRIMARY KEY,
+            mission_id INTEGER NOT NULL,
+            cell_id TEXT NOT NULL,
             first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
-            consecutive_anomaly_count INTEGER DEFAULT 1
+            consecutive_anomaly_count INTEGER DEFAULT 1,
+            PRIMARY KEY (mission_id, cell_id)
         )
         """
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_candidates_mission ON candidates (mission_id)"
     )
 
     columns = _column_names(connection, "alerts")
@@ -106,6 +127,15 @@ def _migrate_alerts_schema(connection: sqlite3.Connection):
     if "wildfire_assessment" not in columns:
         connection.execute("ALTER TABLE alerts ADD COLUMN wildfire_assessment TEXT")
 
+    if "mission_id" not in columns:
+        connection.execute("ALTER TABLE alerts ADD COLUMN mission_id INTEGER")
+
+    if "use_case_id" not in columns:
+        connection.execute("ALTER TABLE alerts ADD COLUMN use_case_id TEXT")
+
+    if "target_pack_id" not in columns:
+        connection.execute("ALTER TABLE alerts ADD COLUMN target_pack_id TEXT")
+
     connection.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_alerts_event_id
@@ -122,25 +152,54 @@ def init_db(reset: bool = False):
             connection.execute("DELETE FROM candidates")
         connection.commit()
 
-def upsert_candidate(cell_id: str) -> int:
-    """Record or update a candidate, returning the new consecutive anomaly count."""
+def upsert_candidate(mission_id: int, cell_id: str) -> int:
+    """Record a mission-scoped candidate and return its consecutive count."""
+    mission_id = int(mission_id)
+    if mission_id <= 0:
+        raise ValueError("mission_id must be positive")
     with _connect() as connection:
         _migrate_alerts_schema(connection)
-        row = connection.execute("SELECT consecutive_anomaly_count FROM candidates WHERE cell_id = ?", (cell_id,)).fetchone()
+        row = connection.execute(
+            """
+            SELECT consecutive_anomaly_count
+            FROM candidates
+            WHERE mission_id = ? AND cell_id = ?
+            """,
+            (mission_id, cell_id),
+        ).fetchone()
         if row:
             new_count = row["consecutive_anomaly_count"] + 1
-            connection.execute("UPDATE candidates SET consecutive_anomaly_count = ? WHERE cell_id = ?", (new_count, cell_id))
+            connection.execute(
+                """
+                UPDATE candidates
+                SET consecutive_anomaly_count = ?
+                WHERE mission_id = ? AND cell_id = ?
+                """,
+                (new_count, mission_id, cell_id),
+            )
         else:
             new_count = 1
-            connection.execute("INSERT INTO candidates (cell_id, consecutive_anomaly_count) VALUES (?, 1)", (cell_id,))
+            connection.execute(
+                """
+                INSERT INTO candidates (mission_id, cell_id, consecutive_anomaly_count)
+                VALUES (?, ?, 1)
+                """,
+                (mission_id, cell_id),
+            )
         connection.commit()
         return new_count
 
-def remove_candidate(cell_id: str):
-    """Remove a candidate if the anomaly fails to persist."""
+def remove_candidate(mission_id: int, cell_id: str):
+    """Remove a mission-scoped candidate if the anomaly fails to persist."""
+    mission_id = int(mission_id)
+    if mission_id <= 0:
+        raise ValueError("mission_id must be positive")
     with _connect() as connection:
         _migrate_alerts_schema(connection)
-        connection.execute("DELETE FROM candidates WHERE cell_id = ?", (cell_id,))
+        connection.execute(
+            "DELETE FROM candidates WHERE mission_id = ? AND cell_id = ?",
+            (mission_id, cell_id),
+        )
         connection.commit()
 
 
@@ -166,6 +225,9 @@ def push_alert(
     visual_model_review: dict | None = None,
     wildfire_assessment: dict | None = None,
     downlinked: bool = False,
+    mission_id: int | None = None,
+    use_case_id: str | None = None,
+    target_pack_id: str | None = None,
 ):
     with _connect() as connection:
         _migrate_alerts_schema(connection)
@@ -192,8 +254,11 @@ def push_alert(
                 detection_summary,
                 object_deltas,
                 visual_model_review,
-                wildfire_assessment
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                wildfire_assessment,
+                mission_id,
+                use_case_id,
+                target_pack_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event_id,
@@ -221,6 +286,9 @@ def push_alert(
                 json.dumps(object_deltas) if object_deltas else None,
                 json.dumps(_compact_visual_model_review(visual_model_review)) if visual_model_review else None,
                 json.dumps(wildfire_assessment) if wildfire_assessment else None,
+                int(mission_id) if mission_id is not None else None,
+                str(use_case_id).strip() if use_case_id else None,
+                str(target_pack_id).strip() if target_pack_id else None,
             ),
         )
         connection.commit()
@@ -367,7 +435,10 @@ def get_recent_alerts(limit: int = 50) -> RecentAlertsResponse:
                 detection_summary,
                 object_deltas,
                 visual_model_review,
-                wildfire_assessment
+                wildfire_assessment,
+                mission_id,
+                use_case_id,
+                target_pack_id
             FROM alerts
             ORDER BY id DESC
             LIMIT ?
@@ -406,6 +477,9 @@ def get_recent_alerts(limit: int = 50) -> RecentAlertsResponse:
                 "event_id": row["event_id"],
                 "region_id": row["region_id"],
                 "cell_id": row["cell_id"],
+                "mission_id": int(row["mission_id"]) if "mission_id" in row.keys() and row["mission_id"] is not None else None,
+                "use_case_id": row["use_case_id"] if "use_case_id" in row.keys() else None,
+                "target_pack_id": row["target_pack_id"] if "target_pack_id" in row.keys() else None,
                 "change_score": float(row["change_score"]),
                 "confidence": float(row["confidence"]),
                 "priority": row["priority"],

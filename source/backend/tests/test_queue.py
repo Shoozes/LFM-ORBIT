@@ -1,6 +1,15 @@
 import os
 
-from core.queue import estimate_object_proof_payload_bytes, estimate_payload_bytes, get_alert_counts, get_recent_alerts, init_db, push_alert
+from core.queue import (
+    estimate_object_proof_payload_bytes,
+    estimate_payload_bytes,
+    get_alert_counts,
+    get_recent_alerts,
+    init_db,
+    push_alert,
+    remove_candidate,
+    upsert_candidate,
+)
 
 
 def test_queue_round_trip(tmp_path):
@@ -99,6 +108,21 @@ def test_init_db_reset_clears_alerts(tmp_path):
 
     counts = get_alert_counts()
     assert counts["total_alerts"] == 0
+
+
+def test_candidates_are_scoped_to_mission(tmp_path):
+    db_path = tmp_path / "candidates.sqlite"
+    os.environ["CANOPY_SENTINEL_DB_PATH"] = str(db_path)
+
+    init_db(reset=True)
+
+    assert upsert_candidate(1, "same-cell") == 1
+    assert upsert_candidate(2, "same-cell") == 1
+    assert upsert_candidate(1, "same-cell") == 2
+
+    remove_candidate(1, "same-cell")
+    assert upsert_candidate(1, "same-cell") == 1
+    assert upsert_candidate(2, "same-cell") == 2
 
 
 def test_payload_estimation_is_positive():

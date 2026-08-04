@@ -59,7 +59,7 @@ export default function AlertsLogs({
   return (
     <div className="flex flex-col h-full w-full bg-white">
       <div className="flex flex-1 flex-col overflow-hidden bg-transparent">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-5">
           <div>
@@ -124,7 +124,7 @@ export default function AlertsLogs({
               )}
             </div>
           </div>
-          
+
           {/* Flagged Examples  */}
           <div className="flex flex-col w-full p-6 border-b border-zinc-200">
             <div className="flex items-center justify-between mb-4">
@@ -133,7 +133,7 @@ export default function AlertsLogs({
                 {metricsSummary?.flagged_examples.length ?? 0}
               </p>
             </div>
-            
+
             <div className="flex-1 space-y-3 overflow-y-auto pr-2 custom-scrollbar">
               {(metricsSummary?.flagged_examples ?? []).length === 0 ? (
                 <div className="rounded border border-dashed border-zinc-300 bg-zinc-50 p-5 text-center text-sm font-semibold text-zinc-400">

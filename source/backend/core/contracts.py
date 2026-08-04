@@ -172,6 +172,9 @@ class AlertRecord(TypedDict):
     event_id: str
     region_id: str
     cell_id: str
+    mission_id: NotRequired[int | None]
+    use_case_id: NotRequired[str | None]
+    target_pack_id: NotRequired[str | None]
     change_score: float
     confidence: float
     priority: Literal["low", "medium", "high", "critical"]
@@ -285,6 +288,9 @@ class HealthResponse(TypedDict):
     runtime_truth_mode: str
     imagery_origin: str
     scoring_basis: str
+    confirmation_policy: str
+    confirmation_required_acquisitions: int
+    resource_limits: dict[str, dict[str, int | float]]
 
 
 class RecentAlertsResponse(TypedDict):

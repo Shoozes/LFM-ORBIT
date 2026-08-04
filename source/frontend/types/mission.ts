@@ -6,6 +6,7 @@ export type Mission = {
   end_date: string | null;
   status: "active" | "idle" | "complete";
   mission_mode?: "live" | "replay";
+  confirmation_policy?: "single_acquisition" | "distinct_acquisition" | null;
   replay_id?: string | null;
   summary?: string | null;
   use_case_id?: string | null;

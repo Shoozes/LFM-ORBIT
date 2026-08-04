@@ -12,12 +12,14 @@ import json
 import sqlite3
 import os
 import time
+from contextlib import AbstractContextManager
 from pathlib import Path
 
 from core.config import PROVIDER_SIMSAT_MAPBOX, PROVIDER_SIMSAT_SENTINEL, REGION
 from core.contracts import ObservationPair
 from core.observability import log_throttled
 from core.paths import get_api_cache_path
+from core.sqlite import managed_connection
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +30,13 @@ def _cache_key_for_cell(cell_id: str) -> str:
     return f"{REGION.observation_mode}:{REGION.before_label}:{REGION.after_label}:{cell_id}"
 
 
+def _connect() -> AbstractContextManager[sqlite3.Connection]:
+    return managed_connection(sqlite3.connect(CACHE_PATH))
+
+
 def _init_cache():
     os.makedirs(Path(CACHE_PATH).parent, exist_ok=True)
-    with sqlite3.connect(CACHE_PATH) as conn:
+    with _connect() as conn:
         conn.execute(
             "CREATE TABLE IF NOT EXISTS obs_cache (cell_id TEXT PRIMARY KEY, observation_json TEXT)"
         )
@@ -43,7 +49,7 @@ except Exception as e:
 def _get_cached_obs(cell_id: str) -> Optional[ObservationPair]:
     cache_key = _cache_key_for_cell(cell_id)
     try:
-        with sqlite3.connect(CACHE_PATH) as conn:
+        with _connect() as conn:
             cursor = conn.execute("SELECT observation_json FROM obs_cache WHERE cell_id = ?", (cache_key,))
             row = cursor.fetchone()
             if row:
@@ -55,7 +61,7 @@ def _get_cached_obs(cell_id: str) -> Optional[ObservationPair]:
 def _set_cached_obs(cell_id: str, obs: ObservationPair):
     cache_key = _cache_key_for_cell(cell_id)
     try:
-        with sqlite3.connect(CACHE_PATH) as conn:
+        with _connect() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO obs_cache (cell_id, observation_json) VALUES (?, ?)",
                 (cache_key, json.dumps(obs))

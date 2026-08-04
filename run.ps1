@@ -5,6 +5,7 @@ param(
     [switch]$Clean,
     [switch]$Verify,
     [switch]$FetchModel,
+    [switch]$Hosted,
     [switch]$Help
 )
 
@@ -367,6 +368,7 @@ function Show-Usage {
     Write-Host "  .\run.ps1 -Run            Advanced/dev: start backend + frontend from existing deps"
     Write-Host "  .\run.ps1 -Clean          Clear mutable runtime stores for a cold start"
     Write-Host "  .\run.ps1 -Verify         Install deps and run backend, frontend, and E2E checks"
+    Write-Host "  .\run.ps1 -Hosted         Start the browser-only hosted portfolio demo"
 }
 
 function Write-SimSatStatus {
@@ -403,7 +405,7 @@ function Install-BackendDeps {
         $syncExit = $LASTEXITCODE
         if ($syncExit -ne 0) {
             if ($installModelRuntime) {
-                throw "llama-cpp model runtime failed to install. The production/hackathon path requires the trained GGUF runtime; repair compiler/Python wheel support and rerun option 1."
+                throw "llama-cpp model runtime failed to install. The full-runtime path requires the trained GGUF runtime; repair compiler/Python wheel support and rerun option 1."
             } else {
                 throw "Backend dependency sync failed with exit code $syncExit."
             }
@@ -424,9 +426,25 @@ function Install-FrontendDeps {
     }
 }
 
+function Install-HostedFrontend {
+    Ensure-Node
+    $viteCommand = Join-Path $FrontendDir "node_modules\.bin\vite.cmd"
+    if (Test-Path $viteCommand) {
+        return
+    }
+
+    Write-Host "[*] Installing hosted-demo frontend dependencies from package-lock.json..." -ForegroundColor Cyan
+    Push-Location $FrontendDir
+    try {
+        Invoke-RequiredCommand -Description "Hosted-demo frontend dependency install" -Command { npm ci }
+    } finally {
+        Pop-Location
+    }
+}
+
 function Ensure-TrainedModel {
     if (-not $FetchModel) {
-        Write-Host "[i] Skipping trained GGUF fetch. Use -FetchModel for production/hackathon runs; fallback analysis is development-only." -ForegroundColor Gray
+        Write-Host "[i] Skipping trained GGUF fetch. Use -FetchModel for full-runtime runs; fallback analysis is development-only." -ForegroundColor Gray
         return
     }
 
@@ -600,6 +618,8 @@ function Run-Verify {
         Invoke-RequiredCommand -Description "Frontend typecheck" -Command { npm run lint }
         Write-Host "[*] Frontend production build..." -ForegroundColor Cyan
         Invoke-RequiredCommand -Description "Frontend production build" -Command { npm run build }
+        Write-Host "[*] Hosted production build and smoke..." -ForegroundColor Cyan
+        Invoke-RequiredCommand -Description "Hosted production build and smoke" -Command { npm run verify:hosted }
         Write-Host "[*] Playwright E2E..." -ForegroundColor Cyan
         Invoke-RequiredCommand -Description "Playwright E2E" -Command { npm run test:e2e }
     } finally {
@@ -635,7 +655,7 @@ function Run-App {
     Write-SimSatStatus
 
     if (-not (Test-Path $ModelFile)) {
-        Write-Host "[!] Trained GGUF model not found. Run .\run.ps1 -Install for the production/hackathon path; continuing with development fallback behavior." -ForegroundColor Yellow
+        Write-Host "[!] Trained GGUF model not found. Run .\run.ps1 -Install for the full-runtime path; continuing with development fallback behavior." -ForegroundColor Yellow
     }
 
     Write-Host "[*] Launching backend..." -ForegroundColor Cyan
@@ -694,6 +714,21 @@ function Run-App {
     }
 }
 
+function Run-Hosted {
+    Install-HostedFrontend
+    Write-Host "[*] Starting browser-only hosted demo on http://127.0.0.1:5173/hosted ..." -ForegroundColor Cyan
+    Ensure-OrbitPortAvailable -Port 5173 -Role "hosted frontend"
+    Push-Location $FrontendDir
+    try {
+        npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
+        if ($LASTEXITCODE -ne 0) {
+            throw "Hosted frontend dev server failed with exit code $LASTEXITCODE."
+        }
+    } finally {
+        Pop-Location
+    }
+}
+
 function Clean-Data {
     Write-Host "[*] Cleaning runtime data for a cold start..." -ForegroundColor Yellow
     $pathsToRemove = @(
@@ -716,6 +751,17 @@ function Clean-Data {
         Get-ChildItem -LiteralPath $ObservationStoreDir -Filter "*.json" -File | ForEach-Object {
             Remove-Item -LiteralPath $_.FullName -Force
             Write-Host "    Removed $($_.FullName)" -ForegroundColor Gray
+        }
+    }
+
+    foreach ($runtimeDir in @(
+        (Join-Path $RuntimeDir "observation-store"),
+        (Join-Path $RuntimeDir "timelapse-cache"),
+        (Join-Path $RuntimeDir "monitor-reports")
+    )) {
+        if (Test-Path $runtimeDir) {
+            Remove-Item -LiteralPath $runtimeDir -Recurse -Force
+            Write-Host "    Removed $runtimeDir" -ForegroundColor Gray
         }
     }
 
@@ -774,6 +820,11 @@ function Run-InteractiveMenu {
 
 if ($Help) {
     Show-Usage
+    exit
+}
+
+if ($Hosted) {
+    Run-Hosted
     exit
 }
 

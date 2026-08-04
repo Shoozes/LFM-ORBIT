@@ -40,6 +40,7 @@ RUN_APP_ONLY=false
 CLEAN=false
 VERIFY=false
 FETCH_MODEL=false
+HOSTED=false
 RUNNING_VERIFY=false
 
 show_usage() {
@@ -53,6 +54,7 @@ Usage:
   ./run.sh --run           Advanced/dev: start backend + frontend from existing deps
   ./run.sh --clean         Clear mutable runtime stores for a cold start
   ./run.sh --verify        Install deps and run backend, frontend, and E2E checks
+  ./run.sh --hosted        Start the browser-only hosted portfolio demo
 EOF
 }
 
@@ -422,7 +424,7 @@ install_backend_deps() {
             sync_args+=(--extra model)
             echo "[i] Attempting llama-cpp model runtime install for GGUF inference."
         elif [[ "$require_model_runtime" == true ]]; then
-            echo "[!] llama-cpp model runtime is required for the production/hackathon path but no Linux C/C++ compiler was found." >&2
+            echo "[!] llama-cpp model runtime is required for the full-runtime path but no Linux C/C++ compiler was found." >&2
             echo "    Install build-essential, gcc/g++, or clang, then rerun option 1." >&2
             exit 1
         else
@@ -438,7 +440,7 @@ install_backend_deps() {
         cd "$BACKEND_DIR"
         if ! "$UV_CMD" "${sync_args[@]}"; then
             if [[ "$include_model_runtime" == true ]]; then
-                echo "[!] llama-cpp model runtime failed to install. The trained GGUF runtime is required for production/hackathon runs." >&2
+                echo "[!] llama-cpp model runtime failed to install. The trained GGUF runtime is required for full-runtime runs." >&2
                 exit 1
             else
                 exit 1
@@ -456,9 +458,21 @@ install_frontend_deps() {
     )
 }
 
+install_hosted_frontend() {
+    ensure_node
+    if [[ -x "$FRONTEND_DIR/node_modules/.bin/vite" || -x "$FRONTEND_DIR/node_modules/.bin/vite.cmd" ]]; then
+        return
+    fi
+    echo "[*] Installing hosted-demo frontend dependencies from package-lock.json..."
+    (
+        cd "$FRONTEND_DIR"
+        "$NPM_CMD" ci
+    )
+}
+
 ensure_trained_model() {
     if [[ "$FETCH_MODEL" != true ]]; then
-        echo "[i] Skipping trained GGUF fetch. Use --fetch-model for production/hackathon runs; fallback analysis is development-only."
+        echo "[i] Skipping trained GGUF fetch. Use --fetch-model for full-runtime runs; fallback analysis is development-only."
         return
     fi
 
@@ -629,6 +643,8 @@ run_verify() {
         "$NPM_CMD" run lint
         echo "[*] Frontend production build..."
         "$NPM_CMD" run build
+        echo "[*] Hosted production build and smoke..."
+        "$NPM_CMD" run verify:hosted
         echo "[*] Playwright E2E..."
         "$NPM_CMD" run test:e2e
     )
@@ -642,7 +658,7 @@ run_app() {
     write_simsat_status
 
     if [[ ! -f "$MODEL_FILE" ]]; then
-        echo "[!] Trained GGUF model not found. Run ./run.sh --install for the production/hackathon path; continuing with development fallback behavior."
+        echo "[!] Trained GGUF model not found. Run ./run.sh --install for the full-runtime path; continuing with development fallback behavior."
     fi
 
     echo "[*] Launching backend..."
@@ -699,6 +715,16 @@ run_app() {
     )
 }
 
+run_hosted() {
+    install_hosted_frontend
+    echo "[*] Starting browser-only hosted demo on http://127.0.0.1:5173/hosted ..."
+    ensure_orbit_port_available 5173 "hosted frontend"
+    (
+        cd "$FRONTEND_DIR"
+        "$NPM_CMD" run dev -- --host 127.0.0.1 --port 5173 --strictPort
+    )
+}
+
 clean_data() {
     echo "[*] Cleaning runtime data for a cold start..."
     local paths_to_remove=(
@@ -720,6 +746,13 @@ clean_data() {
     if [[ -d "$observation_store_dir" ]]; then
         find "$observation_store_dir" -maxdepth 1 -type f -name '*.json' -print -delete
     fi
+
+    for runtime_subdir in "$RUNTIME_DIR/observation-store" "$RUNTIME_DIR/timelapse-cache" "$RUNTIME_DIR/monitor-reports"; do
+        if [[ -d "$runtime_subdir" ]]; then
+            rm -rf "$runtime_subdir"
+            echo "    Removed $runtime_subdir"
+        fi
+    done
 
     echo "[+] Clean complete."
 }
@@ -792,6 +825,9 @@ while [[ $# -gt 0 ]]; do
         --fetch-model)
             FETCH_MODEL=true
             ;;
+        --hosted)
+            HOSTED=true
+            ;;
         -h|--help)
             show_usage
             exit 0
@@ -806,6 +842,11 @@ done
 
 if [[ "$CLEAN" == true ]]; then
     clean_data
+fi
+
+if [[ "$HOSTED" == true ]]; then
+    run_hosted
+    exit 0
 fi
 
 if [[ "$INSTALL_ONLY" == true ]]; then

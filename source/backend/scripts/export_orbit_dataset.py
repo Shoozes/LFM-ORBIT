@@ -30,7 +30,7 @@ _MIME_SUFFIXES = {
     "video/webm": ".webm",
     "video/mp4": ".mp4",
 }
-_DEFAULT_TASK = "deforestation_detection"
+_DEFAULT_TASK = "temporal_change_review"
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SEEDED_DATA_DIR = Path(__file__).resolve().parent.parent / "assets" / "seeded_data"
 _MONITOR_REPORT_MODES = {
@@ -258,8 +258,11 @@ def _build_alert_record(alert: dict[str, Any], *, eval_ratio: float) -> dict[str
         "review_state": "ground_confirmed" if has_gallery else "satellite_flagged",
         "label_tier": "silver" if has_gallery else "bronze",
         "target_action": "alert",
-        "target_category": "deforestation",
+        "target_category": "temporal_change",
         "target_task": _DEFAULT_TASK,
+        "mission_id": alert.get("mission_id"),
+        "use_case_id": alert.get("use_case_id"),
+        "target_pack_id": alert.get("target_pack_id"),
         "region_id": alert["region_id"],
         "event_id": alert["event_id"],
         "cell_id": cell_id,
@@ -724,7 +727,6 @@ def _build_seeded_cache_record(meta_path: Path, *, eval_ratio: float) -> dict[st
     runtime_truth_mode = str(meta.get("runtime_truth_mode") or "replay")
     imagery_origin = str(meta.get("imagery_origin") or "cached_api")
     scoring_basis = str(meta.get("scoring_basis") or "visual_only")
-    inferred_deforestation = "rond" in location_name.lower()
     reason_codes = ["seeded_data", "training_ready"] if training_ready else ["seeded_data"]
     if use_case_id:
         reason_codes.append(f"use_case:{use_case_id}")
@@ -737,8 +739,8 @@ def _build_seeded_cache_record(meta_path: Path, *, eval_ratio: float) -> dict[st
         "review_state": "seeded_training_ready" if training_ready else "seeded_cached",
         "label_tier": "silver" if training_ready else "unlabeled",
         "target_action": "review",
-        "target_category": target_category or ("deforestation" if inferred_deforestation else "temporal_change"),
-        "target_task": target_task or ("deforestation_detection" if inferred_deforestation else "temporal_change_review"),
+        "target_category": target_category or "temporal_change",
+        "target_task": target_task or "temporal_change_review",
         "region_id": REGION.region_id,
         "event_id": f"seeded_{sig}",
         "cell_id": f"seeded_{sig}",

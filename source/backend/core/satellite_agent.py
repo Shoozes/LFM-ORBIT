@@ -22,6 +22,7 @@ from core.config import REGION
 from core.grid import cell_to_latlng, generate_grid_for_bbox, generate_scan_grid
 from core.mission import get_active_mission, update_mission_progress
 from core.observability import log_throttled
+from core.scan_coordinator import claim_scan_engine, release_scan_engine
 from core.scorer import score_cell_change
 from core.inference import build_satellite_prompt, generate, stream_tokens, parse_output
 
@@ -42,11 +43,18 @@ def _llm_stream_bus_enabled() -> bool:
 
 
 def _seeded_cache_can_promote(mission: dict | None) -> bool:
+    return _seeded_cache_promotion_contract(mission) is not None
+
+
+def _seeded_cache_promotion_contract(mission: dict | None) -> dict | None:
     if not mission:
-        return False
-    target_pack_id = str(mission.get("target_pack_id") or "").strip().lower()
-    use_case_id = str(mission.get("use_case_id") or "").strip().lower()
-    return target_pack_id == "deforestation" or use_case_id == "deforestation"
+        return None
+    from core.temporal_use_cases import get_replay_cache_promotion_contract
+
+    return get_replay_cache_promotion_contract(
+        use_case_id=mission.get("use_case_id"),
+        target_pack_id=mission.get("target_pack_id"),
+    )
 
 
 def _build_flag_message(
@@ -54,6 +62,7 @@ def _build_flag_message(
     score: dict,
     mission_id: int | None = None,
     llm_result: dict | None = None,
+    mission: dict | None = None,
 ) -> dict:
     payload = {
         "event_id": f"sat_{uuid4().hex[:10]}",
@@ -71,6 +80,11 @@ def _build_flag_message(
     }
     if mission_id is not None:
         payload["mission_id"] = mission_id
+    if mission:
+        for key in ("use_case_id", "target_pack_id"):
+            value = str(mission.get(key) or "").strip()
+            if value:
+                payload[key] = value
     if llm_result:
         payload["thinking"] = llm_result.get("thinking", "")
         payload["response"] = llm_result.get("response", "")
@@ -78,13 +92,18 @@ def _build_flag_message(
     return payload
 
 
-async def _run_llm_triage(cell_id: str, score: dict, loop: asyncio.AbstractEventLoop) -> dict:
+async def _run_llm_triage(
+    cell_id: str,
+    score: dict,
+    loop: asyncio.AbstractEventLoop,
+    mission: dict | None = None,
+) -> dict:
     """Run LFM inference on an anomalous cell in a thread pool.
 
     Emits a stream_token heartbeat to the bus while generating so the
     debug dashboard can show live token output.
     """
-    prompt = build_satellite_prompt(cell_id, score)
+    prompt = build_satellite_prompt(cell_id, score, mission=mission)
 
     if _llm_stream_bus_enabled():
         post_message(
@@ -244,6 +263,7 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
 
         mission = get_active_mission()
         if mission and mission.get("mission_mode") == "replay":
+            await release_scan_engine("satellite_agent")
             mission_id = mission["id"]
             if mission_id != getattr(run_satellite_agent, "_last_replay_mission_id", None):
                 run_satellite_agent._last_replay_mission_id = mission_id  # type: ignore[attr-defined]
@@ -264,6 +284,7 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
             continue
 
         if not mission:
+            await release_scan_engine("satellite_agent")
             run_satellite_agent._last_replay_mission_id = None  # type: ignore[attr-defined]
             if getattr(run_satellite_agent, "_last_mission_id", None) is not None:
                 run_satellite_agent._last_mission_id = None  # type: ignore[attr-defined]
@@ -279,6 +300,11 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
             continue
 
         run_satellite_agent._last_replay_mission_id = None  # type: ignore[attr-defined]
+        mission_id = mission["id"]
+        if not await claim_scan_engine("satellite_agent", int(mission_id)):
+            await asyncio.sleep(_CYCLE_PAUSE)
+            continue
+
         features = _scan_features_for_mission(mission)
         total_cells = len(features)
         cycle += 1
@@ -286,7 +312,6 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
         flags_sent = 0
 
         # Read active mission
-        mission_id = mission["id"] if mission else None
         mission_bbox = mission["bbox"] if mission else None  # [W, S, E, N] or None
 
         if mission and (cycle == 1 or mission_id != getattr(run_satellite_agent, "_last_mission_id", None)):
@@ -353,31 +378,32 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                 dim = 0.05
                 cell_bbox = [clng - dim, clat - dim, clng + dim, clat + dim]
                 chunk_sig = _chunk_sig(cell_bbox)
-                
-                if _seeded_cache_can_promote(mission) and _read_cache(chunk_sig):
+
+                promotion = _seeded_cache_promotion_contract(mission)
+                if promotion and _read_cache(chunk_sig):
                     # We have seeded video data! Override the score to ensure it flags.
                     score["change_score"] = 0.96
                     score["confidence"] = 0.99
-                    score["observation_source"] = "Seeded Orbital Video Cache"
-                    
+                    score["observation_source"] = str(promotion["observation_source"])
+
                     if "seeded_data_found" not in score["reason_codes"]:
                         score["reason_codes"].extend(["seeded_data_found", "interesting", "alert"])
-                        
-                    # Also persist it to our observation store as a training-ready VLM inference 
+
+                    # Also persist it to our observation store as a training-ready VLM inference
                     from core.observation_store import load_observation, save_observation
                     obs = load_observation(cell_bbox)
                     vlm_text = None
                     if obs and obs.get("observations"):
                         vlm_text = obs["observations"][-1].get("vlm_text")
                     if not vlm_text:
-                        vlm_text = "Detailed seeded timelapse analysis confirms intense forest canopy loss. Tagged as interesting."
+                        vlm_text = str(promotion["default_analysis"])
                         save_observation(
                             bbox=cell_bbox,
                             agent_role="satellite",
                             vlm_text=vlm_text,
                             cell_id=cell_id,
                             source="seeded_cache_auto_tag",
-                            extra={"tags": ["interesting", "alert", "deforestation"]}
+                            extra={"tags": list(promotion.get("tags") or [])}
                         )
                     score["timelapse_analysis"] = vlm_text
             except Exception as cache_exc:
@@ -409,7 +435,7 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                 # Run LFM triage reasoning on this cell
                 llm_result = None
                 try:
-                    llm_result = await _run_llm_triage(cell_id, score, loop)
+                    llm_result = await _run_llm_triage(cell_id, score, loop, mission=mission)
                 except Exception as exc:
                     log_throttled(
                         logger,
@@ -423,16 +449,22 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                 response_str = (llm_result.get("response", "") if llm_result else "").lower()
                 tool_calls = llm_result.get("tool_calls", []) if llm_result else []
                 is_discard = any(str(tc.get("name", "")).startswith("discard") for tc in tool_calls)
-                
+
                 # Check explicit tags / prompt responses
                 is_seasonal = "discard" in response_str and "seasonal" in response_str
-                
+
                 if is_discard or is_seasonal:
                     logger.info("[SAT] Dropping flag %s - detected as seasonal variation or discarded by LFM.", cell_id)
                     continue
 
                 flags_sent += 1
-                payload = _build_flag_message(cell_id, score, mission_id=mission_id, llm_result=llm_result)
+                payload = _build_flag_message(
+                    cell_id,
+                    score,
+                    mission_id=mission_id,
+                    llm_result=llm_result,
+                    mission=mission,
+                )
                 post_message(
                     sender=_SATELLITE_SENDER,
                     recipient=_GROUND_RECIPIENT,
@@ -485,6 +517,7 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                 )
 
         if replay_interrupted:
+            await release_scan_engine("satellite_agent")
             continue
 
         # Update mission progress
@@ -506,10 +539,10 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
             if reply["msg_type"] == "confirmation":
                 conf_cell_id = reply.get("cell_id")
                 timelapse_analysis = reply["payload"].get("timelapse_analysis")
-                
+
                 if conf_cell_id and timelapse_analysis:
                     from core.inference import generate
-                    
+
                     system_prompt = "You are the Satellite evidence-packet reviewer analyzing timelapse-derived orbital evidence."
                     user_prompt = (
                         f"The ground station has linked a timelapse-derived evidence packet for cell {conf_cell_id} with these signals: "
@@ -517,7 +550,7 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                         "Review the evidence packet. Answer in exactly 1-2 short sentences: explain what the retained "
                         "orbital evidence indicates and whether the structural-decay claim is supported."
                     )
-                    
+
                     try:
                         vlm_explanation = None
                         try:
@@ -576,7 +609,7 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
                             except Exception as store_exc:
                                 logger.warning("[SAT] Failed to save observation: %s", store_exc)
 
-                        
+
                         post_message(
                             sender=_SATELLITE_SENDER,
                             recipient="broadcast",
@@ -611,4 +644,5 @@ async def run_satellite_agent(stop_event: asyncio.Event | None = None) -> None:
             ),
         )
 
+        await release_scan_engine("satellite_agent")
         await asyncio.sleep(_CYCLE_PAUSE)

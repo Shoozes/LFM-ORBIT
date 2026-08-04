@@ -20,12 +20,18 @@ import os
 import sqlite3
 import asyncio
 import html as html_mod
+from contextlib import AbstractContextManager
 from pathlib import Path
 from datetime import datetime, timezone
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+
+from core.agent_bus import get_bus_path
+from core.local_boundary import is_allowed_origin, is_local_host
+from core.request_limits import get_max_request_body_bytes
+from core.sqlite import managed_connection
 
 app = FastAPI(title="Satellite Debug Hub")
 
@@ -46,17 +52,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DB_PATH = Path(__file__).parent.parent.parent / "runtime-data" / "agent_bus.sqlite"
+
+@app.middleware("http")
+async def local_debug_boundary(request: Request, call_next):
+    host = request.client.host if request.client else ""
+    origin = request.headers.get("origin")
+    if not is_local_host(host) or not is_allowed_origin(origin, _debug_cors_allow_origins()):
+        return JSONResponse(status_code=403, content={"error": "Local-only debug endpoint"})
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > get_max_request_body_bytes():
+                return JSONResponse(status_code=413, content={"error": "request body is too large"})
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "invalid content-length"})
+    return await call_next(request)
 
 
-def _connect() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+def _connect() -> AbstractContextManager[sqlite3.Connection]:
+    conn = sqlite3.connect(get_bus_path(), check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    return conn
+    return managed_connection(conn)
 
 
 def _get_stats() -> dict:
-    if not DB_PATH.exists():
+    if not Path(get_bus_path()).exists():
         return {"error": "DB not found", "feed": [], "total_messages": 0,
                 "satellite_dispatched": 0, "unread_queued_to_ground": 0,
                 "latest_heartbeat": "Offline"}
@@ -120,7 +140,7 @@ def _get_model_status() -> dict:
 
 
 def _last_message_id() -> int:
-    if not DB_PATH.exists():
+    if not Path(get_bus_path()).exists():
         return 0
     with _connect() as conn:
         row = conn.execute("SELECT MAX(id) FROM agent_messages").fetchone()
@@ -128,7 +148,7 @@ def _last_message_id() -> int:
 
 
 def _messages_since(last_id: int) -> list:
-    if not DB_PATH.exists():
+    if not Path(get_bus_path()).exists():
         return []
     with _connect() as conn:
         rows = conn.execute(
@@ -695,4 +715,9 @@ def _render_payload_server(payload, msg_type: str) -> str:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("satellite_debug:app", host="0.0.0.0", port=8080, reload=True)
+    uvicorn.run(
+        "satellite_debug:app",
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "8080")),
+        reload=os.getenv("ORBIT_DEBUG_RELOAD", "false").lower() in {"1", "true", "yes", "on"},
+    )

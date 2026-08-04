@@ -400,7 +400,7 @@ def fetch_sh_window(
     except Exception as exc:
         logger.warning("  [SH] Band stats failed %s %s->%s: %s", label, start_date, end_date, exc)
         quality["band_stats_error"] = str(exc)
-    
+
     request = SentinelHubRequest(
         evalscript=SH_EVALSCRIPTS.get(visual_mode, SH_EVALSCRIPT),
         input_data=[
@@ -417,7 +417,7 @@ def fetch_sh_window(
         size=(_FRAME_W, _FRAME_H),
         config=config
     )
-    
+
     try:
         data = request.get_data()
         if data and len(data) > 0:
@@ -426,9 +426,9 @@ def fetch_sh_window(
             if arr.shape[-1] == 4:
                 arr = arr[:, :, :3]
             logger.info(f"  [SH] {label} {start_date}->{end_date}  mean={arr.mean():.0f}")
-            
+
             img = Image.fromarray(arr).convert("RGB")
-            
+
             draw = ImageDraw.Draw(img)
             bar_h = 28
             draw.rectangle([(0, _FRAME_H - bar_h), (_FRAME_W, _FRAME_H)], fill=(0, 0, 0))
@@ -440,11 +440,11 @@ def fetch_sh_window(
                 else f"clear {quality['valid_pixel_ratio'] * 100:.0f}%"
             )
             draw.text((680, _FRAME_H - bar_h + 6), quality_label, fill=(180, 220, 255))
-            
+
             return np.array(img, dtype=np.uint8), f"{source_label} {label}", quality
     except Exception as e:
         logger.warning(f"  [SH] Failed {label} {start_date}->{end_date}: {e}")
-        
+
     return None, "", quality
 
 
@@ -542,7 +542,7 @@ def seed_single_cell(
     rejected_windows = []
     provider_source = _VISUAL_MODE_LABELS.get(visual_mode, _VISUAL_MODE_LABELS["true_color"])
     requested_bands = _VISUAL_MODE_BANDS.get(visual_mode, _VISUAL_MODE_BANDS["true_color"])
-    
+
     frame_windows = date_windows or [
         (f"{year}-{month:02d}-15", f"{year}-{month:02d}-01", f"{year + 1}-01-01" if month == 12 else f"{year}-{month + 1:02d}-01")
         for year, month in _month_range(start_ym, end_ym)

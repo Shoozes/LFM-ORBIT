@@ -28,7 +28,7 @@ def fetch_simsat_observations(cell_id: str, provider: str | None = None) -> Opti
     observation_mode = provider or REGION.observation_mode
 
     client = get_simsat_client()
-    
+
     # We query the current satellite footprint rather than a historical scrape
     # to maintain live telemetry integrity.
     try:
@@ -52,24 +52,24 @@ def fetch_simsat_observations(cell_id: str, provider: str | None = None) -> Opti
 
     # SimSat imagery check successful; construct the deterministic ObservationPair
     h = int(hashlib.md5(cell_id.encode()).hexdigest(), 16)
-    
+
     before_bands = {
         "nir": 0.65 + (h % 10) * 0.01,
         "red": 0.08 + ((h >> 4) % 10) * 0.005,
         "swir": 0.15 + ((h >> 8) % 10) * 0.01,
     }
-    
+
     after_bands = dict(before_bands)
-    
+
     before_flags = []
     after_flags = []
-    
+
     if (h % 100) < 20:
         after_bands["nir"] *= 0.4
         after_bands["red"] *= 1.8
         after_bands["swir"] *= 1.5
         after_flags.append("disturbance_pattern")
-        
+
     return {
         "source": source,
         "cell_id": cell_id,

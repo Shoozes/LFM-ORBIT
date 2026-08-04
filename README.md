@@ -1,14 +1,26 @@
 # LFM-ORBIT
 
-LFM-ORBIT is a professional-product-style MVP for satellite evidence triage. It is not a production surveillance system; it is a reproducible mission-control prototype showing how local Liquid AI reasoning can reduce satellite downlink load, retain only useful evidence, and produce compact proof packets with provenance.
+LFM-ORBIT is a professional-product-style MVP for satellite evidence triage. It is not a production surveillance system; it is a reproducible mission-control prototype showing how local Liquid AI reasoning can reduce satellite downlink load, retain only useful evidence, and produce compact proof packets with provenance. GenUni is the separate training-cycle/producer repository; it is not the LFM-ORBIT application repository.
 
 The product journey is simple: an operator selects a mission area, Orbit scans satellite tiles, low-value cells are pruned before downlink, retained evidence is reviewed by SAT/GND agents, and the final output is compact proof JSON with imagery provenance.
 
-[Demo guide](docs/user/DEMO_GUIDE.md) | [Validation](#validation-snapshot) | [Release](https://github.com/Shoozes/LFM-ORBIT/releases/latest)
+[Hosted browser demo](docs/user/HOSTED_DEMO.md) | [Demo guide](docs/user/DEMO_GUIDE.md) | [Validation](#validation-snapshot) | [LFM-ORBIT on GitHub](https://github.com/Shoozes/LFM-ORBIT) | [Repository boundary](docs/dev/REPOSITORY_BOUNDARY.md)
 
 ![What is LFM-ORBIT?](docs/media/infographics/what-is-lfm-orbit-info.png)
 
 ## Run The App
+
+For the lightweight portfolio presentation, start the browser-only hosted route:
+
+```powershell
+.\run.ps1 -Hosted
+```
+
+```bash
+./run.sh --hosted
+```
+
+Open `http://127.0.0.1:5173/hosted`. It loads a validated saved-package manifest and starts the pinned small browser-model fetch only when the visitor chooses it. The current browser path performs text reasoning over saved evidence; it is not image-conditioned VLM inference. It does not require the backend, provider credentials, or an Orbit API. See the [hosted demo handoff](docs/user/HOSTED_DEMO.md).
 
 ```powershell
 .\run.ps1
@@ -30,7 +42,7 @@ Linux/macOS:
 
 App: `http://127.0.0.1:5173`
 
-The default hackathon path uses SimSat/Mapbox plus bundled cached replay proof. Sentinel Hub credentials are not required.
+The default full-app path uses SimSat/Mapbox plus bundled cached replay proof. Sentinel Hub credentials are not required.
 
 Option 1 reuses an existing valid trained GGUF after the first download. Set `LFM_ORBIT_REFRESH_MODEL=true` only when you intentionally want to refresh the moving Hugging Face `main` handoff.
 
@@ -97,7 +109,7 @@ Full repo verification:
 - Compact proof JSON instead of raw-image downlink.
 - Saved and tagged evidence for export, retagging, tuning, replay, and cached-data rescan with newer prompts or models.
 
-The hackathon artifact is treated like a product contract: install path, deterministic demo, source-backed evidence, proof output, and honest runtime boundaries.
+The portfolio artifact is treated like a product contract: install path, deterministic demo, source-backed evidence, proof output, and honest runtime boundaries.
 
 ## Proof Gallery
 
@@ -149,14 +161,31 @@ Ground Agent handles replay loads, mission packs, link simulation, and operator 
 
 Known map targets carry mission context and safe evidence guidance with the camera move.
 
+### 09. Hosted Browser Presentation
+
+![Hosted browser demo](docs/media/readme/readme-hosted-demo.png)
+
+The separate hosted route presents saved evidence packages and local browser inference without backend controls.
+
+[Hosted browser demo video](docs/media/videos/hosted-demo.webm) shows the static route, saved-package provenance, and local-model boundary without starting the backend.
+
+### 10. Hosted Evidence Package
+
+![Hosted saved evidence package](docs/media/readme/readme-hosted-evidence.png)
+
+The hosted package view keeps the data boundary visible: saved demo evidence is not live imagery.
+
 ## Validation Snapshot
+
+The table below separates the historical May 8 release snapshot from the current August 4 integrity pass. The current backend suite and hosted frontend route have been rerun locally; the production GGUF launcher path remains a separate heavyweight verification lane.
 
 | Check | Current State |
 |---|---|
-| Root verify | `.\run.ps1 -Verify` passing |
-| Backend tests | `499 passed` |
-| Frontend | typecheck + build passing |
-| Playwright E2E | passing with intentional skips |
+| Root verify | August 4 `.\run.ps1 -Verify` passed; the optional trained-GGUF runtime smoke remains a separate lane |
+| Backend tests | August 4 full backend suite `552 passed` |
+| Frontend | typecheck + production build passing; hosted smoke, static preview, and production-preview model proof passing |
+| Hosted real-model proof | `npm run test:hosted:model:build` fetched the pinned 219 MB GGUF and generated a local response with no backend/API/WebSocket requests |
+| Playwright E2E | hosted smoke plus full app suite locally: `108 passed, 6 skipped` with intentional skips; the full suite remains the heavyweight gate |
 | Docs/import guards | passing |
 | Option 1 launch | backend `8000` and app `5173` ready |
 | Clean-start smoke | idle on Atacama context, no auto replay, no default scan |

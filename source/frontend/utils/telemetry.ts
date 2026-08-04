@@ -369,7 +369,7 @@ export function formatPercent(value: number): string {
 export function getApiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_BASE_URL?.trim();
   if (configured && configured.length > 0) return configured.replace(/\/$/, "");
-  
+
   // Fallback to current hostname but locked to port 8000
   if (typeof window !== "undefined") {
     const host = window.location.hostname === "localhost" ? "127.0.0.1" : window.location.hostname;

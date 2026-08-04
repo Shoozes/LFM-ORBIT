@@ -20,14 +20,23 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
+from core.paths import atomic_write_text, get_observation_store_dir
+
 logger = logging.getLogger(__name__)
 
-_STORE_DIR = Path(__file__).resolve().parent.parent / "assets" / "observation_store"
+_DEFAULT_STORE_DIR = Path(__file__).resolve().parent.parent / "assets" / "observation_store"
+# Kept as a patch seam for focused tests and backwards-compatible local tooling.
+_STORE_DIR = _DEFAULT_STORE_DIR
+
+
+def _store_dir() -> Path:
+    return get_observation_store_dir() if _STORE_DIR == _DEFAULT_STORE_DIR else _STORE_DIR
 
 
 def _ensure_dir() -> Path:
-    _STORE_DIR.mkdir(parents=True, exist_ok=True)
-    return _STORE_DIR
+    store = _store_dir()
+    store.mkdir(parents=True, exist_ok=True)
+    return store
 
 
 def _chunk_sig(bbox: list[float]) -> str:
@@ -38,7 +47,7 @@ def _chunk_sig(bbox: list[float]) -> str:
 def load_observation(bbox: list[float]) -> dict | None:
     """Return stored observation record for a bbox, or None if not found."""
     sig = _chunk_sig(bbox)
-    path = _STORE_DIR / f"{sig}.json"
+    path = _store_dir() / f"{sig}.json"
     if not path.exists():
         return None
     try:
@@ -50,7 +59,7 @@ def load_observation(bbox: list[float]) -> dict | None:
 
 
 def load_observation_by_sig(sig: str) -> dict | None:
-    path = _STORE_DIR / f"{sig}.json"
+    path = _store_dir() / f"{sig}.json"
     if not path.exists():
         return None
     try:
@@ -115,8 +124,7 @@ def save_observation(
     record["training_ready"] = ("satellite" in roles and "ground" in roles)
 
     try:
-        with open(path, "w") as f:
-            json.dump(record, f, indent=2)
+        atomic_write_text(path, json.dumps(record, indent=2))
         logger.info("[OBS] Saved observation for sig=%s role=%s cell=%s", sig, agent_role, cell_id)
     except Exception as exc:
         logger.warning("[OBS] Failed to write observation %s: %s", sig, exc)

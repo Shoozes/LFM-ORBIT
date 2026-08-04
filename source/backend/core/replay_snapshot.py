@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import math
 from typing import Any
 
 from core.agent_bus import get_recent_messages, list_pins, post_message, upsert_pin
 from core.gallery import add_gallery_item, get_gallery_item, list_gallery
 from core.metrics import read_metrics_summary, seed_metrics_summary
-from core.mission import get_active_mission, list_missions, start_mission, update_mission_progress
+from core.mission import (
+    MISSION_CONFIRMATION_POLICIES,
+    get_active_mission,
+    list_missions,
+    start_mission,
+    update_mission_progress,
+)
 from core.queue import estimate_payload_bytes, get_recent_alerts, push_alert
+from core.request_limits import validate_json_shape
 from core.runtime_state import reset_runtime_state
 
 
@@ -44,25 +52,42 @@ def export_replay_snapshot(*, limit: int = 200) -> dict[str, Any]:
 
 def _coerce_float(value: Any, default: float = 0.0) -> float:
     try:
-        return float(value)
+        converted = float(value)
+        return converted if math.isfinite(converted) else default
     except (TypeError, ValueError):
         return default
 
 
 def _coerce_bool(value: Any) -> bool:
-    return bool(value)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on", "enabled"}:
+            return True
+        if normalized in {"0", "false", "no", "off", "disabled", ""}:
+            return False
+    # Unknown snapshot values must not silently opt into a flagged state.
+    return False
 
 
 def _restore_active_mission(snapshot: dict[str, Any]) -> int | None:
     mission = snapshot.get("active_mission") if isinstance(snapshot.get("active_mission"), dict) else None
     if mission is None:
         return None
+    raw_confirmation_policy = mission.get("confirmation_policy")
+    confirmation_policy = str(raw_confirmation_policy).strip().lower() if raw_confirmation_policy else None
+    if confirmation_policy and confirmation_policy not in MISSION_CONFIRMATION_POLICIES:
+        raise ValueError("snapshot confirmation_policy is invalid")
     restored = start_mission(
         task_text=str(mission.get("task_text") or "Imported replay snapshot"),
         bbox=mission.get("bbox") if isinstance(mission.get("bbox"), list) else None,
         start_date=mission.get("start_date"),
         end_date=mission.get("end_date"),
         mission_mode=str(mission.get("mission_mode") or "replay"),
+        confirmation_policy=confirmation_policy,
         replay_id=mission.get("replay_id"),
         summary=mission.get("summary"),
         use_case_id=mission.get("use_case_id"),
@@ -77,11 +102,71 @@ def _restore_active_mission(snapshot: dict[str, Any]) -> int | None:
     return int(restored["id"])
 
 
-def import_replay_snapshot(snapshot: dict[str, Any], *, reset: bool = True) -> dict[str, Any]:
+def _validate_finite_values(value: Any, *, path: str = "$") -> None:
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ValueError(f"snapshot contains a non-finite number at {path}")
+    if isinstance(value, dict):
+        for key, child in value.items():
+            _validate_finite_values(child, path=f"{path}.{key}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            _validate_finite_values(child, path=f"{path}[{index}]")
+
+
+def _validate_snapshot(snapshot: dict[str, Any]) -> None:
     if not isinstance(snapshot, dict) or snapshot.get("format") != SNAPSHOT_FORMAT:
         raise ValueError(f"snapshot format must be {SNAPSHOT_FORMAT}")
-    if reset:
-        reset_runtime_state()
+    if snapshot.get("schema_version") not in (None, 1):
+        raise ValueError("unsupported snapshot schema_version")
+
+    try:
+        validate_json_shape(snapshot)
+    except ValueError as exc:
+        raise ValueError(f"invalid snapshot shape: {exc}") from exc
+    _validate_finite_values(snapshot)
+
+    active_mission = snapshot.get("active_mission")
+    if active_mission is not None and not isinstance(active_mission, dict):
+        raise ValueError("active_mission must be an object or null")
+    if isinstance(active_mission, dict):
+        bbox = active_mission.get("bbox")
+        if bbox is not None and (not isinstance(bbox, list) or len(bbox) != 4):
+            raise ValueError("active_mission.bbox must contain four coordinates")
+
+    section_limits = {"missions": 500, "alerts": 200, "gallery": 500, "pins": 500, "messages": 500}
+    for section, limit in section_limits.items():
+        rows = snapshot.get(section, [])
+        if rows is None:
+            continue
+        if not isinstance(rows, list):
+            raise ValueError(f"snapshot.{section} must be an array")
+        if len(rows) > limit:
+            raise ValueError(f"snapshot.{section} exceeds the {limit}-row limit")
+        if any(not isinstance(row, dict) for row in rows):
+            raise ValueError(f"snapshot.{section} contains a non-object row")
+
+    for index, alert in enumerate(snapshot.get("alerts") or []):
+        payload_bytes = alert.get("payload_bytes")
+        if payload_bytes is not None:
+            try:
+                numeric_bytes = int(payload_bytes)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"snapshot.alerts[{index}].payload_bytes must be an integer") from exc
+            if numeric_bytes < 0 or numeric_bytes > 64_000_000:
+                raise ValueError(f"snapshot.alerts[{index}].payload_bytes is outside the supported range")
+        reasons = alert.get("reason_codes")
+        if reasons is not None and (not isinstance(reasons, list) or any(not isinstance(item, str) for item in reasons)):
+            raise ValueError(f"snapshot.alerts[{index}].reason_codes must be an array of strings")
+
+    for index, item in enumerate(snapshot.get("gallery") or []):
+        if not str(item.get("cell_id") or "").strip():
+            raise ValueError(f"snapshot.gallery[{index}].cell_id is required")
+        for field in ("lat", "lng", "change_score"):
+            if field in item and _coerce_float(item.get(field), default=math.nan) != _coerce_float(item.get(field), default=math.nan):
+                raise ValueError(f"snapshot.gallery[{index}].{field} must be numeric")
+
+
+def _apply_replay_snapshot(snapshot: dict[str, Any], *, reset: bool) -> dict[str, Any]:
 
     metrics = snapshot.get("metrics")
     if isinstance(metrics, dict):
@@ -123,6 +208,9 @@ def import_replay_snapshot(snapshot: dict[str, Any], *, reset: bool = True) -> d
             object_deltas=alert.get("object_deltas") if isinstance(alert.get("object_deltas"), list) else None,
             visual_model_review=alert.get("visual_model_review") if isinstance(alert.get("visual_model_review"), dict) else None,
             downlinked=_coerce_bool(alert.get("downlinked")),
+            mission_id=mission_id or alert.get("mission_id"),
+            use_case_id=str(alert.get("use_case_id") or "") or None,
+            target_pack_id=str(alert.get("target_pack_id") or "") or None,
         )
         alert_count += 1
 
@@ -188,3 +276,21 @@ def import_replay_snapshot(snapshot: dict[str, Any], *, reset: bool = True) -> d
         "pins_imported": pin_count,
         "messages_imported": message_count,
     }
+
+
+def import_replay_snapshot(snapshot: dict[str, Any], *, reset: bool = True) -> dict[str, Any]:
+    """Validate the complete payload before reset, then restore it as one import unit."""
+    _validate_snapshot(snapshot)
+    previous = export_replay_snapshot(limit=500) if reset else None
+    if reset:
+        reset_runtime_state()
+    try:
+        return _apply_replay_snapshot(snapshot, reset=reset)
+    except Exception as exc:
+        if previous is not None:
+            try:
+                reset_runtime_state(archive_missions=False)
+                _apply_replay_snapshot(previous, reset=True)
+            except Exception as rollback_exc:
+                raise RuntimeError(f"snapshot import failed and rollback failed: {rollback_exc}") from exc
+        raise RuntimeError(f"snapshot import failed; runtime was not committed: {exc}") from exc

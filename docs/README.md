@@ -4,16 +4,19 @@ Start with the product [README](../README.md). Use the docs below only when you 
 
 ## User
 
+- [Hosted browser demo](user/HOSTED_DEMO.md)
 - [Demo guide](user/DEMO_GUIDE.md)
 - [Target-pack proof contracts](user/OBJECT_EVIDENCE_MODE.md)
 
 ## Dev
 
 - [Architecture](dev/ARCHITECTURE.md)
+- [Repository boundary](dev/REPOSITORY_BOUNDARY.md)
 - [Model handoff](dev/MODEL_HANDOFF.md)
 - [Dataset cycle](dev/DATASET_CYCLE_TUTORIAL.md)
 - [Seeded data registry](dev/SEEDED_DATA_REGISTRY.md)
 - [Current backlog](dev/TODO.md)
+- [Summary-bank history](dev/archive/summary_bank_history.json)
 
 ## Reference
 

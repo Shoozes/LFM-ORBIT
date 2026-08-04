@@ -33,6 +33,12 @@ _TEMPORAL_USE_CASES: list[dict[str, Any]] = [
             "suspected_canopy_loss",
             "multi_index_consensus",
         ],
+        "replay_cache_promotion": {
+            "enabled": True,
+            "observation_source": "Seeded Orbital Video Cache",
+            "default_analysis": "Saved temporal evidence packet supports a canopy-loss review candidate; confirm the region-level interpretation with the retained frames.",
+            "tags": ["interesting", "alert", "deforestation"],
+        },
         "keywords": [
             "deforestation",
             "forest",
@@ -741,6 +747,26 @@ def get_temporal_use_case(use_case_id: str | None) -> dict[str, Any]:
     return deepcopy(_USE_CASE_BY_ID.get(str(use_case_id or ""), _USE_CASE_BY_ID[GENERIC_USE_CASE_ID]))
 
 
+def get_replay_cache_promotion_contract(
+    *,
+    use_case_id: str | None = None,
+    target_pack_id: str | None = None,
+) -> dict[str, Any] | None:
+    """Return the explicit use-case contract for promoting a saved temporal cache."""
+    requested = {
+        str(use_case_id or "").strip().lower(),
+        str(target_pack_id or "").strip().lower(),
+    }
+    requested.discard("")
+    for use_case in _TEMPORAL_USE_CASES:
+        if str(use_case.get("id") or "").lower() not in requested:
+            continue
+        contract = use_case.get("replay_cache_promotion")
+        if isinstance(contract, dict) and contract.get("enabled") is True:
+            return deepcopy(contract)
+    return None
+
+
 def _normalize_text(value: str) -> str:
     normalized = value.lower().replace("_", " ").replace("-", " ")
     normalized = re.sub(r"[^a-z0-9.+/ ]+", " ", normalized)
@@ -927,7 +953,8 @@ def build_api_prep_plan(record: dict[str, Any], use_case_decision: dict[str, Any
 def enrich_temporal_record(record: dict[str, Any]) -> dict[str, Any]:
     """Attach use-case and API prep metadata to a dataset record."""
     enriched = dict(record)
-    decision = classify_temporal_use_case(enriched)
+    requested_use_case_id = str(enriched.get("use_case_id") or "").strip() or None
+    decision = classify_temporal_use_case(enriched, requested_use_case_id=requested_use_case_id)
 
     enriched["temporal_use_case"] = decision
     enriched["target_task"] = decision["target_task"]

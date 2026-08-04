@@ -360,6 +360,17 @@ def resolve_active_provider() -> str:
 # Region configuration
 # ---------------------------------------------------------------------------
 
+def _confirmation_policy_from_env() -> str:
+    value = os.getenv("ORBIT_CONFIRMATION_POLICY", "distinct_acquisition").strip().lower()
+    return value if value in {"single_acquisition", "distinct_acquisition"} else "distinct_acquisition"
+
+
+def _positive_int_from_env(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.getenv(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
 @dataclass(frozen=True)
 class RegionConfig:
     region_id: str
@@ -379,6 +390,8 @@ class RegionConfig:
     cloud_seed_threshold: float
     map_zoom: float
     demo_mode_loop_scan: bool
+    confirmation_policy: str
+    confirmation_required_acquisitions: int
 
 
 
@@ -402,6 +415,8 @@ REGION = RegionConfig(
     cloud_seed_threshold=0.975,
     map_zoom=6.0,
     demo_mode_loop_scan=os.getenv("ORBIT_DEMO_LOOP_SCAN", "false").lower() in ("true", "1", "yes"),
+    confirmation_policy=_confirmation_policy_from_env(),
+    confirmation_required_acquisitions=_positive_int_from_env("ORBIT_CONFIRMATION_REQUIRED_ACQUISITIONS", 2),
 )
 
 

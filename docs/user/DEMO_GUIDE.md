@@ -1,10 +1,10 @@
-# Hackathon Demo
+# Full application demo
 
-This is the recorded showcase path for the Liquid AI x DPhi Space Hackathon submission.
+This document covers the existing full Orbit application and its recorded showcase path. The portfolio landing experience is intentionally separate: use [Hosted browser demo](HOSTED_DEMO.md) for the short browser-only presentation, and use this guide when reviewing the full mission-control workflow.
 
 Frame the product as one clear operator journey: select a mission area, scan satellite tiles, prune low-value cells before downlink, review retained evidence with SAT/GND agents, and produce compact proof JSON with imagery provenance. Avoid showing the whole app in the main cut; every visible screen should support that path.
 
-The hackathon satellite-data API target is SimSat/Mapbox through DPhi Space SimSat. The default lane is SimSat Sentinel, with SimSat Mapbox available as the optional imagery/context lane when a Mapbox token is configured. The recorded showcase does not require Sentinel Hub credentials; bundled replay fixtures and SimSat/Mapbox runtime defaults keep the demo deterministic and quota-free. Sentinel Hub is used only for development real-data seeding and cached replay refreshes, not as the default hackathon provider.
+The full-app satellite-data API target is SimSat/Mapbox through DPhi Space SimSat. The default lane is SimSat Sentinel, with SimSat Mapbox available as the optional imagery/context lane when a Mapbox token is configured. The recorded showcase does not require Sentinel Hub credentials; bundled replay fixtures and SimSat/Mapbox runtime defaults keep the demo deterministic and quota-free. Sentinel Hub is used only for development real-data seeding and cached replay refreshes, not as the default provider.
 
 Normal app startup is intentionally idle. It opens on the Atacama mining context so the strongest story is ready to inspect, but it does not auto-play the last replay, launch a mission, or begin scanning until the operator confirms a mission proposal.
 
@@ -113,7 +113,7 @@ The tutorial walkthrough is now the plain-English product run-through. It starts
 
 Replay-backed proof mode can now keep the active replay instead of forcing Rondonia, so mission-specific proof copy stays attached to maritime, mining, flood, wildfire, and urban replay packs. Some development replay fixtures use visible Sentinel-2 L2A frames and explicitly reject invalid still-image color-shift timelapses. Their real monthly WebMs are kept in the legacy `source/backend/assets/seeded_data/` cache for dataset export and training, but they are not a Sentinel Hub dependency for the default demo.
 
-Current runtime wording: SimSat/Mapbox is the main hackathon satellite-data API family. SimSat Sentinel is the default realtime lane, SimSat Mapbox is optional imagery/context through the same SimSat path, and replay fixtures are used for deterministic demos. The SAT/GND GGUF runtime reasons over scored evidence packets. The separate `/api/inference/image` lane passes retained frames into LiquidAI/LFM2.5-VL-450M through Transformers when the optional image runtime is installed and enabled.
+Current runtime wording: SimSat/Mapbox is the main full-app satellite-data API family. SimSat Sentinel is the default realtime lane, SimSat Mapbox is optional imagery/context through the same SimSat path, and replay fixtures are used for deterministic demos. The SAT/GND GGUF runtime reasons over scored evidence packets. The separate `/api/inference/image` lane passes retained frames into LiquidAI/LFM2.5-VL-450M through Transformers when the optional image runtime is installed and enabled.
 
 Enable and smoke-test retained-frame image review. This uses the backend `vision` extra, which installs Transformers, Torch, Torchvision, Accelerate, and Pillow:
 

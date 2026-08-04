@@ -10,7 +10,9 @@
 import { useEffect, useRef, useState } from "react";
 import { getApiBaseUrl } from "../utils/telemetry";
 import { Mission } from "../types/mission";
+import type { ReplayComparison } from "../types/replay";
 import { getDefaultMissionDateRange, getRecentMissionDateRange } from "../utils/dateRange";
+import ReplayComparisonCard from "./ReplayComparisonCard";
 
 type ReplayCatalogItem = {
   replay_id: string;
@@ -284,6 +286,8 @@ type MissionControlProps = {
   scanCellCount?: number;
   onReplayLoaded?: (primaryCellId: string | null) => void | Promise<void>;
   onReplayRescanStarted?: (mission: Mission, primaryCellId: string | null) => void | Promise<void>;
+  replayComparison: ReplayComparison | null;
+  onReplayComparisonChange: (comparison: ReplayComparison | null) => void;
   onPreviewBbox?: (bbox: number[]) => void;
   initialPresetId?: string | null;
 };
@@ -307,6 +311,8 @@ export default function MissionControl({
   scanCellCount = 0,
   onReplayLoaded,
   onReplayRescanStarted,
+  replayComparison,
+  onReplayComparisonChange,
   onPreviewBbox,
   initialPresetId = null,
 }: MissionControlProps) {
@@ -318,9 +324,11 @@ export default function MissionControl({
   const [replays, setReplays] = useState<ReplayCatalogItem[]>([]);
   const [replayBusyId, setReplayBusyId] = useState<string | null>(null);
   const [replayNotice, setReplayNotice] = useState("");
+  const [showReplayCatalog, setShowReplayCatalog] = useState(true);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [selectedUseCaseId, setSelectedUseCaseId] = useState<string | null>(null);
   const [selectedTargetPackId, setSelectedTargetPackId] = useState<string | null>(null);
+  const [confirmationPolicy, setConfirmationPolicy] = useState<"single_acquisition" | "distinct_acquisition">("distinct_acquisition");
   const [activePanelTab, setActivePanelTab] = useState<MissionPanelTab>("plan");
 
   const [submitting, setSubmitting] = useState(false);
@@ -351,7 +359,10 @@ export default function MissionControl({
     if (mission?.target_pack_id !== undefined) {
       setSelectedTargetPackId(mission.target_pack_id ?? null);
     }
-  }, [mission?.id, mission?.target_pack_id]);
+    if (mission?.confirmation_policy !== undefined) {
+      setConfirmationPolicy(mission.confirmation_policy ?? "distinct_acquisition");
+    }
+  }, [mission?.confirmation_policy, mission?.id, mission?.target_pack_id]);
 
   useEffect(() => {
     if (mission?.status !== "active") return;
@@ -414,6 +425,7 @@ export default function MissionControl({
           end_date: endDate || null,
           use_case_id: selectedUseCaseId,
           target_pack_id: selectedTargetPackId,
+          confirmation_policy: confirmationPolicy,
         }),
       });
       if (!response.ok) {
@@ -439,6 +451,7 @@ export default function MissionControl({
   const handleReplayLoad = async (replayId: string) => {
     setReplayBusyId(replayId);
     setReplayNotice("");
+    onReplayComparisonChange(null);
     setErrorMsg("");
     try {
       const response = await fetch(`${apiBase}/api/replay/load/${replayId}`, { method: "POST" });
@@ -462,6 +475,7 @@ export default function MissionControl({
   const handleReplayRescan = async (replay: ReplayCatalogItem) => {
     setReplayBusyId(replay.replay_id);
     setReplayNotice("");
+    onReplayComparisonChange(null);
     setErrorMsg("");
     try {
       const response = await fetch(`${apiBase}/api/replay/rescan/${replay.replay_id}`, { method: "POST" });
@@ -473,6 +487,7 @@ export default function MissionControl({
           review_model_revision?: string;
         };
         primary_cell_id?: string | null;
+        comparison?: ReplayComparison;
       };
       if (!response.ok || !payload.mission) {
         throw new Error(payload.error || "Replay rescan failed");
@@ -487,6 +502,7 @@ export default function MissionControl({
       } else if (replay.bbox) {
         onPreviewBbox?.([...replay.bbox]);
       }
+      onReplayComparisonChange(payload.comparison ?? null);
       const modelFilename = payload.review_metadata?.review_model_filename;
       const modelRevision = payload.review_metadata?.review_model_revision;
       const modelLabel = modelFilename
@@ -522,6 +538,9 @@ export default function MissionControl({
     : liveCellsScanned > 0
       ? "Scanning selected area"
       : "Starting scan";
+  const confirmationPolicyLabel = confirmationPolicy === "single_acquisition" ? "one acquisition" : "distinct acquisitions";
+  const confirmationPolicySource = mission?.confirmation_policy ? "mission override" : "safe region default";
+  const visibleReplays = showReplayCatalog ? replays : [];
 
   const severityColor = (s: string) => {
     if (s === "active") return "text-emerald-700 bg-emerald-50 border-emerald-200";
@@ -570,6 +589,7 @@ export default function MissionControl({
               <div className="flex gap-4 text-xs text-zinc-600 mt-2">
                 <span>{mission.cells_scanned} cells scanned</span>
                 <span>{mission.flags_found} flags found</span>
+                <span data-testid="mission-confirmation-policy">Confirmation: {confirmationPolicyLabel} · {confirmationPolicySource}</span>
                 {mission.bbox && (
                   <span className={`font-semibold ${mission.mission_mode === "replay" ? "text-cyan-700" : "text-emerald-700"}`}>
                     AREA MAPPED
@@ -742,15 +762,28 @@ export default function MissionControl({
                 <label className="block text-[10px] uppercase tracking-wider font-semibold text-zinc-500">
                   Replay Cache
                 </label>
-                <span className="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold">
-                  {replays.length} saved
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold">
+                    {visibleReplays.length} visible / {replays.length} saved
+                  </span>
+                  <button
+                    type="button"
+                    data-testid="replay-visibility-toggle"
+                    aria-pressed={showReplayCatalog}
+                    onClick={() => setShowReplayCatalog((value) => !value)}
+                    className="rounded border border-zinc-300 bg-white px-2 py-1 text-[9px] uppercase tracking-wider text-zinc-700 hover:bg-zinc-100 transition font-semibold"
+                  >
+                    {showReplayCatalog ? "Live-only QA" : "Show replay catalog"}
+                  </button>
+                </div>
               </div>
               <p className="text-xs text-zinc-600 leading-relaxed">
-                Open a frozen proof bundle, or rerun the current prompt/model stack over the same cached frames and evidence.
+                {showReplayCatalog
+                  ? "Open a frozen proof bundle, or rerun the current prompt/model stack over the same cached frames and evidence. Hide the catalog to keep QA focused on the live mission path."
+                  : "Replay catalog hidden for live-only QA. Switch to Plan to launch a provider-backed mission; no replay data was deleted. "}
               </p>
-              <div className="space-y-3">
-                {replays.map((replay) => (
+              {showReplayCatalog && <div className="space-y-3">
+                {visibleReplays.map((replay) => (
                   <div key={replay.replay_id} className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -798,12 +831,13 @@ export default function MissionControl({
                     )}
                   </div>
                 ))}
-              </div>
+              </div>}
               {replayNotice && (
                 <div className="rounded border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-medium text-cyan-700">
                   {replayNotice}
                 </div>
               )}
+              {replayComparison && <ReplayComparisonCard comparison={replayComparison} />}
             </div>
           )}
 
@@ -902,6 +936,25 @@ export default function MissionControl({
                 className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 outline-none"
               />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="mission-confirmation-policy" className="block text-[10px] uppercase tracking-wider font-semibold text-zinc-500">
+              Confirmation policy
+            </label>
+            <select
+              id="mission-confirmation-policy"
+              data-testid="mission-confirmation-policy-select"
+              value={confirmationPolicy}
+              onChange={(event) => setConfirmationPolicy(event.target.value as "single_acquisition" | "distinct_acquisition")}
+              className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 outline-none"
+            >
+              <option value="distinct_acquisition">Distinct acquisitions (safe default)</option>
+              <option value="single_acquisition">One acquisition (deliberate one-shot review)</option>
+            </select>
+            <p className="text-[10px] leading-snug text-zinc-500">
+              Distinct acquisitions wait for independent confirmation; one acquisition is for an explicit one-shot review and is persisted with this mission.
+            </p>
           </div>
 
           {/* Bbox draw */}

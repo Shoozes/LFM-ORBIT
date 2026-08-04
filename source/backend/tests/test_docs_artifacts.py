@@ -64,6 +64,7 @@ def test_documented_demo_media_exists_and_is_nonempty():
         "docs/media/infographics/image-to-training-data-flow-info.png",
         "docs/media/infographics/app-usage-to-agent-growth-info.png",
         "docs/media/videos/showcase-demo.webm",
+        "docs/media/videos/hosted-demo.webm",
         "docs/media/videos/payload-reduction-demo.webm",
         "docs/media/videos/provenance-demo.webm",
         "docs/media/videos/abstain-safety-demo.webm",
@@ -125,6 +126,7 @@ def test_public_readme_images_are_visually_nonblank():
 def test_public_demo_videos_are_temporal_and_nonblank():
     video_paths = [
         "docs/media/videos/showcase-demo.webm",
+        "docs/media/videos/hosted-demo.webm",
         "docs/media/videos/payload-reduction-demo.webm",
         "docs/media/videos/provenance-demo.webm",
         "docs/media/videos/abstain-safety-demo.webm",
@@ -228,11 +230,12 @@ def test_docs_user_and_dev_surfaces_are_separated():
     release_docs = sorted(path.name for path in (docs_root / "release").glob("*.md"))
     root_docs = sorted(path.name for path in docs_root.glob("*.md"))
 
-    assert user_docs == ["DEMO_GUIDE.md", "OBJECT_EVIDENCE_MODE.md"]
+    assert user_docs == ["DEMO_GUIDE.md", "HOSTED_DEMO.md", "OBJECT_EVIDENCE_MODE.md"]
     assert dev_docs == [
         "ARCHITECTURE.md",
         "DATASET_CYCLE_TUTORIAL.md",
         "MODEL_HANDOFF.md",
+        "REPOSITORY_BOUNDARY.md",
         "SEEDED_DATA_REGISTRY.md",
         "TODO.md",
     ]
@@ -286,6 +289,29 @@ def test_docs_do_not_reintroduce_retired_mission_evidence_ui():
     leaked = [claim for claim in retired_active_claims if claim in combined]
 
     assert leaked == []
+
+
+def test_active_product_copy_excludes_retired_competition_framing():
+    active_paths = [
+        REPO_ROOT / "README.md",
+        REPO_ROOT / "docs/README.md",
+        REPO_ROOT / "docs/dev/ARCHITECTURE.md",
+        REPO_ROOT / "docs/dev/MODEL_HANDOFF.md",
+        *sorted((REPO_ROOT / "docs/user").glob("*.md")),
+        REPO_ROOT / "source/backend/data/README.md",
+        REPO_ROOT / "source/backend/data/HF_DATASET_CARD.md",
+        REPO_ROOT / "source/backend/core/ground_agent_knowledge.py",
+    ]
+    leaked = [
+        path.relative_to(REPO_ROOT).as_posix()
+        for path in active_paths
+        if "hackathon" in path.read_text(encoding="utf-8", errors="ignore").lower()
+    ]
+    assert leaked == []
+
+    bank = json.loads((REPO_ROOT / "summary_bank.json").read_text(encoding="utf-8"))
+    for group_name in ("issue_group_hackathon_scope_agent_first_polish", "issue_group_hackathon_release_qa"):
+        assert bank["groups"][group_name].get("_archived") is True
 
 
 def test_readme_timelapse_gif_fits_github_inline_limit():
@@ -349,16 +375,14 @@ def test_readme_documents_minimal_cold_start_prerequisites():
 def test_validation_snapshots_match_current_release_gate():
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     todo = (REPO_ROOT / "docs/dev/TODO.md").read_text(encoding="utf-8")
-    bank = json.loads((REPO_ROOT / "summary_bank.json").read_text(encoding="utf-8"))
-    release_note = bank["groups"]["issue_group_hackathon_release_qa"]["note"]
+    release = (REPO_ROOT / "docs/release/v0.4.0-public-proof.md").read_text(encoding="utf-8")
 
-    for source in (readme, todo, release_note):
-        assert "499 passed" in source
+    for source in (readme, todo, release):
+        assert "552 passed" in source
         assert "Playwright" in source
         assert "intentional skips" in source
         assert "104 passed" not in source
 
-    assert "backend 495 tests" not in json.dumps(bank)
     assert "backend `495 passed`" not in todo
 
 
@@ -411,6 +435,96 @@ def test_summary_bank_file_groups_are_deduplicated():
             seen.add(rel_path)
 
     assert duplicates == []
+
+
+def test_summary_bank_defaults_and_archived_routes_are_recoverable():
+    bank = json.loads((REPO_ROOT / "summary_bank.json").read_text(encoding="utf-8"))
+    default_groups = bank["defaults"]["groups"]
+
+    assert default_groups
+    assert all(group in bank["groups"] for group in default_groups)
+    assert all(not bank["groups"][group].get("_archived") for group in default_groups)
+
+    for group_name, group in bank["groups"].items():
+        if not group.get("_archived"):
+            assert group.get("description"), group_name
+            continue
+
+        archive_ref = group.get("_archive_ref", "")
+        assert "#groups." in archive_ref, group_name
+        archive_path, archived_name = archive_ref.split("#groups.", 1)
+        archive = json.loads((REPO_ROOT / archive_path).read_text(encoding="utf-8"))
+        assert archive["schema"] == "summary_bank_archive_v1"
+        assert archived_name == group_name
+        assert group_name in archive["groups"]
+
+
+def test_public_model_handoff_matches_current_repo_identity_and_runtime_boundary():
+    handoff = json.loads(
+        (REPO_ROOT / "docs/model/orbit_model_handoff.json").read_text(encoding="utf-8")
+    )
+
+    assert handoff["producer"]["name"] == "GenUni"
+    assert handoff["source"]["repo_id"] == "Shoozes/lfm2.5-450m-vl-orbit-satellite"
+    assert handoff["source"]["revision"] == "0fc90b8caaa6b8e07d1dc0a9125969c2730e4353"
+    assert handoff["source"]["file_sha256"] == "9e488f38f64dc4b897c768bec4b37ba01a671309910fd08c470220fa244e14f6"
+    assert handoff["source"]["file_bytes"] == 219310432
+    assert handoff["runtime"]["mmproj_filename"] == ""
+    assert handoff["artifact"]["browser_manifest"] == "source/frontend/public/model-manifest.json"
+
+    manifest = json.loads(
+        (REPO_ROOT / "source/frontend/public/model-manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["revision"] == handoff["source"]["revision"]
+    assert manifest["sha256"] == handoff["source"]["file_sha256"]
+    assert manifest["bytes"] == handoff["source"]["file_bytes"]
+    assert manifest["capabilities"] == {"textReasoning": True, "imageInput": False, "mmproj": None}
+
+
+def test_summary_bank_tracks_current_hosted_integrity_surfaces():
+    bank = json.loads((REPO_ROOT / "summary_bank.json").read_text(encoding="utf-8"))
+    hosted = bank["groups"]["feature_group_hosted_browser_portfolio"]
+    coordinator = bank["groups"]["issue_group_scan_producer_and_agent_deduplication"]
+
+    assert "source/frontend/hosted/demoPackages.ts" in hosted["files"]
+    assert "source/frontend/public/demo-packages/index.json" in hosted["files"]
+    assert "source/frontend/public/model-manifest.json" in hosted["files"]
+    assert "source/frontend/public/demo-assets/atacama-mining.png" not in hosted["files"]
+    assert "source/backend/core/scan_coordinator.py" in coordinator["files"]
+
+
+def test_hosted_demo_packages_are_versioned_and_trace_to_saved_replays():
+    manifest = json.loads(
+        (REPO_ROOT / "source/frontend/public/demo-packages/index.json").read_text(encoding="utf-8")
+    )
+    assert manifest["schemaVersion"] == 2
+    packages = manifest["packages"]
+    assert packages
+    package_ids = {package["id"] for package in packages}
+    assert len(package_ids) == len(packages)
+
+    for package in packages:
+        evidence = package["evidence"]
+        assert evidence["runtimeTruthMode"] == "replay"
+        assert evidence["imageryOrigin"] == "cached_api"
+        assert evidence["retentionDecision"] in {"candidate", "review", "abstain"}
+        bbox = evidence["bbox"]
+        assert len(bbox) == 4
+        assert bbox[0] < bbox[2] and bbox[1] < bbox[3]
+        source_asset = evidence["sourceAsset"]
+        assert re.fullmatch(r"source/backend/assets/replays/[a-z0-9_]+\.json", source_asset)
+        replay_path = REPO_ROOT / source_asset
+        assert replay_path.exists(), package["id"]
+        replay = json.loads(replay_path.read_text(encoding="utf-8"))
+        assert replay["replay_id"] == evidence["sourceReplayId"]
+        assert list(replay["bbox"]) == bbox
+        first_alert = replay["alerts"][0]
+        runtime_truth_mode = replay.get("runtime_truth_mode") or first_alert.get("runtime_truth_mode") or "replay"
+        imagery_origin = replay.get("imagery_origin") or first_alert.get("imagery_origin") or "cached_api"
+        scoring_basis = replay.get("scoring_basis") or first_alert.get("scoring_basis") or "visual_only"
+        assert runtime_truth_mode == "replay"
+        assert imagery_origin == "cached_api"
+        assert scoring_basis == evidence["scoringBasis"]
 
 
 def test_visual_story_manifest_assets_exist_and_disclose_fixture_boxes():

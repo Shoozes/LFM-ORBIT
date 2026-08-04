@@ -77,7 +77,7 @@ Future marine-debris examples should stay out of the active fixture until `start
 
 ## Optional Sentinel Replay Data
 
-LFM Orbit's hackathon runtime is DPhi Space SimSat-first. Sentinel Hub is optional support for local real-data testing, replay-cache refreshes, and dataset development; the default showcase does not need Sentinel Hub credentials.
+LFM Orbit's portfolio runtime is DPhi Space SimSat-first. Sentinel Hub is optional support for local real-data testing, replay-cache refreshes, and dataset development; the default showcase does not need Sentinel Hub credentials.
 
 High-quality replay timelapses can be refreshed from Sentinel Hub and then reused by demos and dataset export through the existing `assets/seeded_data/sh_<signature>.webm` cache. The folder name is legacy; the data is stored real API imagery, not generated evidence.
 
@@ -310,7 +310,7 @@ Current training-focused replay/cache export result after the wildfire refresh:
 - Keep `mission_metadata` for metadata-only missions such as the Greenland ice/snow extent replay instead of forcing invalid timelapse assets into image configs.
 - For public training refreshes, use `--no-missions --no-archived-missions` when local operator mission archives would flood image training with repeated intent-only rows. Include `mission_metadata` deliberately when the refresh goal is tool/intent tuning.
 - Record each Hub refresh in this README, `docs/dev/DATASET_CYCLE_TUTORIAL.md`, and `summary_bank.json` with counts, commit hash, tagger source, and skipped/failed asset counts.
-- For hackathon demos, prefer seeded replay data and SimSat runtime evidence before spending direct-provider quota on refreshes.
+- For portfolio demos, prefer seeded replay data and SimSat runtime evidence before spending direct-provider quota on refreshes.
 - Hugging Face dataset: `Shoozes/LFM-Orbit-SatData`, data payload commit `9ccff9ce7315e270ca1b280c82c39414ce591d01`, Dataset Viewer verification commit `2df07094f36037e71c7e14e28dfbd298343be359`, final card documentation commit `550c98f7c9b84eefbe3c0c6eb77b33a70028402a`, with `records=46`, `seeded_cache_records=33`, `monitor_report_records=5`, `mission_metadata_records=0`, `unique_training_assets=265`, `unique_temporal_sequences=33`, remote `num_rows=1126`, `70` wildfire image rows, and `11` wildfire temporal rows.
 - Dataset Viewer schema note: upload `source/backend/data/HF_DATASET_CARD.md` as the Hub `README.md` so single-image SFT rows, temporal SFT rows, metadata, mission metadata, and review records load as separate configs instead of one mixed inferred JSON split.
 

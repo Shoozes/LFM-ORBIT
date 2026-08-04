@@ -610,7 +610,7 @@ export default function SettingsPanel({ isOpen, onClose, apiBaseUrl }: SettingsP
                 {savingSettings ? "Saving..." : "Save Credentials"}
               </button>
             </div>
-            
+
             <div className="space-y-3 text-xs text-zinc-500">
               <div>
                 <p className="text-zinc-600 font-semibold mb-1">Observation Provider</p>

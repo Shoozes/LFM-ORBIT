@@ -6,7 +6,7 @@ import os
 import warnings
 from contextlib import asynccontextmanager
 from datetime import date
-from typing import Any
+from typing import Any, Literal
 
 try:
     from sentinelhub import SHRateLimitWarning
@@ -50,10 +50,12 @@ from core.depth_anything import (
     get_depth_anything_status,
     set_depth_anything_enabled,
 )
+from core.image_payload import MAX_IMAGE_B64_CHARS
 from core.gallery import list_gallery, get_gallery_item, get_visual_review_image
 from core.ground_agent import run_ground_agent
 from core.inference import model_status as llm_model_status, runtime_capabilities
 from core.ice_snow_monitoring import score_ice_snow_extent
+from core.local_boundary import is_allowed_origin, is_local_host
 from core.lifeline_monitoring import (
     build_lifeline_monitor_report,
     evaluate_lifeline_predictions,
@@ -86,10 +88,17 @@ from core.object_targets import (
 )
 from core.queue import get_alert_counts, get_recent_alerts
 from core.replay import list_seeded_replays, load_seeded_replay, rescan_seeded_replay
-from core.replay_snapshot import export_replay_snapshot, import_replay_snapshot
+from core.replay_snapshot import _coerce_bool, export_replay_snapshot, import_replay_snapshot
+from core.request_limits import (
+    ExpensiveCallBusy,
+    ExpensiveCallTimedOut,
+    get_max_request_body_bytes,
+    validate_json_shape,
+    run_expensive_call,
+)
 from core.runtime_state import ensure_runtime_state, reset_runtime_state
 from core.satellite_agent import run_satellite_agent
-from core.scanner import stream_region_scan
+from core.scanner import run_mission_scan_service, stream_region_scan
 from core.simsat_client import get_simsat_client, SimSatConfig
 from core.telemetry import build_health_payload
 from core.temporal_use_cases import (
@@ -196,7 +205,17 @@ def _should_resume_active_mission_on_boot() -> bool:
 
 
 def _should_run_agent_pair_on_boot() -> bool:
-    return os.getenv("RUN_AGENT_PAIR_ON_BOOT", "true").lower() not in ("false", "0", "no")
+    return os.getenv("RUN_AGENT_PAIR_ON_BOOT", "false").lower() not in ("false", "0", "no")
+
+
+def _live_scan_engine() -> str:
+    """Resolve one live scan owner while keeping the legacy agent opt-in."""
+    configured = os.getenv("ORBIT_LIVE_SCAN_ENGINE", "").strip().lower()
+    if configured in {"coordinator", "agent"}:
+        return configured
+    if configured:
+        logger.warning("Unknown ORBIT_LIVE_SCAN_ENGINE=%s; using coordinator", configured)
+    return "agent" if _should_run_agent_pair_on_boot() else "coordinator"
 
 
 def _cors_allow_origins() -> list[str]:
@@ -217,9 +236,23 @@ def _require_local_request(request: Request | None = None) -> None:
     if request is None:
         return
     host = request.client.host if request.client else ""
-    if host in {"127.0.0.1", "::1", "localhost", "testclient"}:
+    if is_local_host(host):
         return
     raise HTTPException(status_code=403, detail="Local-only control endpoint")
+
+
+def _websocket_is_allowed(websocket: WebSocket) -> bool:
+    host = websocket.client.host if websocket.client else ""
+    origin = websocket.headers.get("origin")
+    return is_local_host(host) and is_allowed_origin(origin, _cors_allow_origins())
+
+
+async def _accept_local_websocket(websocket: WebSocket) -> bool:
+    if not _websocket_is_allowed(websocket):
+        await websocket.close(code=1008, reason="Local websocket origin required")
+        return False
+    await websocket.accept()
+    return True
 
 
 def _is_windows_transport_disconnect_noise(context: dict[str, Any]) -> bool:
@@ -264,6 +297,22 @@ async def _safe_send_text(websocket: WebSocket, payload: dict) -> bool:
         raise
 
 
+async def _run_expensive_endpoint(name: str, operation, *args, **kwargs):
+    """Return a stable API response for bounded local provider/model work."""
+    try:
+        return await run_expensive_call(name, operation, *args, **kwargs)
+    except ExpensiveCallBusy as exc:
+        return JSONResponse(
+            status_code=429,
+            content={"status": "busy", "resource": name, "error": str(exc)},
+        )
+    except ExpensiveCallTimedOut as exc:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "timeout", "resource": name, "error": str(exc)},
+        )
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     _install_asyncio_disconnect_noise_filter()
@@ -286,19 +335,25 @@ async def lifespan(_: FastAPI):
     )
 
     stop_event = asyncio.Event()
+    mission_scan_task = asyncio.create_task(run_mission_scan_service(stop_event))
     agent_tasks: list[asyncio.Task] = []
-    if _should_run_agent_pair_on_boot():
+    scan_engine = _live_scan_engine()
+    if _should_run_agent_pair_on_boot() and scan_engine == "agent":
         agent_tasks = [
             asyncio.create_task(run_satellite_agent(stop_event)),
             asyncio.create_task(run_ground_agent(stop_event)),
         ]
         logger.info("Agent pair launched: satellite_agent + ground_agent")
+    elif _should_run_agent_pair_on_boot():
+        logger.info("Agent pair launch suppressed by ORBIT_LIVE_SCAN_ENGINE=%s", scan_engine)
     else:
         logger.info("Agent pair launch skipped by RUN_AGENT_PAIR_ON_BOOT=false")
 
     yield
 
     stop_event.set()
+    mission_scan_task.cancel()
+    await asyncio.gather(mission_scan_task, return_exceptions=True)
     for task in agent_tasks:
         task.cancel()
     try:
@@ -322,6 +377,31 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def request_shape_guard(request: Request, call_next):
+    """Bound JSON bodies before route-specific parsing or expensive work."""
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > get_max_request_body_bytes():
+                return JSONResponse(status_code=413, content={"error": "request body is too large"})
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "invalid content-length"})
+
+    if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() == "application/json":
+        raw_body = await request.body()
+        if len(raw_body) > get_max_request_body_bytes():
+            return JSONResponse(status_code=413, content={"error": "request body is too large"})
+        try:
+            validate_json_shape(json.loads(raw_body))
+        except json.JSONDecodeError:
+            # Let FastAPI's normal validation response describe malformed JSON.
+            pass
+        except ValueError as exc:
+            return JSONResponse(status_code=413, content={"error": str(exc)})
+    return await call_next(request)
 
 
 @app.get("/api/health")
@@ -592,12 +672,12 @@ def link_dtn_proof(body: DtnProofBody, request: Request = None):
 def simsat_status():
     """
     Check SimSat API connection status and configuration.
-    
+
     Returns information about SimSat availability and token configuration.
     """
     config = SimSatConfig.from_env()
     client = get_simsat_client()
-    
+
     return {
         "simsat_base_url": config.base_url,
         "simsat_available": client.is_available(),
@@ -687,8 +767,9 @@ def temporal_use_cases():
 
 
 @app.post("/api/temporal/classify")
-def temporal_classify(body: dict):
+def temporal_classify(body: dict, request: Request = None):
     """Auto-select the temporal use case for mission, alert, or API-prep metadata."""
+    _require_local_request(request)
     requested = body.get("use_case_id") if isinstance(body, dict) else None
     return classify_temporal_use_case_record(body if isinstance(body, dict) else {}, requested)
 
@@ -731,8 +812,9 @@ def lifeline_assets(category: str | None = None, region: str | None = None):
 
 
 @app.post("/api/lifelines/monitor")
-def lifeline_monitor(body: LifelineMonitorBody):
+def lifeline_monitor(body: LifelineMonitorBody, request: Request = None):
     """Build a before/after civilian lifeline report and downlink decision."""
+    _require_local_request(request)
     try:
         report = build_lifeline_monitor_report(
             asset_id=body.asset_id,
@@ -749,14 +831,16 @@ def lifeline_monitor(body: LifelineMonitorBody):
 
 
 @app.post("/api/lifelines/evaluate")
-def lifeline_evaluate(body: LifelineEvalBody):
+def lifeline_evaluate(body: LifelineEvalBody, request: Request = None):
     """Evaluate lifeline candidate decisions against expected actions."""
+    _require_local_request(request)
     return evaluate_lifeline_predictions(body.cases)
 
 
 @app.post("/api/ice-snow/score")
-def ice_snow_score(body: IceSnowScoreBody):
+def ice_snow_score(body: IceSnowScoreBody, request: Request = None):
     """Score long-window ice/snow extent from Sentinel-2 L2A frame summaries."""
+    _require_local_request(request)
     return score_ice_snow_extent(
         body.frames,
         runtime_truth_mode=body.runtime_truth_mode,
@@ -767,8 +851,9 @@ def ice_snow_score(body: IceSnowScoreBody):
 
 
 @app.post("/api/wildfire/smoke-score")
-def wildfire_smoke_score(body: WildfireSmokeScoreBody):
+def wildfire_smoke_score(body: WildfireSmokeScoreBody, request: Request = None):
     """Score wildfire smoke/cloud/burn confidence from Sentinel-2 L2A summaries."""
+    _require_local_request(request)
     return score_wildfire_smoke_assist(
         body.frames,
         hotspot_context=body.hotspot_context,
@@ -800,8 +885,9 @@ class MaritimeMonitorBody(BaseModel):
 
 
 @app.post("/api/maritime/monitor")
-def maritime_monitor(body: MaritimeMonitorBody):
+def maritime_monitor(body: MaritimeMonitorBody, request: Request = None):
     """Build an Orbit-native maritime monitor and cardinal investigation plan."""
+    _require_local_request(request)
     report = build_maritime_monitor_report(
         lat=body.lat,
         lon=body.lon,
@@ -820,7 +906,8 @@ def maritime_monitor(body: MaritimeMonitorBody):
 
 @app.websocket("/ws/telemetry")
 async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
+    if not await _accept_local_websocket(websocket):
+        return
 
     try:
         await stream_region_scan(websocket)
@@ -840,7 +927,8 @@ async def agent_dialogue_websocket(websocket: WebSocket):
     """
     from core.agent_bus import _connect as _bus_connect
 
-    await websocket.accept()
+    if not await _accept_local_websocket(websocket):
+        return
     last_id = 0
 
     # Send recent history on connect
@@ -951,8 +1039,9 @@ def get_map_pins():
 
 
 @app.post("/api/map/pins")
-def drop_operator_pin(body: PinBody):
+def drop_operator_pin(body: PinBody, request: Request = None):
     """Drop an operator (OPR) pin on the map."""
+    _require_local_request(request)
     label = body.label.strip() or f"OPR ★ ({body.lat:.3f}, {body.lng:.3f})"
     pin_id = upsert_pin(
         pin_type="operator",
@@ -966,8 +1055,9 @@ def drop_operator_pin(body: PinBody):
 
 
 @app.delete("/api/map/pins/{pin_id}")
-def remove_pin(pin_id: int):
+def remove_pin(pin_id: int, request: Request = None):
     """Remove a pin by id."""
+    _require_local_request(request)
     removed = delete_pin(pin_id)
     if not removed:
         return JSONResponse(status_code=404, content={"error": "Pin not found"})
@@ -999,14 +1089,17 @@ class AlertAnalysisBody(BaseModel):
     target_pack_id: str | None = Field(default=None, max_length=80)
 
 @app.post("/api/analysis/timelapse")
-def analysis_timelapse(body: BboxRequest):
+async def analysis_timelapse(body: BboxRequest, request: Request = None):
+    _require_local_request(request)
     from core.analyzer import analyze_timelapse
 
-    analysis_text = analyze_timelapse(body.bbox)
+    analysis_text = await _run_expensive_endpoint("analysis", analyze_timelapse, body.bbox)
+    if isinstance(analysis_text, JSONResponse):
+        return analysis_text
     return {"analysis": analysis_text}
 
 @app.post("/api/analysis/alert")
-def analyze_alert_endpoint(body: AlertAnalysisBody):
+def analyze_alert_endpoint(body: AlertAnalysisBody, request: Request = None):
     """
     Analyze a mission alert using ground evidence reasoning.
 
@@ -1014,6 +1107,7 @@ def analyze_alert_endpoint(body: AlertAnalysisBody):
     manifest-resolved Orbit GGUF when it is loaded. The offline path remains
     available as the safe fallback.
     """
+    _require_local_request(request)
     return analyze_alert(
         change_score=body.change_score,
         confidence=body.confidence,
@@ -1036,6 +1130,7 @@ class MissionStartBody(BaseModel):
     bbox: list[float] | None = None   # [west, south, east, north]
     start_date: str | None = None
     end_date: str | None = None
+    confirmation_policy: Literal["single_acquisition", "distinct_acquisition"] | None = None
     use_case_id: str | None = None
     target_pack_id: str | None = Field(default=None, max_length=80)
     object_targets: list[ObjectTargetBody] | None = Field(default=None, max_length=50)
@@ -1079,6 +1174,7 @@ def mission_start(body: MissionStartBody, request: Request = None):
             bbox=body.bbox,
             start_date=body.start_date,
             end_date=body.end_date,
+            confirmation_policy=body.confirmation_policy,
             use_case_id=body.use_case_id,
             target_pack_id=body.target_pack_id,
             object_targets=[target.model_dump() for target in body.object_targets or []] or None,
@@ -1248,7 +1344,7 @@ async def replay_snapshot_import(request: Request):
     except Exception as exc:
         return JSONResponse(status_code=400, content={"error": f"invalid snapshot JSON: {exc}"})
     snapshot = body.get("snapshot") if isinstance(body, dict) and isinstance(body.get("snapshot"), dict) else body
-    reset = bool(body.get("reset", True)) if isinstance(body, dict) else True
+    reset = _coerce_bool(body.get("reset", True)) if isinstance(body, dict) else True
     try:
         return import_replay_snapshot(snapshot, reset=reset)
     except ValueError as exc:
@@ -1381,15 +1477,17 @@ class TimelapseBody(BboxRequest):
 
 
 @app.post("/api/timelapse/generate")
-def generate_timelapse(body: TimelapseBody):
+async def generate_timelapse(body: TimelapseBody, request: Request = None):
     """Generate a timelapse WebM video for a bounding box over a time range."""
-    result = generate_timelapse_frames(
+    _require_local_request(request)
+    return await _run_expensive_endpoint(
+        "timelapse",
+        generate_timelapse_frames,
         bbox=body.bbox,
         start_date=body.start_date,
         end_date=body.end_date,
-        steps=body.steps
+        steps=body.steps,
     )
-    return result
 
 
 @app.get("/api/inference/status")
@@ -1402,7 +1500,7 @@ def inference_status():
 
 class ImageInferenceBody(BaseModel):
     prompt: str = Field(min_length=1, max_length=1000)
-    image_b64: str | None = Field(default=None, max_length=15_000_000)
+    image_b64: str | None = Field(default=None, max_length=MAX_IMAGE_B64_CHARS)
     image_path: str | None = Field(default=None, max_length=1000)
     cell_id: str | None = Field(default=None, max_length=80)
     event_id: str | None = Field(default=None, max_length=120)
@@ -1429,8 +1527,9 @@ class ImageInferenceBody(BaseModel):
 
 
 @app.post("/api/inference/image")
-def inference_image(body: ImageInferenceBody):
+async def inference_image(body: ImageInferenceBody, request: Request = None):
     """Image-conditioned review endpoint; unavailable until a real image adapter is configured."""
+    _require_local_request(request)
     if body.image_path:
         return JSONResponse(
             status_code=400,
@@ -1441,7 +1540,9 @@ def inference_image(body: ImageInferenceBody):
         "cell_id": body.cell_id or body.metadata.get("cell_id", ""),
         "event_id": body.event_id or body.metadata.get("event_id", ""),
     }
-    return generate_with_image(
+    return await _run_expensive_endpoint(
+        "image_review",
+        generate_with_image,
         body.prompt,
         image_path=body.image_path,
         image_b64=body.image_b64,
@@ -1584,17 +1685,21 @@ class DepthAnythingSettingsBody(BaseModel):
 
 
 class DepthEstimateBody(BaseModel):
-    image_b64: str = Field(..., min_length=1)
+    image_b64: str = Field(..., min_length=1, max_length=MAX_IMAGE_B64_CHARS)
 
 @app.post("/api/vlm/grounding")
-def vlm_grounding(body: VlmGroundingBody):
-    return explain_vlm_grounding(body.bbox, body.prompt)
+async def vlm_grounding(body: VlmGroundingBody, request: Request = None):
+    _require_local_request(request)
+    return await _run_expensive_endpoint("vlm", explain_vlm_grounding, body.bbox, body.prompt)
 
 
 @app.post("/api/vlm/grounding/batch")
-def vlm_grounding_batch(body: VlmGroundingBatchBody):
+async def vlm_grounding_batch(body: VlmGroundingBatchBody, request: Request = None):
+    _require_local_request(request)
     try:
-        return run_object_evidence_batch(
+        return await _run_expensive_endpoint(
+            "vlm",
+            run_object_evidence_batch,
             body.bbox,
             [target.model_dump() for target in body.targets],
             target_pack_id=body.target_pack_id,
@@ -1605,12 +1710,14 @@ def vlm_grounding_batch(body: VlmGroundingBatchBody):
 
 
 @app.post("/api/vlm/vqa")
-def vlm_vqa(body: VlmVqaBody):
-    return explain_vlm_vqa(body.bbox, body.question)
+async def vlm_vqa(body: VlmVqaBody, request: Request = None):
+    _require_local_request(request)
+    return await _run_expensive_endpoint("vlm", explain_vlm_vqa, body.bbox, body.question)
 
 @app.post("/api/vlm/caption")
-def vlm_caption(body: VlmCaptionBody):
-    return explain_vlm_caption(body.bbox)
+async def vlm_caption(body: VlmCaptionBody, request: Request = None):
+    _require_local_request(request)
+    return await _run_expensive_endpoint("vlm", explain_vlm_caption, body.bbox)
 
 
 @app.get("/api/depth/status")
@@ -1620,16 +1727,18 @@ def depth_status():
 
 
 @app.post("/api/depth/settings")
-def depth_settings(body: DepthAnythingSettingsBody):
+def depth_settings(body: DepthAnythingSettingsBody, request: Request = None):
     """Toggle Depth Anything V3 for the current backend process."""
+    _require_local_request(request)
     return set_depth_anything_enabled(body.enabled)
 
 
 @app.post("/api/depth/estimate")
-def depth_estimate(body: DepthEstimateBody):
+async def depth_estimate(body: DepthEstimateBody, request: Request = None):
     """Run optional Depth Anything V3 and return compact depth statistics."""
+    _require_local_request(request)
     try:
-        return estimate_depth_summary(body.image_b64)
+        return await _run_expensive_endpoint("depth", estimate_depth_summary, body.image_b64)
     except ValueError as exc:
         return JSONResponse(status_code=400, content={"error": str(exc)})
     except DepthAnythingUnavailable as exc:

@@ -102,6 +102,21 @@ def test_generate_with_image_rejects_invalid_image_payload(monkeypatch, tmp_path
     assert "valid base64" in payload["reason"]
 
 
+def test_generate_with_image_keeps_controlled_provenance_fields(monkeypatch, tmp_path):
+    _clear_image_runtime_env(monkeypatch)
+    monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(tmp_path / "runtime-data"))
+
+    payload = generate_with_image(
+        "Inspect.",
+        image_b64=_png_b64(),
+        metadata={"image_conditioned": True, "image_width": 999999, "runtime_inference_mode": "fake"},
+    )
+
+    assert payload["provenance"]["image_conditioned"] is False
+    assert payload["provenance"]["image_width"] == 12
+    assert payload["provenance"]["runtime_inference_mode"] == "text_evidence_packet"
+
+
 def test_generate_with_image_abstains_on_blank_image(monkeypatch, tmp_path):
     _clear_image_runtime_env(monkeypatch)
     monkeypatch.setenv("CANOPY_SENTINEL_RUNTIME_DIR", str(tmp_path / "runtime-data"))

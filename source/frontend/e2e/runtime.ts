@@ -65,6 +65,7 @@ export async function startMission(
     end_date: string;
     use_case_id: string;
     target_pack_id?: string;
+    confirmation_policy?: "single_acquisition" | "distinct_acquisition";
   },
 ) {
   const response = await request.post(`${API_BASE}/api/mission/start`, { data: body });

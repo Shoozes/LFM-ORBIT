@@ -1,17 +1,17 @@
 # TODO
 
-Updated **May 8, 2026**.
+Updated **August 4, 2026**.
 
-This is the compact backlog and integrity checklist. Keep run-by-run history in `summary_bank.json`; keep product proof in `README.md`; keep implementation contracts in focused docs.
+This is the compact backlog and integrity checklist. Keep current context routing in `summary_bank.json`, historical route notes in `archive/summary_bank_history.json`, product proof in `README.md`, and implementation contracts in focused docs.
 
 ## Current State
 
 - LFM Orbit is a demo-ready, local-first mission-control prototype, not an unattended production deployment.
-- The hackathon satellite-data API family is SimSat/Mapbox through DPhi Space SimSat. Default realtime scanning uses `simsat_sentinel`; `simsat_mapbox` is the optional SimSat imagery/context lane when a Mapbox token is configured. Sentinel Hub, NASA, and GEE-style providers are optional development or replay support only.
-- Sentinel Hub must stay a development/cache-seeding path for real/realtime research data, not the hackathon default provider. Release QA should prove the app boots and runs its default path with SimSat/Mapbox plus bundled cached replay assets, without requiring Sentinel Hub credentials.
+- The default satellite-data API family is SimSat/Mapbox through DPhi Space SimSat. Default realtime scanning uses `simsat_sentinel`; `simsat_mapbox` is the optional SimSat imagery/context lane when a Mapbox token is configured. Sentinel Hub, NASA, and GEE-style providers are optional development or replay support only.
+- Sentinel Hub must stay a development/cache-seeding path for real/realtime research data, not the default provider. Release QA should prove the app boots and runs its default path with SimSat/Mapbox plus bundled cached replay assets, without requiring Sentinel Hub credentials.
 - Evidence surfaces must keep `runtime_truth_mode`, `imagery_origin`, and `scoring_basis` visible.
 - Replay-cache entries are stored real API imagery with preserved metadata. They are deterministic review assets, not generated evidence.
-- New runtime cache WebM/meta outputs under `source/backend/assets/seeded_data/` are ignored by default; promote only reviewed fixtures with forced git add plus docs and summary-bank updates.
+- New runtime cache WebM/meta outputs under `source/backend/assets/seeded_data/` are ignored by default; the tracked `nasa_aa01bc81.webm` file is the explicit frontend E2E context-timelapse fixture, and other generated NASA assets require forced promotion plus docs and summary-bank updates.
 - Replay Cache excludes cached WebMs that fail timelapse-integrity checks.
 - Cloud, no-data, malformed spectral bands, and RGB-only inputs must abstain instead of fabricating indices.
 - Ground Agent mutating actions use proposal cards before state changes.
@@ -29,13 +29,27 @@ This is the compact backlog and integrity checklist. Keep run-by-run history in 
 - Frontend reloads must not restart an active mission from the first scan cell or let stale demo query params override a live mission.
 - Public README proof currently centers on Critical Minerals, target-pack proof, payload reduction, orbital eclipse queueing, provenance, abstain safety, Greenland timelapse context, Ground Agent flow, and semantic map context.
 - The current trained LiquidAI Leap Tune-compatible bundle is fetched from `Shoozes/lfm2.5-450m-vl-orbit-satellite`; SAT/GND GGUF calls remain evidence-packet reasoning. `/api/inference/image` provides a separate opt-in retained-frame LiquidAI/LFM2.5-VL-450M image-text-to-text review path when `image_conditioned_runtime_enabled=true`.
+- The hosted portfolio route is separate from the full app: the normal build keeps the full app at `/` and the browser-only alias at `/hosted`; `npm run build:hosted` emits an isolated static bundle at `/` with Wllama/WebAssembly, a pinned small GGUF manifest, validated saved packages, and no backend/provider controls. The browser runtime is text reasoning over saved evidence, not image-conditioned VLM inference.
+- The hosted route reads the static model manifest before any GGUF request, displays the pinned model identity/size/license/capability, and exposes separate download and generation cancellation states so a stopped response can reuse the loaded browser instance.
+- Mission confirmation overrides are now persisted through `core/mission.py` and `/api/mission/start`; omitted policy still falls back to the conservative `distinct_acquisition` region setting, while explicitly requested `single_acquisition` is available for one-shot callers.
+- The repository boundary is explicit: LFM-ORBIT `main` carries the public application, GenUni remains the separate training-cycle/producer repository, and `.tools/project.json` points publish/pull helpers at public LFM-ORBIT while recording GenUni as `trainingRemote`.
+- Generated observations and timelapse caches are runtime-owned under `CANOPY_SENTINEL_RUNTIME_DIR`; committed seeded replay fixtures remain read-only inputs, and JSON/metadata writes use replace-safe temporary files.
+- Replay snapshot imports validate shape, row limits, numeric finiteness, and payload ranges before reset; reset failures attempt a compensating restore so malformed imports do not silently erase the prior runtime.
 - Proof Mode asks the backend for the retained visual-review image, then calls the image-review endpoint with `image_b64`, renders enabled/unavailable/abstain status, and includes `visual_model_review` in proof JSON. Alert persistence, replay snapshots, dataset export, and SFT-style training JSONL preserve the compact visual-review payload when present.
 - The backend `vision` extra and launchers support `LFM_ORBIT_INSTALL_IMAGE_RUNTIME=true`; the extra includes Transformers `5.8+`, Torch, Torchvision, Accelerate, and Pillow. `scripts/smoke_image_review.py --require-present` is the real-runtime smoke gate, and `scripts/probe_live_observation.py` proves configured live SimSat imagery without fallback.
-- Replay rescans rerun current prompt/model review over cached replay evidence, keep `runtime_truth_mode=replay` and `imagery_origin=cached_api`, rehydrate alerts/gallery/pins/messages/metrics, and return current model review metadata (`review_model_filename`, `review_model_revision`, `reviewed_at`, presence booleans) without exposing local paths.
+- Replay rescans rerun current prompt/model review over cached replay evidence, keep `runtime_truth_mode=replay` and `imagery_origin=cached_api`, rehydrate alerts/gallery/pins/messages/metrics, and return current model review metadata (`review_model_filename`, `review_model_revision`, `reviewed_at`, presence booleans) without exposing local paths. Mission Control labels replay provenance and can hide the catalog for live-only QA; the rescan comparison is additive and preserves the source replay.
 - Option 1 / `-Install` / `--install` refresh moving Hugging Face model refs such as `main` instead of assuming the installed manifest is current.
 - The shared trained GGUF runtime serializes completion calls so simultaneous satellite/ground-agent generations cannot crash the native llama.cpp context.
+- Proof Mode hydration is keyed to stable mission identity; high-frequency mission and telemetry refreshes must not cancel the current mission's related-timelapse request.
 - Docs are split by audience: `docs/user/` is for demo/review operators, `docs/dev/` is for active architecture, data/model handoff, and backlog work; older planning notes stay under `docs/dev/archive/`.
 - Tracked ad hoc backend scratch probes are pruned; use maintained scripts, tests, or documented manual provider probes instead.
+- Broadcast bus rows now use per-recipient receipts, so ground and satellite consumers can each receive the same broadcast without the first reader hiding it from the other.
+- Candidate persistence is keyed by `(mission_id, cell_id)`; an old candidate table without `mission_id` is discarded as transient state during migration instead of leaking anomaly streaks into a new mission.
+- Alert records now preserve `mission_id`, `use_case_id`, and `target_pack_id`; dataset export honors explicit mission use cases and falls back to generic temporal-change labels rather than deforestation labels.
+- SAT triage prompts now derive category, task, signals, and temporal methods from the active temporal-use-case contract; they no longer assume deforestation when a mission is wildfire, maritime, flood, or generic change review.
+- Generated timelapse caches use a versioned key over effective months, bbox, and provider preference. Legacy bbox-only keys remain available only to committed replay-fixture readers.
+- Telemetry WebSocket clients share one bounded scan producer and receive a replay of the latest published state on subscribe; the optional boot-time SAT agent still needs an explicit single-engine policy before it is enabled alongside live telemetry scanning.
+- Image and depth request decoding share bounded base64/byte limits, pixel checks, and readable-image validation. Mutating and resource-heavy POST routes are local-request guarded and bounded by process-wide concurrency/time budgets exposed through health; replay snapshot boolean imports use strict text coercion.
 - Manual Sentinel WMS connectivity/evalscript checks live in `source/backend/scripts/probe_sentinel_wms.py`; root-level `test_*.py` probes are intentionally blocked by import-contract tests.
 - Manual Sentinel Hub cache refreshes are allowed for development/source-backed replay assets only. The May 5 Lochloosa West Fire seed attempt proved this path stays manual: `sh.txt` credentials resolved, the pre-fire Sentinel-2 L2A frame loaded, the May 4-5 event window was rejected for no-data/insufficient valid pixels, and no one-frame timelapse was written. The SR-26/Balu Forest fire seed succeeded as `sh_83e3aea2`. The May 7 South Georgia refresh promoted Highway 82 (`sh_4015e8b8`) and Pineland Road (`sh_af5954b2`) as real Sentinel-2 L2A burn-scar/smoke-cloud review replays with frame PNGs, richer band stats, and candidate-only curated replay wiring.
 - The promoted real-provider cache keys, bbox/date windows, and reuse rules are tracked in [SEEDED_DATA_REGISTRY.md](SEEDED_DATA_REGISTRY.md). Check it before using Sentinel Hub credentials during replay polishing, training export, or threshold tuning.
@@ -44,24 +58,43 @@ This is the compact backlog and integrity checklist. Keep run-by-run history in 
 - The May 7 full integrity pass validated the staged repo from clean Windows and WSL/Linux clones. Playwright backend servers now use `uv run --locked`, and WSL requires native Linux `node`/`npm`/`npx`, `uv` on non-login PATH, and Playwright Chromium/deps before browser smoke tests.
 - The May 7 Hugging Face dataset refresh published a larger `Shoozes/LFM-Orbit-SatData` training set and logged the export pitfalls in [archive/QA_PITFALLS.md](archive/QA_PITFALLS.md). The upload helper now validates JSONL, image references, local path leaks, orphaned images, and empty README-configured JSONL splits before upload.
 
-## Active Backlog
+## Completed in This Pass
 
-- Rerun and review the Lochloosa West Fire Sentinel Hub seed after the next accepted post-event Sentinel pass before promoting Florida Fire/Drought Readiness Watch beyond candidate triage.
-- Tune the wildfire confidence-assist thresholds with exported labels; current replay behavior intentionally defers smoke/cloud ambiguity instead of escalating it without hotspot or stronger burn-index support.
-- Add a simple Settings/backlog-controlled switch to hide or disable cached replay data for live-provider testing. Keep it out of the default hackathon flow unless release QA shows operators are confusing cached replay proof with live SimSat/Mapbox scans.
-- Add post-run Replay Cache diff output that compares completed current-model results against prior replay proof without overwriting the original proof.
-- Keep the optional LiquidAI/LFM2.5-VL-450M image smoke in the release gate whenever the model revision, Transformers stack, or `vision` lockfile changes.
-- Seed longer source-backed Atacama, Columbia Glacier, Great Salt Lake, and Lake Mead story assets before promoting those as README-level long-form proof.
-- Expand object-evidence eval fixtures beyond the first replay-safe fireline/port cases and add stable CI thresholds.
-- Extend responsive coverage into Proof Mode and long evidence panels. The main app shell now covers wide desktop, 16:9 mobile landscape, and 9:16 mobile portrait.
-- Add a small frontend unit/component layer for high-churn pure logic and hooks.
-- Keep import/export guards current whenever scripts, entrypoints, or dataset row types change.
-- Add an optional upload polling helper that waits for Hugging Face Dataset Viewer `/size` to report no pending/failed configs and records the verified row counts automatically.
-- Keep the docs user/dev split enforced when adding new markdown files.
-- Keep Proof Mode media pre-warmed or trimmed so recorded videos do not linger on black loading states.
-- Promote additional camera/location targets only with semantic profiles: aliases, bbox, center, camera, location type, terrain context, mission context, safe evidence guidance, and tags.
-- Add optional external geocoding behind `/api/location/resolve` only if arbitrary place lookup becomes required. Keep the vetted local registry as the offline/default provider.
-- Keep `marine_debris` and live HAB scoring as post-handoff Sentinel lanes. Planning notes are archived under [archive/FUTURE_SENTINEL_LANES.md](archive/FUTURE_SENTINEL_LANES.md).
+- Hosted package/model manifests, isolated production entry, static-safe browser preview, and no-backend/MIME smoke proof are complete. Done when: `npm run verify:hosted` passes with FastAPI stopped and `dist-hosted` contains no full-app chunks.
+- Browser artifact identity is sealed to the pinned Hugging Face revision, SHA-256, byte count, license, and text-only capability contract. Done when: the browser validates the manifest, pointer, and byte count before Wllama loads.
+- Telemetry producer cleanup is generation-safe, the lifespan supervisor keeps live missions scanning with zero viewers, confirmation policy is explicit, mission-persisted, and replay-snapshot-preserved, and expensive backend work has deterministic concurrency/timeout responses. Done when: focused scanner/resource/mission/API/replay tests and health metadata prove the contracts.
+- Runtime-owned atomic artifacts use collision-resistant temporary names for concurrent Windows writers. Done when: the metrics writer regression passes under synchronized concurrent writes and the replay browser path no longer loses mission state to a temp-file permission race.
+- Active portfolio copy no longer uses competition-only runtime framing; historical QA remains archived in the context bank. Done when: active data/agent copy passes the retired-term guard and archived records remain attributable.
+- Summary-bank routing is consolidated into a small default orientation route plus focused workflow/feature/issue routes; historical groups remain recoverable in `docs/dev/archive/summary_bank_history.json`. Done when: the context audit reports no missing references, no archived default groups, and the project controller opens a live default group.
+- Runtime SQLite helpers now commit successful work, roll back failures, and close every connection through one shared lifecycle helper. Done when: the lifecycle regression covers agent bus, DTN queue, and debug connections and the warnings-enabled API suite emits no runtime database-leak warnings.
+- Telemetry refreshes now abort superseded work and ignore stale/unmounted responses; metrics polling and WebSocket callbacks stop updating state after cleanup. Done when: frontend typecheck/build passes and the browser guard remains green.
+- The hosted hero action now starts the browser-local Wllama fetch directly after manifest identity is visible, with separate generation cancellation and an opt-in real-model smoke proving the static route needs no FastAPI/model server. Done when: the real hosted fetch reaches local-ready state, generation returns a response, and no `/api`, `/ws`, or port-8000 requests occur.
+- The production hosted proof now covers the built preview, browser-local generation, executable JavaScript MIME, and `application/wasm` MIME. Done when: `npm run test:hosted:model:build` passes after `npm run build:hosted`.
+- Current-state docs now distinguish the August 4 root-launcher rerun from the historical May release gate and the optional trained-GGUF smoke lane; target-pack contracts carry the current review date. Done when: docs/media guards pass and no current doc conflates `run.ps1 -Verify` with the optional trained-GGUF smoke.
+- GitHub Actions and CodeQL workflow pins now target Node-24-native action majors, while heavyweight real hosted model fetches remain outside normal E2E. Done when: the CI summary passes without a Node-20 runtime annotation and the normal test list excludes the opt-in model-fetch specs.
+- Hosted browser capability probing now gates WebAssembly, browser storage, and device-memory risk before fetch; unsupported or incomplete signals keep the saved-package route usable and preserve `imageInput=false`. Done when: `npm run test:unit`, hosted contract smoke, and actionable fallback copy all pass without a backend request.
+- Hosted saved evidence is schema-v2 and traces each promoted card to a local replay manifest, bbox, observation window, scoring basis, runtime truth, imagery origin, and retention decision. Done when: package validation, source-replay inventory tests, and hosted static smoke pass offline.
+- Cached replay QA now has a local visibility switch plus an additive prior/current model comparison with source replay identity and scoring bases preserved. Done when: focused replay tests and Playwright prove hidden replay entries, live-only copy, and comparison output without overwriting the original proof.
+- Mission Control now lets an operator deliberately choose distinct-acquisition or one-shot confirmation and displays the persisted policy after launch. Done when: API/scanner/replay persistence tests and serialized browser wiring prove the selected policy and safe default.
+- The hosted proof cut is captured as `docs/media/videos/hosted-demo.webm`, linked from the README/media inventory, and generated without a model fetch. Done when: the capture passes and media guards confirm duration, temporal change, and nonblank samples.
+- The current vetted location registry and explicitly unavailable future Sentinel lanes are covered by contract tests and archive guards. Done when: target/location tests pass and no provider or marine/HAB action is half-wired.
+- The public/private repository boundary is documented and synchronized. Done when: LFM-ORBIT `main` is the app remote, GenUni `main` retains its pre-migration training app state, links and controller policy point to the correct repositories, and the handoff note records both histories.
+
+## External Gates (not local stubs)
+
+- Task: Revalidate wildfire source evidence before promotion. **Owner/provider evidence required.**
+  - What/Why: The current Fire/Drought Watch correctly defers smoke/cloud ambiguity, but the Lochloosa seed has not earned stronger-than-candidate wording.
+  - Where: Sentinel seed manifests, `source/backend/assets/replays/`, `source/backend/core/wildfire_smoke.py`, and wildfire confidence tests.
+  - How: An owner must rerun the next accepted post-event pass, record source/frame provenance, and tune thresholds against exported labels while preserving candidate-only behavior.
+  - Done when: A reviewed replay has accepted source-backed frames, stable confidence metrics, updated provenance docs, and tests prove ambiguous smoke remains review-only.
+  - Verification: `uv run --no-sync pytest tests/test_wildfire_smoke.py tests/test_seed_sentinel_cache.py tests/test_replay.py -q` plus a reviewed manifest/frame audit and owner acceptance.
+
+- Task: Audit model licensing and publishable handoff metadata. **Owner/legal evidence required.**
+  - What/Why: The hosted manifest reports `mit` for the Shoozes handoff repository while the upstream Liquid AI base model is labeled `lfm1.0`; repository metadata must not settle inherited model or artifact redistribution terms.
+  - Where: `source/frontend/public/model-manifest.json`, `docs/user/HOSTED_DEMO.md`, `docs/dev/MODEL_HANDOFF.md`, the Shoozes Hugging Face handoff repo, and `docs/legal/THIRD_PARTY_NOTICES.md`.
+  - How: The repository owner/legal reviewer must confirm the handoff model card, base-model license, quantization/artifact terms, and required attribution, then encode approved license-source fields without runtime inference.
+  - Done when: one owner-approved decision covers the published GGUF, base model, quantization, hosted redistribution, and displayed attribution, with matching model-card/docs/tests.
+  - Verification: manifest/license consistency test, third-party-notices review, pinned handoff revision audit, and explicit owner sign-off.
 
 ## Scope Lock
 
@@ -153,9 +186,11 @@ Model/runtime:
 - Docs/media guard: `uv run --no-sync pytest tests/test_docs_artifacts.py -q` from `source/backend`
 - Import/export guard: `uv run --no-sync pytest tests/test_import_contracts.py -q` from `source/backend`
 - Image review API guard: `uv run --no-sync pytest tests/test_multimodal_inference.py tests/test_inference_image_api.py -q` from `source/backend`
+- Resource-limit guard: `uv run --no-sync pytest tests/test_request_limits.py -q` from `source/backend`
 - Optional real image runtime smoke: `uv run --extra dev --extra model --extra vision python scripts/smoke_image_review.py --require-present` from `source/backend`
 - Optional live provider probe: `uv run --no-sync python scripts/probe_live_observation.py --provider simsat_sentinel --bbox="-63.1,-10.1,-62.9,-9.9" --start "2025-01-01" --end "2025-02-01"` from `source/backend`
 - Frontend type/build guard: `npm run lint` and `npm run build` from `source/frontend`
+- Hosted static guard: `npm run verify:hosted` from `source/frontend` (`build:hosted` followed by the static preview smoke)
 - Full browser guard: `npm run test:e2e` from `source/frontend`
 - Demo refresh: `npm run demo:record` and `npm run demo:tutorial` from `source/frontend`
 - README timelapse refresh: `uv run --no-sync python scripts/build_docs_timelapse_highlight.py` from `source/backend`
@@ -163,9 +198,17 @@ Model/runtime:
 
 ## Latest Validation Snapshot
 
-- Current local verification: `.\run.ps1 -Verify` passed end-to-end. Backend `499 passed`; GGUF runtime smoke passed; frontend typecheck/build passed; full Playwright E2E passed with intentional skips. The latest May 8 integrity spot-check passed import contracts, docs artifacts, frontend typecheck/build, full replay backend tests, and the focused Ground Agent replay/rescan browser flow.
-- Current launcher verification: `.\run.ps1 -Install` launched option-1 flow successfully; backend `8000` and frontend `5173` became ready, then the launched process tree was stopped cleanly.
-- Cold staged-content verification: fresh Windows and WSL/Linux clones passed before the final wildfire/docs guard additions; the current release gate is the full local `499 passed` backend suite plus option-1 launcher smoke. Windows covered `uv sync --extra dev`, `npm ci`, frontend build, and responsive/replay smoke. WSL/Linux covered native Linux Node/uv setup, `npm ci`, frontend build, Playwright Chromium/deps install, and the same responsive/replay smoke.
+- Prior recorded release verification: `.\run.ps1 -Verify` passed end-to-end on May 8 with backend `499 passed`, GGUF runtime smoke, frontend typecheck/build, and full Playwright E2E with intentional skips. Treat that as historical until the current environment reruns the launcher gate.
+- August 4 backend verification: `python -m pytest -q` recorded `552 passed`; coverage includes queue, prompt, cache, image-safety, local-boundary, path, replay-validation, additive cached-rescan comparison, project-config, CI workflow, clean-checkout assets, scenario-registry, model-handoff identity, hosted package wiring, telemetry-coordinator contracts, mission-owned scanning, persisted/replay-safe confirmation-policy API wiring, resource-limit behavior, SQLite lifecycle closure, and concurrent runtime-artifact writes.
+- August 4 hosted verification: `npm run lint`, `npm run build:hosted`, `npm run test:hosted`, and `npm run test:hosted:build` passed from `source/frontend`; the hosted smoke does not start FastAPI or require the backend model runtime, the static preview proves JSON/JavaScript/WebAssembly MIME types, and the manifest identity is visible before a model request.
+- August 4 hosted production browser-model verification: `npm run test:hosted:model:build` passed after the real 219 MB GGUF fetch; the built preview reached local-ready state and generated a local response with no backend/API/WebSocket requests. This remains opt-in and excluded from the normal/full E2E configs because it depends on network, device memory, and browser cache state.
+- August 4 full-app launcher verification: `.\run.ps1 -Verify` passed with `108 passed, 6 skipped` and intentional skips; the replay-replacement case passed after the Windows-safe atomic runtime-writer fix, the 7-minute tutorial capture passed, and the tracked README/tutorial media was regenerated by the verification suite.
+- The GitHub E2E job allows 35 minutes so clean runners can install Playwright OS/browser dependencies before the serialized full suite; this is a CI budget, not a hosted-demo requirement.
+- August 3 hosted media verification: `npm run demo:hosted` passed and regenerated the nonblank README stills for the hero and saved-evidence sections; the capture path does not fetch the GGUF.
+- August 3 frontend dependency verification: `npm audit --omit=dev` reported zero vulnerabilities after the Vite/PostCSS update.
+- The full-app launcher/Playwright gate requires the backend `uv` environment; optional trained-GGUF smoke and browser model-fetch lanes remain separate. Do not report any of these as current hosted-demo requirements.
+- Prior launcher verification: `.\run.ps1 -Install` launched option-1 flow successfully; backend `8000` and frontend `5173` became ready, then the launched process tree was stopped cleanly.
+- Cold staged-content verification: fresh Windows and WSL/Linux clones passed before the final wildfire/docs guard additions; those historical runs covered `uv sync --extra dev`, `npm ci`, frontend build, Playwright Chromium/deps install, and responsive/replay smoke.
 - Current runtime boundary: SAT/GND GGUF calls remain text evidence-packet reasoning; `/api/inference/image` is optional LiquidAI/LFM2.5-VL-450M image-conditioned retained-frame review and only reports enabled after a real adapter passes image pixels.
 - Current media verification: `npm run demo:record` passed `5`, `npm run demo:tutorial` passed `1`, the regenerated tutorial is about `267s`, and sampled contact sheets/screenshots are nonblank with expected Proof Mode fallback wording.
 - Current export boundary: alert persistence, replay snapshots, dataset samples, and training JSONL carry `visual_model_review` when present; rows with successful visual review export as image/text SFT rows, and rows without visual review remain valid evidence-packet rows.

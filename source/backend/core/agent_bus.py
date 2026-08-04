@@ -18,24 +18,35 @@ Message schema:
 import json
 import os
 import sqlite3
+from contextlib import AbstractContextManager
 from datetime import datetime, timezone
 from typing import Any
 
-_DEFAULT_BUS_PATH = os.path.join(
-    os.path.dirname(__file__), "../../../runtime-data/agent_bus.sqlite"
-)
+from core.paths import get_runtime_data_dir
+from core.sqlite import managed_connection
+
+_BROADCAST_RECIPIENTS = ("ground", "satellite")
 
 
 def _bus_path() -> str:
-    return os.getenv("AGENT_BUS_PATH", _DEFAULT_BUS_PATH)
+    return os.getenv("AGENT_BUS_PATH", str(get_runtime_data_dir() / "agent_bus.sqlite"))
 
 
-def _connect() -> sqlite3.Connection:
+def get_bus_path() -> str:
+    """Return the configured agent-bus database path for diagnostics."""
+    return _bus_path()
+
+
+def _connect() -> AbstractContextManager[sqlite3.Connection]:
     path = _bus_path()
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    conn = sqlite3.connect(path)
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    conn = sqlite3.connect(path, timeout=5.0)
+    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute("PRAGMA journal_mode = WAL")
     conn.row_factory = sqlite3.Row
-    return conn
+    return managed_connection(conn)
 
 
 def init_bus(reset: bool = False) -> None:
@@ -76,7 +87,22 @@ def init_bus(reset: bool = False) -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_pins_type ON map_pins (pin_type)"
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS agent_message_receipts (
+                message_id INTEGER NOT NULL,
+                recipient TEXT NOT NULL,
+                read_at TEXT NOT NULL,
+                PRIMARY KEY (message_id, recipient),
+                FOREIGN KEY (message_id) REFERENCES agent_messages(id) ON DELETE CASCADE
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_bus_receipts_recipient ON agent_message_receipts (recipient, message_id)"
+        )
         if reset:
+            conn.execute("DELETE FROM agent_message_receipts")
             conn.execute("DELETE FROM agent_messages")
             conn.execute("DELETE FROM map_pins")
         conn.commit()
@@ -114,25 +140,78 @@ def pull_messages(
     limit: int = 20,
     mark_read: bool = True,
 ) -> list[dict[str, Any]]:
-    """Pull unread messages for a recipient, optionally marking them read."""
+    """Pull unread messages for a recipient, optionally marking them read.
+
+    Direct messages keep the legacy row-level ``read`` flag. Broadcasts use
+    per-recipient receipts so the first consumer cannot hide a message from
+    the other agent.
+    """
+    safe_limit = max(1, min(int(limit), 500))
     with _connect() as conn:
         rows = conn.execute(
             """
             SELECT id, sender, recipient, msg_type, cell_id, payload, timestamp
             FROM agent_messages
-            WHERE recipient IN (?, 'broadcast') AND read = 0
+            WHERE (
+                (recipient = ? AND read = 0)
+                OR (
+                    recipient = 'broadcast'
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM agent_message_receipts AS receipt
+                        WHERE receipt.message_id = agent_messages.id
+                          AND receipt.recipient = ?
+                    )
+                )
+            )
             ORDER BY id ASC
             LIMIT ?
             """,
-            (recipient, limit),
+            (recipient, recipient, safe_limit),
         ).fetchall()
 
         if mark_read and rows:
-            ids = [r["id"] for r in rows]
-            conn.execute(
-                f"UPDATE agent_messages SET read = 1 WHERE id IN ({','.join('?' * len(ids))})",
-                ids,
-            )
+            direct_ids = [r["id"] for r in rows if r["recipient"] != "broadcast"]
+            broadcast_ids = [r["id"] for r in rows if r["recipient"] == "broadcast"]
+            if direct_ids:
+                placeholders = ",".join("?" * len(direct_ids))
+                conn.execute(
+                    f"UPDATE agent_messages SET read = 1 WHERE id IN ({placeholders})",
+                    direct_ids,
+                )
+            if broadcast_ids:
+                conn.executemany(
+                    """
+                    INSERT OR IGNORE INTO agent_message_receipts (message_id, recipient, read_at)
+                    VALUES (?, ?, ?)
+                    """,
+                    [
+                        (message_id, recipient, _now_ts())
+                        for message_id in broadcast_ids
+                    ],
+                )
+                placeholders = ",".join("?" * len(broadcast_ids))
+                conn.execute(
+                    f"""
+                    UPDATE agent_messages
+                    SET read = 1
+                    WHERE recipient = 'broadcast'
+                      AND id IN ({placeholders})
+                      AND EXISTS (
+                          SELECT 1
+                          FROM agent_message_receipts AS receipt
+                          WHERE receipt.message_id = agent_messages.id
+                            AND receipt.recipient = ?
+                      )
+                      AND EXISTS (
+                          SELECT 1
+                          FROM agent_message_receipts AS receipt
+                          WHERE receipt.message_id = agent_messages.id
+                            AND receipt.recipient = ?
+                      )
+                    """,
+                    (*broadcast_ids, *_BROADCAST_RECIPIENTS),
+                )
             conn.commit()
 
     return [

@@ -76,7 +76,7 @@ export default function TimelapseViewer({
             steps: 24,
           }),
         });
-        
+
         const data = (await res.json()) as TimelapsePayload;
         if (!res.ok) {
           throw new Error(data.error || `Server returned ${res.status}: ${res.statusText}`);
@@ -87,7 +87,7 @@ export default function TimelapseViewer({
 
         if (mounted) {
           setTimelapse(data);
-          
+
           // Acknowledge in Agent Dialogue
           fetch(`${apiBase}/api/agent/bus/inject`, {
             method: "POST",
@@ -130,7 +130,7 @@ export default function TimelapseViewer({
               {startDate} / {endDate}
             </span>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="text-zinc-400 hover:text-zinc-600 transition"
           >
@@ -151,7 +151,7 @@ export default function TimelapseViewer({
           {error && !isLoading && (
             <div className="flex flex-col gap-2 items-center justify-center p-8 text-center text-red-500 text-xs font-semibold uppercase tracking-wider">
               <span>{error}</span>
-              <button 
+              <button
                 onClick={() => setRequestVersion((version) => version + 1)}
                 className="mt-2 px-3 py-1 rounded border border-red-200 bg-white hover:bg-red-50 transition"
               >

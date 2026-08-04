@@ -441,6 +441,9 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
             visual_model_review=alert.get("visual_model_review") if isinstance(alert.get("visual_model_review"), dict) else None,
             wildfire_assessment=alert.get("wildfire_assessment") if isinstance(alert.get("wildfire_assessment"), dict) else None,
             downlinked=True,
+            mission_id=mission_id,
+            use_case_id=str(spec.get("use_case_id") or "") or None,
+            target_pack_id=str(spec.get("target_pack_id") or "") or None,
         )
 
         seeded_video = str(alert.get("seeded_video") or "").strip()
@@ -538,6 +541,69 @@ def load_seeded_replay(replay_id: str) -> dict[str, Any]:
         "metrics": metrics,
         "title": str(spec.get("title") or replay_id),
         "summary": str(spec.get("summary") or ""),
+    }
+
+
+def _build_rescan_comparison(
+    replay_id: str,
+    spec: dict[str, Any],
+    alerts: list[dict[str, Any]],
+    analysis_results: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Build an additive prior/current comparison without mutating replay proof."""
+    current_by_cell = {
+        str(result.get("cell_id")): result
+        for result in analysis_results
+        if str(result.get("cell_id") or "").strip()
+    }
+    rows: list[dict[str, Any]] = []
+    prior_scoring_bases = {
+        str(alert.get("scoring_basis") or spec.get("scoring_basis") or "replay_fixture")
+        for alert in alerts
+    }
+    for alert in alerts:
+        cell_id = str(alert.get("cell_id") or "")
+        current = current_by_cell.get(cell_id, {})
+        prior_summary = str(alert.get("analysis_summary") or alert.get("ground_note") or "")
+        current_summary = str(current.get("summary") or "")
+        prior_priority = str(alert.get("priority") or "review")
+        current_priority = str(current.get("priority") or prior_priority)
+        changes: list[str] = []
+        if prior_priority != current_priority:
+            changes.append("priority")
+        if prior_summary != current_summary:
+            changes.append("model_review")
+        rows.append(
+            {
+                "cell_id": cell_id,
+                "status": "changed" if changes else "unchanged",
+                "prior": {
+                    "priority": prior_priority,
+                    "change_score": float(alert.get("change_score") or 0.0),
+                    "confidence": float(alert.get("confidence") or 0.0),
+                    "summary": prior_summary,
+                },
+                "current": {
+                    "priority": current_priority,
+                    "change_score": float(alert.get("change_score") or 0.0),
+                    "confidence": float(alert.get("confidence") or 0.0),
+                    "summary": current_summary,
+                },
+                "changes": changes,
+            }
+        )
+    changed_count = sum(row["status"] == "changed" for row in rows)
+    return {
+        "mode": "additive",
+        "source_replay_id": replay_id,
+        "prior_scoring_basis": sorted(prior_scoring_bases)[0] if prior_scoring_bases else "replay_fixture",
+        "current_scoring_basis": "cached_rescan_current_model",
+        "prior_alert_count": len(alerts),
+        "current_alert_count": len(analysis_results),
+        "changed_count": changed_count,
+        "unchanged_count": len(rows) - changed_count,
+        "rows": rows,
+        "note": "Original replay proof remains unchanged; this comparison is additive.",
     }
 
 
@@ -647,6 +713,9 @@ def rescan_seeded_replay(replay_id: str) -> dict[str, Any]:
             visual_model_review=alert.get("visual_model_review") if isinstance(alert.get("visual_model_review"), dict) else None,
             wildfire_assessment=alert.get("wildfire_assessment") if isinstance(alert.get("wildfire_assessment"), dict) else None,
             downlinked=True,
+            mission_id=mission_id,
+            use_case_id=str(spec.get("use_case_id") or "") or None,
+            target_pack_id=str(spec.get("target_pack_id") or "") or None,
         )
 
         seeded_video = str(alert.get("seeded_video") or "").strip()
@@ -769,6 +838,7 @@ def rescan_seeded_replay(replay_id: str) -> dict[str, Any]:
         "metrics": metrics,
         "review_metadata": review_metadata,
         "analysis_results": analysis_results,
+        "comparison": _build_rescan_comparison(replay_id, spec, alerts, analysis_results),
         "title": str(spec.get("title") or replay_id),
         "summary": str(spec.get("summary") or ""),
     }

@@ -4,14 +4,20 @@ These tests verify that all REST endpoints return expected data
 and comply with the locked contract schemas.
 """
 import json
+import time
+from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
+from fastapi import HTTPException
 
 from api.main import (
     _cors_allow_origins,
     _is_windows_transport_disconnect_noise,
     _require_local_request,
+    _websocket_is_allowed,
+    _live_scan_engine,
     _should_resume_active_mission_on_boot,
     _should_run_agent_pair_on_boot,
     app,
@@ -26,11 +32,21 @@ def _payload_text(payload: dict) -> str:
 
 
 def test_agent_pair_boot_can_be_disabled_for_recorded_demos(monkeypatch):
+    monkeypatch.delenv("RUN_AGENT_PAIR_ON_BOOT", raising=False)
+    monkeypatch.delenv("ORBIT_LIVE_SCAN_ENGINE", raising=False)
+    assert _should_run_agent_pair_on_boot() is False
+    assert _live_scan_engine() == "coordinator"
+
     monkeypatch.setenv("RUN_AGENT_PAIR_ON_BOOT", "false")
     assert _should_run_agent_pair_on_boot() is False
+    assert _live_scan_engine() == "coordinator"
 
     monkeypatch.setenv("RUN_AGENT_PAIR_ON_BOOT", "true")
     assert _should_run_agent_pair_on_boot() is True
+    assert _live_scan_engine() == "agent"
+
+    monkeypatch.setenv("ORBIT_LIVE_SCAN_ENGINE", "coordinator")
+    assert _live_scan_engine() == "coordinator"
 
 
 def test_active_mission_resume_on_boot_is_opt_in(monkeypatch):
@@ -39,6 +55,47 @@ def test_active_mission_resume_on_boot_is_opt_in(monkeypatch):
 
     monkeypatch.setenv("RESUME_ACTIVE_MISSION_ON_BOOT", "true")
     assert _should_resume_active_mission_on_boot() is True
+
+
+def test_local_control_boundary_rejects_non_loopback_request():
+    request = SimpleNamespace(client=SimpleNamespace(host="10.0.0.8"))
+
+    with pytest.raises(HTTPException) as exc_info:
+        _require_local_request(request)
+
+    assert exc_info.value.status_code == 403
+
+
+def test_websocket_boundary_requires_local_host_and_allowed_origin():
+    allowed = SimpleNamespace(
+        client=SimpleNamespace(host="127.0.0.1"),
+        headers={"origin": "http://127.0.0.1:5173"},
+    )
+    remote_origin = SimpleNamespace(
+        client=SimpleNamespace(host="127.0.0.1"),
+        headers={"origin": "https://untrusted.example"},
+    )
+    remote_host = SimpleNamespace(
+        client=SimpleNamespace(host="203.0.113.20"),
+        headers={"origin": "http://127.0.0.1:5173"},
+    )
+
+    assert _websocket_is_allowed(allowed) is True
+    assert _websocket_is_allowed(remote_origin) is False
+    assert _websocket_is_allowed(remote_host) is False
+
+
+def test_temporal_classify_rejects_deep_json_shape():
+    payload: dict = {"task_text": "ice"}
+    nested = payload
+    for _ in range(10):
+        nested["next"] = {}
+        nested = nested["next"]
+
+    response = client.post("/api/temporal/classify", json=payload)
+
+    assert response.status_code == 413
+    assert "nesting" in response.json()["error"]
 
 
 def test_lifespan_closes_persisted_active_mission_by_default(tmp_path, monkeypatch):
@@ -136,6 +193,37 @@ def test_health_endpoint_returns_ok_status():
     assert data["status"] == "ok"
     assert "region_id" in data
     assert "display_name" in data
+    assert data["resource_limits"]["timelapse"]["max_concurrency"] >= 1
+    assert data["resource_limits"]["timelapse"]["timeout_seconds"] > 0
+
+
+def test_timelapse_timeout_is_structured_and_bounded(monkeypatch):
+    monkeypatch.setenv("ORBIT_TIMELAPSE_TIMEOUT_SECONDS", "0.05")
+    monkeypatch.setenv("ORBIT_TIMELAPSE_MAX_CONCURRENCY", "1")
+
+    from core.request_limits import reset_expensive_call_state
+
+    reset_expensive_call_state()
+
+    def slow_timelapse(**_kwargs):
+        time.sleep(0.2)
+        return {"status": "late"}
+
+    with patch("api.main.generate_timelapse_frames", side_effect=slow_timelapse):
+        response = client.post(
+            "/api/timelapse/generate",
+            json={
+                "bbox": [-63.1, -10.1, -62.9, -9.9],
+                "start_date": "2025-01-01",
+                "end_date": "2025-02-01",
+                "steps": 2,
+            },
+        )
+
+    assert response.status_code == 503
+    assert response.json()["status"] == "timeout"
+    assert response.json()["resource"] == "timelapse"
+    time.sleep(0.25)
 
 
 def test_cold_start_runtime_supports_object_missions_without_external_api(monkeypatch, tmp_path):
@@ -332,10 +420,10 @@ def test_vlm_grounding_batch_endpoint_calls_object_evidence(monkeypatch):
 def test_health_endpoint_includes_alert_counts():
     """Health endpoint must include alert count metrics."""
     response = client.get("/api/health")
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     assert "total_alerts" in data
     assert "total_payload_bytes" in data
     assert isinstance(data["total_alerts"], int)
@@ -346,10 +434,10 @@ def test_health_endpoint_includes_alert_counts():
 def test_recent_alerts_endpoint_returns_list():
     """Recent alerts endpoint must return structured list."""
     response = client.get("/api/alerts/recent")
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     assert "region_id" in data
     assert "alerts" in data
     assert isinstance(data["alerts"], list)
@@ -358,10 +446,10 @@ def test_recent_alerts_endpoint_returns_list():
 def test_recent_alerts_endpoint_respects_limit():
     """Recent alerts endpoint must respect limit parameter."""
     response = client.get("/api/alerts/recent?limit=5")
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     # May be less than limit if DB doesn't have enough alerts
     assert len(data["alerts"]) <= 5
 
@@ -369,10 +457,10 @@ def test_recent_alerts_endpoint_respects_limit():
 def test_metrics_summary_endpoint_returns_structure():
     """Metrics summary endpoint must return complete structure."""
     response = client.get("/api/metrics/summary")
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     # Required fields
     assert "region_id" in data
     assert "total_cycles_completed" in data
@@ -392,10 +480,10 @@ def test_metrics_summary_endpoint_returns_structure():
 def test_health_endpoint_shows_observation_mode():
     """Health endpoint must include observation mode for transparency."""
     response = client.get("/api/health")
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     assert "observation_mode" in data
     assert "runtime_truth_mode" in data
     assert "imagery_origin" in data
@@ -411,7 +499,7 @@ def test_invalid_limit_returns_validation_error():
     # Limit below minimum
     response = client.get("/api/alerts/recent?limit=0")
     assert response.status_code == 422
-    
+
     # Limit above maximum
     response = client.get("/api/alerts/recent?limit=500")
     assert response.status_code == 422
@@ -732,7 +820,7 @@ def test_provider_status_endpoint_returns_structure():
     assert "nasa_api_direct" in data["providers"]
 
 
-def test_provider_status_keeps_simsat_as_primary_hackathon_path():
+def test_provider_status_keeps_simsat_as_primary_portfolio_path():
     """SimSat must remain first in the provider chain for recorded demos."""
     response = client.get("/api/provider/status")
 
@@ -2264,7 +2352,7 @@ def test_timelapse_generate_endpoint_returns_webm(monkeypatch):
         import numpy as np
         mock_frame = np.zeros((960, 1280, 3), dtype=np.uint8)
         mock_fetch.return_value = [(mock_frame, "iso1"), (mock_frame.copy(), "iso2")]
-        
+
         response = client.post(
             "/api/timelapse/generate",
             json={
@@ -2274,10 +2362,10 @@ def test_timelapse_generate_endpoint_returns_webm(monkeypatch):
                 "steps": 5
             }
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         assert "video_b64" in data
         assert "frames_count" in data
         assert data["format"] == "webm"
@@ -2293,10 +2381,10 @@ def test_analysis_timelapse_endpoint_returns_text_evaluation():
             "bbox": [-60.50, -3.50, -60.40, -3.40]
         }
     )
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     assert "analysis" in data
     assert isinstance(data["analysis"], str)
     assert len(data["analysis"]) > 0
@@ -2350,6 +2438,31 @@ def test_mission_start_endpoint_validates_bbox_order():
         json={
             "task_text": "Scan invalid area",
             "bbox": [-60.40, -3.50, -60.50, -3.40],
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_mission_start_endpoint_persists_confirmation_policy():
+    response = client.post(
+        "/api/mission/start",
+        json={
+            "task_text": "Single acquisition API mission",
+            "confirmation_policy": "single_acquisition",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["confirmation_policy"] == "single_acquisition"
+
+
+def test_mission_start_endpoint_rejects_unknown_confirmation_policy():
+    response = client.post(
+        "/api/mission/start",
+        json={
+            "task_text": "Invalid policy API mission",
+            "confirmation_policy": "emit_everything",
         },
     )
 

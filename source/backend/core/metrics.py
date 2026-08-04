@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 from typing import Any
 
 from core.config import (
@@ -9,16 +10,17 @@ from core.config import (
     scoring_basis_for_source,
 )
 from core.contracts import MetricsFlaggedExample, MetricsSummary
+from core.paths import atomic_write_text, get_runtime_data_dir
 from core.utils import utc_timestamp
 
-DEFAULT_METRICS_PATH = os.path.join(
-    os.path.dirname(__file__),
-    "../../../runtime-data/demo_metrics_summary.json",
-)
+DEFAULT_METRICS_PATH = str(get_runtime_data_dir() / "demo_metrics_summary.json")
 
 
 def get_metrics_path() -> str:
-    return os.getenv("CANOPY_SENTINEL_METRICS_PATH", DEFAULT_METRICS_PATH)
+    return os.getenv(
+        "CANOPY_SENTINEL_METRICS_PATH",
+        str(get_runtime_data_dir() / "demo_metrics_summary.json"),
+    )
 
 
 def _default_metrics_state() -> MetricsSummary:
@@ -107,8 +109,10 @@ def _read_state() -> MetricsSummary:
 
 def _write_state(state: MetricsSummary):
     _ensure_parent_dir()
-    with open(get_metrics_path(), "w", encoding="utf-8") as file:
-        json.dump(state, file, indent=2, sort_keys=True)
+    atomic_write_text(
+        Path(get_metrics_path()),
+        json.dumps(state, indent=2, sort_keys=True),
+    )
 
 
 def init_metrics(reset: bool = False):

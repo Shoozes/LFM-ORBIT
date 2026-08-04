@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "kind": "browser-gguf",
+  "repo": "Shoozes/lfm2.5-450m-vl-orbit-satellite",
+  "file": "LFM2.5-VL-450M-Q4_0.gguf",
+  "revision": "0fc90b8caaa6b8e07d1dc0a9125969c2730e4353",
+  "url": "https://huggingface.co/Shoozes/lfm2.5-450m-vl-orbit-satellite/resolve/0fc90b8caaa6b8e07d1dc0a9125969c2730e4353/LFM2.5-VL-450M-Q4_0.gguf",
+  "rawUrl": "https://huggingface.co/Shoozes/lfm2.5-450m-vl-orbit-satellite/raw/0fc90b8caaa6b8e07d1dc0a9125969c2730e4353/LFM2.5-VL-450M-Q4_0.gguf",
+  "sha256": "9e488f38f64dc4b897c768bec4b37ba01a671309910fd08c470220fa244e14f6",
+  "bytes": 219310432,
+  "license": "mit",
+  "label": "LFM2.5-VL-450M Orbit",
+  "sizeLabel": "219 MB · Q4_0",
+  "capabilities": {
+    "textReasoning": true,
+    "imageInput": false,
+    "mmproj": null
+  }
+}

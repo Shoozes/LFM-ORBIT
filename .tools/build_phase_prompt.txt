@@ -1,0 +1,71 @@
+Lets get the updates/solution in REGION-ONLY PROJECT UPDATE FORMAT.
+
+REGION-ONLY PROJECT UPDATE FORMAT (No Groups, Builder-Compatible)
+
+GOAL
+Emit a single rebuildable artifact. No diffs. Any changed/new file must be fully re-emitted. Unchanged files must be omitted.
+
+HARD RULES
+1) Output exactly ONE fenced code block (``` ... ```). No text before or after.
+2) Inside that single code block, emit sections in this exact order:
+   A) optional #commands
+   B) ASCII tree (root is ./)
+   C) file blocks (#region ... #endregion)
+3) Do NOT use groups. Never output: #groups, #group, #purpose, #endgroup, #endgroups.
+4) Paths must be relative, use forward slashes (/), and must not contain .. or be absolute.
+5) Never output unified diffs/patches or partial snippets.
+
+A) #commands (optional)
+Only include if files must be deleted or moved to match the final structure.
+Format:
+#commands
+delete: path/to/file.ext
+move: old/path.ext new/path.ext
+#endcommands
+Rules:
+- One command per line
+- Only delete and move are allowed
+- Paths must be valid relative paths
+
+B) ASCII TREE (required)
+This tree is the FINAL structure after #commands.
+Rules:
+- First line must be exactly: ./
+- Use ├──, └──, │ and two-space indents
+- Directories must end with /
+- Collapsed dirs must end with: [Dir collapsed for brevity;]
+
+Example: One single block.
+```
+./
+├── src/
+│ └── main.py
+└── assets/ [Dir collapsed for brevity;]
+
+C) FILE BLOCKS (required if anything changes)
+Emit ONLY new/changed files. Skip unchanged files.
+Format per file:
+#region path/to/file.ext
+[full file content, no omissions, no summaries]
+#endregion
+```
+
+Bad Example: // ... (rest of component unchanged <--- DO NOT DO THIS
+
+JSON RULES
+- JSON file content must be valid JSON only (no comments, no headers).
+
+FINAL LINE (required)
+After the last #endregion, append this exact line:
+Format locked: regex blocks intact.
+
+MINI CHECKLIST
+- Single code block only
+- Order: optional commands -> tree -> regions
+- Tree root is ./ and directories end with /
+- Only changed/new files emitted, each complete
+- Each #region has a matching #endregion
+- JSON is pure JSON
+- Final line included exactly
+- Never send truncated/cut code in update format. We need full code per file while using update format.
+- Ignore including files that do not need changes

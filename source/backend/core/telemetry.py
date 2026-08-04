@@ -5,6 +5,7 @@ from core.config import (
     scoring_basis_for_source,
 )
 from core.contracts import AlertRecord, GridInitMessage, HealthResponse, ScanResultMessage
+from core.request_limits import get_expensive_call_limits
 
 
 def get_priority(change_score: float) -> str:
@@ -56,6 +57,13 @@ def build_health_payload(counts: dict[str, int]) -> HealthResponse:
         "runtime_truth_mode": runtime_truth_mode,
         "imagery_origin": imagery_origin_for_source(REGION.observation_mode),
         "scoring_basis": scoring_basis_for_source(REGION.observation_mode),
+        "confirmation_policy": (
+            "demo_immediate"
+            if REGION.demo_mode_loop_scan
+            else REGION.confirmation_policy
+        ),
+        "confirmation_required_acquisitions": REGION.confirmation_required_acquisitions,
+        "resource_limits": get_expensive_call_limits(),
         "demo_mode_enabled": False,
     }
 

@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 2,
+  "packages": [
+    {
+      "id": "atacama-mining",
+      "title": "Mine expansion packet",
+      "location": "Atacama · saved demo package",
+      "summary": "A compact before/after evidence packet for explaining how edge triage keeps low-value imagery off the downlink.",
+      "signal": "surface-change candidate",
+      "teachingPoint": "Compare a small evidence packet with raw imagery and ask the model what should be retained.",
+      "facts": ["2 temporal windows", "NDVI + SWIR summaries", "provenance included", "not live provider data"],
+      "imageSrc": "/demo-assets/atacama-mining.png",
+      "imageAlt": "Saved Sentinel-2 frame of the Atacama mining region",
+      "evidence": {
+        "sourceReplayId": "atacama_mining_replay",
+        "sourceAsset": "source/backend/assets/replays/atacama_mining_replay.json",
+        "runtimeTruthMode": "replay",
+        "imageryOrigin": "cached_api",
+        "scoringBasis": "visual_only",
+        "observationWindow": {"start": "2024-01-15", "end": "2025-12-15"},
+        "bbox": [-69.115, -24.29, -69.035, -24.21],
+        "retentionDecision": "review",
+        "reviewSummary": "Retained region-level expansion evidence supports review of pond-like, tailings-like, road, facility, and open-pit context without proving illegal mining, pollution, or production output."
+      }
+    },
+    {
+      "id": "greenland-ice",
+      "title": "Ice extent quality gate",
+      "location": "Greenland · saved demo package",
+      "summary": "A deliberately cautious packet showing how cloud and no-data checks can produce an abstention instead of a false alert.",
+      "signal": "quality gate / abstain",
+      "teachingPoint": "Ask why a model should abstain when the evidence window is not trustworthy.",
+      "facts": ["NDSI trend", "cloud rejection", "confidence capped", "no alert emitted"],
+      "imageSrc": "/demo-assets/greenland-ice.png",
+      "imageAlt": "Saved Sentinel-2 frame of Greenland ice and snow extent",
+      "evidence": {
+        "sourceReplayId": "greenland_ice_snow_extent_replay",
+        "sourceAsset": "source/backend/assets/replays/greenland_ice_snow_extent_replay.json",
+        "runtimeTruthMode": "replay",
+        "imageryOrigin": "cached_api",
+        "scoringBasis": "multispectral_bands",
+        "observationWindow": {"start": "2024 accepted-frame baseline", "end": "2025 accepted-frame current"},
+        "bbox": [-51.13, 69.1, -50.97, 69.26],
+        "retentionDecision": "abstain",
+        "reviewSummary": "Cloud and no-data gates keep the packet in abstention when the evidence window cannot support an extent-change claim."
+      }
+    },
+    {
+      "id": "fireline-review",
+      "title": "Fireline review packet",
+      "location": "Southeast US · saved demo package",
+      "summary": "A review-only packet that separates smoke, cloud, burn-scar, and vegetation cues before escalation.",
+      "signal": "review-only candidate",
+      "teachingPoint": "Use the model to practice separating evidence, uncertainty, and action.",
+      "facts": ["smoke/cloud ambiguity", "hotspot context", "candidate status", "human review retained"],
+      "evidence": {
+        "sourceReplayId": "southeast_fireline_object_replay",
+        "sourceAsset": "source/backend/assets/replays/southeast_fireline_object_replay.json",
+        "runtimeTruthMode": "replay",
+        "imageryOrigin": "cached_api",
+        "scoringBasis": "visual_only",
+        "observationWindow": {"start": "baseline", "end": "current"},
+        "bbox": [-81.916, 31.143, -81.756, 31.303],
+        "retentionDecision": "candidate",
+        "reviewSummary": "Smoke, cloud, burn-scar, and road-corridor cues remain candidate evidence until source-backed fire context and human review support escalation."
+      }
+    }
+  ]
+}

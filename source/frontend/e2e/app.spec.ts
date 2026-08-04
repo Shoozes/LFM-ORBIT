@@ -1,7 +1,6 @@
 import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
-import { readFileSync } from "fs";
-import { resolve } from "path";
 import { API_BASE } from "./testUrls";
+import { readSeededTimelapseDataUrl } from "./fixtureMedia";
 import {
   gotoApp,
   loadSeededReplay,
@@ -63,11 +62,6 @@ async function waitForFlaggedExamples(page: Page, timeoutMs = 15_000) {
     const text = await page.getByText("Flagged Examples").locator("..").locator("p").nth(1).innerText();
     expect(parseInt(text, 10)).toBeGreaterThan(0);
   }).toPass({ timeout: timeoutMs, intervals: [300, 750, 1500] });
-}
-
-function seededTimelapseDataUrl() {
-  const videoPath = resolve(process.cwd(), "../backend/assets/seeded_data/nasa_aa01bc81.webm");
-  return `data:video/webm;base64,${readFileSync(videoPath).toString("base64")}`;
 }
 
 async function waitForSettingsApiReady(request: APIRequestContext) {
@@ -416,6 +410,7 @@ test.describe("Phase 4.75 - Cached replay flow", () => {
     await expect(page.getByText("CACHED RESCAN ACTIVE: rondonia_frontier_showcase")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("replay_rondonia_center_cached_rescan")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("Cached Rescan Current Model")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("replay-comparison")).toContainText("Original cached proof stays unchanged", { timeout: 10_000 });
   });
 });
 
@@ -603,7 +598,7 @@ test.describe("Phase 9 - Context Module and Timelapse Validation", () => {
   });
 
   test("triggering timelapse drops temporal popup", async ({ page }) => {
-    const video_b64 = seededTimelapseDataUrl();
+    const video_b64 = readSeededTimelapseDataUrl();
     await page.route("**/api/timelapse/generate", async (route) => {
       await route.fulfill({
         status: 200,

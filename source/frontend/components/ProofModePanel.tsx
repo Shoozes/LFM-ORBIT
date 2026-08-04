@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import type { Mission } from "../types/mission";
 import type { AlertItem, ApiMetricsSummary, RecentAlertsResponse } from "../types/telemetry";
 import { formatReasonCode, formatSourceLabel } from "../utils/telemetry";
@@ -944,6 +944,15 @@ export default function ProofModePanel({
   const [flushedQueueCount, setFlushedQueueCount] = useState(0);
   const [linkStatus, setLinkStatus] = useState("LINK OPEN");
   const [dtnProof, setDtnProof] = useState<DtnProof | null>(null);
+  const missionRef = useRef(mission);
+  const alertsRef = useRef(alerts);
+  const metricsSummaryRef = useRef(metricsSummary);
+  missionRef.current = mission;
+  alertsRef.current = alerts;
+  metricsSummaryRef.current = metricsSummary;
+  const missionKey = mission
+    ? `${mission.id}:${mission.mission_mode ?? "live"}:${mission.replay_id ?? ""}`
+    : "none";
 
   useEffect(() => {
     setRecentAlerts(alerts);
@@ -983,6 +992,11 @@ export default function ProofModePanel({
     let cancelled = false;
 
     async function hydrateProof() {
+      const missionSnapshot = missionRef.current;
+      const alertsSnapshot = alertsRef.current;
+      const metricsSummarySnapshot = metricsSummaryRef.current;
+      const liveMissionSnapshot = !demoMode && Boolean(missionSnapshot) && !missionSnapshot?.replay_id;
+      const replayEvidenceSnapshot = Boolean(missionSnapshot?.replay_id) || (demoMode && demoCase === "showcase");
       onStepChange?.(3);
       const [recentPayload, metricsPayload] = await Promise.all([
         fetchJson<RecentAlertsResponse>(`${apiBaseUrl}/api/alerts/recent?limit=10`),
@@ -990,12 +1004,12 @@ export default function ProofModePanel({
       ]);
 
       if (cancelled) return;
-      const resolvedAlerts = recentPayload?.alerts ?? alerts;
+      const resolvedAlerts = recentPayload?.alerts ?? alertsSnapshot;
       setRecentAlerts(resolvedAlerts);
-      setMetrics(metricsPayload ?? metricsSummary);
+      setMetrics(metricsPayload ?? metricsSummarySnapshot);
 
-      const resolvedScopedAlerts = liveMissionScoped
-        ? filterAlertsForBbox(resolvedAlerts, mission?.bbox)
+      const resolvedScopedAlerts = liveMissionSnapshot
+        ? filterAlertsForBbox(resolvedAlerts, missionSnapshot?.bbox)
         : resolvedAlerts;
       const resolvedAlert = selectedCellId
         ? resolvedScopedAlerts.find((alert) => alert.cell_id === selectedCellId) ?? resolvedScopedAlerts[0] ?? null
@@ -1003,7 +1017,7 @@ export default function ProofModePanel({
 
       let resolvedGallery: GalleryItem | null = null;
       let visualReviewImage: VisualReviewImage | null = null;
-      if (usesReplayEvidence && resolvedAlert?.cell_id) {
+      if (replayEvidenceSnapshot && resolvedAlert?.cell_id) {
         [resolvedGallery, visualReviewImage] = await Promise.all([
           fetchJson<GalleryItem>(`${apiBaseUrl}/api/gallery/${resolvedAlert.cell_id}`),
           fetchJson<VisualReviewImage>(`${apiBaseUrl}/api/gallery/${resolvedAlert.cell_id}/visual-review-image`),
@@ -1011,11 +1025,11 @@ export default function ProofModePanel({
         if (!cancelled) setGalleryItem(resolvedGallery);
       }
 
-      if (usesReplayEvidence) {
+      if (replayEvidenceSnapshot) {
         await sleep(700);
         onStepChange?.(4);
-        const bbox = mission?.bbox ?? SHOWCASE_BBOX;
-        const replayPrompt = mission?.task_text ?? SHOWCASE_PROMPT;
+        const bbox = missionSnapshot?.bbox ?? SHOWCASE_BBOX;
+        const replayPrompt = missionSnapshot?.task_text ?? SHOWCASE_PROMPT;
         const startedAt = performance.now();
         const reviewImage = visualReviewImage?.available && visualReviewImage.image_b64
           ? visualReviewImage
@@ -1031,7 +1045,7 @@ export default function ProofModePanel({
                 metadata: {
                   cell_id: resolvedAlert?.cell_id ?? "",
                   frame_id: reviewImage.frame_id ?? resolvedAlert?.after_window?.label ?? "retained_evidence_frame",
-                  runtime_truth_mode: mission?.replay_id ? "replay" : "realtime",
+                  runtime_truth_mode: missionSnapshot?.replay_id ? "replay" : "realtime",
                   imagery_origin: reviewImage.imagery_origin ?? reviewImage.source ?? resolvedAlert?.observation_source ?? "unknown",
                   bbox: reviewImage.bbox ?? bbox,
                 },
@@ -1081,7 +1095,7 @@ export default function ProofModePanel({
           setVisualReview(null);
         } else {
           setGroundingResults([]);
-          const hasFindings = Boolean(resolvedAlert) || Number(mission?.flags_found ?? 0) > 0;
+          const hasFindings = Boolean(resolvedAlert) || Number(missionSnapshot?.flags_found ?? 0) > 0;
           setVqaAnswer(
             hasFindings
               ? "Retained mission evidence is bounded to the selected bbox and alert packets."
@@ -1095,16 +1109,16 @@ export default function ProofModePanel({
           setVisualReview(null);
           setMissionTimelapse(null);
           setMissionTimelapseError(null);
-          if (mission?.bbox) {
-            const defaultStart = mission.start_date || "2025-05-05";
-            const defaultEnd = mission.end_date || "2026-05-05";
+          if (missionSnapshot?.bbox) {
+            const defaultStart = missionSnapshot.start_date || "2025-05-05";
+            const defaultEnd = missionSnapshot.end_date || "2026-05-05";
             const timelapsePayload = await fetchJson<MissionTimelapse & { error?: string; format?: string }>(
               `${apiBaseUrl}/api/timelapse/generate`,
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  bbox: mission.bbox,
+                  bbox: missionSnapshot.bbox,
                   start_date: defaultStart,
                   end_date: defaultEnd,
                   steps: 12,
@@ -1136,7 +1150,7 @@ export default function ProofModePanel({
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, alerts, demoCase, demoMode, metricsSummary, mission, onStepChange, selectedCellId, usesReplayEvidence]);
+  }, [apiBaseUrl, demoCase, demoMode, missionKey, onStepChange, selectedCellId, usesReplayEvidence]);
 
   useEffect(() => {
     if (!demoMode && mission) {

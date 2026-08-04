@@ -8,7 +8,7 @@ tags:
 - sentinel-2
 - lfm-orbit
 - liquid-ai
-- dphi-space-hackathon
+- edge-ai
 configs:
 - config_name: default
   data_files:
@@ -38,7 +38,7 @@ configs:
 
 # LFM Orbit SatData
 
-Retagged Earth-observation training data produced by LFM Orbit for the Liquid AI x DPhi Space Hackathon.
+Retagged Earth-observation training data produced by the LFM Orbit / GenUni edge-AI training pipeline.
 
 The default viewer config is `training_assets.jsonl`, which contains single-image SFT rows with `image`, `messages`, and metadata. Temporal sequence rows live in the `temporal_sft` config so the Hugging Face Dataset Viewer does not try to cast sequence rows into the single-image schema.
 

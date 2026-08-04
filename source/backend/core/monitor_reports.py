@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from core.paths import REPO_ROOT, get_runtime_data_dir
+from core.paths import REPO_ROOT, atomic_write_text, get_monitor_reports_dir as get_runtime_monitor_reports_dir
 
 
 MONITOR_REPORTS_SUBDIR = "monitor-reports"
@@ -19,7 +19,7 @@ def _now() -> str:
 
 
 def get_monitor_reports_dir() -> Path:
-    return get_runtime_data_dir() / MONITOR_REPORTS_SUBDIR
+    return get_runtime_monitor_reports_dir()
 
 
 def _safe_slug(value: str) -> str:
@@ -61,7 +61,7 @@ def persist_monitor_report(report: dict[str, Any]) -> dict[str, Any]:
         "filename": filename,
     }
     payload["persistence"] = persistence
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    atomic_write_text(path, json.dumps(payload, indent=2, sort_keys=True))
     return persistence
 
 

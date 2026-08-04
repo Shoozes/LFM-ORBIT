@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from fastapi import WebSocket
 
-from core.mission import get_active_mission, update_mission_progress
+from core.mission import MISSION_CONFIRMATION_POLICIES, get_active_mission, update_mission_progress
 from core.config import (
     REGION,
     imagery_origin_for_source,
@@ -20,10 +20,12 @@ from core.scorer import score_cell_change
 from core.telemetry import build_alert_payload, build_grid_init_message, build_scan_result_message
 from core.utils import utc_timestamp
 from core.observability import RuntimeObserver, log_throttled
+from core.scan_coordinator import claim_scan_engine, release_scan_engine
 
 logger = logging.getLogger(__name__)
 
 QUALITY_REJECTION_REASONS = {"insufficient_valid_pixels", "scene_quality_rejected"}
+CONFIRMATION_POLICIES = set(MISSION_CONFIRMATION_POLICIES) | {"demo_immediate"}
 
 
 def _rejection_reason_from_exception(exc: Exception) -> str:
@@ -125,21 +127,41 @@ def _resume_progress_for_mission(mission: dict | None, total_cells: int) -> tupl
     return cells_scanned, flags_found
 
 
-async def stream_region_scan(websocket: WebSocket):
-    mission = get_active_mission()
-    mission_bbox = mission["bbox"] if mission else None
-    grid_data = generate_grid_for_bbox(mission_bbox) if mission_bbox else {
+def confirmation_policy_for_mission(mission: dict | None) -> str:
+    """Resolve the declared confirmation policy without weakening the safe default."""
+    if getattr(REGION, "demo_mode_loop_scan", False):
+        return "demo_immediate"
+    requested = str((mission or {}).get("confirmation_policy") or "").strip().lower()
+    if requested in MISSION_CONFIRMATION_POLICIES:
+        return requested
+    return str(getattr(REGION, "confirmation_policy", "distinct_acquisition"))
+
+
+def confirm_anomaly_candidate(mission_id: int, cell_id: str, mission: dict | None) -> bool:
+    """Apply the mission policy and return whether one cell can be emitted."""
+    policy = confirmation_policy_for_mission(mission)
+    if policy in {"single_acquisition", "demo_immediate"}:
+        remove_candidate(mission_id, cell_id)
+        return True
+    consecutive = upsert_candidate(mission_id, cell_id)
+    if consecutive >= max(1, int(getattr(REGION, "confirmation_required_acquisitions", 2))):
+        remove_candidate(mission_id, cell_id)
+        return True
+    return False
+
+
+async def _run_region_scan(publish):
+    grid_data = {
         "type": "FeatureCollection",
         "features": [],
     }
-
-    await websocket.send_text(json.dumps(build_grid_init_message(grid_data)))
-
     features = grid_data["features"]
     total_cells = len(features)
     cycle_index = 0
-    current_mission_id = mission["id"] if mission else None
+    current_mission_id = None
     replay_idle_mission_id = None
+
+    await publish(json.dumps(build_grid_init_message(grid_data)))
 
     while True:
         mission = get_active_mission()
@@ -147,29 +169,48 @@ async def stream_region_scan(websocket: WebSocket):
         mission_id = mission["id"] if mission else None
         mission_mode = mission.get("mission_mode") if mission else None
 
+        if mission and mission_mode != "replay":
+            owns_scan_slot = await claim_scan_engine("telemetry", int(mission_id))
+            if not owns_scan_slot:
+                await publish(
+                    json.dumps(
+                        {
+                            "type": "scan_engine_busy",
+                            "mission_id": mission_id,
+                            "owner": "satellite_agent",
+                        }
+                    )
+                )
+                await asyncio.sleep(1.0)
+                continue
+
         if mission_id != current_mission_id:
             current_mission_id = mission_id
             if mission_bbox:
                 grid_data = generate_grid_for_bbox(mission_bbox)
-            else:
+            elif mission:
                 grid_data = generate_scan_grid(
                     REGION.center_lat,
                     REGION.center_lng,
                     resolution=REGION.grid_resolution,
                     ring_size=REGION.ring_size,
                 )
+            else:
+                grid_data = {"type": "FeatureCollection", "features": []}
             features = grid_data["features"]
             total_cells = len(features)
-            await websocket.send_text(json.dumps(build_grid_init_message(grid_data)))
+            await publish(json.dumps(build_grid_init_message(grid_data)))
 
         if mission is None:
-            await websocket.send_text(json.dumps({"type": "scan_complete"}))
+            await release_scan_engine("telemetry")
+            await publish(json.dumps({"type": "scan_complete"}))
             await asyncio.sleep(1.0)
             continue
 
         if mission_mode == "replay":
+            await release_scan_engine("telemetry")
             if mission_id != replay_idle_mission_id:
-                await websocket.send_text(json.dumps({"type": "scan_complete"}))
+                await publish(json.dumps({"type": "scan_complete"}))
                 replay_idle_mission_id = mission_id
             await asyncio.sleep(1.0)
             continue
@@ -187,7 +228,7 @@ async def stream_region_scan(websocket: WebSocket):
         mission_changed_during_cycle = False
 
         if resume_cells_scanned >= total_cells and total_cells > 0 and not getattr(REGION, 'demo_mode_loop_scan', False):
-            await websocket.send_text(json.dumps({"type": "scan_complete"}))
+            await publish(json.dumps({"type": "scan_complete"}))
             completed_mission_id = current_mission_id
             while True:
                 await asyncio.sleep(1.0)
@@ -244,17 +285,14 @@ async def stream_region_scan(websocket: WebSocket):
                     is_confirmed_anomaly = False
 
                     if is_anomaly:
-                        if getattr(REGION, 'demo_mode_loop_scan', False):
-                            # Bypass persistence in pure demo loops for quick visual feedback
-                            is_confirmed_anomaly = True
-                        else:
-                            with observer.Stage("Persistence Check"):
-                                consecutive = upsert_candidate(cell_id)
-                                if consecutive >= 2:
-                                    is_confirmed_anomaly = True
-                                    remove_candidate(cell_id)
+                        with observer.Stage("Persistence Check"):
+                            is_confirmed_anomaly = confirm_anomaly_candidate(
+                                int(current_mission_id),
+                                cell_id,
+                                latest_mission,
+                            )
                     else:
-                        remove_candidate(cell_id)
+                        remove_candidate(int(current_mission_id), cell_id)
 
                     cells_scanned += 1
                     current_alerts_emitted = alerts_emitted + (1 if is_confirmed_anomaly else 0)
@@ -337,6 +375,9 @@ async def stream_region_scan(websocket: WebSocket):
                             after_window=score.get("after_window"),
                             wildfire_assessment=score.get("wildfire_assessment"),
                             boundary_context=boundary_context,
+                            mission_id=int(current_mission_id),
+                            use_case_id=str(latest_mission.get("use_case_id") or "") if latest_mission else None,
+                            target_pack_id=str(latest_mission.get("target_pack_id") or "") if latest_mission else None,
                         )
 
                     estimated_bandwidth_saved_mb = 0.0 if is_confirmed_anomaly else REGION.estimated_frame_size_mb
@@ -388,7 +429,7 @@ async def stream_region_scan(websocket: WebSocket):
                         cycle_index=cycle_index,
                     )
 
-                    await websocket.send_text(json.dumps(telemetry_message))
+                    await publish(json.dumps(telemetry_message))
 
                 except Exception as e:
                     import traceback
@@ -409,8 +450,9 @@ async def stream_region_scan(websocket: WebSocket):
             continue
 
         if not getattr(REGION, 'demo_mode_loop_scan', False):
-            await websocket.send_text(json.dumps({"type": "scan_complete"}))
+            await publish(json.dumps({"type": "scan_complete"}))
             completed_mission_id = current_mission_id
+            await release_scan_engine("telemetry")
             while True:
                 await asyncio.sleep(1.0)
                 latest_mission = get_active_mission()
@@ -418,3 +460,29 @@ async def stream_region_scan(websocket: WebSocket):
                 if latest_mission_id != completed_mission_id:
                     break
             continue
+
+
+async def stream_region_scan(websocket: WebSocket):
+    """Subscribe a telemetry client to the single shared scan producer."""
+    from core.scan_coordinator import stream_shared_scan
+
+    await stream_shared_scan(websocket, _run_region_scan)
+
+
+async def run_mission_scan_service(stop_event: asyncio.Event) -> None:
+    """Keep live mission scanning independent from browser viewer lifetimes."""
+    from core.scan_coordinator import ensure_shared_scan, stop_shared_scan
+
+    try:
+        while not stop_event.is_set():
+            mission = get_active_mission()
+            if mission and mission.get("mission_mode") != "replay":
+                await ensure_shared_scan(_run_region_scan, mission_owned=True)
+            else:
+                await stop_shared_scan()
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=0.25)
+            except asyncio.TimeoutError:
+                continue
+    finally:
+        await stop_shared_scan()

@@ -15,7 +15,12 @@ const backendEnv = { UV_PROJECT_ENVIRONMENT: backendVenvDir };
 
 export default defineConfig({
   testDir: "./e2e",
-  testIgnore: ["**/demos/**"],
+  testIgnore: [
+    "**/demos/**",
+    "**/hosted.build.spec.ts",
+    "**/hosted.model-build.spec.ts",
+    "**/hosted.model-fetch.spec.ts",
+  ],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

@@ -73,9 +73,15 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await page.getByTestId("tab-mission").click();
 
     await page.getByTestId("mission-task-input").fill("Detect canopy loss");
+    await page.getByTestId("mission-confirmation-policy-select").selectOption("single_acquisition");
 
     const launchBtn = page.getByRole("button", { name: /Launch Mission|Mission Complete/i });
     await expect(launchBtn).toBeEnabled();
+    const missionRequest = page.waitForRequest((request) => request.url().endsWith("/api/mission/start") && request.method() === "POST");
+    await launchBtn.click();
+    const request = await missionRequest;
+    expect(request.postDataJSON().confirmation_policy).toBe("single_acquisition");
+    await expect(page.getByTestId("mission-confirmation-policy")).toContainText("one acquisition", { timeout: 15_000 });
   });
 
   test("verify Ground Agent message input", async ({ page }) => {
@@ -369,10 +375,16 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await page.getByTestId("tab-mission").click();
     await expect(page.getByTestId("mission-panel-tab-plan")).toHaveClass(/bg-white/);
     await expect(page.getByTestId("mission-preset-panel")).toBeVisible();
+    await expect(page.getByTestId("mission-confirmation-policy-select")).toHaveValue("distinct_acquisition");
     await expect(page.getByTestId("fast-replay-panel")).not.toBeVisible();
 
     await page.getByTestId("mission-panel-tab-replay").click();
     await expect(page.getByTestId("fast-replay-panel")).toBeVisible();
+    await page.getByTestId("replay-visibility-toggle").click();
+    await expect(page.getByTestId("load-replay-rondonia_frontier_showcase")).toHaveCount(0);
+    await expect(page.getByTestId("replay-visibility-toggle")).toHaveText("Show replay catalog");
+    await page.getByTestId("replay-visibility-toggle").click();
+    await expect(page.getByTestId("load-replay-rondonia_frontier_showcase")).toBeVisible();
     await expect(page.getByTestId("mission-preset-panel")).not.toBeVisible();
     await expect(page.getByTestId("mission-panel-tab-targets")).toHaveCount(0);
     await expect(page.getByTestId("mission-panel-tab-monitors")).toHaveCount(0);
@@ -417,6 +429,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await page.getByTestId("rescan-replay-georgia_wildfire_replay").click();
     await expect(page.getByTestId("tab-inspect")).toHaveClass(/border-zinc-900/, { timeout: 15_000 });
     await expect(page.getByText("CACHED RESCAN ACTIVE: georgia_wildfire_replay")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("replay-comparison")).toContainText("Original cached proof stays unchanged", { timeout: 15_000 });
 
     await page.getByTestId("tab-agents").click();
     await expect(page.getByTestId("ground-agent-nav-object_evidence")).toHaveCount(0);

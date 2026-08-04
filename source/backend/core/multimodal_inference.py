@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import base64
-import binascii
 import logging
 import os
 import threading
@@ -10,16 +8,21 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+from core.image_payload import MAX_IMAGE_BYTES, decode_base64_payload
 from core.model_manifest import SatelliteModelArtifact, resolve_satellite_model_artifact
 
 try:
     from PIL import Image, ImageStat, UnidentifiedImageError
+    from PIL.Image import DecompressionBombError
 except ImportError:  # pragma: no cover - optional runtime dependency guard
     Image = None  # type: ignore[assignment]
     ImageStat = None  # type: ignore[assignment]
 
     class UnidentifiedImageError(Exception):
         """Fallback image decode error used when Pillow is not installed."""
+
+    class DecompressionBombError(Exception):
+        """Fallback image bomb error used when Pillow is not installed."""
 
 
 _VALID_BACKENDS = {"none", "llama_cpp_mmproj", "transformers_vlm"}
@@ -111,13 +114,6 @@ def _public_path_label(path: str | None) -> str:
     return Path(path).name
 
 
-def _strip_data_url(value: str) -> str:
-    text = value.strip()
-    if "," in text and text.lower().startswith("data:"):
-        return text.split(",", 1)[1].strip()
-    return text
-
-
 def _decode_image_payload(*, image_b64: str | None, image_path: str | None) -> _ImagePayload | None:
     if Image is None:
         return None
@@ -127,28 +123,31 @@ def _decode_image_payload(*, image_b64: str | None, image_path: str | None) -> _
     b64_present = bool(image_b64)
     path_label = _public_path_label(image_path)
     if image_b64:
-        try:
-            raw = base64.b64decode(_strip_data_url(image_b64), validate=True)
-        except (binascii.Error, ValueError) as exc:
-            raise ValueError("image_b64 must be valid base64 image data") from exc
+        raw = decode_base64_payload(image_b64)
         source_label = "request_b64"
     elif image_path:
         path = Path(image_path)
         if not path.is_file():
             raise ValueError("image_path does not point to an available image file")
         raw = path.read_bytes()
+        if len(raw) > MAX_IMAGE_BYTES:
+            raise ValueError(f"decoded image exceeds the {MAX_IMAGE_BYTES} byte limit")
         source_label = path.name
     else:
         raise ValueError("image_b64 or image_path is required")
 
     try:
-        image = Image.open(BytesIO(raw)).convert("RGB")
-    except (UnidentifiedImageError, OSError) as exc:
+        with Image.open(BytesIO(raw)) as opened:
+            width, height = opened.size
+            if width <= 0 or height <= 0:
+                raise ValueError("image payload has invalid dimensions")
+            if width * height > 16 * 1024 * 1024:
+                raise ValueError("image payload exceeds the 16777216 pixel limit")
+            image = opened.convert("RGB")
+    except (DecompressionBombError, UnidentifiedImageError, OSError, ValueError) as exc:
         raise ValueError("image payload is not a readable image") from exc
 
     width, height = image.size
-    if width <= 0 or height <= 0:
-        raise ValueError("image payload has invalid dimensions")
     return _ImagePayload(
         image=image,
         source_label=source_label,
@@ -364,6 +363,7 @@ def _unavailable_payload(
         "abstained": False,
         "max_tokens": max_tokens,
         "provenance": {
+            **(metadata or {}),
             "image_conditioned": False,
             "visual_model": runtime_status.get("visual_model", ""),
             "model_path": _public_path_label(runtime_status.get("model_path", "")),
@@ -377,7 +377,6 @@ def _unavailable_payload(
             "prompt_present": bool(prompt.strip()),
             "fallback_used": False,
             "runtime_inference_mode": runtime_status["runtime_inference_mode"],
-            **(metadata or {}),
         },
     }
 
@@ -429,6 +428,7 @@ def generate_with_image(
             "abstained": True,
             "max_tokens": max_tokens,
             "provenance": {
+                **(metadata or {}),
                 "image_conditioned": False,
                 "visual_model": status.get("visual_model", ""),
                 "image_source": image_payload.source_label,
@@ -439,7 +439,6 @@ def generate_with_image(
                 "prompt_present": bool(prompt.strip()),
                 "fallback_used": False,
                 "runtime_inference_mode": status["runtime_inference_mode"],
-                **(metadata or {}),
             },
         }
 
@@ -490,6 +489,7 @@ def generate_with_image(
         "abstained": False,
         "max_tokens": max_tokens,
         "provenance": {
+            **(metadata or {}),
             "image_conditioned": True,
             "visual_model": visual_model,
             "runtime_backend": "transformers_vlm",
@@ -503,6 +503,5 @@ def generate_with_image(
             "image_height": image_payload.height,
             "prompt_present": bool(prompt.strip()),
             "fallback_used": False,
-            **(metadata or {}),
         },
     }

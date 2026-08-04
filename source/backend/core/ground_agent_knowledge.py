@@ -1206,7 +1206,7 @@ def _build_agentic_mission_plan(user_msg: str, text: str) -> dict[str, Any] | No
         "task_text": task_text,
         "planner_attempts": planner_attempts,
         "tool_plan": [
-            "Use DPhi SimSat first for live evidence during the hackathon run",
+            "Use DPhi SimSat first for live evidence during the portfolio run",
             f"Request {temporal_cadence} frame sampling when the runtime supports it",
             "Use sh.txt/Sentinel paths only as development or replay support when configured",
             "Emit compact candidate packets for Ground Validator review before proof packaging",
@@ -1831,7 +1831,7 @@ def _protected_wildlife_custom_proposal(user_msg: str, text: str, region: dict[s
             "Selected winter habitat/access proxy review with the waterline target pack.",
         ],
         "tool_plan": [
-            "Use DPhi SimSat first for live map/tasking during the hackathon run",
+            "Use DPhi SimSat first for live map/tasking during the portfolio run",
             "Review waterline, water color, shoreline, and access-context candidates",
             "Package final output as candidate habitat/refuge/access context only",
         ],
@@ -2767,7 +2767,7 @@ def get_ground_agent_reply(user_msg: str) -> str:
     if any(k in msg for k in ("settings", "gear", "provider", "config", "credential", "sentinel hub")):
         return (
             "Settings shows provider status, SimSat readiness, credential state, trained model status, and depth adapter status. "
-            "DPhi SimSat is the primary hackathon runtime lane."
+            "DPhi SimSat is the primary portfolio runtime lane."
         )
 
     if any(k in msg for k in ("architect", "how", "work", "pipeline", "lfm", "model")):

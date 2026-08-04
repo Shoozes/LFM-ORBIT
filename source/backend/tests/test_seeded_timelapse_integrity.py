@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import imageio.v3 as iio
@@ -45,6 +46,38 @@ def _wildfire_replay_seeded_video_keys() -> set[str]:
             if seeded_video:
                 keys.add(seeded_video)
     return keys
+
+
+def test_replay_seeded_assets_are_tracked_for_clean_checkouts():
+    tracked = set(
+        subprocess.check_output(
+            ["git", "-C", str(Path(__file__).resolve().parents[3]), "ls-files"],
+            text=True,
+        ).splitlines()
+    )
+
+    missing: list[str] = []
+    for seeded_video in sorted(_replay_seeded_video_keys()):
+        for suffix in (".webm", "_meta.json"):
+            rel_path = f"source/backend/assets/seeded_data/{seeded_video}{suffix}"
+            if rel_path not in tracked:
+                missing.append(rel_path)
+
+    assert missing == []
+
+
+def test_frontend_e2e_seeded_fixture_is_tracked_for_clean_checkouts():
+    repo_root = Path(__file__).resolve().parents[3]
+    tracked = set(
+        subprocess.check_output(
+            ["git", "-C", str(repo_root), "ls-files"],
+            text=True,
+        ).splitlines()
+    )
+    fixture = "source/backend/assets/seeded_data/nasa_aa01bc81.webm"
+
+    assert fixture in tracked
+    assert (repo_root / fixture).is_file()
 
 
 def test_seeded_replay_timelapses_are_real_frame_sequences():

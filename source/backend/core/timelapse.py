@@ -26,6 +26,7 @@ import imageio.v3 as iio
 import numpy as np
 from PIL import Image, ImageDraw
 from core.grid import normalize_bbox
+from core.paths import atomic_write_bytes, atomic_write_text, get_timelapse_cache_dir
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +53,25 @@ _SEEDED_DIR = Path(__file__).resolve().parent.parent / "assets" / "seeded_data"
 # ---------------------------------------------------------------------------
 
 def _chunk_sig(bbox: list[float]) -> str:
+    """Return the legacy bbox-only key used by committed replay fixtures."""
     rounded = [round(b, 3) for b in bbox]
     return hashlib.md5(str(rounded).encode()).hexdigest()[:8]
+
+
+def _request_cache_key(
+    bbox: list[float],
+    months: list[tuple[int, int]],
+    prefer_provider: str | None,
+) -> str:
+    """Build a cache key from every input that can change generated frames."""
+    payload = {
+        "version": 2,
+        "bbox": [round(float(value), 6) for value in bbox],
+        "months": [[int(year), int(month)] for year, month in months],
+        "prefer_provider": str(prefer_provider or "auto").strip().lower() or "auto",
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()[:16]
 
 
 def _limit_months(months: list[tuple[int, int]], steps: int | None) -> list[tuple[int, int]]:
@@ -260,39 +278,48 @@ def _encode_webm(frames: list[np.ndarray]) -> bytes:
 
 
 def _write_cache(sig: str, webm: bytes, meta: dict) -> None:
-    _SEEDED_DIR.mkdir(parents=True, exist_ok=True)
-    (_SEEDED_DIR / f"nasa_{sig}.webm").write_bytes(webm)
-    (_SEEDED_DIR / f"nasa_{sig}_meta.json").write_text(json.dumps(meta, indent=2))
+    cache_dir = get_timelapse_cache_dir()
+    atomic_write_bytes(cache_dir / f"nasa_{sig}.webm", webm)
+    atomic_write_text(cache_dir / f"nasa_{sig}_meta.json", json.dumps(meta, indent=2))
     logger.info("[TIMELAPSE] Cached %s (%d KB)", sig, len(webm) // 1024)
 
 
-def _read_cache(sig: str) -> dict | None:
-    # Prefer high-quality Sentinel Hub cache
-    sh_webm_path = _SEEDED_DIR / f"sh_{sig}.webm"
-    sh_meta_path = _SEEDED_DIR / f"sh_{sig}_meta.json"
-    
-    nasa_webm_path = _SEEDED_DIR / f"nasa_{sig}.webm"
-    nasa_meta_path = _SEEDED_DIR / f"nasa_{sig}_meta.json"
-    
-    if sh_webm_path.exists():
-        webm_path = sh_webm_path
-        meta_path = sh_meta_path
-        cache_family = "sentinelhub"
-    elif nasa_webm_path.exists():
-        webm_path = nasa_webm_path
-        meta_path = nasa_meta_path
-        cache_family = "nasa_gibs"
-    else:
+def _cache_candidate(directory: Path, sig: str, family: str) -> dict | None:
+    webm_path = directory / f"{family}_{sig}.webm"
+    meta_path = directory / f"{family}_{sig}_meta.json"
+    if not webm_path.exists():
         return None
 
-    frames_count = 4
     meta: dict = {}
     try:
-        meta = json.loads(meta_path.read_text())
-        frames_count = meta.get("frames_count", 4)
+        raw = json.loads(meta_path.read_text(encoding="utf-8"))
+        if isinstance(raw, dict):
+            meta = raw
     except Exception as exc:
         logger.debug("[TIMELAPSE] Invalid cache metadata for %s: %s", sig, exc)
-    data_b64 = base64.b64encode(webm_path.read_bytes()).decode("ascii")
+
+    generated = directory == get_timelapse_cache_dir()
+    if generated:
+        if (
+            meta.get("cache_key_version") != 2
+            or meta.get("cache_key") != sig
+            or not isinstance(meta.get("months"), list)
+            or not isinstance(meta.get("frames_count"), int)
+            or meta.get("frames_count", 0) < 2
+            or not str(meta.get("provider") or "").strip()
+        ):
+            logger.warning("[TIMELAPSE] Rejecting generated cache with invalid metadata: %s", sig)
+            return None
+
+    try:
+        data_b64 = base64.b64encode(webm_path.read_bytes()).decode("ascii")
+    except OSError as exc:
+        logger.debug("[TIMELAPSE] Unable to read cache %s: %s", sig, exc)
+        return None
+
+    cache_family = "sentinelhub" if family == "sh" else "nasa_gibs"
+    frames_count = int(meta.get("frames_count", 4) or 4)
+    provider = str(meta.get("provider") or cache_family)
     return {
         "video_b64": f"data:video/webm;base64,{data_b64}",
         "frames_count": frames_count,
@@ -301,16 +328,31 @@ def _read_cache(sig: str) -> dict | None:
         "runtime_truth_mode": "replay",
         "imagery_origin": "cached_api",
         "scoring_basis": "visual_only",
-        "provider": meta.get("provider", cache_family),
+        "provider": provider,
         "provenance": {
             "kind": "replay_cache",
             "legacy_kind": "seeded_cache",
             "label": "Cached real API timelapse",
-            "provider": meta.get("provider", cache_family),
+            "provider": provider,
             "cache_family": cache_family,
             "cache_key": sig,
+            "cache_storage": "runtime" if generated else "committed_seeded_fixture",
         },
     }
+
+
+def _read_cache(sig: str) -> dict | None:
+    # Runtime-generated cache wins, then committed Sentinel Hub, then legacy NASA fixtures.
+    runtime_dir = get_timelapse_cache_dir()
+    for directory, family in (
+        (runtime_dir, "nasa"),
+        (_SEEDED_DIR, "sh"),
+        (_SEEDED_DIR, "nasa"),
+    ):
+        cached = _cache_candidate(directory, sig, family)
+        if cached:
+            return cached
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -367,19 +409,21 @@ def generate_timelapse_frames(
                 "error": "External APIs disabled.",
                 "provenance": {"kind": "unavailable", "label": "External APIs disabled"}}
 
-    sig = _chunk_sig(bbox)
-
-    # Serve from cache if available
-    cached = _read_cache(sig)
-    if cached:
-        logger.info("[TIMELAPSE] Serving cache %s", sig)
-        return cached
-
     months = _month_range(start_date, end_date, steps=steps)
     if not months:
         return {"video_b64": "", "frames_count": 0, "format": "none",
                 "error": "No months in date range.",
                 "provenance": {"kind": "unavailable", "label": "No monthly frame window"}}
+
+    # Generated frames must not reuse a legacy bbox-only cache: date windows,
+    # sampling density, and provider preference all affect the result.
+    cache_key = _request_cache_key(bbox, months, prefer_provider)
+
+    # Serve from cache if available
+    cached = _read_cache(cache_key)
+    if cached:
+        logger.info("[TIMELAPSE] Serving cache %s", cache_key)
+        return cached
 
     logger.info("[TIMELAPSE] Fetching %d months | %s → %s | bbox=%s",
                 len(months), start_date, end_date, [round(b, 2) for b in bbox])
@@ -418,10 +462,14 @@ def generate_timelapse_frames(
                 "provenance": {"kind": "unavailable", "label": "Video encoding failed"}}
 
     meta = {
-        "chunk_signature": sig,
+        "cache_key_version": 2,
+        "cache_key": cache_key,
         "bbox": bbox,
         "start_date": start_date,
         "end_date": end_date,
+        "months": [[year, month] for year, month in months],
+        "steps": steps,
+        "prefer_provider": prefer_provider or "auto",
         "frames_count": len(frame_data),
         "frame_dates": [iso for _, iso in frame_data],
         "provider": provider_used,
@@ -429,7 +477,7 @@ def generate_timelapse_frames(
                   else "GEE Sentinel-2 SR 10m cloud-masked",
         "cached_at": date.today().isoformat(),
     }
-    _write_cache(sig, webm, meta)
+    _write_cache(cache_key, webm, meta)
 
     return {
         "video_b64": f"data:video/webm;base64,{base64.b64encode(webm).decode()}",
@@ -445,6 +493,6 @@ def generate_timelapse_frames(
             "kind": "live_fetch",
             "label": meta["source"],
             "provider": provider_used,
-            "cache_key": sig,
+            "cache_key": cache_key,
         },
     }

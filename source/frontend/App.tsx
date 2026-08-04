@@ -8,6 +8,8 @@ import type { Mission } from "./types/mission";
 import type { OrbitalScanEventDetail } from "./types/telemetry";
 import type { ChatResponse } from "./components/GroundAgentActionCard";
 import type { MapCameraRequest } from "./types/mapCamera";
+import type { ReplayComparison } from "./types/replay";
+import ReplayComparisonCard from "./components/ReplayComparisonCard";
 
 const loadMapVisualizer = () => import("./components/MapVisualizer");
 const loadValidationPanel = () => import("./components/ValidationPanel");
@@ -289,6 +291,9 @@ export default function App() {
   const [proofMission, setProofMission] = useState<Mission | null>(null);
   const [dismissedCompleteMissionId, setDismissedCompleteMissionId] = useState<number | null>(null);
   const [demoStepIndex, setDemoStepIndex] = useState(0);
+  const handleProofStepChange = useCallback((stepIndex: number) => {
+    setDemoStepIndex((currentStep) => Math.max(currentStep, stepIndex));
+  }, []);
   const previousActiveMissionRef = useRef<Mission | null>(null);
   const previewedMissionIdRef = useRef<number | null>(null);
   const replayScanTimeoutsRef = useRef<number[]>([]);
@@ -452,6 +457,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>(
     demoQuery.enabled ? "mission" : "agents",
   );
+  const [replayComparison, setReplayComparison] = useState<ReplayComparison | null>(null);
   const [mobileView, setMobileView] = useState<MobileView>("chat");
 
   const handleProofModeStart = useCallback(async () => {
@@ -1163,6 +1169,8 @@ export default function App() {
                       isScanComplete={missionPassComplete}
                       onReplayLoaded={handleReplayLoaded}
                       onReplayRescanStarted={handleReplayRescanStarted}
+                      replayComparison={replayComparison}
+                      onReplayComparisonChange={setReplayComparison}
                       onOpenLogs={openMissionLogs}
                       onOpenProofMode={() => void handleProofModeStart()}
                       onInspectFirstResult={openFirstResult}
@@ -1255,6 +1263,7 @@ export default function App() {
 
           {activeTab === "inspect" && selectedCellId && (
             <div className="flex flex-col h-full p-4">
+              {replayComparison && <ReplayComparisonCard comparison={replayComparison} />}
               {mission && missionScopedAlerts.length > 0 && (
                 <div
                   data-testid="inspect-result-next-actions"
@@ -1401,7 +1410,7 @@ export default function App() {
             metricsSummary={metricsSummary}
             selectedCellId={selectedCellId}
             onClose={() => setProofModeActive(false)}
-            onStepChange={(stepIndex) => setDemoStepIndex((currentStep) => Math.max(currentStep, stepIndex))}
+            onStepChange={handleProofStepChange}
           />
         </Suspense>
       )}

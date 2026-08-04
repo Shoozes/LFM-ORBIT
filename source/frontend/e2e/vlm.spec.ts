@@ -1,16 +1,10 @@
 import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
-import { readFileSync } from "fs";
-import { resolve } from "path";
 import { gotoApp, loadSeededReplay, resetRuntimeState, startMission, waitForBasemapReady, waitForLinkOpen } from "./runtime";
 import { API_BASE } from "./testUrls";
-
-function seededTimelapseDataUrl() {
-  const videoPath = resolve(process.cwd(), "../backend/assets/seeded_data/nasa_aa01bc81.webm");
-  return `data:video/webm;base64,${readFileSync(videoPath).toString("base64")}`;
-}
+import { readSeededTimelapseDataUrl } from "./fixtureMedia";
 
 async function routeMissionTimelapse(page: Page) {
-  const video_b64 = seededTimelapseDataUrl();
+  const video_b64 = readSeededTimelapseDataUrl();
   await page.route("**/api/timelapse/generate", async (route) => {
     await route.fulfill({
       status: 200,

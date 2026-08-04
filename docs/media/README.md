@@ -21,6 +21,7 @@ Start with the tutorial videos. They are linked here instead of embedded on the 
 | Tutorial walkthrough | [`videos/tutorial_video.webm`](videos/tutorial_video.webm) | End-to-end operator path: mission selection, scan grid, SAT/GND handoff, retained evidence, Proof Mode, compact JSON, and tagged data. |
 | Training journey | [`videos/training-journey.webm`](videos/training-journey.webm) | How reviewed Orbit evidence becomes reusable training data for model improvement. |
 | Critical Minerals proof cut | [`videos/showcase-demo.webm`](videos/showcase-demo.webm) | Short deterministic proof cut centered on Critical Minerals Expansion Watch. |
+| Hosted browser demo | [`videos/hosted-demo.webm`](videos/hosted-demo.webm) | Static hosted route, browser capability boundary, saved package selection, and local-model copy without a backend. |
 
 ## Promoted Media Inventory
 
@@ -34,11 +35,14 @@ Start with the tutorial videos. They are linked here instead of embedded on the 
 - `media/readme/readme-ground-agent-playbook.png`
 - `media/readme/readme-ground-agent-chat-action.png`
 - `media/readme/readme-location-camera-context.png`
+- `media/readme/readme-hosted-demo.png`
+- `media/readme/readme-hosted-evidence.png`
 - `media/story-plates/story-critical-minerals-expansion.png`
 - `media/story-plates/story-object-evidence-port.png`
 - `media/timelapse/highlight-greenland-ice-timelapse.gif`
 - `media/timelapse/highlight-greenland-ice-timelapse.webm`
 - `media/videos/showcase-demo.webm`
+- `media/videos/hosted-demo.webm`
 - `media/videos/payload-reduction-demo.webm`
 - `media/videos/provenance-demo.webm`
 - `media/videos/abstain-safety-demo.webm`

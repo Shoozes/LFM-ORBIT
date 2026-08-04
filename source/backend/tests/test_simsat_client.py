@@ -16,14 +16,14 @@ from core.simsat_client import (
 
 class TestSimSatConfig:
     """Tests for SimSatConfig."""
-    
+
     def test_default_config(self):
         """Test default configuration values."""
         config = SimSatConfig()
         assert config.base_url == "http://localhost:8080"
         assert config.mapbox_token is None
         assert config.timeout_seconds == 30.0
-    
+
     def test_custom_config(self):
         """Test custom configuration values."""
         config = SimSatConfig(
@@ -63,7 +63,7 @@ class TestSimSatConfig:
 
 class TestImageryRequest:
     """Tests for ImageryRequest."""
-    
+
     def test_minimal_request(self):
         """Test minimal imagery request."""
         request = ImageryRequest(
@@ -75,7 +75,7 @@ class TestImageryRequest:
         assert request.lng == -60.025
         assert request.source == DataSource.SENTINEL
         assert request.endpoint_type == EndpointType.CURRENT
-    
+
     def test_full_request(self):
         """Test full imagery request with all parameters."""
         request = ImageryRequest(
@@ -96,18 +96,18 @@ class TestImageryRequest:
 
 class TestSimSatClient:
     """Tests for SimSatClient."""
-    
+
     def test_endpoint_paths(self):
         """Test endpoint path mapping."""
         client = SimSatClient(SimSatConfig())
-        
+
         assert client._get_endpoint(DataSource.SENTINEL, EndpointType.CURRENT) == "/data/current/image/sentinel"
         assert client._get_endpoint(DataSource.SENTINEL, EndpointType.HISTORICAL) == "/data/image/sentinel"
         assert client._get_endpoint(DataSource.MAPBOX, EndpointType.CURRENT) == "/data/current/image/mapbox"
         assert client._get_endpoint(DataSource.MAPBOX, EndpointType.HISTORICAL) == "/data/image/mapbox"
-        
+
         client.close()
-    
+
     def test_build_params_minimal(self):
         """Test parameter building with minimal request."""
         client = SimSatClient(SimSatConfig())
@@ -117,19 +117,19 @@ class TestSimSatClient:
             source=DataSource.SENTINEL,
         )
         params = client._build_params(request)
-        
+
         assert params["lat"] == -3.119
         assert params["lng"] == -60.025
         assert "date" not in params
         assert "resolution" not in params
-        
+
         client.close()
-    
+
     def test_build_params_full(self):
         """Test parameter building with full request."""
         config = SimSatConfig(mapbox_token="test_token")
         client = SimSatClient(config)
-        
+
         request = ImageryRequest(
             lat=-3.119,
             lng=-60.025,
@@ -141,7 +141,7 @@ class TestSimSatClient:
             height=512,
         )
         params = client._build_params(request)
-        
+
         assert params["lat"] == -3.119
         assert params["lng"] == -60.025
         assert params["date"] == "2024-06-01"
@@ -149,19 +149,19 @@ class TestSimSatClient:
         assert params["width"] == 512
         assert params["height"] == 512
         assert params["token"] == "test_token"
-        
+
         client.close()
-    
+
     def test_mapbox_requires_token(self):
         """Test that Mapbox requests without token return error."""
         config = SimSatConfig(mapbox_token=None)
         client = SimSatClient(config)
-        
+
         response = client.fetch_mapbox_current(lat=-3.119, lng=-60.025)
-        
+
         assert response.success is False
         assert "token not configured" in response.error.lower()
-        
+
         client.close()
 
     def test_fetch_imagery_rejects_empty_success_payload(self):
@@ -187,27 +187,27 @@ class TestSimSatClient:
         assert "empty imagery payload" in response.error.lower()
 
         client.close()
-    
+
     def test_context_manager(self):
         """Test client works as context manager."""
         with SimSatClient(SimSatConfig()) as client:
             assert client._client is None  # Lazy initialization
-    
+
     def test_singleton_functions(self):
         """Test singleton client functions."""
         reset_simsat_client()
-        
+
         client1 = get_simsat_client()
         client2 = get_simsat_client()
-        
+
         assert client1 is client2
-        
+
         reset_simsat_client()
 
 
 class TestDataSourceEnum:
     """Tests for DataSource enum."""
-    
+
     def test_values(self):
         """Test enum values."""
         assert DataSource.SENTINEL.value == "sentinel"
@@ -216,7 +216,7 @@ class TestDataSourceEnum:
 
 class TestEndpointTypeEnum:
     """Tests for EndpointType enum."""
-    
+
     def test_values(self):
         """Test enum values."""
         assert EndpointType.HISTORICAL.value == "historical"

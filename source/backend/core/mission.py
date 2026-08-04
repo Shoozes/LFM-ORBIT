@@ -25,6 +25,8 @@ from core.temporal_use_cases import classify_temporal_use_case
 
 logger = logging.getLogger(__name__)
 
+MISSION_CONFIRMATION_POLICIES = frozenset({"single_acquisition", "distinct_acquisition"})
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
@@ -43,6 +45,7 @@ def _ensure_missions_table() -> None:
                 end_date     TEXT,
                 status       TEXT NOT NULL DEFAULT 'active',
                 mission_mode TEXT NOT NULL DEFAULT 'live',
+                confirmation_policy TEXT,
                 replay_id    TEXT,
                 summary      TEXT,
                 use_case_id  TEXT,
@@ -62,6 +65,8 @@ def _ensure_missions_table() -> None:
         }
         if "mission_mode" not in existing_cols:
             conn.execute("ALTER TABLE missions ADD COLUMN mission_mode TEXT NOT NULL DEFAULT 'live'")
+        if "confirmation_policy" not in existing_cols:
+            conn.execute("ALTER TABLE missions ADD COLUMN confirmation_policy TEXT")
         if "replay_id" not in existing_cols:
             conn.execute("ALTER TABLE missions ADD COLUMN replay_id TEXT")
         if "summary" not in existing_cols:
@@ -99,6 +104,7 @@ def start_mission(
     end_date: str | None = None,
     *,
     mission_mode: str = "live",
+    confirmation_policy: str | None = None,
     replay_id: str | None = None,
     summary: str | None = None,
     use_case_id: str | None = None,
@@ -112,6 +118,9 @@ def start_mission(
     bbox = normalize_bbox(bbox) if bbox is not None else None
     if mission_mode not in {"live", "replay"}:
         raise ValueError("mission_mode must be 'live' or 'replay'")
+    normalized_confirmation_policy = confirmation_policy.strip().lower() if confirmation_policy else None
+    if normalized_confirmation_policy and normalized_confirmation_policy not in MISSION_CONFIRMATION_POLICIES:
+        raise ValueError("confirmation_policy must be 'single_acquisition' or 'distinct_acquisition'")
     normalized_pack_id = target_pack_id.strip().lower() if target_pack_id else None
     pack_targets: list[dict[str, Any]] = []
     if normalized_pack_id:
@@ -151,6 +160,7 @@ def start_mission(
                 end_date,
                 status,
                 mission_mode,
+                confirmation_policy,
                 replay_id,
                 summary,
                 use_case_id,
@@ -160,7 +170,7 @@ def start_mission(
                 use_case_decision,
                 created_at
             )
-            VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 task_text,
@@ -168,6 +178,7 @@ def start_mission(
                 start_date,
                 end_date,
                 mission_mode,
+                normalized_confirmation_policy,
                 replay_id,
                 summary,
                 use_case_decision["id"],
@@ -343,6 +354,7 @@ def _row_to_dict(row) -> dict[str, Any]:
             logger.debug("[MISSION] Invalid bbox payload for mission %s: %s", d.get("id"), exc)
             d["bbox"] = None
     d["mission_mode"] = str(d.get("mission_mode") or "live")
+    d["confirmation_policy"] = str(d["confirmation_policy"]) if d.get("confirmation_policy") else None
     d["replay_id"] = str(d["replay_id"]) if d.get("replay_id") else None
     d["summary"] = str(d["summary"]) if d.get("summary") else None
     d["use_case_id"] = str(d["use_case_id"]) if d.get("use_case_id") else None

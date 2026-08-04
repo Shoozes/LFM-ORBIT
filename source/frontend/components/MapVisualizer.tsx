@@ -769,7 +769,7 @@ export default function MapVisualizer({
           "line-width": 2,
         }
       });
-      
+
       map.addLayer({
         id: "bbox-preview-fill",
         type: "fill",
@@ -792,7 +792,7 @@ export default function MapVisualizer({
       // Context menu
       map.on("contextmenu", (event) => {
         event.originalEvent.preventDefault();
-        
+
         let targetCellId: string | null = null;
         targetCellId = getTargetCellIdAtPoint(map, event.point);
 
@@ -927,10 +927,10 @@ export default function MapVisualizer({
         return;
       }
       const { cell_id: cellId, is_anomaly: isAnomaly } = scanEvent.detail;
-      
+
       // Update cell visual
       setFeatureStateIfReady(map, "scan-grid", cellId, { isScanned: true });
-      
+
       // Move realtime footprint array
       const centroid = cellCentroidsRef.current[cellId];
       if (centroid) {
@@ -943,7 +943,7 @@ export default function MapVisualizer({
               properties: {}
             }]
          });
-         
+
          if (sweepTimeoutRef.current) window.clearTimeout(sweepTimeoutRef.current);
          sweepTimeoutRef.current = window.setTimeout(() => {
             const m = mapRef.current;
@@ -951,8 +951,8 @@ export default function MapVisualizer({
             s?.setData({ type: "FeatureCollection", features: [] });
           }, 350);
       }
-      
-      
+
+
       const timeoutId = window.setTimeout(() => {
         scanStateTimeoutsRef.current.delete(timeoutId);
         const currentMap = mapRef.current;
@@ -983,7 +983,7 @@ export default function MapVisualizer({
 
     const source = getGeoJsonSource(map, "bbox-preview");
     if (!source) return;
-    
+
     const activeBbox = bboxPreview ?? drawnBbox;
 
     if (activeBbox) {
@@ -1093,7 +1093,7 @@ export default function MapVisualizer({
           .addTo(map);
         markerRefs.current[pin.id] = marker;
       }
-      
+
       const visibleCellId = pin.cell_id && cellCentroidsRef.current[pin.cell_id]
         ? pin.cell_id
         : getNearestCellId(cellCentroidsRef.current, pin.lat, pin.lng);
@@ -1148,7 +1148,7 @@ export default function MapVisualizer({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
-    
+
     if (!map.getSource("vlm-boxes")) {
        map.addSource("vlm-boxes", { type: "geojson", data: vlmGeoJson });
 
@@ -1173,7 +1173,7 @@ export default function MapVisualizer({
             "line-blur": 6
           }
        });
-       
+
        map.addLayer({
           id: "vlm-boxes-line",
           type: "line",
@@ -1420,7 +1420,7 @@ export default function MapVisualizer({
 
       {/* Operator Right Click Context Menu */}
       {contextMenu && (
-        <div 
+        <div
           role="menu"
           aria-label="Spatial options"
           className="absolute z-50 rounded-xl border border-white/10 bg-zinc-900/75 backdrop-blur-md shadow-[0_4px_30px_rgba(0,0,0,0.5)] py-2 outline-none flex flex-col w-64"
@@ -1436,8 +1436,8 @@ export default function MapVisualizer({
             <span className="text-[9px] uppercase tracking-[0.2em] font-mono text-cyan-500">Spatial Options</span>
             <span className="text-[8px] text-gray-500">[{contextMenu.lng.toFixed(2)}, {contextMenu.lat.toFixed(2)}]</span>
           </div>
-          
-          <button 
+
+          <button
             ref={firstMenuButtonRef}
             type="button"
             role="menuitem"
@@ -1451,8 +1451,8 @@ export default function MapVisualizer({
           >
             ◫ Set Mission BBox Here
           </button>
-          
-          <button 
+
+          <button
              type="button"
              role="menuitem"
              className="text-left px-4 py-2 text-xs font-mono text-gray-300 hover:bg-cyan-900/40 hover:text-cyan-300 transition-colors"
@@ -1465,8 +1465,8 @@ export default function MapVisualizer({
           >
              ▷ Generate Temporal Timelapse
           </button>
-          
-          <button 
+
+          <button
              type="button"
              role="menuitem"
              className="text-left px-4 py-2 text-xs font-mono text-cyan-300 hover:bg-cyan-800 hover:text-white transition-colors border-y border-gray-800 my-1 font-semibold"
@@ -1479,8 +1479,8 @@ export default function MapVisualizer({
           >
              ◈ Agent Video Evaluation
           </button>
-          
-          <button 
+
+          <button
              type="button"
              role="menuitem"
              className="text-left px-4 py-2 text-xs font-mono text-emerald-400 hover:bg-emerald-900/40 hover:text-emerald-300 transition-colors"

@@ -34,9 +34,9 @@ export type UseTelemetryState = {
   refreshTelemetry: (options?: { replaceAlerts?: boolean }) => Promise<void>;
 };
 
-async function fetchJson<T>(url: string): Promise<T | null> {
+async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T | null> {
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, signal ? { signal } : undefined);
 
     if (!response.ok) {
       return null;
@@ -67,33 +67,65 @@ export function useTelemetry(): UseTelemetryState {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttempts = useRef(0);
+  const mountedRef = useRef(true);
+  const refreshAbortRef = useRef<AbortController | null>(null);
+  const refreshSequenceRef = useRef(0);
+  const metricsInFlightRef = useRef(false);
   const MAX_RECONNECT_ATTEMPTS = 10;
   const BASE_RECONNECT_DELAY_MS = 1000;
 
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      refreshAbortRef.current?.abort();
+      refreshAbortRef.current = null;
+    };
+  }, []);
+
   const refreshTelemetry = useCallback(async (options?: { replaceAlerts?: boolean }) => {
     const replaceAlerts = options?.replaceAlerts ?? false;
-    const [health, recent, metrics] = await Promise.all([
-      fetchJson<ApiHealth>(`${apiBaseUrl}/api/health`),
-      fetchJson<RecentAlertsResponse>(`${apiBaseUrl}/api/alerts/recent?limit=50`),
-      fetchJson<ApiMetricsSummary>(`${apiBaseUrl}/api/metrics/summary`),
-    ]);
+    const requestSequence = ++refreshSequenceRef.current;
+    refreshAbortRef.current?.abort();
+    const controller = new AbortController();
+    refreshAbortRef.current = controller;
 
-    if (health) {
-      setApiHealth(health);
-      setRegionId(health.region_id);
-      setDisplayName(health.display_name);
-    }
+    try {
+      const [health, recent, metrics] = await Promise.all([
+        fetchJson<ApiHealth>(`${apiBaseUrl}/api/health`, controller.signal),
+        fetchJson<RecentAlertsResponse>(`${apiBaseUrl}/api/alerts/recent?limit=50`, controller.signal),
+        fetchJson<ApiMetricsSummary>(`${apiBaseUrl}/api/metrics/summary`, controller.signal),
+      ]);
 
-    if (recent) {
-      setAlerts((current) => (replaceAlerts ? recent.alerts : mergeAlertLists(current, recent.alerts)));
-      if (recent.region_id) {
-        setRegionId(recent.region_id);
+      if (
+        controller.signal.aborted ||
+        !mountedRef.current ||
+        requestSequence !== refreshSequenceRef.current
+      ) {
+        return;
       }
-    }
 
-    if (metrics) {
-      setMetricsSummary(metrics);
-      setBandwidthSaved(metrics.total_bandwidth_saved_mb);
+      if (health) {
+        setApiHealth(health);
+        setRegionId(health.region_id);
+        setDisplayName(health.display_name);
+      }
+
+      if (recent) {
+        setAlerts((current) => (replaceAlerts ? recent.alerts : mergeAlertLists(current, recent.alerts)));
+        if (recent.region_id) {
+          setRegionId(recent.region_id);
+        }
+      }
+
+      if (metrics) {
+        setMetricsSummary(metrics);
+        setBandwidthSaved(metrics.total_bandwidth_saved_mb);
+      }
+    } finally {
+      if (refreshAbortRef.current === controller) {
+        refreshAbortRef.current = null;
+      }
     }
   }, [apiBaseUrl]);
 
@@ -102,17 +134,36 @@ export function useTelemetry(): UseTelemetryState {
   }, [refreshTelemetry]);
 
   useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      void (async () => {
-        const metrics = await fetchJson<ApiMetricsSummary>(`${apiBaseUrl}/api/metrics/summary`);
-        if (metrics) {
-          setMetricsSummary(metrics);
-          setBandwidthSaved(metrics.total_bandwidth_saved_mb);
+    const controller = new AbortController();
+
+    const refreshMetrics = async () => {
+      if (metricsInFlightRef.current || controller.signal.aborted) {
+        return;
+      }
+      metricsInFlightRef.current = true;
+      try {
+        const metrics = await fetchJson<ApiMetricsSummary>(
+          `${apiBaseUrl}/api/metrics/summary`,
+          controller.signal,
+        );
+        if (controller.signal.aborted || !mountedRef.current || !metrics) {
+          return;
         }
-      })();
+        setMetricsSummary(metrics);
+        setBandwidthSaved(metrics.total_bandwidth_saved_mb);
+      } finally {
+        metricsInFlightRef.current = false;
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void refreshMetrics();
     }, 5000);
 
-    return () => window.clearInterval(intervalId);
+    return () => {
+      controller.abort();
+      window.clearInterval(intervalId);
+    };
   }, [apiBaseUrl]);
 
   useEffect(() => {
@@ -127,10 +178,11 @@ export function useTelemetry(): UseTelemetryState {
       setIsScanComplete(false);
 
       socket.onopen = () => {
+        if (cancelled) return;
         if (reconnectAttempts.current > 0) {
           void (async () => {
             const recent = await fetchJson<RecentAlertsResponse>(`${apiBaseUrl}/api/alerts/recent?limit=50`);
-            if (recent) {
+            if (!cancelled && recent) {
               setAlerts((current) => mergeAlertLists(current, recent.alerts));
             }
           })();
@@ -140,13 +192,13 @@ export function useTelemetry(): UseTelemetryState {
       };
 
       socket.onerror = () => {
+        if (cancelled || !mountedRef.current) return;
         setConnectionState("error");
       };
 
       socket.onclose = () => {
         wsRef.current = null;
-        if (cancelled) {
-          setConnectionState("closed");
+        if (cancelled || !mountedRef.current) {
           return;
         }
         if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
@@ -163,6 +215,7 @@ export function useTelemetry(): UseTelemetryState {
       };
 
       socket.onmessage = (event) => {
+        if (cancelled) return;
         const message: TelemetryMessage | null = parseTelemetryMessage(event.data);
 
         if (!message) {

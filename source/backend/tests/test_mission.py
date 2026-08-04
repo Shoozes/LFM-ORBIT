@@ -51,6 +51,22 @@ def test_start_mission_rejects_invalid_mode():
         start_mission("Bad mode", mission_mode="demo")
 
 
+def test_start_mission_persists_confirmation_policy():
+    from core.mission import get_mission, start_mission
+
+    mission = start_mission("Single pass review", confirmation_policy="single_acquisition")
+
+    assert mission["confirmation_policy"] == "single_acquisition"
+    assert get_mission(mission["id"])["confirmation_policy"] == "single_acquisition"
+
+
+def test_start_mission_rejects_invalid_confirmation_policy():
+    from core.mission import start_mission
+
+    with pytest.raises(ValueError, match="confirmation_policy"):
+        start_mission("Unsafe policy", confirmation_policy="emit_everything")
+
+
 def test_start_mission_with_dates():
     from core.mission import start_mission
     m = start_mission("Temporal scan", start_date="2024-01-01", end_date="2024-06-30")
