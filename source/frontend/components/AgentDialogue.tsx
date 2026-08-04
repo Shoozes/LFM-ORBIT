@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getApiBaseUrl } from "../utils/telemetry";
+import { createRequestGate } from "../utils/requestGateCore.js";
 import { useAgentBus } from "../hooks/useAgentBus";
 import type { Mission } from "../types/mission";
 
@@ -80,21 +81,33 @@ export default function AgentDialogue({ isOpen, mission }: AgentDialogueProps) {
   // Fetch bus stats periodically
   useEffect(() => {
     if (!isOpen) return;
+    const gate = createRequestGate();
     const fetchStats = async () => {
+      const request = gate.begin();
       try {
-        const r = await fetch(`${apiBase}/api/agent/bus/stats`);
+        const r = await fetch(`${apiBase}/api/agent/bus/stats`, { signal: request.controller.signal });
         if (!r.ok) {
           throw new Error(`HTTP ${r.status}`);
         }
-        setStats(await r.json() as Record<string, number>);
-        setStatsError(null);
+        const nextStats = await r.json() as Record<string, number>;
+        if (gate.isCurrent(request)) {
+          setStats(nextStats);
+          setStatsError(null);
+        }
       } catch {
-        setStatsError("Bus stats unavailable");
+        if (gate.isCurrent(request)) {
+          setStatsError("Bus stats unavailable");
+        }
+      } finally {
+        gate.finish(request);
       }
     };
-    fetchStats();
+    void fetchStats();
     const id = window.setInterval(fetchStats, 5000);
-    return () => window.clearInterval(id);
+    return () => {
+      gate.abort();
+      window.clearInterval(id);
+    };
   }, [isOpen, apiBase]);
 
   const sendOperatorMessage = async () => {

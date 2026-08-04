@@ -273,6 +273,7 @@ Architecture docs describe the guard suite; run-by-run totals live in `README.md
 - Artifact guard: README links, documented media, story-plate manifests, repo-relative summary-bank file references, proof-frame luminance, and timelapse integrity checks.
 - Wrapper guard: `.\run.ps1 -Verify` and `./run.sh --verify` run the repo-level install/runtime validation path with platform-specific backend virtualenvs.
 - State-isolation guard: normal Playwright runs start fresh local servers by default; stale server reuse is opt-in through `PLAYWRIGHT_REUSE_SERVER=1`.
+- Async refresh guard: the shared frontend request gate aborts superseded requests and ignores stale responses; mission polling and Agent Dialogue bus stats also abort on close/unmount so an old response cannot repaint a newer surface.
 - Cold-start guard: the Windows launcher can bootstrap repo-local `uv` from Python, prepend it for Playwright child servers, install backend/frontend dependencies from a clean generated state, and verify with only Python plus Node/npm present. WSL/Linux cold-start validation requires native Linux `node`/`npm`/`npx`, `uv` on PATH for non-login child shells, and Playwright Chromium browser/dependency installation.
 
 ## Known Constraints

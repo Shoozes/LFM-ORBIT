@@ -2,6 +2,8 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { VlmBox } from "./types/visualEvidence";
 import { useTelemetry } from "./hooks/useTelemetry";
 import { getApiBaseUrl, generateGridForBbox } from "./utils/telemetry";
+import { createRequestGate } from "./utils/requestGateCore.js";
+import type { RequestGate } from "./utils/requestGateCore.js";
 import { getDefaultMissionDateRange } from "./utils/dateRange";
 import { cellIdMatchesBbox, filterAlertsForBbox } from "./utils/missionAlerts";
 import type { Mission } from "./types/mission";
@@ -297,22 +299,38 @@ export default function App() {
   const previousActiveMissionRef = useRef<Mission | null>(null);
   const previewedMissionIdRef = useRef<number | null>(null);
   const replayScanTimeoutsRef = useRef<number[]>([]);
+  const missionRefreshGateRef = useRef<RequestGate | null>(null);
   const apiBaseUrl = getApiBaseUrl();
   const demoUiEnabled = Boolean(demoQuery.enabled && missionLoaded && (!mission || mission.mission_mode === "replay"));
 
   const fetchMission = useCallback(async () => {
+    const gate = missionRefreshGateRef.current ?? createRequestGate();
+    missionRefreshGateRef.current = gate;
+    const request = gate.begin();
+    const { controller } = request;
     try {
-      const res = await fetch(`${apiBaseUrl}/api/mission/current`);
+      const res = await fetch(`${apiBaseUrl}/api/mission/current`, { signal: controller.signal });
+      if (!gate.isCurrent(request)) {
+        return null;
+      }
       if (res.ok) {
         const d = await res.json() as { mission: Mission | null };
+        if (!gate.isCurrent(request)) {
+          return null;
+        }
         setMission(d.mission);
         return d.mission;
       }
       console.debug(`Mission refresh failed with HTTP ${res.status}.`);
     } catch (error) {
-      console.debug("Mission refresh failed.", error);
+      if (gate.isCurrent(request)) {
+        console.debug("Mission refresh failed.", error);
+      }
     } finally {
-      setMissionLoaded(true);
+      if (gate.isCurrent(request)) {
+        gate.finish(request);
+        setMissionLoaded(true);
+      }
     }
     return null;
   }, [apiBaseUrl]);
@@ -320,7 +338,10 @@ export default function App() {
   useEffect(() => {
     fetchMission();
     const id = setInterval(fetchMission, 5000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      missionRefreshGateRef.current?.abort();
+    };
   }, [fetchMission]);
 
   useEffect(() => {

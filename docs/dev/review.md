@@ -30,6 +30,8 @@ The hosted application is ready for a Pages project-path build, but the public d
 - Added the missing review snapshot and routed it from the docs index/context bank instead of expanding progress notes across product docs.
 - Added explicit hosted manifest readiness/disabled states, a Pages-only saved-packages gate, Chromium installation in the workflow, and a post-deploy static-origin smoke that retains Playwright reports.
 - Made distinct-acquisition confirmation idempotent by persisting a stable acquisition fingerprint per mission/cell and defaulted new one-shot missions to `single_acquisition`.
+- Added a shared request gate with tests, then applied it to App mission polling and Agent Dialogue bus stats polling so superseded or unmounted responses cannot repaint state.
+- Narrowed active summary-bank routes to focused source/contracts and omitted large binary/media payloads; the audit now reports no missing references, broad groups, or over-budget active groups.
 
 ## Release gates
 
@@ -42,8 +44,11 @@ The hosted application is ready for a Pages project-path build, but the public d
 
 - Bundled Node TypeScript check: passed.
 - Pages production build: passed.
+- Hosted build smoke follow-up: the built preview started, but the managed browser hung on its single static test after launch; the test-owned process was stopped after a bounded wait, so this run is unproven rather than green.
 - Pages-subpath Playwright smoke: build contract passed; the managed browser runner became stuck after launch in this sandbox and was stopped without changing repo state. CI now installs Chromium and runs the same smoke on Ubuntu.
-- Browser model unit tests: 8 passed.
+- Frontend unit tests: 10 passed (8 browser-model cases and 2 request-gate cases).
+- Summary-bank audit: 66 groups, one default route, 107.9 KB expanded default context, no missing references, and no active group over its advisory budget.
 - Backend/docs/import/CI verification: 557 tests passed in the repository Windows environment with one Starlette deprecation warning because that stale venv lacks the declared `httpx2` dev extra; no app test failures. The lockfile/CI contract still declares `httpx2` for a warning-free managed run.
+- Follow-up environment audit: both ignored backend virtualenvs currently point to a missing uv-managed Python executable, and the bundled Python runtime has no pytest; a fresh backend pytest rerun is therefore blocked until the local environment is resynchronized.
 - Default Playwright E2E: 108 passed and 6 intentional skips; release-only Pages specs are excluded from the default suite.
-- Live-origin static/model verification: not run; the Pages workflow is present locally but has not been deployed from these changes. The static smoke is wired as a post-deploy job; the model proof remains owner/license-gated.
+- Live-origin static/model verification: not confirmed in this local pass; the workflow is published and wired as a post-deploy job, while the model proof remains owner/license-gated.

@@ -496,9 +496,8 @@ def test_summary_bank_tracks_current_hosted_integrity_surfaces():
     assert "source/frontend/playwright.hosted.pages.live.static.config.ts" in pages["files"]
     scanner = bank["groups"]["issue_group_scan_producer_and_agent_deduplication"]
     assert "source/backend/core/acquisition.py" in scanner["files"]
-    assert "source/frontend/e2e/hosted.pages.spec.ts" in hosted["files"]
-    assert "source/frontend/playwright.hosted.pages.config.ts" in hosted["files"]
-    assert "source/frontend/public/demo-assets/fireline-sentinel.png" in hosted["files"]
+    assert "source/frontend/e2e/hosted.pages.spec.ts" in pages["files"]
+    assert "source/frontend/playwright.hosted.pages.config.ts" in pages["files"]
     assert "source/frontend/vite.config.ts" in hosted["files"]
     assert "source/backend/core/scan_coordinator.py" in coordinator["files"]
 
