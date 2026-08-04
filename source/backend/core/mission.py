@@ -81,6 +81,10 @@ def _ensure_missions_table() -> None:
             conn.execute("ALTER TABLE missions ADD COLUMN use_case_confidence REAL")
         if "use_case_decision" not in existing_cols:
             conn.execute("ALTER TABLE missions ADD COLUMN use_case_decision TEXT")
+        conn.execute(
+            "UPDATE missions SET confirmation_policy = ? WHERE confirmation_policy IS NULL",
+            ("single_acquisition",),
+        )
         # We don't delete here by default, we'll expose a reset function
         conn.commit()
 
@@ -118,8 +122,12 @@ def start_mission(
     bbox = normalize_bbox(bbox) if bbox is not None else None
     if mission_mode not in {"live", "replay"}:
         raise ValueError("mission_mode must be 'live' or 'replay'")
-    normalized_confirmation_policy = confirmation_policy.strip().lower() if confirmation_policy else None
-    if normalized_confirmation_policy and normalized_confirmation_policy not in MISSION_CONFIRMATION_POLICIES:
+    normalized_confirmation_policy = (
+        confirmation_policy.strip().lower()
+        if confirmation_policy and confirmation_policy.strip()
+        else "single_acquisition"
+    )
+    if normalized_confirmation_policy not in MISSION_CONFIRMATION_POLICIES:
         raise ValueError("confirmation_policy must be 'single_acquisition' or 'distinct_acquisition'")
     normalized_pack_id = target_pack_id.strip().lower() if target_pack_id else None
     pack_targets: list[dict[str, Any]] = []

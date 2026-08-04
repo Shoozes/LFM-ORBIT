@@ -43,6 +43,7 @@ def test_score_cell_healthy_vegetation(mock_loader):
     assert "stable_vegetation" in score["reason_codes"]
     assert "suspected_canopy_loss" not in score["reason_codes"]
     assert score["confidence"] > 0.0
+    assert score["acquisition_key"].startswith("sha256:")
 
 @patch("core.scorer.load_temporal_observations")
 def test_score_cell_single_index_penalty(mock_loader):

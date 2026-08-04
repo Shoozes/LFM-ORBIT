@@ -375,7 +375,7 @@ test.describe("QA Verification — Single Page Architecture", () => {
     await page.getByTestId("tab-mission").click();
     await expect(page.getByTestId("mission-panel-tab-plan")).toHaveClass(/bg-white/);
     await expect(page.getByTestId("mission-preset-panel")).toBeVisible();
-    await expect(page.getByTestId("mission-confirmation-policy-select")).toHaveValue("distinct_acquisition");
+    await expect(page.getByTestId("mission-confirmation-policy-select")).toHaveValue("single_acquisition");
     await expect(page.getByTestId("fast-replay-panel")).not.toBeVisible();
 
     await page.getByTestId("mission-panel-tab-replay").click();

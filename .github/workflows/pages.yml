@@ -19,7 +19,7 @@ jobs:
   build:
     name: Build Pages artifact
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout exact commit
         uses: actions/checkout@v7
@@ -35,6 +35,10 @@ jobs:
         working-directory: source/frontend
         run: npm ci
 
+      - name: Install Chromium for hosted smoke tests
+        working-directory: source/frontend
+        run: npx playwright install --with-deps chromium
+
       - name: Run hosted unit checks
         working-directory: source/frontend
         run: npm run test:unit
@@ -43,12 +47,14 @@ jobs:
         working-directory: source/frontend
         env:
           VITE_PUBLIC_BASE: "/${{ github.event.repository.name }}/"
+          VITE_HOSTED_MODEL_ENABLED: "false"
         run: npm run build:pages
 
       - name: Run Pages-subpath production smoke
         working-directory: source/frontend
         env:
           VITE_PUBLIC_BASE: "/${{ github.event.repository.name }}/"
+          VITE_HOSTED_MODEL_ENABLED: "false"
         run: npm run test:hosted:pages
 
       - name: Configure GitHub Pages
@@ -74,3 +80,46 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+
+  static-smoke:
+    name: Verify deployed Pages origin
+    runs-on: ubuntu-latest
+    needs: deploy
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: source/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: source/frontend
+        run: npm ci
+
+      - name: Install Chromium for deployed smoke tests
+        working-directory: source/frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify deployed static origin
+        working-directory: source/frontend
+        env:
+          HOSTED_PAGES_URL: ${{ needs.deploy.outputs.page_url }}
+        run: npm run test:hosted:pages:live:static
+
+      - name: Upload deployed smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hosted-pages-static-smoke
+          path: |
+            source/frontend/test-results
+            source/frontend/playwright-report
+          if-no-files-found: ignore

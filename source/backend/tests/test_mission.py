@@ -24,6 +24,7 @@ def test_start_mission_returns_dict():
     assert m["task_text"] == "Scan Amazonas sector"
     assert m["status"] == "active"
     assert m["bbox"] is None
+    assert m["confirmation_policy"] == "single_acquisition"
 
 
 def test_start_mission_with_bbox():

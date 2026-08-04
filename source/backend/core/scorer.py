@@ -1,4 +1,5 @@
 from core.config import DETECTION, REGION
+from core.acquisition import build_acquisition_key
 from core.contracts import WindowObservation
 from core.loader import load_temporal_observations
 from core.grid import get_cell_neighbors
@@ -166,6 +167,7 @@ def score_cell_change(cell_id: str, observer: Any = None) -> dict:
 
     return {
         "observation_source": observations["source"],
+        "acquisition_key": build_acquisition_key(observations),
         "before_window": before_window,
         "after_window": after_window,
         "change_score": round(change_score, 4),

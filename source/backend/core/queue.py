@@ -62,9 +62,11 @@ def _migrate_alerts_schema(connection: sqlite3.Connection):
     )
 
     candidate_columns = _column_names(connection, "candidates")
-    if candidate_columns and "mission_id" not in candidate_columns:
+    required_candidate_columns = {"mission_id", "cell_id", "acquisition_key", "distinct_acquisition_count"}
+    if candidate_columns and not required_candidate_columns.issubset(candidate_columns):
         # Candidate counts are transient and cannot be safely assigned to a
-        # mission after the schema upgrade, so discard only this derived state.
+        # mission/acquisition after the schema upgrade, so discard only this
+        # derived state.
         connection.execute("DROP TABLE candidates")
 
     connection.execute(
@@ -72,14 +74,18 @@ def _migrate_alerts_schema(connection: sqlite3.Connection):
         CREATE TABLE IF NOT EXISTS candidates (
             mission_id INTEGER NOT NULL,
             cell_id TEXT NOT NULL,
+            acquisition_key TEXT NOT NULL,
             first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
-            consecutive_anomaly_count INTEGER DEFAULT 1,
-            PRIMARY KEY (mission_id, cell_id)
+            distinct_acquisition_count INTEGER NOT NULL DEFAULT 1,
+            PRIMARY KEY (mission_id, cell_id, acquisition_key)
         )
         """
     )
     connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_candidates_mission ON candidates (mission_id)"
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_candidates_mission_cell ON candidates (mission_id, cell_id)"
     )
 
     columns = _column_names(connection, "alerts")
@@ -152,42 +158,38 @@ def init_db(reset: bool = False):
             connection.execute("DELETE FROM candidates")
         connection.commit()
 
-def upsert_candidate(mission_id: int, cell_id: str) -> int:
-    """Record a mission-scoped candidate and return its consecutive count."""
+
+def upsert_candidate(mission_id: int, cell_id: str, acquisition_key: str = "legacy") -> int:
+    """Record one distinct acquisition and return the cell's distinct count."""
     mission_id = int(mission_id)
     if mission_id <= 0:
         raise ValueError("mission_id must be positive")
+    cell_id = str(cell_id).strip()
+    if not cell_id:
+        raise ValueError("cell_id is required")
+    acquisition_key = str(acquisition_key).strip()
+    if not acquisition_key:
+        raise ValueError("acquisition_key is required")
     with _connect() as connection:
         _migrate_alerts_schema(connection)
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO candidates (mission_id, cell_id, acquisition_key)
+            VALUES (?, ?, ?)
+            """,
+            (mission_id, cell_id, acquisition_key),
+        )
         row = connection.execute(
             """
-            SELECT consecutive_anomaly_count
+            SELECT COUNT(*) AS distinct_count
             FROM candidates
             WHERE mission_id = ? AND cell_id = ?
             """,
             (mission_id, cell_id),
         ).fetchone()
-        if row:
-            new_count = row["consecutive_anomaly_count"] + 1
-            connection.execute(
-                """
-                UPDATE candidates
-                SET consecutive_anomaly_count = ?
-                WHERE mission_id = ? AND cell_id = ?
-                """,
-                (new_count, mission_id, cell_id),
-            )
-        else:
-            new_count = 1
-            connection.execute(
-                """
-                INSERT INTO candidates (mission_id, cell_id, consecutive_anomaly_count)
-                VALUES (?, ?, 1)
-                """,
-                (mission_id, cell_id),
-            )
         connection.commit()
-        return new_count
+        return int(row["distinct_count"])
+
 
 def remove_candidate(mission_id: int, cell_id: str):
     """Remove a mission-scoped candidate if the anomaly fails to persist."""

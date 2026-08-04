@@ -21,6 +21,7 @@
     "test:hosted:build": "npx playwright test -c playwright.hosted.build.config.ts",
     "test:hosted:pages": "npx playwright test -c playwright.hosted.pages.config.ts",
     "test:hosted:pages:live": "npx playwright test -c playwright.hosted.pages.live.config.ts",
+    "test:hosted:pages:live:static": "npx playwright test -c playwright.hosted.pages.live.static.config.ts",
     "test:hosted:model": "npx playwright test -c playwright.hosted.model.config.ts",
     "test:hosted:model:build": "npm run build:hosted && npx playwright test -c playwright.hosted.model.build.config.ts",
     "verify:hosted": "npm run test:unit && npm run build:hosted && npm run test:hosted:build",

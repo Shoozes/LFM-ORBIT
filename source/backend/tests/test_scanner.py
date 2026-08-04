@@ -197,13 +197,45 @@ def test_confirmation_policy_separates_single_and_distinct_acquisition(monkeypat
     monkeypatch.setattr(scanner, "REGION", Config())
     counts = iter((1, 2))
     removed: list[tuple[int, str]] = []
-    monkeypatch.setattr(scanner, "upsert_candidate", lambda _mission_id, _cell_id: next(counts))
+    monkeypatch.setattr(scanner, "upsert_candidate", lambda _mission_id, _cell_id, _acquisition_key: next(counts))
     monkeypatch.setattr(scanner, "remove_candidate", lambda mission_id, cell_id: removed.append((mission_id, cell_id)))
 
     assert scanner.confirm_anomaly_candidate(9, "cell-a", {"confirmation_policy": "single_acquisition"}) is True
     assert scanner.confirm_anomaly_candidate(9, "cell-a", {"confirmation_policy": "distinct_acquisition"}) is False
     assert scanner.confirm_anomaly_candidate(9, "cell-a", {"confirmation_policy": "distinct_acquisition"}) is True
     assert removed == [(9, "cell-a"), (9, "cell-a")]
+
+
+def test_distinct_confirmation_ignores_repeated_cached_evidence(monkeypatch):
+    import core.scanner as scanner
+    from core.acquisition import build_acquisition_key
+
+    class Config:
+        demo_mode_loop_scan = False
+        confirmation_policy = "distinct_acquisition"
+        confirmation_required_acquisitions = 2
+
+    monkeypatch.setattr(scanner, "REGION", Config())
+    seen: set[str] = set()
+
+    def record_candidate(_mission_id, _cell_id, acquisition_key):
+        seen.add(acquisition_key)
+        return len(seen)
+
+    monkeypatch.setattr(scanner, "upsert_candidate", record_candidate)
+    monkeypatch.setattr(scanner, "remove_candidate", lambda *_args: None)
+    score = {
+        "observation_source": "cached_provider",
+        "before_window": {"label": "2024-01", "ndvi": 0.7},
+        "after_window": {"label": "2025-01", "ndvi": 0.3},
+    }
+
+    assert scanner.confirm_anomaly_candidate(9, "cell-a", {"confirmation_policy": "distinct_acquisition"}, score) is False
+    assert scanner.confirm_anomaly_candidate(9, "cell-a", {"confirmation_policy": "distinct_acquisition"}, score) is False
+    changed_score = {**score, "after_window": {"label": "2025-02", "ndvi": 0.2}}
+    assert scanner.confirm_anomaly_candidate(9, "cell-a", {"confirmation_policy": "distinct_acquisition"}, changed_score) is True
+    assert build_acquisition_key({"acquisition_key": "  provider-frame-7  "}) == "provider-frame-7"
+    assert build_acquisition_key({"acquisition_key": " "}) == build_acquisition_key({})
 
 
 def test_confirmation_policy_rejects_unknown_override_to_safe_default(monkeypatch):

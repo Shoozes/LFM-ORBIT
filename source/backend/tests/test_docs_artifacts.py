@@ -380,7 +380,7 @@ def test_validation_snapshots_match_current_release_gate():
     release = (REPO_ROOT / "docs/release/v0.4.0-public-proof.md").read_text(encoding="utf-8")
 
     for source in (readme, todo, release):
-        assert "554 passed" in source
+        assert "557 passed" in source
         assert "Playwright" in source
         assert "intentional skips" in source
         assert "104 passed" not in source
@@ -491,6 +491,11 @@ def test_summary_bank_tracks_current_hosted_integrity_surfaces():
     assert "source/frontend/hosted/demoPackages.ts" in hosted["files"]
     assert "source/frontend/public/demo-packages/index.json" in hosted["files"]
     assert "source/frontend/public/model-manifest.json" in hosted["files"]
+    pages = bank["groups"]["issue_group_hosted_pages_path_and_deployment"]
+    assert "source/frontend/e2e/hosted.pages.live.static.spec.ts" in pages["files"]
+    assert "source/frontend/playwright.hosted.pages.live.static.config.ts" in pages["files"]
+    scanner = bank["groups"]["issue_group_scan_producer_and_agent_deduplication"]
+    assert "source/backend/core/acquisition.py" in scanner["files"]
     assert "source/frontend/e2e/hosted.pages.spec.ts" in hosted["files"]
     assert "source/frontend/playwright.hosted.pages.config.ts" in hosted["files"]
     assert "source/frontend/public/demo-assets/fireline-sentinel.png" in hosted["files"]

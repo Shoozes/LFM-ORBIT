@@ -1,5 +1,6 @@
 export const IS_HOSTED_BUILD = ["hosted", "pages"].includes(import.meta.env.MODE) || import.meta.env.VITE_ORBIT_BUILD === "hosted";
 export const HOSTED_ROUTE = IS_HOSTED_BUILD ? import.meta.env.BASE_URL : "/hosted";
+export const HOSTED_MODEL_ENABLED = import.meta.env.VITE_HOSTED_MODEL_ENABLED !== "false";
 
 const RELATIVE_ASSET_PATTERN = /^[A-Za-z0-9._/-]+$/;
 

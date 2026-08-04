@@ -60,8 +60,12 @@ def test_pages_workflow_builds_and_deploys_only_the_hosted_project_path():
     assert "  pages: write" in workflow
     assert "  id-token: write" in workflow
     assert "VITE_PUBLIC_BASE: \"/${{ github.event.repository.name }}/\"" in workflow
+    assert "VITE_HOSTED_MODEL_ENABLED: \"false\"" in workflow
+    assert "timeout-minutes: 20" in workflow
+    assert "npx playwright install --with-deps chromium" in workflow
     assert "npm run build:pages" in workflow
     assert "npm run test:hosted:pages" in workflow
+    assert workflow.index("npx playwright install --with-deps chromium") < workflow.index("npm run test:hosted:pages")
     assert "actions/configure-pages@v5" in workflow
     assert "actions/upload-pages-artifact@v4" in workflow
     assert "actions/deploy-pages@v4" in workflow
@@ -69,6 +73,12 @@ def test_pages_workflow_builds_and_deploys_only_the_hosted_project_path():
     assert "needs: build" in workflow
     assert "name: github-pages" in workflow
     assert "url: ${{ steps.deployment.outputs.page_url }}" in workflow
+    assert "page_url: ${{ steps.deployment.outputs.page_url }}" in workflow
+    assert "static-smoke:" in workflow
+    assert "needs: deploy" in workflow
+    assert "npm run test:hosted:pages:live:static" in workflow
+    assert workflow.rfind("npx playwright install --with-deps chromium") < workflow.index("npm run test:hosted:pages:live:static")
+    assert "actions/upload-artifact@v7" in workflow
 
 
 def test_default_playwright_suite_excludes_pages_only_specs():

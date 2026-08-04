@@ -6,6 +6,7 @@ from uuid import uuid4
 from fastapi import WebSocket
 
 from core.mission import MISSION_CONFIRMATION_POLICIES, get_active_mission, update_mission_progress
+from core.acquisition import build_acquisition_key
 from core.config import (
     REGION,
     imagery_origin_for_source,
@@ -137,14 +138,15 @@ def confirmation_policy_for_mission(mission: dict | None) -> str:
     return str(getattr(REGION, "confirmation_policy", "distinct_acquisition"))
 
 
-def confirm_anomaly_candidate(mission_id: int, cell_id: str, mission: dict | None) -> bool:
+def confirm_anomaly_candidate(mission_id: int, cell_id: str, mission: dict | None, score: dict | None = None) -> bool:
     """Apply the mission policy and return whether one cell can be emitted."""
     policy = confirmation_policy_for_mission(mission)
     if policy in {"single_acquisition", "demo_immediate"}:
         remove_candidate(mission_id, cell_id)
         return True
-    consecutive = upsert_candidate(mission_id, cell_id)
-    if consecutive >= max(1, int(getattr(REGION, "confirmation_required_acquisitions", 2))):
+    acquisition_key = build_acquisition_key(score or {})
+    distinct_count = upsert_candidate(mission_id, cell_id, acquisition_key)
+    if distinct_count >= max(1, int(getattr(REGION, "confirmation_required_acquisitions", 2))):
         remove_candidate(mission_id, cell_id)
         return True
     return False
@@ -290,6 +292,7 @@ async def _run_region_scan(publish):
                                 int(current_mission_id),
                                 cell_id,
                                 latest_mission,
+                                score,
                             )
                     else:
                         remove_candidate(int(current_mission_id), cell_id)

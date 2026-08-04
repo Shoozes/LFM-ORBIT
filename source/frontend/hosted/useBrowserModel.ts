@@ -3,13 +3,14 @@ import type { Wllama } from "@wllama/wllama";
 import wasmUrl from "@wllama/wllama/esm/wasm/wllama.wasm?url";
 import { loadHostedModelManifest, verifyHostedModelArtifact } from "./hostedModel";
 import type { HostedModelManifest } from "./hostedModel";
+import { HOSTED_MODEL_ENABLED } from "./hostedConfig";
 import {
   browserModelErrorMessage,
   probeBrowserModelCapability,
   responseText,
   statusAfterBrowserModelCancellation,
 } from "./modelState";
-import type { BrowserModelCapability, BrowserModelStatus } from "./modelState";
+import type { BrowserModelCapability, BrowserModelManifestStatus, BrowserModelStatus } from "./modelState";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant";
@@ -22,8 +23,10 @@ export function useBrowserModel() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [manifest, setManifest] = useState<HostedModelManifest | null>(null);
+  const [manifestStatus, setManifestStatus] = useState<BrowserModelManifestStatus>(HOSTED_MODEL_ENABLED ? "loading" : "disabled");
   const [capability, setCapability] = useState<BrowserModelCapability | null>(null);
   const manifestRef = useRef<HostedModelManifest | null>(null);
+  const manifestPromiseRef = useRef<Promise<HostedModelManifest> | null>(null);
   const statusRef = useRef<BrowserModelStatus>("idle");
   const generationAbortRef = useRef<AbortController | null>(null);
 
@@ -63,25 +66,68 @@ export function useBrowserModel() {
     statusRef.current = status;
   }, [status]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    void loadHostedModelManifest(controller.signal)
+  const fetchManifest = useCallback((signal?: AbortSignal): Promise<HostedModelManifest> => {
+    if (!HOSTED_MODEL_ENABLED) {
+      return Promise.reject(new Error("Browser inference is disabled for this hosted build; saved packages remain available."));
+    }
+    if (manifestRef.current) return Promise.resolve(manifestRef.current);
+    if (manifestPromiseRef.current) return manifestPromiseRef.current;
+
+    setManifestStatus("loading");
+    const promise = loadHostedModelManifest(signal)
       .then((loadedManifest) => {
-        if (controller.signal.aborted) return;
+        if (signal?.aborted) return loadedManifest;
         manifestRef.current = loadedManifest;
         setManifest(loadedManifest);
+        setManifestStatus("ready");
+        return loadedManifest;
       })
       .catch((manifestError: unknown) => {
-        if (controller.signal.aborted) return;
-        setError(manifestError instanceof Error ? manifestError.message : String(manifestError));
-      });
-    return () => controller.abort();
+        if (!signal?.aborted) {
+          setManifestStatus("error");
+          setError(manifestError instanceof Error ? manifestError.message : String(manifestError));
+        }
+        throw manifestError;
+    });
+    manifestPromiseRef.current = promise;
+    void promise.then(
+      () => {
+        if (manifestPromiseRef.current === promise) manifestPromiseRef.current = null;
+      },
+      () => {
+        if (manifestPromiseRef.current === promise) manifestPromiseRef.current = null;
+      },
+    );
+    return promise;
   }, []);
+
+  useEffect(() => {
+    if (!HOSTED_MODEL_ENABLED) return undefined;
+    // The manifest is a small static identity file. Keep this shared request
+    // independent from component cleanup so React StrictMode cannot abort the
+    // first request and leave a second mount waiting on its rejected promise.
+    void fetchManifest().catch(() => undefined);
+    return undefined;
+  }, [fetchManifest]);
+
+  const retryManifest = useCallback(() => {
+    if (!HOSTED_MODEL_ENABLED) return;
+    setError(null);
+    void fetchManifest().catch(() => undefined);
+  }, [fetchManifest]);
 
   const load = useCallback(async () => {
     if (["loading", "ready", "generating"].includes(statusRef.current)) return;
+    if (!HOSTED_MODEL_ENABLED) {
+      setError("Browser inference is disabled for this hosted build; saved packages remain available.");
+      return;
+    }
     if (capability && !capability.canFetch) {
       setError(capability.message);
+      return;
+    }
+    if (!manifestRef.current && manifestStatus !== "ready") {
+      setError("The pinned browser model manifest is not ready yet. Retry the manifest check before fetching.");
       return;
     }
     transition("loading");
@@ -91,7 +137,7 @@ export function useBrowserModel() {
     abortRef.current = controller;
     let instance: Wllama | null = null;
     try {
-      const loadedManifest = manifestRef.current ?? await loadHostedModelManifest(controller.signal);
+      const loadedManifest = manifestRef.current ?? await fetchManifest(controller.signal);
       manifestRef.current = loadedManifest;
       setManifest(loadedManifest);
       await verifyHostedModelArtifact(loadedManifest, controller.signal);
@@ -122,7 +168,7 @@ export function useBrowserModel() {
         void instance.exit().catch(() => undefined);
       }
     }
-  }, [capability, transition]);
+  }, [capability, fetchManifest, manifestStatus, transition]);
 
   const chat = useCallback(async (messages: ChatMessage[]): Promise<string> => {
     const instance = instanceRef.current;
@@ -197,8 +243,11 @@ export function useBrowserModel() {
     capability,
     error,
     load,
+    manifestStatus,
     model: manifest,
+    modelEnabled: HOSTED_MODEL_ENABLED,
     progress,
+    retryManifest,
     status,
   };
 }

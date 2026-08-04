@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import TerrainShaderCanvas from "./TerrainShaderCanvas";
 import { loadDemoPackages, packageContext, SYSTEM_PROMPT } from "./demoPackages";
 import type { DemoPackage } from "./demoPackages";
-import { HOSTED_ROUTE, IS_HOSTED_BUILD, resolveHostedAsset } from "./hostedConfig";
+import { HOSTED_MODEL_ENABLED, HOSTED_ROUTE, IS_HOSTED_BUILD, resolveHostedAsset } from "./hostedConfig";
 import { isBrowserModelAbortError } from "./modelState";
 import { useBrowserModel } from "./useBrowserModel";
 import "./hosted.css";
@@ -19,6 +19,11 @@ function statusCopy(status: ReturnType<typeof useBrowserModel>["status"]): strin
   if (status === "generating") return "Orbit Classroom is thinking locally";
   if (status === "error") return "Browser model needs attention";
   return "Ready to fetch the browser model";
+}
+
+function modelStatusCopy(model: ReturnType<typeof useBrowserModel>): string {
+  if (!model.modelEnabled) return "Browser inference unavailable in this build; saved packages remain available";
+  return statusCopy(model.status);
 }
 
 function capabilityCopy(capability: ReturnType<typeof useBrowserModel>["capability"]): string {
@@ -43,9 +48,14 @@ export default function HostedDemo() {
   );
   const onShaderStatus = useCallback((status: string) => setShaderStatus(status), []);
   const startModelFetch = useCallback(() => {
-    void model.load();
+    if (!HOSTED_MODEL_ENABLED) return;
+    if (model.manifestStatus === "error") {
+      model.retryManifest();
+    } else if (model.manifestStatus === "ready") {
+      void model.load();
+    }
     document.getElementById("model")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [model.load]);
+  }, [model.load, model.manifestStatus, model.retryManifest]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -123,11 +133,27 @@ export default function HostedDemo() {
           <p className="hosted-kicker">Browser-first edge AI field note</p>
           <h1>See how a small model turns satellite change into a compact decision.</h1>
           <p className="hosted-hero-copy">
-            Fetch the Orbit model once, run the conversation locally with WebAssembly, and explore saved evidence without an API key or a backend server.
+            {model.modelEnabled
+              ? "Fetch the Orbit model once, run the conversation locally with WebAssembly, and explore saved evidence without an API key or a backend server."
+              : "Explore saved evidence packages without an API key or backend server. Browser inference is temporarily unavailable while the public model license is finalized."}
           </p>
           <div className="hosted-hero-actions">
-            <button className="hosted-button hosted-button-primary" type="button" onClick={startModelFetch} disabled={!model.capability?.canFetch || model.status === "ready" || model.status === "generating"}>
-              {!model.capability ? "Checking browser support" : !model.capability.canFetch ? "Saved packages only" : model.status === "loading" ? "Fetching in this browser" : model.status === "ready" ? "Model ready" : "Fetch the small model"}
+            <button className="hosted-button hosted-button-primary" type="button" onClick={startModelFetch} disabled={!model.modelEnabled || !model.capability?.canFetch || model.manifestStatus === "loading" || model.status === "ready" || model.status === "generating"}>
+              {!model.modelEnabled
+                ? "Browser inference unavailable"
+                : !model.capability
+                  ? "Checking browser support"
+                  : !model.capability.canFetch
+                    ? "Saved packages only"
+                    : model.manifestStatus === "loading"
+                      ? "Reading model manifest"
+                      : model.manifestStatus === "error"
+                        ? "Retry model manifest"
+                        : model.status === "loading"
+                          ? "Fetching in this browser"
+                          : model.status === "ready"
+                            ? "Model ready"
+                            : "Fetch the small model"}
             </button>
             <button className="hosted-button hosted-button-quiet" type="button" onClick={() => setShowLesson((value) => !value)}>
               {showLesson ? "Hide lesson map" : "Show lesson map"}
@@ -166,31 +192,33 @@ export default function HostedDemo() {
         </div>
 
         <aside className="hosted-model-card" aria-labelledby="model-heading">
-          <div className="hosted-card-topline"><span>MODEL FETCH</span><span>{model.model?.sizeLabel ?? "Sealed browser artifact"}</span></div>
-          <h2 id="model-heading">{model.model?.label ?? "Orbit browser model"}</h2>
-          <p className="hosted-model-repo">{model.model ? `${model.model.repo} / ${model.model.file}` : "Fetch to load the pinned public GGUF"}</p>
-          <p className="hosted-model-license">{model.model ? `License: ${model.model.license} · Text reasoning only` : "Reading the pinned model manifest"}</p>
+          <div className="hosted-card-topline"><span>{model.modelEnabled ? "MODEL FETCH" : "MODEL FETCH DISABLED"}</span><span>{model.model?.sizeLabel ?? (model.modelEnabled ? "Sealed browser artifact" : "Saved packages only")}</span></div>
+          <h2 id="model-heading">{model.model?.label ?? (model.modelEnabled ? "Orbit browser model" : "Browser inference unavailable")}</h2>
+          <p className="hosted-model-repo">{model.model ? `${model.model.repo} / ${model.model.file} · revision ${model.model.revision.slice(0, 12)}` : model.modelEnabled ? "Reading the pinned public GGUF manifest" : "The model fetch lane is disabled for this deployment"}</p>
+          <p className="hosted-model-license">{model.model ? `License: ${model.model.license} · Text reasoning only` : model.modelEnabled ? "Manifest identity required before any model request" : "Model licensing is being finalized before browser fetch is enabled"}</p>
           <p className="hosted-model-capability" data-testid="hosted-model-capability">{capabilityCopy(model.capability)}</p>
-          <p className="hosted-model-status">{statusCopy(model.status)}</p>
+          <p className="hosted-model-status">{modelStatusCopy(model)}</p>
           {model.status === "loading" && (
             <div className="hosted-progress" aria-label={`Model fetch ${Math.round(model.progress * 100)} percent`}>
               <span style={{ width: `${Math.round(model.progress * 100)}%` }} />
             </div>
           )}
           <div className="hosted-model-actions">
-            {model.status === "loading" ? (
+            {!model.modelEnabled ? (
+              <button className="hosted-button hosted-button-secondary" type="button" disabled>Browser inference unavailable</button>
+            ) : model.status === "loading" ? (
               <button className="hosted-button hosted-button-secondary" type="button" onClick={model.cancelDownload}>Cancel fetch</button>
             ) : model.status === "generating" ? (
               <button className="hosted-button hosted-button-secondary" type="button" onClick={model.cancelGeneration}>Stop generation</button>
             ) : (
-              <button className="hosted-button hosted-button-secondary" type="button" onClick={() => void model.load()} disabled={model.status === "ready" || !model.capability?.canFetch}>
-                {model.status === "ready" ? "Model ready" : model.status === "error" ? "Retry fetch" : "Fetch + load locally"}
+              <button className="hosted-button hosted-button-secondary" type="button" onClick={() => model.manifestStatus === "error" ? model.retryManifest() : void model.load()} disabled={model.status === "ready" || !model.capability?.canFetch || model.manifestStatus === "loading"}>
+                {model.manifestStatus === "loading" ? "Reading model manifest" : model.manifestStatus === "error" ? "Retry model manifest" : model.status === "ready" ? "Model ready" : model.status === "error" ? "Retry fetch" : "Fetch + load locally"}
               </button>
             )}
             <span className="hosted-no-api">No Orbit API required</span>
           </div>
           {model.error && <p className="hosted-error" role="alert">{model.error}</p>}
-          <p className="hosted-model-note">The first visit verifies and downloads the pinned public GGUF from Hugging Face. Wllama caches it in browser storage for later visits.</p>
+          <p className="hosted-model-note">{model.modelEnabled ? "The first visit verifies and downloads the pinned public GGUF from Hugging Face. Wllama caches it in browser storage for later visits." : "This deployment intentionally serves the saved evidence experience only. No model manifest, weight, or remote model request is made by the app."}</p>
         </aside>
       </section>
 
@@ -250,9 +278,9 @@ export default function HostedDemo() {
           <p>Keep questions grounded in the selected packet. The tutor is intentionally small, local, and transparent about uncertainty.</p>
         </div>
         <div className="hosted-chat-card">
-          <div className="hosted-chat-header"><span>ORBIT CLASSROOM</span><span className={model.status === "ready" ? "hosted-live" : ""}>{statusCopy(model.status)}</span></div>
+          <div className="hosted-chat-header"><span>ORBIT CLASSROOM</span><span className={model.status === "ready" ? "hosted-live" : ""}>{modelStatusCopy(model)}</span></div>
           <div className="hosted-chat-log" aria-live="polite">
-            {chat.length === 0 && <p className="hosted-chat-empty">{!selectedPackage ? "Load a saved package to continue." : model.status === "ready" ? "Ask: Why should this packet be retained?" : "Fetch the model to start a local conversation."}</p>}
+            {chat.length === 0 && <p className="hosted-chat-empty">{!selectedPackage ? "Load a saved package to continue." : model.status === "ready" ? "Ask: Why should this packet be retained?" : model.modelEnabled ? "Fetch the model to start a local conversation." : "Browser inference is unavailable here; review the saved packet and teaching point."}</p>}
             {chat.map((line, index) => <div className={`hosted-chat-line hosted-chat-${line.role}`} key={`${line.role}-${index}`}><span>{line.role === "user" ? "YOU" : "ORBIT"}</span><p>{line.text}</p></div>)}
           </div>
           <form className="hosted-chat-form" onSubmit={submitQuestion}>

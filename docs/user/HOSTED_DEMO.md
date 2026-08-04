@@ -17,26 +17,33 @@ Open `http://127.0.0.1:5173/hosted`. This path installs only the frontend; it do
 ## What the visitor sees
 
 - A terrain shader presentation adapted from the HAIO WebGL landing-page direction.
-- One public GGUF fetch action using Wllama in the browser through WebAssembly; the hero action starts that browser-local load directly after the static manifest has shown the exact model identity, size, license, and text-only capability.
+- One public GGUF fetch action using Wllama in the browser through WebAssembly for model-enabled local builds; the hero action starts that browser-local load only after the static manifest has shown the exact model identity, size, license, and text-only capability.
 - Three clearly labeled saved evidence packages loaded from a validated static manifest; they are not live satellite data.
 - Each package uses schema v2 and carries a local replay id, source manifest path, bbox, observation window, scoring basis, runtime truth, imagery origin, and candidate/review/abstain decision.
 - A local Orbit Classroom chat grounded in the selected package.
 - Short teaching cards covering browser constraints, evidence boundaries, and edge-AI tradeoffs.
 - Reviewed Atacama, Greenland, and Southeast US fireline evidence stills; every promoted package now has a matching visual asset and accessible alt text.
 
-The browser model is pinned by `source/frontend/public/model-manifest.json` to Hugging Face revision `0fc90b8caaa6b8e07d1dc0a9125969c2730e4353`, with a 219,310,432-byte inventory and SHA-256 `9e488f38f64dc4b897c768bec4b37ba01a671309910fd08c470220fa244e14f6`. The route reads this local manifest on entry without fetching the GGUF. After the visitor chooses fetch, it verifies the remote pointer and byte count before Wllama loads the public artifact; later visits may use browser cache.
+The browser model is pinned by `source/frontend/public/model-manifest.json` to Hugging Face revision `0fc90b8caaa6b8e07d1dc0a9125969c2730e4353`, with a 219,310,432-byte inventory and SHA-256 `9e488f38f64dc4b897c768bec4b37ba01a671309910fd08c470220fa244e14f6`. A model-enabled route reads this local manifest before any GGUF request, then verifies the remote pointer and byte count before Wllama loads the public artifact; later visits may use browser cache. The committed Pages workflow currently sets `VITE_HOSTED_MODEL_ENABLED=false`, so that public build does not request the manifest, pointer, or weights from the app and remains a saved-packages-only presentation while redistribution terms are reviewed.
 
 The hosted entry point never starts or calls an Orbit model server. The browser fetches the pinned artifact from Hugging Face, loads Wllama’s local WebAssembly runtime, and keeps the saved-package experience available if WebAssembly, storage, device-memory limits, or network policy prevent model loading. The page probes those browser signals before enabling fetch; a disabled fetch button means “saved packages only,” not a backend outage.
 
 The current browser path sends text package metadata to Wllama. It is text reasoning over saved Orbit evidence, not image-conditioned VLM inference; the `VL` name reflects the upstream artifact lineage, not a browser image-input guarantee. Download cancellation returns to idle, while generation cancellation returns to the reusable local-ready state. The evidence card keeps the replay/scoring provenance visible so a generated explanation cannot be mistaken for a live provider result.
 
-The hosted manifest currently labels the Shoozes handoff repository `mit`. The upstream [LiquidAI/LFM2.5-VL-450M model card](https://huggingface.co/LiquidAI/LFM2.5-VL-450M) labels the base model `lfm1.0`; treat the complete redistribution/attribution decision for the handoff bundle as pending legal review rather than assuming the repository label settles inherited terms.
+The hosted manifest currently labels the Shoozes handoff repository `mit`. The upstream [LiquidAI/LFM2.5-VL-450M model card](https://huggingface.co/LiquidAI/LFM2.5-VL-450M) labels the base model `lfm1.0`; treat the complete redistribution/attribution decision for the handoff bundle as pending legal review rather than assuming the repository label settles inherited terms. This is why the public Pages model lane is disabled until the owner can reconcile the exact pinned revision and notices.
 
 ## Deploy
 
 Build the hosted presentation with `npm run build:hosted` from `source/frontend`, then serve `source/frontend/dist-hosted` at a domain root. For the standard repository Pages site, use `npm run build:pages`; it emits `dist-pages` with the project base supplied by `VITE_PUBLIC_BASE` (the committed workflow supplies `/<repository>/`). The hosted build renders at `/`; `/hosted` remains the local full-app build alias. The hosted route must not be configured as a backend/API proxy.
 
-The committed `.github/workflows/pages.yml` runs the hosted unit checks, Pages-subpath production smoke, and Pages-only artifact build on `main`, then deploys `dist-pages` through the `github-pages` environment. A live-origin model proof and owner-approved model licensing decision are still required before calling the public site release-ready.
+The committed `.github/workflows/pages.yml` runs the hosted unit checks, installs Chromium and its Linux dependencies before browser checks, builds a saved-packages-only Pages artifact, and deploys only `dist-pages` through the `github-pages` environment. A post-deploy static-origin smoke then checks the public project path, MIME types, manifests, images, favicon, and WASM without downloading model weights. A live-origin model proof and owner-approved model licensing decision are still required before calling the public model lane release-ready.
+
+To run the no-weight public-origin smoke after deployment:
+
+```powershell
+$env:HOSTED_PAGES_URL = "https://<owner>.github.io/<repository>/"
+npm run test:hosted:pages:live:static
+```
 
 After deployment, run the release-only live proof from `source/frontend` with the exact trailing-slash Pages URL:
 
@@ -45,7 +52,7 @@ $env:HOSTED_PAGES_URL = "https://<owner>.github.io/<repository>/"
 npm run test:hosted:pages:live
 ```
 
-The live proof runs the browser model/chat path twice and attaches timing evidence. It fails closed when `HOSTED_PAGES_URL` is missing and is intentionally not part of normal CI because each pass can download the 219 MB model artifact.
+The live proof runs the browser model/chat path twice and attaches timing evidence including model transfer bytes and browser cache/service-worker provenance. It fails closed when `HOSTED_PAGES_URL` is missing and is intentionally not part of normal CI because each pass can download the 219 MB model artifact. The static proof is the required lightweight post-deploy CI check; the model proof stays release-only.
 
 The browser demo is device-dependent: model memory, download time, WebAssembly support, and browser storage vary. If local inference cannot start, the page should show the error and keep the saved evidence and teaching content usable.
 

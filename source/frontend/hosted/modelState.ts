@@ -7,6 +7,7 @@ import {
 } from "./modelStateCore.js";
 
 export type BrowserModelStatus = "idle" | "loading" | "ready" | "generating" | "error";
+export type BrowserModelManifestStatus = "disabled" | "loading" | "ready" | "error";
 
 export type BrowserModelCapability = {
   canFetch: boolean;

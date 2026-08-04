@@ -67,6 +67,11 @@ class ObservationPair(TypedDict):
     centroid_lng: float
     before: ObservationWindow
     after: ObservationWindow
+    acquisition_key: NotRequired[str]
+    acquisition_id: NotRequired[str]
+    source_asset_id: NotRequired[str]
+    before_frame_hash: NotRequired[str]
+    after_frame_hash: NotRequired[str]
 
 
 class ScanHeartbeat(TypedDict):

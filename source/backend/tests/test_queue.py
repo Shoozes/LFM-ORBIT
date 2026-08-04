@@ -1,4 +1,5 @@
 import os
+import sqlite3
 
 from core.queue import (
     estimate_object_proof_payload_bytes,
@@ -116,13 +117,49 @@ def test_candidates_are_scoped_to_mission(tmp_path):
 
     init_db(reset=True)
 
-    assert upsert_candidate(1, "same-cell") == 1
-    assert upsert_candidate(2, "same-cell") == 1
-    assert upsert_candidate(1, "same-cell") == 2
+    assert upsert_candidate(1, "same-cell", "acq-1") == 1
+    assert upsert_candidate(2, "same-cell", "acq-1") == 1
+    assert upsert_candidate(1, "same-cell", "acq-2") == 2
 
     remove_candidate(1, "same-cell")
-    assert upsert_candidate(1, "same-cell") == 1
-    assert upsert_candidate(2, "same-cell") == 2
+    assert upsert_candidate(1, "same-cell", "acq-1") == 1
+    assert upsert_candidate(2, "same-cell", "acq-2") == 2
+
+
+def test_duplicate_acquisition_is_idempotent(tmp_path):
+    db_path = tmp_path / "duplicate_acquisition.sqlite"
+    os.environ["CANOPY_SENTINEL_DB_PATH"] = str(db_path)
+
+    init_db(reset=True)
+
+    assert upsert_candidate(1, "same-cell", "cached-frame-1") == 1
+    assert upsert_candidate(1, "same-cell", "cached-frame-1") == 1
+    assert upsert_candidate(1, "same-cell", "new-frame-2") == 2
+
+
+def test_legacy_candidate_schema_is_discarded_as_transient_state(tmp_path):
+    db_path = tmp_path / "legacy_candidates.sqlite"
+    os.environ["CANOPY_SENTINEL_DB_PATH"] = str(db_path)
+
+    connection = sqlite3.connect(db_path)
+    connection.execute(
+        """
+        CREATE TABLE candidates (
+            mission_id INTEGER NOT NULL,
+            cell_id TEXT NOT NULL,
+            first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+            consecutive_anomaly_count INTEGER DEFAULT 1,
+            PRIMARY KEY (mission_id, cell_id)
+        )
+        """
+    )
+    connection.execute("INSERT INTO candidates (mission_id, cell_id) VALUES (1, 'same-cell')")
+    connection.commit()
+    connection.close()
+
+    init_db()
+
+    assert upsert_candidate(1, "same-cell", "fresh-frame") == 1
 
 
 def test_payload_estimation_is_positive():

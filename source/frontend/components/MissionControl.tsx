@@ -328,7 +328,7 @@ export default function MissionControl({
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [selectedUseCaseId, setSelectedUseCaseId] = useState<string | null>(null);
   const [selectedTargetPackId, setSelectedTargetPackId] = useState<string | null>(null);
-  const [confirmationPolicy, setConfirmationPolicy] = useState<"single_acquisition" | "distinct_acquisition">("distinct_acquisition");
+  const [confirmationPolicy, setConfirmationPolicy] = useState<"single_acquisition" | "distinct_acquisition">("single_acquisition");
   const [activePanelTab, setActivePanelTab] = useState<MissionPanelTab>("plan");
 
   const [submitting, setSubmitting] = useState(false);
@@ -360,7 +360,7 @@ export default function MissionControl({
       setSelectedTargetPackId(mission.target_pack_id ?? null);
     }
     if (mission?.confirmation_policy !== undefined) {
-      setConfirmationPolicy(mission.confirmation_policy ?? "distinct_acquisition");
+      setConfirmationPolicy(mission.confirmation_policy ?? "single_acquisition");
     }
   }, [mission?.confirmation_policy, mission?.id, mission?.target_pack_id]);
 
@@ -539,7 +539,7 @@ export default function MissionControl({
       ? "Scanning selected area"
       : "Starting scan";
   const confirmationPolicyLabel = confirmationPolicy === "single_acquisition" ? "one acquisition" : "distinct acquisitions";
-  const confirmationPolicySource = mission?.confirmation_policy ? "mission override" : "safe region default";
+  const confirmationPolicySource = mission?.confirmation_policy ? "mission policy" : "region fallback";
   const visibleReplays = showReplayCatalog ? replays : [];
 
   const severityColor = (s: string) => {
@@ -949,11 +949,11 @@ export default function MissionControl({
               onChange={(event) => setConfirmationPolicy(event.target.value as "single_acquisition" | "distinct_acquisition")}
               className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 outline-none"
             >
-              <option value="distinct_acquisition">Distinct acquisitions (safe default)</option>
-              <option value="single_acquisition">One acquisition (deliberate one-shot review)</option>
+              <option value="single_acquisition">One acquisition (default one-shot review)</option>
+              <option value="distinct_acquisition">Distinct acquisitions (recurring monitor)</option>
             </select>
             <p className="text-[10px] leading-snug text-zinc-500">
-              Distinct acquisitions wait for independent confirmation; one acquisition is for an explicit one-shot review and is persisted with this mission.
+              One-shot missions use the first acquisition by default. Choose distinct acquisitions for a recurring monitor that needs independent confirmation.
             </p>
           </div>
 

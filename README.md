@@ -182,9 +182,9 @@ The table below separates the historical May 8 release snapshot from the current
 | Check | Current State |
 |---|---|
 | Root verify | August 4 `.\run.ps1 -Verify` passed; the optional trained-GGUF runtime smoke remains a separate lane |
-| Backend tests | August 4 full backend suite `554 passed` |
+| Backend tests | August 4 full backend suite `557 passed`; the stale Windows venv emitted one Starlette warning because its declared `httpx2` dev extra was not synced |
 | Frontend | typecheck + production build passing; hosted smoke, static preview, and production-preview model proof passing |
-| Pages project path | Pages-mode production build and `/LFM-ORBIT/` static smoke passing locally; live deployment proof remains separate |
+| Pages project path | Saved-packages-only Pages-mode build, `/LFM-ORBIT/` smoke, and no-weight static-origin smoke passing locally; live deployment proof remains separate |
 | Hosted real-model proof | `npm run test:hosted:model:build` fetched the pinned 219 MB GGUF and generated a local response with no backend/API/WebSocket requests |
 | Playwright E2E | August 4 default suite rerun: `108 passed, 6 skipped` with intentional skips; Pages-only release specs are excluded from this default port-owning suite |
 | Docs/import guards | passing |

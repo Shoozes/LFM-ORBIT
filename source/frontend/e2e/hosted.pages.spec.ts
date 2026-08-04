@@ -3,10 +3,12 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 
 const PAGES_BASE = process.env.VITE_PUBLIC_BASE ?? "/LFM-ORBIT/";
+const MODEL_ENABLED = process.env.VITE_HOSTED_MODEL_ENABLED !== "false";
 
 test("hosted Pages build stays under the project path", async ({ page }) => {
   const firstPartyRootRequests: string[] = [];
   const forbiddenRootRequests: string[] = [];
+  const modelManifestRequests: string[] = [];
   const scriptMimes: string[] = [];
   const cssMimes: string[] = [];
 
@@ -17,6 +19,7 @@ test("hosted Pages build stays under the project path", async ({ page }) => {
     if (/^\/(?:assets|demo-assets|demo-packages|model-manifest\.json|orbit-mark\.svg)(?:\/|$)/.test(url.pathname)) {
       forbiddenRootRequests.push(url.pathname);
     }
+    if (url.pathname.endsWith("/model-manifest.json")) modelManifestRequests.push(url.pathname);
   });
   page.on("response", (response) => {
     const pathname = new URL(response.url()).pathname;
@@ -29,6 +32,12 @@ test("hosted Pages build stays under the project path", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /small model turns satellite change/i })).toBeVisible();
   await expect(page.getByRole("link", { name: /Orbit hosted demo home/i })).toHaveAttribute("href", PAGES_BASE);
   await expect(page.getByRole("link", { name: /Full app \(local\)/i })).toHaveCount(0);
+  if (!MODEL_ENABLED) {
+    await expect(page.getByRole("button", { name: "Browser inference unavailable" }).first()).toBeDisabled();
+    await expect(page.getByText(/temporarily unavailable while the public model license is finalized/i)).toBeVisible();
+    await expect(page.getByText(/No model manifest, weight, or remote model request is made by the app/i)).toBeVisible();
+    expect(modelManifestRequests).toEqual([]);
+  }
 
   const packageResponse = await page.request.get(new URL("demo-packages/index.json", page.url()).toString());
   const modelResponse = await page.request.get(new URL("model-manifest.json", page.url()).toString());
