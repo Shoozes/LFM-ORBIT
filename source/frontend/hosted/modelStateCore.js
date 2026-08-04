@@ -27,6 +27,12 @@ function hasWorkingWebAssembly(runtime) {
 }
 
 export async function probeBrowserModelCapability(runtime = globalThis) {
+  if (runtime?.isSecureContext === false) {
+    return savedPackagesOnly(
+      "secure-context-unavailable",
+      "Secure HTTPS context is required for reliable local model loading. Saved evidence packages remain available.",
+    );
+  }
   const wasmAvailable = hasWorkingWebAssembly(runtime);
   if (!wasmAvailable) {
     return savedPackagesOnly(

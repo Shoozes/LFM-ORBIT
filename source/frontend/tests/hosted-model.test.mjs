@@ -48,6 +48,16 @@ test("browser capability probe disables fetch when WebAssembly is unavailable", 
   assert.equal(result.mode, "saved-packages-only");
 });
 
+test("browser capability probe requires a secure context for model loading", async () => {
+  const result = await probeBrowserModelCapability({
+    ...runtime(),
+    isSecureContext: false,
+  });
+  assert.equal(result.canFetch, false);
+  assert.equal(result.code, "secure-context-unavailable");
+  assert.match(result.message, /HTTPS/i);
+});
+
 test("browser capability probe disables fetch when storage is unavailable or too full", async () => {
   const unavailable = await probeBrowserModelCapability(runtime({ storage: null }));
   assert.equal(unavailable.code, "storage-unavailable");

@@ -34,9 +34,17 @@ export type UseTelemetryState = {
   refreshTelemetry: (options?: { replaceAlerts?: boolean }) => Promise<void>;
 };
 
+const FETCH_TIMEOUT_MS = 5000;
+
 async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T | null> {
+  const requestController = new AbortController();
+  const timeoutId = window.setTimeout(() => requestController.abort(), FETCH_TIMEOUT_MS);
+  const abortRequest = () => requestController.abort();
+  signal?.addEventListener("abort", abortRequest, { once: true });
+
   try {
-    const response = await fetch(url, signal ? { signal } : undefined);
+    if (signal?.aborted) requestController.abort();
+    const response = await fetch(url, { signal: requestController.signal });
 
     if (!response.ok) {
       return null;
@@ -45,6 +53,9 @@ async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T | null
     return (await response.json()) as T;
   } catch {
     return null;
+  } finally {
+    window.clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", abortRequest);
   }
 }
 
@@ -169,10 +180,35 @@ export function useTelemetry(): UseTelemetryState {
   useEffect(() => {
     let cancelled = false;
 
+    const scheduleReconnect = () => {
+      if (cancelled || !mountedRef.current || reconnectTimer.current) return;
+      if (reconnectAttempts.current >= MAX_RECONNECT_ATTEMPTS) {
+        setConnectionState("closed");
+        return;
+      }
+      const delay = Math.min(
+        BASE_RECONNECT_DELAY_MS * Math.pow(2, reconnectAttempts.current),
+        30000,
+      );
+      reconnectAttempts.current += 1;
+      setConnectionState("reconnecting");
+      reconnectTimer.current = setTimeout(() => {
+        reconnectTimer.current = null;
+        connect();
+      }, delay);
+    };
+
     function connect() {
       if (cancelled) return;
 
-      const socket = new WebSocket(telemetryUrl);
+      let socket: WebSocket;
+      try {
+        socket = new WebSocket(telemetryUrl);
+      } catch {
+        setConnectionState("error");
+        scheduleReconnect();
+        return;
+      }
       wsRef.current = socket;
       setConnectionState(reconnectAttempts.current > 0 ? "reconnecting" : "connecting");
       setIsScanComplete(false);
@@ -197,21 +233,14 @@ export function useTelemetry(): UseTelemetryState {
       };
 
       socket.onclose = () => {
+        if (wsRef.current !== socket) {
+          return;
+        }
         wsRef.current = null;
         if (cancelled || !mountedRef.current) {
           return;
         }
-        if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
-          const delay = Math.min(
-            BASE_RECONNECT_DELAY_MS * Math.pow(2, reconnectAttempts.current),
-            30000,
-          );
-          reconnectAttempts.current += 1;
-          setConnectionState("reconnecting");
-          reconnectTimer.current = setTimeout(connect, delay);
-        } else {
-          setConnectionState("closed");
-        }
+        scheduleReconnect();
       };
 
       socket.onmessage = (event) => {

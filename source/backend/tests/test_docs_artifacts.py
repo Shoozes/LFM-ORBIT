@@ -472,10 +472,10 @@ def test_public_model_handoff_matches_current_repo_identity_and_runtime_boundary
     assert handoff["source"]["file_sha256"] == "9e488f38f64dc4b897c768bec4b37ba01a671309910fd08c470220fa244e14f6"
     assert handoff["source"]["file_bytes"] == 219310432
     assert handoff["runtime"]["mmproj_filename"] == ""
-    assert handoff["artifact"]["browser_manifest"] == "source/frontend/public/model-manifest.json"
+    assert handoff["artifact"]["browser_manifest"] == "source/frontend/hosted/model-manifest.json"
 
     manifest = json.loads(
-        (REPO_ROOT / "source/frontend/public/model-manifest.json").read_text(encoding="utf-8")
+        (REPO_ROOT / "source/frontend/hosted/model-manifest.json").read_text(encoding="utf-8")
     )
     assert manifest["revision"] == handoff["source"]["revision"]
     assert manifest["sha256"] == handoff["source"]["file_sha256"]
@@ -490,7 +490,8 @@ def test_summary_bank_tracks_current_hosted_integrity_surfaces():
 
     assert "source/frontend/hosted/demoPackages.ts" in hosted["files"]
     assert "source/frontend/public/demo-packages/index.json" in hosted["files"]
-    assert "source/frontend/public/model-manifest.json" in hosted["files"]
+    assert "source/frontend/hosted/model-manifest.json" in hosted["files"]
+    assert "source/frontend/hosted/HostedEvidenceDemo.tsx" in hosted["files"]
     pages = bank["groups"]["issue_group_hosted_pages_path_and_deployment"]
     assert "source/frontend/e2e/hosted.pages.live.static.spec.ts" in pages["files"]
     assert "source/frontend/playwright.hosted.pages.live.static.config.ts" in pages["files"]

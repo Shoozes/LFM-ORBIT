@@ -2,7 +2,7 @@ import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 
-const HostedDemo = lazy(() => import("./hosted/HostedEvidenceDemo.tsx"));
+const HostedDemo = lazy(() => import("./hosted/HostedDemo.tsx"));
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

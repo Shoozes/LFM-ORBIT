@@ -31,7 +31,8 @@ This is the compact backlog and integrity checklist. Keep current context routin
 - The current trained LiquidAI Leap Tune-compatible bundle is fetched from `Shoozes/lfm2.5-450m-vl-orbit-satellite`; SAT/GND GGUF calls remain evidence-packet reasoning. `/api/inference/image` provides a separate opt-in retained-frame LiquidAI/LFM2.5-VL-450M image-text-to-text review path when `image_conditioned_runtime_enabled=true`.
 - The hosted portfolio route is separate from the full app: the normal build keeps the full app at `/` and the browser-only alias at `/hosted`; `npm run build:hosted` emits an isolated static bundle at `/`, while `npm run build:pages` emits the same browser-only route under a configurable project base such as `/LFM-ORBIT/`. The browser runtime is text reasoning over saved evidence, not image-conditioned VLM inference.
 - Every promoted hosted package has a repo-local visual asset and accessible alt text; the fireline card uses the reviewed `fireline_sentinel.png` source frame and remains candidate/review-only.
-- The hosted route has explicit manifest states and a build-time model gate. Local hosted builds keep the manifest-first browser fetch lane; Pages builds set `VITE_HOSTED_MODEL_ENABLED=false`, serve saved packages only, and make no app request for model metadata or weights until redistribution terms are settled.
+- The hosted route has one parsed deployment capability and a fail-closed model gate. Local hosted builds keep the manifest-first browser fetch lane; Pages builds default to the model-free `hosted-main.tsx` entry and emit no model manifest, Wllama chunk, or WASM unless `VITE_HOSTED_MODEL_ENABLED=true` is explicitly supplied.
+- Model-enabled browser loading requires a secure context and selects single-thread Wllama mode when cross-origin isolation is unavailable; iOS Safari compatibility remains an external physical-device proof, with saved packages as the safe fallback.
 - Mission confirmation overrides are persisted through `core/mission.py` and `/api/mission/start`; one-shot missions default to `single_acquisition`, while recurring monitors can explicitly choose `distinct_acquisition`, which counts stable acquisition fingerprints rather than repeated cached evidence.
 - The repository boundary is explicit: LFM-ORBIT `main` carries the public application, GenUni remains the separate training-cycle/producer repository, and `.tools/project.json` points publish/pull helpers at public LFM-ORBIT while recording GenUni as `trainingRemote`.
 - Boundary, remote-target, and cross-history recovery pitfalls are recorded in [PITFALL_LEDGER.md](PITFALL_LEDGER.md); keep it focused on regression prevention rather than progress reporting.
@@ -43,7 +44,7 @@ This is the compact backlog and integrity checklist. Keep current context routin
 - Option 1 / `-Install` / `--install` refresh moving Hugging Face model refs such as `main` instead of assuming the installed manifest is current.
 - The shared trained GGUF runtime serializes completion calls so simultaneous satellite/ground-agent generations cannot crash the native llama.cpp context.
 - Proof Mode hydration is keyed to stable mission identity; high-frequency mission and telemetry refreshes must not cancel the current mission's related-timelapse request.
-- Frontend mission and Agent Dialogue polling share a request gate that aborts superseded/unmounted work and ignores late responses.
+- Frontend mission and Agent Dialogue polling share a request gate that aborts superseded/unmounted work and ignores late responses; telemetry JSON refreshes time out, and agent-dialogue WebSocket payloads are validated, bounded, and retried with capped backoff.
 - Docs are split by audience: `docs/user/` is for demo/review operators, `docs/dev/` is for active architecture, data/model handoff, and backlog work; older planning notes stay under `docs/dev/archive/`.
 - Tracked ad hoc backend scratch probes are pruned; use maintained scripts, tests, or documented manual provider probes instead.
 - Broadcast bus rows now use per-recipient receipts, so ground and satellite consumers can each receive the same broadcast without the first reader hiding it from the other.
@@ -61,23 +62,38 @@ This is the compact backlog and integrity checklist. Keep current context routin
 - The May 7 full integrity pass validated the staged repo from clean Windows and WSL/Linux clones. Playwright backend servers now use `uv run --locked`, and WSL requires native Linux `node`/`npm`/`npx`, `uv` on non-login PATH, and Playwright Chromium/deps before browser smoke tests.
 - The May 7 Hugging Face dataset refresh published a larger `Shoozes/LFM-Orbit-SatData` training set and logged the export pitfalls in [archive/QA_PITFALLS.md](archive/QA_PITFALLS.md). The upload helper now validates JSONL, image references, local path leaks, orphaned images, and empty README-configured JSONL splits before upload.
 
-## Active Backlog
+## Completed Local Integrity Items
 
-- Task: Restore the locked backend verification environment. **P1 / developer-environment gate.**
-  - What/Why: The ignored `.venv` and `.venv-windows` launchers currently point to a missing uv-managed Python executable, while the bundled Python runtime has no pytest. This prevents a fresh backend/import/docs gate and can mask dependency drift behind a stale environment.
-  - Where: `source/backend/.venv*` (ignored), `source/backend/pyproject.toml`, `source/backend/uv.lock`, and the Windows/Linux launcher bootstrap in `run.ps1` and `run.sh`.
-  - How: Recreate the ignored environment with the repository's locked `uv` path, install the declared `dev` extra, then rerun the backend, import, docs, and CI-contract suites. Do not commit virtualenv files or generated runtime output.
-  - When: Before the next backend release gate or dependency change.
+- [x] Task: Restore the locked backend verification environment. **P1 / developer-environment gate.**
+  - What/Why: The Windows project environment had been linked to a missing uv-managed Python executable, which prevented fresh backend/import/docs verification and left the locked `httpx2` warning unresolved.
+  - Where: `source/backend/.venv-windows` (ignored), `source/backend/pyproject.toml`, `source/backend/uv.lock`, and the repo-local uv bootstrap under `runtime-data/tools/uv-venv/`.
+  - How: Recreated the ignored Windows environment with repo-local `uv sync --locked --extra dev` using the declared lockfile and verified the focused contracts plus the full suite.
   - Done when: `uv run --locked pytest -q` starts from a clean/resynchronized environment, the `httpx2` warning is absent, and the focused import/docs/CI guards pass.
-  - Verification: `uv sync --locked --extra dev` followed by `uv run --locked pytest -q tests/test_import_contracts.py tests/test_docs_artifacts.py tests/test_ci_workflow.py` from `source/backend`.
+  - Verification: focused import/docs/CI gate `33 passed`; full locked backend suite `557 passed` with no application failures.
+
+- [x] Task: Keep seeded-cache export metadata portable.
+  - What/Why: Export records must identify the seeded metadata file without leaking a workspace or temporary-directory prefix when fixtures are generated outside the repository.
+  - Where: `source/backend/scripts/export_orbit_dataset.py` and `source/backend/tests/test_export_orbit_dataset.py`.
+  - How: Serialize the seeded metadata filename directly and retain the workspace-owned temporary-path regression coverage.
+  - Done when: seeded-cache export records always emit the metadata filename and the exporter regression passes from an in-repository temporary directory.
+  - Verification: focused exporter regression passed; full locked backend suite passed `557` tests.
+
+- [x] Task: Harden frontend agent-bus and telemetry refresh boundaries.
+  - What/Why: Browser WebSocket JSON and periodic API responses are external input; malformed agent fields could reach JSX, dialogue history could grow without a limit, and fixed/infinite retries could waste resources during a backend outage.
+  - Where: `source/frontend/utils/agentBusCore.js`, `source/frontend/hooks/useAgentBus.ts`, `source/frontend/hooks/useTelemetry.ts`, and `source/frontend/components/AgentDialogue.tsx`.
+  - How: Validate and normalize supported envelopes, retain only the latest 200 messages, cap reconnect attempts with exponential backoff, bound telemetry JSON calls to five seconds, and cancel/timeout operator injection.
+  - Done when: malformed envelopes are ignored without render errors, late/unmounted requests cannot repaint state, reconnects stop after the configured cap, and focused tests cover normalization, deduplication, and retention.
+  - Verification: frontend lint/build passed; `npm run test:unit` passed `17` tests including three agent-bus boundary cases.
+
+## Active Backlog
 
 - Task: Prove the deployed Pages origin. **Owner/runtime evidence required.**
   - What/Why: Local project-path proof cannot establish public-origin CORS, MIME, caching, browser-storage, or model-download behavior.
-  - Where: the successful `github-pages` deployment, the deployed project URL, `source/frontend/playwright.hosted.pages.live.static.config.ts`, `source/frontend/e2e/hosted.pages.live.static.spec.ts`, and the release-only model harness.
-  - How: Let the workflow run the no-weight static-origin smoke after deployment, then set `HOSTED_PAGES_URL` to the exact trailing-slash project URL for the opt-in model proof; verify project-path HTML/JS/CSS/JSON/images/WASM MIME, no backend/API/WebSocket/provider requests, and measurable cached model reuse only after licensing is approved.
+  - Where: the successful `github-pages` deployment, the deployed HTTPS project URL, `source/frontend/playwright.hosted.pages.live.static.config.ts`, `source/frontend/e2e/hosted.pages.live.static.spec.ts`, and the release-only model harness.
+  - How: Let the workflow run the no-weight static-origin smoke after deployment, then set `HOSTED_PAGES_URL` to the exact trailing-slash HTTPS project URL for the opt-in model proof; verify project-path HTML/JS/CSS/JSON/images MIME, explicit absence of model runtime assets, no backend/API/WebSocket/provider requests, and measurable cached model reuse only after licensing is approved.
   - When: After the Pages workflow is deployed and GitHub reports the environment URL.
-  - Subtasks: `[x]` Build the fail-closed live harness and timing attachment. `[x]` Add Chromium/dependency installation and post-deploy static smoke. `[ ]` Deploy the workflow. `[ ]` Run the first/cached model proof and retain its artifact.
-  - Done when: the public Pages origin completes an initial and cached local model load with recorded browser/runtime timing and the proof is retained with the release record.
+  - Subtasks: `[x]` Build the fail-closed live harness and timing attachment. `[x]` Add Chromium/dependency installation and post-deploy static smoke. `[x]` Make Pages model-free by default and audit the no-runtime artifact. `[ ]` Deploy the workflow and retain the static-origin proof. `[ ]` Run the first/cached model proof on an owner-approved HTTPS model-enabled release.
+  - Done when: the public Pages origin completes the saved-only static smoke; the later model-enabled HTTPS release completes initial and cached local model loads with recorded browser/runtime timing and the proof is retained with the release record.
   - Verification: release-only or scheduled Playwright run using the deployed URL; do not add the model download to every commit.
 
 - Task: Link the verified Pages URL from public entry points. **Owner/runtime evidence required.**
@@ -90,7 +106,7 @@ This is the compact backlog and integrity checklist. Keep current context routin
 
 - Task: Resolve model redistribution and attribution metadata. **Owner/legal evidence required.**
   - What/Why: The derivative handoff currently advertises `mit`, while the upstream LiquidAI model card advertises `lfm1.0`; the repository must not infer inherited terms from one label.
-  - Where: `source/frontend/public/model-manifest.json`, `docs/legal/THIRD_PARTY_NOTICES.md`, `docs/user/HOSTED_DEMO.md`, `docs/dev/MODEL_HANDOFF.md`, and the Shoozes Hugging Face model card.
+  - Where: `source/frontend/hosted/model-manifest.json`, `docs/legal/THIRD_PARTY_NOTICES.md`, `docs/user/HOSTED_DEMO.md`, `docs/dev/MODEL_HANDOFF.md`, and the Shoozes Hugging Face model card.
   - How: Confirm derivative artifact, base-model, quantization, redistribution, attribution, and naming terms; publish a corrected immutable model revision if required, then update manifest identity and tests together. Until then, keep Pages on the saved-packages-only build gate while local model tests remain opt-in.
   - When: Before public model promotion or any live-origin proof is treated as release-ready.
   - Done when: owner/legal sign-off, model-card metadata, browser manifest, displayed copy, and third-party notices agree for the exact pinned revision.
@@ -209,7 +225,7 @@ Model/runtime:
 - Optional live provider probe: `uv run --no-sync python scripts/probe_live_observation.py --provider simsat_sentinel --bbox="-63.1,-10.1,-62.9,-9.9" --start "2025-01-01" --end "2025-02-01"` from `source/backend`
 - Frontend type/build guard: `npm run lint` and `npm run build` from `source/frontend`
 - Hosted static guard: `npm run verify:hosted` from `source/frontend` (`build:hosted` followed by the static preview smoke)
-- Hosted Pages guard: `npm run build:pages` followed by `npm run test:hosted:pages` from `source/frontend`
+- Hosted Pages guard: `npm run build:pages` followed by `npm run test:hosted:pages` from `source/frontend`; the default Pages artifact must omit the model manifest, Wllama chunk, and WASM
 - Deployed Pages guard: set `HOSTED_PAGES_URL` to the exact trailing-slash Pages URL, then run `npm run test:hosted:pages:live` from `source/frontend`; this is release-only because it downloads the model twice.
 - Deployed Pages static guard: set `HOSTED_PAGES_URL` to the exact trailing-slash Pages URL, then run `npm run test:hosted:pages:live:static`; this checks the public origin without downloading model weights.
 - Full browser guard: `npm run test:e2e` from `source/frontend`
@@ -220,17 +236,14 @@ Model/runtime:
 ## Latest Validation Snapshot
 
 - Prior recorded release verification: `.\run.ps1 -Verify` passed end-to-end on May 8 with backend `499 passed`, GGUF runtime smoke, frontend typecheck/build, and full Playwright E2E with intentional skips. Treat that as historical until the current environment reruns the launcher gate.
-- August 4 backend verification: the focused changed-surface gate recorded `57 passed`; the full Windows repository gate recorded `557 passed` with one warning because the stale local venv lacks the repo-declared `httpx2` dev extra. The locked project dependency contract still declares `httpx2>=2.7.0`; resync that venv before treating the warning as a code regression. Coverage includes queue migration/idempotency, acquisition-aware scanner confirmation, mission defaults, prompt, cache, image-safety, local-boundary, path, replay-validation, additive cached-rescan comparison, project-config, CI workflow, clean-checkout assets, scenario-registry, model-handoff identity, hosted package wiring, telemetry-coordinator contracts, resource-limit behavior, SQLite lifecycle closure, concurrent runtime-artifact writes, and default Playwright Pages-spec exclusion.
-- August 4 hosted verification: `npm run lint`, `npm run test:unit`, `npm run test:hosted`, `npm run test:hosted:build`, `npm run build:pages`, and the saved-packages-only `npm run test:hosted:pages` passed from `source/frontend`; the hosted smoke does not start FastAPI or require the backend model runtime, the static preview proves JSON/JavaScript/WebAssembly MIME types, the Pages build makes no app model-manifest request, and the manifest identity is visible before a model request in enabled builds.
-- August 4 frontend unit verification: `npm run test:unit` passed 10 tests, covering 8 browser-model cases and 2 shared request-gate cases.
-- August 4 enabled hosted model verification: `npm run test:hosted:model:build` reran against the production preview, fetched the pinned 219 MB artifact, reached local-ready state, and generated a local response in 44 seconds with no backend/API/WebSocket traffic. This remains an opt-in local proof; the Pages artifact stays model-disabled pending licensing.
-- August 4 hosted production browser-model verification: `npm run test:hosted:model:build` passed after the real 219 MB GGUF fetch; the built preview reached local-ready state and generated a local response with no backend/API/WebSocket requests. This remains opt-in and excluded from the normal/full E2E configs because it depends on network, device memory, and browser cache state.
-- August 4 hosted smoke follow-up: the current built-preview smoke started but the managed browser hung on its single static test after launch; the test-owned process was stopped after a bounded wait, so no new browser pass is claimed from this run.
-- August 4 Pages-path verification: the saved-packages-only `npm run build:pages` and project-path smoke passed through the approved external browser runtime; the new no-weight deployed-static smoke also passed against a local Pages preview and follows dynamic Vite imports to verify local WASM MIME. The managed sandbox runner remains unreliable for this browser lane.
+- August 4 backend verification: the repo-local Windows environment was resynchronized with `uv sync --locked --extra dev`; the focused import/docs/CI gate passed `33` tests and the full locked repository gate passed `557` tests with no application failures or `httpx2` warning. Coverage includes queue migration/idempotency, acquisition-aware scanner confirmation, mission defaults, prompt, cache, image-safety, local-boundary, path, replay-validation, additive cached-rescan comparison, project-config, CI workflow, clean-checkout assets, scenario-registry, model-handoff identity, hosted package wiring, telemetry-coordinator contracts, resource-limit behavior, SQLite lifecycle closure, concurrent runtime-artifact writes, seeded-cache export portability, and default Playwright Pages-spec exclusion.
+- August 4 current hosted implementation: `npm run lint`, `npm run test:unit`, `npm run build`, `npm run build:hosted`, and the default saved-packages-only `npm run build:pages` passed from `source/frontend`; the explicit model-enabled Pages build also emitted its manifest and Wllama runtime. The project-path browser smoke was listed but local Chromium failed to launch with `spawn EPERM`, so no new browser pass is claimed.
+- August 4 frontend unit verification: `npm run test:unit` passed 17 tests, covering 9 browser-model cases, 3 build-policy cases, 2 shared request-gate cases, and 3 agent-bus boundary cases.
+- Prior August 4 enabled hosted model verification: `npm run test:hosted:model:build` fetched the pinned 219 MB artifact, reached local-ready state, and generated a local response with no backend/API/WebSocket traffic. This remains an opt-in local proof; the Pages artifact stays model-disabled pending licensing, and the current single-thread mobile path still needs a fresh device run.
+- August 4 Pages artifact audit: the default `dist-pages` contains no model manifest, Wllama chunk, model WASM, or Hugging Face URL; the deployed-static harness checks the same absence on the public origin. The managed browser lane remains unavailable locally because Chromium launch returned `spawn EPERM`.
 - August 4 live-origin harness: implemented but not confirmed against a public deployment in this local pass; it fails closed without `HOSTED_PAGES_URL`, retains listeners safely, and records model transfer bytes plus disk/service-worker/prefetch cache provenance across two model/chat passes when supplied.
-- August 4 follow-up environment audit: the ignored backend virtualenvs point to a missing uv-managed Python executable and the bundled Python runtime has no pytest; resynchronize the local locked environment before recording a new backend total.
 - August 4 default browser verification: `npm run test:e2e` reran with `108 passed, 6 skipped` and no failures; the two release-only Pages specs are excluded from the port-owning default config, while the long tutorial case completed in `6.4m`.
-- August 4 Mission Control QA verification: the focused `qa_verification.spec.ts` suite passed `27` tests against direct Windows venv servers, including the persisted one-acquisition default, replay/agent flows, responsive shell, and area tools. The normal Playwright web-server wrapper still requires the unavailable `uv` shim in this environment.
+- August 4 Mission Control QA verification: the focused `qa_verification.spec.ts` suite passed `27` tests against direct Windows venv servers, including the persisted one-acquisition default, replay/agent flows, responsive shell, and area tools. The repo-local uv shim is now restored; no new browser QA pass is claimed because managed Chromium launch still returns `spawn EPERM`.
 - August 4 full-app launcher verification: `.\run.ps1 -Verify` passed with `108 passed, 6 skipped` and intentional skips; the replay-replacement case passed after the Windows-safe atomic runtime-writer fix, the 7-minute tutorial capture passed, and the tracked README/tutorial media was regenerated by the verification suite.
 - The GitHub E2E job allows 35 minutes so clean runners can install Playwright OS/browser dependencies before the serialized full suite; this is a CI budget, not a hosted-demo requirement.
 - August 3 hosted media verification: `npm run demo:hosted` passed and regenerated the nonblank README stills for the hero and saved-evidence sections; the capture path does not fetch the GGUF.
@@ -242,5 +255,5 @@ Model/runtime:
 - Current media verification: `npm run demo:record` passed `5`, `npm run demo:tutorial` passed `1`, the regenerated tutorial is about `267s`, and sampled contact sheets/screenshots are nonblank with expected Proof Mode fallback wording.
 - Current export boundary: alert persistence, replay snapshots, dataset samples, and training JSONL carry `visual_model_review` when present; rows with successful visual review export as image/text SFT rows, and rows without visual review remain valid evidence-packet rows.
 - Current public media boundary: generated WebMs stay tracked under `docs/media/videos/` for release assets and local audit; public playback is handled outside GitHub.
-- Current context-bank audit: one compact default orientation route expands to 107.9 KB; focused active routes have no missing references, broad groups, or advisory budget overages, and large binary/media payloads stay out of those routes.
+- Current context-bank audit: one compact default orientation route expands to 111.1 KB across 67 groups; focused active routes have no missing references, broad groups, or advisory budget overages, and large binary/media payloads stay out of those routes.
 - Historical run-by-run details live in `summary_bank.json`; keep this section limited to the latest release-relevant validation state.

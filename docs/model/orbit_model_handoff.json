@@ -24,7 +24,7 @@
     "base_model": "LiquidAI/LFM2.5-VL-450M",
     "quantization": "q4_0",
     "task": "multitask",
-    "browser_manifest": "source/frontend/public/model-manifest.json",
+    "browser_manifest": "source/frontend/hosted/model-manifest.json",
     "browser_capability": "text_reasoning_over_saved_evidence",
     "browser_mmproj": null
   },

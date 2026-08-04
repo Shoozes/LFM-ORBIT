@@ -106,8 +106,10 @@ test("deployed Pages origin serves the project-path static contract", async ({ p
   const modelResponse = await page.request.get(assetUrl("model-manifest.json", hostedPagesUrl));
   expect(packageResponse.ok()).toBe(true);
   expect(contentType(packageResponse)).toMatch(/application\/json/i);
-  expect(modelResponse.ok()).toBe(true);
-  expect(contentType(modelResponse)).toMatch(/application\/json/i);
+  expect(contentType(modelResponse)).not.toMatch(/application\/json/i);
+  if (modelResponse.ok()) {
+    expect(await modelResponse.text()).not.toMatch(/"schemaVersion"\s*:\s*1/);
+  }
 
   const packagePayload = await packageResponse.json();
   expect(packagePayload.packages).toHaveLength(3);
@@ -118,11 +120,8 @@ test("deployed Pages origin serves the project-path static contract", async ({ p
     expect(contentType(response)).toMatch(/^image\//i);
   }
 
-  const wasmPath = scriptSources.flatMap(wasmPathsFromJavaScript)[0];
-  expect(wasmPath).toBeTruthy();
-  const wasmResponse = await page.request.get(assetUrl(wasmPath, hostedPagesUrl));
-  expect(wasmResponse.ok()).toBe(true);
-  expect(contentType(wasmResponse)).toMatch(/application\/wasm/i);
+  expect(scriptSources.flatMap(wasmPathsFromJavaScript)).toEqual([]);
+  expect(scriptSources.some((source) => /huggingface\.co|model-manifest\.json|wllama/i.test(source))).toBe(false);
 
   const faviconResponse = await page.request.get(assetUrl("orbit-mark.svg", hostedPagesUrl));
   expect(faviconResponse.ok()).toBe(true);

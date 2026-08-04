@@ -506,6 +506,9 @@ def test_write_dataset_export_can_include_seeded_cache_records(tmp_path, monkeyp
     monkeypatch.setenv("CANOPY_SENTINEL_DB_PATH", str(db_path))
     monkeypatch.setenv("AGENT_BUS_PATH", str(bus_path))
     monkeypatch.setattr(export_orbit_dataset, "_SEEDED_DATA_DIR", seeded_dir)
+    # Treat the fixture as if it lives inside the repository so a workspace-relative
+    # path leak cannot hide behind pytest's default external temp directory.
+    monkeypatch.setattr(export_orbit_dataset, "_REPO_ROOT", tmp_path)
     monkeypatch.setattr(export_orbit_dataset, "resolve_context_thumb", lambda lat, lng: _png_data_url())
 
     init_db(reset=True)

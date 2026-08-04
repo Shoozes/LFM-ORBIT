@@ -1,6 +1,17 @@
-export const IS_HOSTED_BUILD = ["hosted", "pages"].includes(import.meta.env.MODE) || import.meta.env.VITE_ORBIT_BUILD === "hosted";
-export const HOSTED_ROUTE = IS_HOSTED_BUILD ? import.meta.env.BASE_URL : "/hosted";
-export const HOSTED_MODEL_ENABLED = import.meta.env.VITE_HOSTED_MODEL_ENABLED !== "false";
+import { resolveHostedModelEnabled } from "./hostedConfigCore.js";
+
+const isHostedBuild = ["hosted", "pages"].includes(import.meta.env.MODE) || import.meta.env.VITE_ORBIT_BUILD === "hosted";
+const modelEnabled = resolveHostedModelEnabled(import.meta.env.MODE, import.meta.env.VITE_HOSTED_MODEL_ENABLED);
+
+export const HOSTED_DEPLOYMENT = Object.freeze({
+  isHostedBuild,
+  mode: import.meta.env.MODE,
+  modelEnabled,
+  route: isHostedBuild ? import.meta.env.BASE_URL : "/hosted",
+});
+export const IS_HOSTED_BUILD = HOSTED_DEPLOYMENT.isHostedBuild;
+export const HOSTED_ROUTE = HOSTED_DEPLOYMENT.route;
+export const HOSTED_MODEL_ENABLED = HOSTED_DEPLOYMENT.modelEnabled;
 
 const RELATIVE_ASSET_PATTERN = /^[A-Za-z0-9._/-]+$/;
 

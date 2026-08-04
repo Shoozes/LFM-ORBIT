@@ -1,6 +1,6 @@
 export type BrowserModelCapabilityCore = {
   canFetch: boolean;
-  code: "ready" | "wasm-unavailable" | "storage-unavailable" | "storage-low" | "device-memory-low";
+  code: "ready" | "secure-context-unavailable" | "wasm-unavailable" | "storage-unavailable" | "storage-low" | "device-memory-low";
   deviceMemoryGb: number | null;
   imageInput: false;
   message: string;

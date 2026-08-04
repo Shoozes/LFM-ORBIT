@@ -16,7 +16,24 @@ export type ChatMessage = {
   role: "system" | "user" | "assistant";
   content: string;
 };
-export function useBrowserModel() {
+
+export type BrowserModelController = {
+  cancel: () => void;
+  cancelDownload: () => void;
+  cancelGeneration: () => void;
+  chat: (messages: ChatMessage[]) => Promise<string>;
+  capability: BrowserModelCapability | null;
+  error: string | null;
+  load: () => Promise<void>;
+  manifestStatus: BrowserModelManifestStatus;
+  model: HostedModelManifest | null;
+  modelEnabled: boolean;
+  progress: number;
+  retryManifest: () => void;
+  status: BrowserModelStatus;
+};
+
+export function useBrowserModel(): BrowserModelController {
   const instanceRef = useRef<Wllama | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const [status, setStatus] = useState<BrowserModelStatus>("idle");
@@ -148,6 +165,11 @@ export function useBrowserModel() {
         {
           n_ctx: 2048,
           n_batch: 128,
+          // GitHub Pages does not provide cross-origin isolation by default.
+          // Wllama will otherwise probe SharedArrayBuffer and can select a
+          // thread mode that is fragile on iOS Safari; single-thread mode is
+          // the safer public fallback while isolated local builds may scale.
+          n_threads: globalThis.crossOriginIsolated ? undefined : 1,
           signal: controller.signal,
           progressCallback: ({ loaded, total }) => {
             setProgress(total > 0 ? Math.max(0, Math.min(1, loaded / total)) : 0);

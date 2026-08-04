@@ -32,12 +32,15 @@ function getMsgTypeIcon(msg_type: string): string {
 }
 
 function formatTimestamp(ts: string): string {
-  try {
-    const d = new Date(ts);
+  const d = new Date(ts);
+  if (Number.isFinite(d.getTime())) {
     return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  } catch {
-    return ts.slice(11, 19);
   }
+  return ts.length >= 19 ? ts.slice(11, 19) : "Unknown time";
+}
+
+function formatMetric(value: unknown): string | null {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(3) : null;
 }
 
 async function readBusError(response: Response, fallback: string): Promise<string> {
@@ -61,6 +64,14 @@ type AgentDialogueProps = {
   mission?: Mission | null;
 };
 
+const BUS_INJECT_TIMEOUT_MS = 10_000;
+
+function normalizeBusStats(value: unknown): Record<string, number> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const entries = Object.entries(value).filter(([, entry]) => typeof entry === "number" && Number.isFinite(entry));
+  return entries.length === 0 ? null : Object.fromEntries(entries);
+}
+
 export default function AgentDialogue({ isOpen, mission }: AgentDialogueProps) {
   const [operatorInput, setOperatorInput] = useState("");
   const [isInjecting, setIsInjecting] = useState(false);
@@ -68,9 +79,20 @@ export default function AgentDialogue({ isOpen, mission }: AgentDialogueProps) {
   const [statsError, setStatsError] = useState<string | null>(null);
   const [injectError, setInjectError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const injectAbortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
   const apiBase = getApiBaseUrl();
   const { messages, wsStatus } = useAgentBus();
   const isReplayMission = mission?.mission_mode === "replay";
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      injectAbortRef.current?.abort();
+      injectAbortRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (isOpen && endRef.current) {
@@ -89,13 +111,19 @@ export default function AgentDialogue({ isOpen, mission }: AgentDialogueProps) {
         if (!r.ok) {
           throw new Error(`HTTP ${r.status}`);
         }
-        const nextStats = await r.json() as Record<string, number>;
+        const nextStats = normalizeBusStats(await r.json());
         if (gate.isCurrent(request)) {
-          setStats(nextStats);
-          setStatsError(null);
+          if (nextStats) {
+            setStats(nextStats);
+            setStatsError(null);
+          } else {
+            setStats(null);
+            setStatsError("Bus stats unavailable");
+          }
         }
       } catch {
         if (gate.isCurrent(request)) {
+          setStats(null);
           setStatsError("Bus stats unavailable");
         }
       } finally {
@@ -115,20 +143,33 @@ export default function AgentDialogue({ isOpen, mission }: AgentDialogueProps) {
     if (!msg || isInjecting) return;
     setIsInjecting(true);
     setInjectError(null);
+    const controller = new AbortController();
+    injectAbortRef.current = controller;
+    const timeoutId = window.setTimeout(() => controller.abort(), BUS_INJECT_TIMEOUT_MS);
     try {
       const response = await fetch(`${apiBase}/api/agent/bus/inject`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: msg }),
+        signal: controller.signal,
       });
       if (!response.ok) {
         throw new Error(await readBusError(response, `Bus injection failed with HTTP ${response.status}.`));
       }
-      setOperatorInput("");
+      if (mountedRef.current) setOperatorInput("");
     } catch (error) {
-      setInjectError(error instanceof Error ? error.message : "Bus injection failed.");
+      if (!mountedRef.current) return;
+      setInjectError(
+        error instanceof DOMException && error.name === "AbortError"
+          ? "Bus injection timed out. Confirm the backend is still running."
+          : error instanceof Error
+            ? error.message
+            : "Bus injection failed.",
+      );
     } finally {
-      setIsInjecting(false);
+      window.clearTimeout(timeoutId);
+      if (injectAbortRef.current === controller) injectAbortRef.current = null;
+      if (mountedRef.current) setIsInjecting(false);
     }
   };
 
@@ -221,7 +262,11 @@ export default function AgentDialogue({ isOpen, mission }: AgentDialogueProps) {
           )}
 
           {displayMessages.map((msg) => {
-            const note = msg.payload.note || "";
+            const note = typeof msg.payload.note === "string" ? msg.payload.note : "";
+            const action = typeof msg.payload.action === "string" ? msg.payload.action : null;
+            const severity = typeof msg.payload.severity === "string" ? msg.payload.severity : null;
+            const changeScore = formatMetric(msg.payload.change_score);
+            const confidence = formatMetric(msg.payload.confidence);
             const isHeartbeat = msg.msg_type === "heartbeat";
 
             if (isHeartbeat) {
@@ -266,14 +311,14 @@ export default function AgentDialogue({ isOpen, mission }: AgentDialogueProps) {
                           {msg.cell_id}
                         </span>
                       )}
-                      {msg.payload.severity && (
+                      {severity && (
                         <span className={`uppercase tracking-wider text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                          msg.payload.severity === "critical" ? "border-red-200 text-red-700 bg-red-50" :
-                          msg.payload.severity === "high" ? "border-orange-200 text-orange-700 bg-orange-50" :
-                          msg.payload.severity === "moderate" ? "border-amber-200 text-amber-700 bg-amber-50" :
+                          severity === "critical" ? "border-red-200 text-red-700 bg-red-50" :
+                          severity === "high" ? "border-orange-200 text-orange-700 bg-orange-50" :
+                          severity === "moderate" ? "border-amber-200 text-amber-700 bg-amber-50" :
                           "border-zinc-200 text-zinc-600 bg-zinc-50"
                         }`}>
-                          {msg.payload.severity}
+                          {severity}
                         </span>
                       )}
                       <span className="ml-auto text-[10px] text-zinc-400 shrink-0">
@@ -281,14 +326,14 @@ export default function AgentDialogue({ isOpen, mission }: AgentDialogueProps) {
                       </span>
                     </div>
                     <p className="leading-relaxed text-xs break-words text-zinc-800">{note}</p>
-                    {msg.payload.action && (
-                      <p className="mt-1 text-[11px] text-zinc-500 italic border-l-2 border-zinc-200 pl-2">{msg.payload.action as string}</p>
+                    {action && (
+                      <p className="mt-1 text-[11px] text-zinc-500 italic border-l-2 border-zinc-200 pl-2">{action}</p>
                     )}
-                    {msg.payload.change_score !== undefined && (
+                    {changeScore !== null && (
                       <div className="mt-2 flex gap-3 text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">
-                        <span>Score: <span className="text-zinc-800">{(msg.payload.change_score as number).toFixed(3)}</span></span>
-                        {msg.payload.confidence !== undefined && (
-                          <span>Conf: <span className="text-zinc-800">{(msg.payload.confidence as number).toFixed(3)}</span></span>
+                        <span>Score: <span className="text-zinc-800">{changeScore}</span></span>
+                        {confidence !== null && (
+                          <span>Conf: <span className="text-zinc-800">{confidence}</span></span>
                         )}
                       </div>
                     )}

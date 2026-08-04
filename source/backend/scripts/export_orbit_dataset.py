@@ -44,13 +44,6 @@ def _safe_name(value: str) -> str:
     return cleaned.strip("._") or "sample"
 
 
-def _portable_path(path: Path) -> str:
-    try:
-        return path.resolve().relative_to(_REPO_ROOT).as_posix()
-    except ValueError:
-        return path.name
-
-
 def _sample_id(primary_id: str, cell_id: str) -> str:
     base = _safe_name(primary_id or cell_id or "sample")
     safe_cell = _safe_name(cell_id or "cell")
@@ -767,7 +760,7 @@ def _build_seeded_cache_record(meta_path: Path, *, eval_ratio: float) -> dict[st
         "band_tags": list(spectral_bands.get("requested_bands", [])) if isinstance(spectral_bands.get("requested_bands"), list) else [],
         "derived_indices": list(spectral_bands.get("derived_indices", [])) if isinstance(spectral_bands.get("derived_indices"), list) else [],
         "frames_count": int(meta.get("frames_count") or 0),
-        "seeded_meta_path": _portable_path(meta_path),
+        "seeded_meta_path": meta_path.name,
         "visual_mode": meta.get("visual_mode"),
         "location_name": location_name,
         "region_note": meta.get("region_note"),

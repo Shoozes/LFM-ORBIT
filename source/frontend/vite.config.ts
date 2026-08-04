@@ -1,6 +1,38 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { resolveHostedModelEnabled } from "./hosted/hostedConfigCore.js";
+
+const frontendRoot = path.dirname(fileURLToPath(import.meta.url));
+const hostedModelManifestPath = path.join(frontendRoot, "hosted", "model-manifest.json");
+
+function hostedModelManifestPlugin(enabled: boolean) {
+  const manifest = readFileSync(hostedModelManifestPath, "utf8");
+  return {
+    name: "orbit-hosted-model-manifest",
+    configureServer(server: { middlewares: { use: (handler: (request: { url?: string }, response: { statusCode: number; setHeader: (name: string, value: string) => void; end: (body: string) => void }, next: () => void) => void) => void } }) {
+      if (!enabled) return;
+      server.middlewares.use((request, response, next) => {
+        const pathname = new URL(request.url ?? "/", "http://orbit.local").pathname;
+        if (!pathname.endsWith("/model-manifest.json")) {
+          next();
+          return;
+        }
+        response.statusCode = 200;
+        response.setHeader("Content-Type", "application/json; charset=utf-8");
+        response.end(manifest);
+      });
+    },
+    generateBundle() {
+      if (enabled) {
+        this.emitFile({ type: "asset", fileName: "model-manifest.json", source: manifest });
+      }
+    },
+  };
+}
 
 function resolvePublicBase(mode: string, configuredBase?: string): string {
   const fallback = mode === "pages" ? "/LFM-ORBIT/" : "/";
@@ -15,6 +47,7 @@ function resolvePublicBase(mode: string, configuredBase?: string): string {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, ".", "VITE_");
   const isHostedBuild = mode === "hosted" || mode === "pages";
+  const hostedModelEnabled = resolveHostedModelEnabled(mode, env.VITE_HOSTED_MODEL_ENABLED);
   const publicBase = resolvePublicBase(mode, env.VITE_PUBLIC_BASE);
 
   return {
@@ -26,10 +59,13 @@ export default defineConfig(({ mode }) => {
         transformIndexHtml: {
           order: "pre",
           handler(html: string) {
-            return isHostedBuild ? html.replace("%BASE_URL%main.tsx", "/hosted-main.tsx") : html;
+            if (!isHostedBuild) return html;
+            const entry = hostedModelEnabled ? "/hosted-model-main.tsx" : "/hosted-main.tsx";
+            return html.replace("%BASE_URL%main.tsx", entry);
           },
         },
       },
+      hostedModelManifestPlugin(hostedModelEnabled),
     ],
     base: publicBase,
     server: {

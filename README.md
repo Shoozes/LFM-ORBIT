@@ -165,7 +165,7 @@ Known map targets carry mission context and safe evidence guidance with the came
 
 ![Hosted browser demo](docs/media/readme/readme-hosted-demo.png)
 
-The separate hosted route presents saved evidence packages and local browser inference without backend controls.
+The separate hosted route presents saved evidence packages and optional local browser inference without backend controls. The GitHub Pages artifact is intentionally saved-packages-only until the browser-model redistribution decision is complete.
 
 [Hosted browser demo video](docs/media/videos/hosted-demo.webm) shows the static route, saved-package provenance, and local-model boundary without starting the backend.
 
@@ -177,19 +177,19 @@ The hosted package view keeps the data boundary visible: saved demo evidence is 
 
 ## Validation Snapshot
 
-The table below separates the historical May 8 release snapshot from the current August 4 integrity pass. The current backend suite and hosted frontend route have been rerun locally; the production GGUF launcher path remains a separate heavyweight verification lane.
+The table below separates the historical May 8 release snapshot from the recorded August 4 integrity pass and this hosted-build follow-up. Frontend build checks were rerun locally; backend and live-browser gates remain qualified below. The production GGUF launcher path remains a separate heavyweight verification lane.
 
 | Check | Current State |
 |---|---|
-| Root verify | August 4 `.\run.ps1 -Verify` passed; the optional trained-GGUF runtime smoke remains a separate lane |
-| Backend tests | August 4 full backend suite `557 passed`; the stale Windows venv emitted one Starlette warning because its declared `httpx2` dev extra was not synced |
-| Frontend | typecheck + production build passing; hosted smoke, static preview, and production-preview model proof passing |
-| Pages project path | Saved-packages-only Pages-mode build, `/LFM-ORBIT/` smoke, and no-weight static-origin smoke passing locally; live deployment proof remains separate |
-| Hosted real-model proof | `npm run test:hosted:model:build` fetched the pinned 219 MB GGUF and generated a local response with no backend/API/WebSocket requests |
+| Root verify | Recorded August 4 `.\run.ps1 -Verify` pass; the optional trained-GGUF runtime smoke remains a separate lane |
+| Backend tests | Fresh locked Windows environment: focused import/docs/CI gate `33 passed`; full backend suite `557 passed` with no application failures or `httpx2` warning |
+| Frontend | Fresh typecheck, 17 unit tests, production build, hosted build, default Pages build, and explicit model-enabled Pages build passed; local Chromium launch returned `spawn EPERM`, so no new browser pass is claimed |
+| Pages project path | Fresh fail-closed saved-packages-only build and no-model-runtime artifact audit pass under `/LFM-ORBIT/`; browser smoke and live deployment proof remain separate |
+| Hosted real-model proof | Prior opt-in `npm run test:hosted:model:build` proof fetched the pinned 219 MB GGUF and generated locally with no backend/API/WebSocket requests; it was not rerun in this pass |
 | Playwright E2E | August 4 default suite rerun: `108 passed, 6 skipped` with intentional skips; Pages-only release specs are excluded from this default port-owning suite |
-| Docs/import guards | passing |
-| Option 1 launch | backend `8000` and app `5173` ready |
-| Clean-start smoke | idle on Atacama context, no auto replay, no default scan |
+| Docs/import guards | Fresh focused backend/import/docs/CI gate `33 passed`; full locked backend suite `557 passed` |
+| Option 1 launch | Recorded August 4: backend `8000` and app `5173` ready |
+| Clean-start smoke | Recorded August 4: idle on Atacama context, no auto replay, no default scan |
 | Recorded demos | showcase, tutorial, training journey, payload, provenance, abstain, eclipse |
 | Dataset export | `46` raw replay/cache samples, `34` timelapse rows |
 | Retagged training set | `265` assets, `33` temporal sequences |

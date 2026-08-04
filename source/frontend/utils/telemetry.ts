@@ -378,10 +378,10 @@ export function getApiBaseUrl(): string {
   return "http://127.0.0.1:8000";
 }
 
-export function getWebSocketUrl(apiBaseUrl?: string): string {
+export function getWebSocketUrl(apiBaseUrl?: string, path = "/ws/telemetry"): string {
   const base = apiBaseUrl || getApiBaseUrl();
   const wsBase = base.replace(/^http/, "ws");
-  return `${wsBase}/ws/telemetry`;
+  return `${wsBase}/${path.replace(/^\/+/, "")}`;
 }
 
 function formatSquareGridCoord(value: number): string {

@@ -1,29 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { getApiBaseUrl } from "../utils/telemetry";
+import { mergeAgentMessages, parseAgentBusEnvelope } from "../utils/agentBusCore.js";
+import type { AgentMessage } from "../utils/agentBusCore.js";
+import { getApiBaseUrl, getWebSocketUrl } from "../utils/telemetry";
 
-export type AgentMessage = {
-  id: number;
-  sender: "satellite" | "ground" | "operator" | "broadcast";
-  recipient: string;
-  msg_type: "flag" | "confirmation" | "reject" | "heartbeat" | "status" | "query" | "error";
-  cell_id: string | null;
-  payload: {
-    note?: string;
-    change_score?: number;
-    confidence?: number;
-    severity?: string;
-    action?: string;
-    analysis_summary?: string;
-    findings?: string[];
-    status?: string;
-    cycle?: number;
-    cells_scanned?: number;
-    flags_sent?: number;
-    discard_ratio?: number;
-    [key: string]: unknown;
-  };
-  timestamp: string;
-};
+export type { AgentMessage } from "../utils/agentBusCore.js";
 
 export function useAgentBus() {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
@@ -35,23 +15,49 @@ export function useAgentBus() {
     let reconnectTimer: number | undefined;
     let initialConnectTimer: number | undefined;
     let isActive = true;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 8;
+    const baseReconnectDelayMs = 1000;
+
+    const scheduleReconnect = () => {
+      if (!isActive || reconnectTimer !== undefined || reconnectAttempts >= maxReconnectAttempts) {
+        if (isActive && reconnectAttempts >= maxReconnectAttempts) {
+          setWsStatus("closed");
+        }
+        return;
+      }
+      const delay = Math.min(baseReconnectDelayMs * 2 ** reconnectAttempts, 30_000);
+      reconnectAttempts += 1;
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = undefined;
+        connect();
+      }, delay);
+    };
 
     const connect = () => {
       if (!isActive) return;
-      const wsBase = apiBase.replace(/^http/, "ws");
-      const ws = new WebSocket(`${wsBase}/ws/agent-dialogue`);
+      let ws: WebSocket;
+      try {
+        ws = new WebSocket(getWebSocketUrl(apiBase, "/ws/agent-dialogue"));
+      } catch {
+        setWsStatus("closed");
+        scheduleReconnect();
+        return;
+      }
       wsRef.current = ws;
       setWsStatus("connecting");
 
       ws.onopen = () => {
-        if (!isActive) return;
+        if (!isActive || wsRef.current !== ws) return;
+        reconnectAttempts = 0;
         setWsStatus("open");
       };
 
       ws.onclose = () => {
-        if (!isActive) return;
+        if (!isActive || wsRef.current !== ws) return;
+        wsRef.current = null;
         setWsStatus("closed");
-        reconnectTimer = window.setTimeout(connect, 3000);
+        scheduleReconnect();
       };
 
       ws.onerror = () => {
@@ -59,22 +65,13 @@ export function useAgentBus() {
       };
 
       ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data as string) as {
-            type: string;
-            messages: AgentMessage[];
-          };
-          if (data.type === "history") {
-            setMessages(data.messages);
-          } else if (data.type === "messages") {
-            setMessages((prev) => {
-              const existingIds = new Set(prev.map((m) => m.id));
-              const fresh = data.messages.filter((m) => !existingIds.has(m.id));
-              return [...prev, ...fresh];
-            });
-          }
-        } catch {
-          // ignore parse errors
+        if (!isActive || wsRef.current !== ws) return;
+        const data = parseAgentBusEnvelope(event.data);
+        if (!data) return;
+        if (data.type === "history") {
+          setMessages(mergeAgentMessages([], data.messages));
+        } else {
+          setMessages((prev) => mergeAgentMessages(prev, data.messages));
         }
       };
     };

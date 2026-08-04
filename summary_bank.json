@@ -125,7 +125,7 @@
       ]
     },
     "feature_group_hosted_browser_portfolio": {
-      "description": "Browser-only hosted route, capability-gated local model/package manifests, auditable replay provenance, safe base-aware assets, separated cancellation state, production-preview MIME/model proof, and no-backend smoke coverage.",
+      "description": "Browser-only hosted route with a fail-closed Pages entry, optional HTTPS model/package manifests, auditable replay provenance, safe base-aware assets, separated cancellation state, production-preview MIME/model proof, and no-backend smoke coverage.",
       "files": [
         "docs/user/HOSTED_DEMO.md",
         "source/frontend/e2e/hosted.build.spec.ts",
@@ -136,12 +136,17 @@
         "source/frontend/e2e/hosted.spec.ts",
         "source/frontend/e2e/hostedModelTest.ts",
         "source/frontend/hosted-main.tsx",
+        "source/frontend/hosted-model-main.tsx",
+        "source/frontend/hosted/HostedEvidenceDemo.tsx",
         "source/frontend/hosted/HostedDemo.tsx",
         "source/frontend/hosted/TerrainShaderCanvas.tsx",
         "source/frontend/hosted/demoPackages.ts",
         "source/frontend/hosted/hosted.css",
         "source/frontend/hosted/hostedConfig.ts",
+        "source/frontend/hosted/hostedConfigCore.d.ts",
+        "source/frontend/hosted/hostedConfigCore.js",
         "source/frontend/hosted/hostedModel.ts",
+        "source/frontend/hosted/model-manifest.json",
         "source/frontend/hosted/modelState.ts",
         "source/frontend/hosted/modelStateCore.d.ts",
         "source/frontend/hosted/modelStateCore.js",
@@ -153,10 +158,10 @@
         "source/frontend/playwright.hosted.model.build.config.ts",
         "source/frontend/playwright.hosted.model.config.ts",
         "source/frontend/public/demo-packages/index.json",
-        "source/frontend/public/model-manifest.json",
         "source/frontend/index.html",
         "source/frontend/tsconfig.json",
         "source/frontend/vite.config.ts",
+        "source/frontend/tests/hosted-config.test.mjs",
         "source/frontend/tests/hosted-model.test.mjs"
       ]
     },
@@ -269,8 +274,20 @@
         "source/frontend/utils/requestGateCore.js"
       ]
     },
+    "issue_group_frontend_transport_integrity": {
+      "description": "Validated agent-dialogue WebSocket envelopes, bounded client history, capped reconnect backoff, and timeout-bounded telemetry refreshes.",
+      "files": [
+        "source/frontend/components/AgentDialogue.tsx",
+        "source/frontend/hooks/useAgentBus.ts",
+        "source/frontend/hooks/useTelemetry.ts",
+        "source/frontend/tests/agent-bus-core.test.mjs",
+        "source/frontend/utils/agentBusCore.d.ts",
+        "source/frontend/utils/agentBusCore.js",
+        "source/frontend/utils/telemetry.ts"
+      ]
+    },
     "issue_group_hosted_pages_path_and_deployment": {
-      "description": "Pages project-path base resolution, safe hosted asset routing, complete saved-package visuals, subpath production smoke, post-deploy static-origin verification, and deployment readiness gates.",
+      "description": "Pages project-path base resolution, fail-closed model-free artifact delivery, safe hosted asset routing, complete saved-package visuals, subpath production smoke, post-deploy static-origin verification, and deployment readiness gates.",
       "files": [
         ".github/workflows/pages.yml",
         "docs/dev/TODO.md",
@@ -281,10 +298,15 @@
         "source/frontend/e2e/hosted.pages.spec.ts",
         "source/frontend/e2e/hosted.pages.live.spec.ts",
         "source/frontend/e2e/hosted.pages.live.static.spec.ts",
+        "source/frontend/hosted/HostedEvidenceDemo.tsx",
         "source/frontend/hosted/HostedDemo.tsx",
+        "source/frontend/hosted-model-main.tsx",
         "source/frontend/hosted/demoPackages.ts",
         "source/frontend/hosted/hostedConfig.ts",
+        "source/frontend/hosted/hostedConfigCore.d.ts",
+        "source/frontend/hosted/hostedConfigCore.js",
         "source/frontend/hosted/hostedModel.ts",
+        "source/frontend/hosted/model-manifest.json",
         "source/frontend/index.html",
         "source/frontend/package.json",
         "source/frontend/playwright.config.ts",

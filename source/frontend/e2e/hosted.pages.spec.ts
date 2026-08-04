@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 const PAGES_BASE = process.env.VITE_PUBLIC_BASE ?? "/LFM-ORBIT/";
-const MODEL_ENABLED = process.env.VITE_HOSTED_MODEL_ENABLED !== "false";
+const MODEL_ENABLED = process.env.VITE_HOSTED_MODEL_ENABLED === "true";
 
 test("hosted Pages build stays under the project path", async ({ page }) => {
   const firstPartyRootRequests: string[] = [];
@@ -33,18 +33,19 @@ test("hosted Pages build stays under the project path", async ({ page }) => {
   await expect(page.getByRole("link", { name: /Orbit hosted demo home/i })).toHaveAttribute("href", PAGES_BASE);
   await expect(page.getByRole("link", { name: /Full app \(local\)/i })).toHaveCount(0);
   if (!MODEL_ENABLED) {
-    await expect(page.getByRole("button", { name: "Browser inference unavailable" }).first()).toBeDisabled();
-    await expect(page.getByText(/temporarily unavailable while the public model license is finalized/i)).toBeVisible();
-    await expect(page.getByText(/No model manifest, weight, or remote model request is made by the app/i)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Explore saved evidence" })).toBeVisible();
+    await expect(page.getByTestId("hosted-guided-path")).toBeVisible();
     expect(modelManifestRequests).toEqual([]);
   }
 
   const packageResponse = await page.request.get(new URL("demo-packages/index.json", page.url()).toString());
-  const modelResponse = await page.request.get(new URL("model-manifest.json", page.url()).toString());
   expect(packageResponse.ok()).toBe(true);
   expect(packageResponse.headers()["content-type"]).toMatch(/application\/json/i);
-  expect(modelResponse.ok()).toBe(true);
-  expect(modelResponse.headers()["content-type"]).toMatch(/application\/json/i);
+  if (MODEL_ENABLED) {
+    const modelResponse = await page.request.get(new URL("model-manifest.json", page.url()).toString());
+    expect(modelResponse.ok()).toBe(true);
+    expect(modelResponse.headers()["content-type"]).toMatch(/application\/json/i);
+  }
 
   const packagePayload = await packageResponse.json();
   expect(packagePayload.packages).toHaveLength(3);
@@ -61,15 +62,25 @@ test("hosted Pages build stays under the project path", async ({ page }) => {
   await expect(page).toHaveURL(/#lesson$/);
   await page.getByRole("link", { name: "Saved evidence" }).click();
   await expect(page).toHaveURL(/#evidence$/);
-  await page.getByRole("link", { name: "Fetch model" }).click();
-  await expect(page).toHaveURL(/#model$/);
+  await page.getByRole("link", { name: MODEL_ENABLED ? "Fetch model" : "Review evidence" }).click();
+  await expect(page).toHaveURL(MODEL_ENABLED ? /#model$/ : /#evidence$/);
 
   const assetNames = await readdir(path.resolve(process.cwd(), "dist-pages", "assets"));
   const wasmAsset = assetNames.find((assetName) => assetName.endsWith(".wasm"));
-  expect(wasmAsset).toBeTruthy();
-  const wasmResponse = await page.request.get(new URL(`assets/${wasmAsset}`, page.url()).toString());
-  expect(wasmResponse.ok()).toBe(true);
-  expect(wasmResponse.headers()["content-type"]).toMatch(/application\/wasm/i);
+  if (MODEL_ENABLED) {
+    expect(wasmAsset).toBeTruthy();
+    const wasmResponse = await page.request.get(new URL(`assets/${wasmAsset}`, page.url()).toString());
+    expect(wasmResponse.ok()).toBe(true);
+    expect(wasmResponse.headers()["content-type"]).toMatch(/application\/wasm/i);
+  } else {
+    expect(wasmAsset).toBeUndefined();
+    const distFiles = await readdir(path.resolve(process.cwd(), "dist-pages"), { recursive: true });
+    const modelFiles = distFiles.filter((fileName) => /model-manifest|wllama|\.wasm$/i.test(fileName));
+    expect(modelFiles).toEqual([]);
+    const textFiles = distFiles.filter((fileName) => /\.(?:html|css|js|json|svg)$/i.test(fileName));
+    const textContents = await Promise.all(textFiles.map((fileName) => readFile(path.resolve(process.cwd(), "dist-pages", fileName), "utf8")));
+    expect(textContents.some((content) => /huggingface\.co/i.test(content))).toBe(false);
+  }
 
   const faviconResponse = await page.request.get(new URL("orbit-mark.svg", page.url()).toString());
   expect(faviconResponse.ok()).toBe(true);
